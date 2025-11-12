@@ -1,0 +1,20 @@
+#!/bin/bash
+
+commit_msg_file="$1"
+commit_msg=$(head -n1 "$commit_msg_file")
+
+# Règle : le message doit commencer par [fix|feat] suivi d’un espace et d’un scope (web|mobile|api)
+pattern='^\[(fix|feat|init) (web|mobile|api)\]'
+
+if ! [[ "$commit_msg" =~ $pattern ]]; then
+  echo "❌ Erreur : le message de commit doit commencer par un préfixe valide."
+  echo ""
+  echo "👉 Format attendu : [fix|feat|init] [web|mobile|api] Votre message ici"
+  echo ""
+  echo "Exemples valides :"
+  echo "  [fix web] correction du bouton de connexion"
+  echo "  [feat api] ajout du filtre de recherche"
+  echo ""
+  echo "💡 Astuce : utilise simplement 'git commit' — le hook prepare-commit-msg t’aidera à formater le message."
+  exit 1
+fi

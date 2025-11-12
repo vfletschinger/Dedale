@@ -1,0 +1,38 @@
+#!/bin/bash
+COMMIT_MSG_FILE="$1"
+
+# Ne pas agir si merge/squash/rebase
+if [ -n "$2" ]; then
+  exit 0
+fi
+
+# Forcer le hook à utiliser le terminal pour l’input
+exec < /dev/tty
+
+echo ""
+echo "🧠 Création du message de commit"
+echo "-------------------------------"
+
+# Sélection du type
+echo "Type de changement :"
+select TYPE in "fix" "feat" "init"; do
+  if [[ -n "$TYPE" ]]; then break; fi
+done
+
+# Sélection du module
+echo "Cible du changement :"
+select SCOPE in "web" "mobile" "api"; do
+  if [[ -n "$SCOPE" ]]; then break; fi
+done
+
+PREFIX="[$TYPE $SCOPE] "
+
+# Si le fichier est vide, on insère le préfixe
+if [ ! -s "$COMMIT_MSG_FILE" ]; then
+  echo "$PREFIX" > "$COMMIT_MSG_FILE"
+else
+  sed -i "1s/^/$PREFIX/" "$COMMIT_MSG_FILE"
+fi
+
+echo "✅ Préfixe ajouté : $PREFIX"
+echo ""
