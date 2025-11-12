@@ -2,6 +2,7 @@ import {
   isRouteErrorResponse,
   Links,
   Meta,
+  NavLink,
   Outlet,
   Scripts,
   ScrollRestoration,
@@ -9,22 +10,11 @@ import {
 
 import type { Route } from "./+types/root";
 import "./app.css";
-
-export const links: Route.LinksFunction = () => [
-  { rel: "preconnect", href: "https://fonts.googleapis.com" },
-  {
-    rel: "preconnect",
-    href: "https://fonts.gstatic.com",
-    crossOrigin: "anonymous",
-  },
-  {
-    rel: "stylesheet",
-    href: "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap",
-  },
-];
+import { Button } from "./components/ui/button";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
+
     <html lang="en">
       <head>
         <meta charSet="utf-8" />
@@ -33,7 +23,20 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Links />
       </head>
       <body>
-        {children}
+        <div className="min-h-screen flex flex-col">
+          <nav className="bg-slate-600 text-white p-4 space-x-2">
+            <Button asChild variant="link" className="text-secondary"><NavLink to="/accueil">Accueil</NavLink></ Button>
+            <Button asChild variant="link" className="text-secondary"><NavLink to="/carte" prefetch="intent">Carte</NavLink></Button>
+            <Button asChild variant="link" className="text-secondary"><NavLink to="/equipes" prefetch="intent">Equipes</NavLink></Button>
+            <Button asChild variant="link" className="text-secondary"><NavLink to="/planning" prefetch="intent">Planning</NavLink></Button>
+          </nav>
+          <main className="flex-1 flex flex-row overflow-y-scroll">
+            {children}
+          </main>
+          <footer className="bg-slate-500 text-white p-4 text-center">
+            IUTRS - W51 - 2025
+          </footer>
+        </div>
         <ScrollRestoration />
         <Scripts />
       </body>
