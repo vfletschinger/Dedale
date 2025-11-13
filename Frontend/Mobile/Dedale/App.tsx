@@ -10,6 +10,8 @@ import RegisterPointScreen from "./src/screens/RegisterPoint";
 
 import type { TabParamList, RootStackParamList } from "./src/types/navigation";
 import { NavigationContainer } from "@react-navigation/native";
+import { useEffect, useState } from "react";
+import getDatabase from "./assets/migrations";
 
 const Tab = createBottomTabNavigator<TabParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -30,6 +32,23 @@ function TabNavigator() {
 }
 
 export default function App() {
+   const [dbReady, setDbReady] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function initDatabase() {
+      try {
+        // Initialiser la base de données
+        getDatabase();
+        setDbReady(true);
+      } catch (err) {
+        console.error('Erreur initialisation DB:', err);
+        setError(err instanceof Error ? err.message : 'Erreur inconnue');
+      }
+    }
+
+    initDatabase();
+  }, []);
   return (
     <NavigationContainer>
       <Stack.Navigator>
