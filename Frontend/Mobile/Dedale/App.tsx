@@ -34,7 +34,7 @@ function TabNavigator() {
 export default function App() {
    const [dbReady, setDbReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
+const db = getDatabase({ seed: __DEV__ });
   useEffect(() => {
     async function initDatabase() {
       try {

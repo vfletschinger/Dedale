@@ -1,5 +1,5 @@
 import { View, Text, Pressable } from "react-native";
-
+import React from "react";
 import "../style/global.css";
 import CustomButton from "../components/CustomButton";
 
