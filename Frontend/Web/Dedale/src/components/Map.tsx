@@ -1,22 +1,30 @@
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
+import React, { useRef, useEffect } from 'react';
+import maplibregl from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
 
+function OfflineMapLibre() {
+  const mapContainer = useRef<HTMLDivElement | null>(null);
 
+  useEffect(() => {
+    if (!mapContainer.current) return;
 
-function Map() {
-  return (
-    <MapContainer center={[51.505, -0.09]} zoom={13} scrollWheelZoom={true} style={{ height: "100vh", width: "100%" }}>
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
-      <Marker position={[51.505, -0.09]}>
-        <Popup>
-          A pretty CSS3 popup. <br /> Easily customizable.
-        </Popup>
-      </Marker>
-    </MapContainer>
-  );
+    const map = new maplibregl.Map({
+      container: mapContainer.current,
+      style: 'http://localhost:8080/styles/basic-preview/style.json', // <-- ton style fonctionne
+      center: [7.7635, 48.5465], // Strasbourg [lon, lat]
+      zoom: 13
+    });
+
+    // Marker exemple
+    new maplibregl.Marker()
+      .setLngLat([7.7635, 48.5465])
+      .setPopup(new maplibregl.Popup().setText('Strasbourg !'))
+      .addTo(map);
+
+    return () => map.remove();
+  }, []);
+
+  return <div ref={mapContainer} style={{ height: '100vh', width: '100%' }} />;
 }
 
-export default Map;
+export default OfflineMapLibre;

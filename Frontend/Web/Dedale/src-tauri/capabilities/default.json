@@ -2,7 +2,9 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Capability for the main window",
-  "windows": ["main"],
+  "windows": [
+    "main"
+  ],
   "permissions": [
     "core:default",
     "opener:default",
@@ -10,6 +12,14 @@
     "sql:allow-load",
     "sql:allow-execute",
     "sql:allow-close",
-    "sql:allow-select"
+    "sql:allow-select",
+    {
+  "identifier": "http:default",
+  "allow": [
+    "http://localhost:8080/*",
+    "https://*.tauri.app"
+           ]
+    }
   ]
+  
 }

@@ -1,11 +1,8 @@
 // On importe les dépendances nécessaires
 use tauri_plugin_sql::{Builder, Migration, MigrationKind};
 
-
 // Elle renvoie le plugin SQL entièrement configuré
 pub fn init_db() -> impl tauri::plugin::Plugin<tauri::Wry> {
-    
-
     let migrations = vec![
         Migration {
             version: 1,
@@ -55,7 +52,7 @@ pub fn init_db() -> impl tauri::plugin::Plugin<tauri::Wry> {
                 );
             ",
             kind: MigrationKind::Up,
-        }
+        },
     ];
 
     // On construit et renvoie le plugin
