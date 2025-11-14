@@ -12,7 +12,8 @@ export default function InterestPointsScreen() {
         className="btn"
       >
         <Text className="btn-text">Press Me</Text>
-      </Pressable>
+      </Pressable>    
+
     </View>
   );
 }
