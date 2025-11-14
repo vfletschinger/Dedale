@@ -1,16 +1,17 @@
 import { View, Text, FlatList, ActivityIndicator } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import { Pressable } from "react-native";
 import React, { useEffect, useState } from "react";
 import { InterestPointsType } from "../types/database";
 import getDatabase from "../../assets/migrations";
+
 
 export default function InterestPointsScreen() {
   const navigation = useNavigation();
   const [listPoint, setListPoint] = useState<InterestPointsType[]>([]);
   const db = getDatabase();
   const [loading, setLoading] = useState(true);
-  
+
   const fetchInterestePoint = async () => {
     try {
       const points = db.getAllSync<InterestPointsType>(
@@ -51,7 +52,7 @@ export default function InterestPointsScreen() {
           keyExtractor={(item) => item.id.toString()}
           renderItem={({ item }) => (
             <Pressable
-              onPress={() => navigation.navigate("CreateRoute" as never)}
+              onPress={() => navigation.navigate("PointDetails", { pointId: item.id })}
               className="bg-blue-500 p-4 rounded-lg mb-3 active:bg-blue-600"
             >
               <Text className="text-white font-semibold text-lg">
