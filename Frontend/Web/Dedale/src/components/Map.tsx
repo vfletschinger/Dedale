@@ -10,12 +10,11 @@ function OfflineMapLibre() {
 
     const map = new maplibregl.Map({
       container: mapContainer.current,
-      style: 'http://localhost:8080/styles/basic-preview/style.json', // <-- ton style fonctionne
-      center: [7.7635, 48.5465], // Strasbourg [lon, lat]
+      style: 'http://localhost:8080/styles/basic-preview/style.json',
+      center: [7.7635, 48.5465],
       zoom: 13
     });
 
-    // Marker exemple
     new maplibregl.Marker()
       .setLngLat([7.7635, 48.5465])
       .setPopup(new maplibregl.Popup().setText('Strasbourg !'))
