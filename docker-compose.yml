@@ -1,0 +1,44 @@
+services:
+  frontend:
+    hostname: nginx-dedale
+    profiles: [dev, production]
+    build:
+      context: ./Frontend/web
+      dockerfile: Dockerfile.dev
+      args:
+        NODE_ENV: dev
+    develop:
+      watch:
+        - action: sync
+          path: ./Frontend/web/app
+          target: /app/app
+        - action: rebuild
+          path: ./Frontend/web/package.json
+          target: /app/package.json
+    ports:
+      - "3000:5173"
+    depends_on:
+      - backend-api
+      
+  backend-api:
+    build:
+      context: ./Backend
+      dockerfile: Dockerfile
+    develop:
+      watch:
+        - action: sync
+          path: ./Backend/api/src
+          target: /app/src
+          ignore:
+            - node_modules/
+        - action: sync
+          path: ./Backend/api/prisma
+          target: /app/prisma
+        - action: rebuild
+          path: ./Backend/api/package.json
+          target: /app/package.json
+    ports:
+      - "8000:3000"
+    environment:
+      - DATABASE_URL=sqlite://root:rootpassword@db:3306/database
+    command: npm run start:dev
