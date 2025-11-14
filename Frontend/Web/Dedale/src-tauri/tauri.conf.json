@@ -13,11 +13,11 @@
     "windows": [
       {
         "title": "dedale",
-        "width": 800,
-        "height": 600
+        "width": 1200,
+        "height": 800
       }
-    ],
-    "security": {
+],
+"security": {
       "csp": null
     }
   },
@@ -31,5 +31,10 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "sql": {
+      "allow": ["sqlite:mydatabase.db"]
+    }
   }
 }
