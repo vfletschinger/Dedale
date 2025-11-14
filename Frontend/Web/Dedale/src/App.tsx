@@ -102,7 +102,6 @@ function Navigation({ page, setPage }: { page: string, setPage: (page: string) =
 
 }
 
-// --- Composant Principal de l'App ---
 
 function App() {
   const [db, setDb] = useState<Database | null>(null);
@@ -117,18 +116,12 @@ function App() {
         setDb(dbInstance);
       } catch (e: any) {
         console.error("Erreur connexion BDD:", e);
-        // On simule que la BDD est connectée pour que l'aperçu fonctionne
-        // L'erreur s'affichera sur l'erreur de BDD
         setError("Erreur de connexion BDD (simulée pour aperçu): " + e.message);
-        // Dans un environnement de prévisualisation, @tauri-apps/plugin-sql ne fonctionnera pas.
-        // On pourrait mettre une valeur "mock" si on voulait que l'UI s'affiche quand même.
-        // Pour l'instant, on laisse l'erreur s'afficher.
       }
     };
     initDb();
   }, []);
 
-  // Choisir la page à afficher
   const renderPage = () => {
     if (error) {
       return <p className="text-red-600 text-center">Erreur: {error}</p>;
