@@ -9,6 +9,7 @@ export default function CreateRouteScreen() {
       <Pressable onPress={() => navigation.goBack()} className="back-btn">
         <Text className="back-btn-text">←</Text>
       </Pressable>
+      <Text>CreateRoute.tsx</Text>
     </View>
   );
 }
