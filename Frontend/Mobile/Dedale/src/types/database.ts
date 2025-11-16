@@ -9,6 +9,7 @@ export type PointDetailType = InterestPointsType & {
     description: string;
     length: number;
     name: string;
-    path: string;
+    image: string;
     width: number;
+    point_id: number
 }

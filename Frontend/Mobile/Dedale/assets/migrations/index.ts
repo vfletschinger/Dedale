@@ -9,7 +9,6 @@ export function getDatabase(options?: { seed?: boolean }): SQLiteDatabase {
     db = openDatabaseSync('database.sqlite');
     runMigrations(db);
     
-    // Seed si demandé
     if (options?.seed) {
       seedDatabase(db);
     }

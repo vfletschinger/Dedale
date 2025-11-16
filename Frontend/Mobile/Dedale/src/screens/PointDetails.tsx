@@ -1,4 +1,4 @@
-import { View, Text, ActivityIndicator, ScrollView } from "react-native";
+import { View, Text, ActivityIndicator, ScrollView, Image } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { Pressable } from "react-native";
 import React, { useEffect, useState } from "react";
@@ -16,10 +16,9 @@ export default function PointDetails() {
   const [loading, setLoading] = useState(true);
 
   const fetchPoint = async () => {
-    console.log('Récupération du point:', pointId);
     try {
       const pointInf = db.getFirstSync<PointDetailType>(
-        `SELECT ip.*, ot.*, c.*, p.*
+        `SELECT ip.*, ot.*, c.*, p.*, ip.id as "point_id"
          FROM interest_points ip
          LEFT JOIN obstacles o ON ip.id = o.point_id
          LEFT JOIN obstacle_types ot ON ot.id = o.type_id
@@ -28,7 +27,6 @@ export default function PointDetails() {
          WHERE ip.id = ?`,
         [pointId]
       );
-      console.log('Point trouvé:', pointInf);
       setDetailsPoint(pointInf);
     } catch (e) {
       console.log('Erreur:', e);
@@ -52,12 +50,12 @@ export default function PointDetails() {
   return (
     <ScrollView className="flex-1 bg-white p-4">
       <Pressable onPress={() => navigation.goBack()} className="mb-4">
-        <Text className="text-2xl">← Retour</Text>
+        <Text className="back-btn-text">←</Text>
       </Pressable>
 
       {detailsPoint ? (
         <View>
-          <Text className="text-3xl font-bold mb-4">Point #{detailsPoint.id}</Text>
+          <Text className="text-3xl font-bold mb-4">Point #{detailsPoint.point_id}</Text>
           
           <View className="bg-gray-100 p-4 rounded-lg mb-4">
             <Text className="text-lg font-semibold mb-2">Coordonnées</Text>
@@ -94,17 +92,19 @@ export default function PointDetails() {
             </View>
           )}
 
-          {detailsPoint.path && (
+          {detailsPoint.image && (
             <View className="bg-gray-100 p-4 rounded-lg mb-4">
-              <Text className="text-lg font-semibold mb-2">Chemin</Text>
-              <Text>{detailsPoint.path}</Text>
+              <Text className="text-lg font-semibold mb-2">Image</Text>
+              <Image 
+                source={{ uri: detailsPoint.image }}
+                className="w-full h-64"
+                resizeMode="cover"
+              />
             </View>
           )}
         </View>
       ) : (
-        <Text className="text-center text-gray-500 mt-8">
-          Point introuvable
-        </Text>
+        <Text>Aucun détail disponible</Text>
       )}
     </ScrollView>
   );
