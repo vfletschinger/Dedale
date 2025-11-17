@@ -86,12 +86,11 @@ if (envFile.exists()) {
     envFile.withInputStream { envProps.load(it) }
 }
 
-// Define a flavor dimension to resolve variant matching conflicts.
-flavorDimensions "build_type"
-
 android {
     ndkVersion rootProject.ext.ndkVersion
 
+    // Define a flavor dimension to resolve variant matching conflicts.
+    flavorDimensions "build_type"
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
