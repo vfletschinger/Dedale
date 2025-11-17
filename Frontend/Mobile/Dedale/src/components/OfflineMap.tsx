@@ -1,6 +1,6 @@
 import * as React from "react";
 import { View, StyleSheet, Text, Platform } from "react-native";
-import MapView, { PROVIDER_DEFAULT, UrlTile } from "react-native-maps";
+import MapView, { PROVIDER_DEFAULT, Region, UrlTile } from "react-native-maps";
 import Constants from "expo-constants";
 
 interface OfflineMapProps {
@@ -13,66 +13,39 @@ interface OfflineMapProps {
 }
 
 export default function OfflineMap({ initialRegion }: OfflineMapProps) {
-  const [tileUrlTemplate, setTileUrlTemplate] = React.useState<string>("");
-
-  // Région par défaut centrée sur Strasbourg
+  // Default region centered on Strasbourg
   const defaultRegion = {
     latitude: 48.5734,
     longitude: 7.7521,
     latitudeDelta: 0.01,
     longitudeDelta: 0.01,
   };
-
   const region = initialRegion || defaultRegion;
 
-  React.useEffect(() => {
-    // Déterminer l'URL de base pour les tuiles
-    if (__DEV__) {
-      // En mode développement avec Expo Go, utiliser un serveur local
-      const manifest = Constants.expoConfig;
-      const hostUri = manifest?.hostUri;
-      if (hostUri) {
-        // Utiliser le serveur de tuiles sur le port 3000
-        const host = hostUri.split(":")[0];
-        const baseUrl = `http://${host}:3000/maps`;
-        setTileUrlTemplate(`${baseUrl}/{z}/{x}/{y}.png`);
-        console.log("Mode Expo Go - URL tuiles:", baseUrl);
-      }
-    } else {
-      // En production, utiliser les assets natifs
-      const path =
-        Platform.select({
-          android: "file:///android_asset/maps/{z}/{x}/{y}.png",
-          ios: "file://maps/{z}/{x}/{y}.png",
-        }) || "file:///android_asset/maps/{z}/{x}/{y}.png";
-      setTileUrlTemplate(path);
+  // Determine the tile URL template based on the environment.
+  // This logic runs only once per render, simplifying the component.
+  const getTileUrlTemplate = () => {
+    if (__DEV__ && Constants.expoConfig?.hostUri) {
+      // In development with Expo Go, use a local tile server.
+      const host = Constants.expoConfig.hostUri.split(":")[0];
+      const baseUrl = `http://${host}:3000/maps`;
+      console.log("Expo Go mode - Tile URL:", baseUrl);
+      return `${baseUrl}/{z}/{x}/{y}.png`;
     }
-  }, []);
-
-  const handleRegionChange = (region: any) => {
-    const zoom = Math.round(Math.log(360 / region.longitudeDelta) / Math.LN2);
-    console.log(
-      `Région changée - Zoom: ${zoom}, Centre: ${region.latitude.toFixed(4)}, ${region.longitude.toFixed(4)}`
-    );
-    if (tileUrlTemplate) {
-      console.log(
-        `Exemple tuile à charger: ${tileUrlTemplate.replace("{z}", zoom.toString())}`
-      );
-    }
+    // In production, use native assets.
+    return Platform.OS === "android"
+      ? "file:///android_asset/maps/{z}/{x}/{y}.png"
+      : "file://maps/{z}/{x}/{y}.png";
   };
 
-  if (!tileUrlTemplate) {
-    return (
-      <View
-        style={[
-          styles.container,
-          { justifyContent: "center", alignItems: "center" },
-        ]}
-      >
-        <Text>Chargement de la carte...</Text>
-      </View>
+  const tileUrlTemplate = getTileUrlTemplate();
+
+  const handleRegionChange = (region: Region) => {
+    const zoom = Math.round(Math.log(360 / region.longitudeDelta) / Math.LN2);
+    console.log(
+      `Region changed - Zoom: ${zoom}, Center: ${region.latitude.toFixed(4)}, ${region.longitude.toFixed(4)}`
     );
-  }
+  };
 
   return (
     <View style={styles.container}>

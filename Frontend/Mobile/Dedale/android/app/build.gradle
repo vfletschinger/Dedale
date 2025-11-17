@@ -85,6 +85,10 @@ def envProps = new Properties()
 if (envFile.exists()) {
     envFile.withInputStream { envProps.load(it) }
 }
+
+// Define a flavor dimension to resolve variant matching conflicts.
+flavorDimensions "build_type"
+
 android {
     ndkVersion rootProject.ext.ndkVersion
 
@@ -103,9 +107,6 @@ android {
         manifestPlaceholders = [
             googleMapsApiKey: envProps.getProperty('GOOGLE_MAPS_API_KEY', 'YOUR_API_KEY_HERE')
         ]
-        // This is the fix for the "No matching variant" error
-        missingDimensionStrategy 'build_type', 'debug'
-
     }
     signingConfigs {
         debug {
@@ -129,6 +130,13 @@ android {
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
             def enablePngCrunchInRelease = findProperty('android.enablePngCrunchInReleaseBuilds') ?: 'true'
             crunchPngs enablePngCrunchInRelease.toBoolean()
+        }
+    }
+    // Define product flavors to match the dimension.
+    // This helps Gradle correctly select library variants.
+    productFlavors {
+        debug {
+            dimension "build_type"
         }
     }
     packagingOptions {
