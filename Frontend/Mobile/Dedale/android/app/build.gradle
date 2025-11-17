@@ -106,7 +106,11 @@ android {
         manifestPlaceholders = [
             googleMapsApiKey: envProps.getProperty('GOOGLE_MAPS_API_KEY', 'YOUR_API_KEY_HERE')
         ]
-        missingDimensionStrategy 'build_type', 'rn'
+        // For dependencies that do not have a 'build_type' flavor, default to the 'rn' flavor.
+        missingDimensionStrategy 'build_type', 'rn', 'general'
+        // For dependencies that do not have a 'release' build type, fall back to 'debug'.
+        // This is common for many React Native libraries.
+        missingDimensionStrategy 'buildType', 'debug'
     }
     signingConfigs {
         debug {
