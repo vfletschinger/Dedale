@@ -12,7 +12,16 @@
       "distribution": "internal"
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "production-debug": {
+      "extends": "production",
+      "android": {
+        "gradleCommand": ":app:assembleRelease -PminifyEnabled=false"
+      }
     }
   },
   "submit": {
