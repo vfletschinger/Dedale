@@ -134,7 +134,7 @@ android {
     // Define product flavors to match the dimension.
     // This helps Gradle correctly select library variants.
     productFlavors {
-        debug {
+        rn {
             dimension "build_type"
         }
     }
