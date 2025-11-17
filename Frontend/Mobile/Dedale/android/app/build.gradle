@@ -106,6 +106,7 @@ android {
         manifestPlaceholders = [
             googleMapsApiKey: envProps.getProperty('GOOGLE_MAPS_API_KEY', 'YOUR_API_KEY_HERE')
         ]
+        missingDimensionStrategy 'build_type', 'rn'
     }
     signingConfigs {
         debug {
