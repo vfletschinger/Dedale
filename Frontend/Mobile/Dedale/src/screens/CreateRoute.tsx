@@ -1,6 +1,6 @@
-import { View, Text } from "react-native";
+import React from "react";
+import { View, Text, Pressable } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { Pressable } from "react-native";
 
 export default function CreateRouteScreen() {
   const navigation = useNavigation();

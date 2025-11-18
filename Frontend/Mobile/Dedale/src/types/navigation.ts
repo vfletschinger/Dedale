@@ -1,11 +1,11 @@
 export type TabParamList = {
   Home: undefined;
-  CreateRoute: undefined;
+  PointDetails: undefined;
   InterestPoints: undefined;
   RegisterPoint: undefined;
 };
 
 export type RootStackParamList = {
-  CreateRoute: undefined;
+  PointDetails: undefined;
   Tabs: undefined;
 };

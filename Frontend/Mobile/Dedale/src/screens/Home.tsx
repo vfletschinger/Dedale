@@ -1,7 +1,9 @@
+import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import OfflineMap from "../components/OfflineMap";
 
 import "../style/global.css";
+import CustomButton from "../components/CustomButton";
 
 export default function HomeScreen() {
   return (
