@@ -28,6 +28,7 @@ export default function PointDetails() {
         [pointId]
       );
       setDetailsPoint(pointInf);
+      console.log('Point:', pointInf?.image ? 'Image exists' : 'No image');
     } catch (e) {
       console.log('Erreur:', e);
     } finally {
