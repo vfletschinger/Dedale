@@ -1,25 +1,22 @@
-import React, { useRef, useEffect, useState } from "react";
-import maplibregl from "maplibre-gl";
-import "maplibre-gl/dist/maplibre-gl.css";
+import React, { useRef, useEffect, useState } from 'react';
+import maplibregl from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
 
 function OfflineMapLibre() {
   const mapContainer = useRef<HTMLDivElement | null>(null);
+  const [map, setMap] = useState<maplibregl.Map | null>(null);
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<any[]>([]);
+  const [currentMarker, setCurrentMarker] = useState<maplibregl.Marker | null>(null);
 
-  const mapRef = useRef<maplibregl.Map | null>(null);
-  const markerRef = useRef<maplibregl.Marker | null>(null);
-
-  let [inputValue, setInputValue] = useState("");
-  let [location, setLocation] = useState([7.7635, 48.5465]); 
-
-  //Création de la map et du marker une seule fois
+  // Initialisation de la carte
   useEffect(() => {
     if (mapRef.current || !mapContainer.current) return; 
 
-    // Création de la carte
-    mapRef.current = new maplibregl.Map({
+    const mapInstance = new maplibregl.Map({
       container: mapContainer.current,
-      style: "http://localhost:8080/styles/basic-preview/style.json",
-      center: [location[0], location[1]],
+      style: 'http://localhost:8080/styles/basic-preview/style.json',
+      center: [7.7635, 48.5465],
       zoom: 13,
     });
     
@@ -29,47 +26,106 @@ function OfflineMapLibre() {
       .setPopup(new maplibregl.Popup().setText("Strasbourg !"))
       .addTo(mapRef.current);
 
-    return () => {
-      mapRef.current?.remove();
-      mapRef.current = null;
-    };
-  }, []); 
-  
-  // Mise à jour de la position du marker et du centre de la map à chaque changement de location
-  useEffect(() => {
-    if (!mapRef.current || !markerRef.current) return;
-    markerRef.current.setLngLat([location[0], location[1]]);
-    mapRef.current.setCenter([location[0], location[1]]);
-  }, [location]);
+    const initialMarker = new maplibregl.Marker()
+      .setLngLat([7.7635, 48.5465])
+      .setPopup(new maplibregl.Popup().setText('Strasbourg !'))
+      .addTo(mapInstance);
 
-  const getLocation = (value: string) => {
-    setLocation([7.6, 48.5]);
+    setCurrentMarker(initialMarker);
+    setMap(mapInstance);
+
+    return () => mapInstance.remove();
+  }, []);
+
+  // Fonction pour sélectionner une suggestion
+  const handleSelect = (place: any) => {
+    if (!map) return;
+
+    const { lon, lat, display_name } = place;
+
+    if (currentMarker) currentMarker.remove();
+
+    const marker = new maplibregl.Marker()
+      .setLngLat([parseFloat(lon), parseFloat(lat)])
+      .setPopup(new maplibregl.Popup().setText(display_name))
+      .addTo(map);
+
+    setCurrentMarker(marker);
+
+    map.flyTo({ center: [parseFloat(lon), parseFloat(lat)], zoom: 15 });
+
+    setQuery(display_name);
+    setResults([]);
   };
 
+  // Debounce pour limiter les appels à Nominatim
+  useEffect(() => {
+    if (!query) {
+      setResults([]);
+      return;
+    }
+
+    const timeout = setTimeout(async () => {
+      try {
+        const response = await fetch(
+          `http://localhost:8081/search?q=${encodeURIComponent(query)}&format=json&limit=5`
+        );
+        const data = await response.json();
+        setResults(data);
+      } catch (error) {
+        console.error('Erreur recherche adresse :', error);
+      }
+    }, 300); // délai 300ms après la dernière frappe
+
+    return () => clearTimeout(timeout);
+  }, [query]);
+
   return (
-    <div className="flex flex-col w-full h-screen">
-      {" "}
-      {/* Input au-dessus de la map */}{" "}
-      <div className="p-4 bg-white shadow-md z-10">
-        {" "}
-        <form
-          onSubmit={(e) => {
-            e.preventDefault(); // Empêche le refresh
-            getLocation(inputValue);
-          }}
-        >
-          {" "}
-          <input
-            type="text"
-            placeholder="search"
-            className="w-full p-2 border border-black-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-          />{" "}
-        </form>{" "}
-      </div>{" "}
-      {/* Map */} 
-      <div ref={mapContainer} className="flex-1 h-full" />{" "}
+    <div style={{ position: 'relative', height: '100vh', width: '100%' }}>
+      {/* Barre de recherche */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 10,
+          left: 10,
+          zIndex: 10,
+          backgroundColor: 'white',
+          padding: '5px',
+          borderRadius: '4px',
+          boxShadow: '0 0 5px rgba(0,0,0,0.3)',
+          width: '300px',
+        }}
+      >
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Rechercher une adresse..."
+          style={{ padding: '5px', width: '100%' }}
+        />
+
+        {/* Liste de suggestions */}
+        {results.length > 0 && (
+          <div style={{ marginTop: '5px', maxHeight: '150px', overflowY: 'auto' }}>
+            {results.map((r, i) => (
+              <div
+                key={i}
+                style={{
+                  padding: '5px',
+                  cursor: 'pointer',
+                  borderBottom: '1px solid #ddd',
+                }}
+                onClick={() => handleSelect(r)}
+              >
+                {r.display_name}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Conteneur de la carte */}
+      <div ref={mapContainer} style={{ height: '100%', width: '100%' }} />
     </div>
   );
 }
