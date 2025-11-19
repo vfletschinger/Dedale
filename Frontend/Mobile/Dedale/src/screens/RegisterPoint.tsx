@@ -1,4 +1,4 @@
-import { View, Text, Alert, Modal, TextInput, StyleSheet, Image } from "react-native";
+import { View, Text, Alert, Modal, TextInput, StyleSheet, Image, Pressable } from "react-native";
 import React, { useEffect, useState, useRef } from "react";
 import CustomButton from "../components/CustomButton";
 import MapView from "react-native-maps";
@@ -42,8 +42,8 @@ export default function RegisterPointScreen() {
         mapRef.current.animateToRegion({
           latitude: newCoords.latitude,
           longitude: newCoords.longitude,
-          latitudeDelta: 0.003,
-          longitudeDelta: 0.003,
+          latitudeDelta: 0.002,
+          longitudeDelta: 0.002,
         }, 800);
       } catch (e) {
           // ignore animate errors
@@ -65,7 +65,6 @@ export default function RegisterPointScreen() {
         quality: 0.7,
       });
 
-      // compatibilité avec différentes versions de expo-image-picker
       const uri = result?.assets?.[0]?.uri ?? result?.uri;
       if (uri) {
         setSelectedImage(uri);
@@ -76,8 +75,7 @@ export default function RegisterPointScreen() {
     }
   };
 
-
-const savePointToDB = async (x: number, y: number, commentValue: string = '') => {
+  const savePointToDB = async (x: number, y: number, commentValue: string = '') => {
   if (!commentValue.trim()) {
     Alert.alert('Erreur', 'Veuillez entrer un commentaire pour le point.');
     return null;
@@ -142,9 +140,9 @@ const savePointToDB = async (x: number, y: number, commentValue: string = '') =>
     Alert.alert('Erreur', "Impossible d'enregistrer le point et son commentaire.");
     return null;
   }
-};
+  };
 
-const getSavedPoints = () => {
+  const getSavedPoints = () => {
   try {
     const results = db.getAllSync('SELECT * FROM interest_points');
     console.log("Saved Points:", results);
@@ -154,9 +152,9 @@ const getSavedPoints = () => {
     Alert.alert('Erreur', 'Impossible de récupérer les points enregistrés.');
     return [];
   }
-};
+  };
 
-const getSavedComments = () => {
+  const getSavedComments = () => {
   try {
     const results = db.getAllSync('SELECT * FROM comments');
     console.log("Saved Comments:", results);
@@ -166,9 +164,9 @@ const getSavedComments = () => {
     Alert.alert('Erreur', 'Impossible de récupérer les commentaires enregistrés.');
     return [];
   }
-};
+  };
 
-const getSavedPictures = () => {
+  const getSavedPictures = () => {
   try {
     const results = db.getAllSync('SELECT * FROM pictures');
     console.log("Saved Pictures:", results);
@@ -178,38 +176,44 @@ const getSavedPictures = () => {
     Alert.alert('Erreur', 'Impossible de récupérer les images enregistrées.');
     return [];
   }
-};
+  };
 
   return (
-    <View className="flex-1">
-      <Text className="text-center mt-4">Register Point Screen</Text>
-      
-      <CustomButton 
-        title="Obtenir ma position" 
-        onPress={requestLocation}
-      />
-      <CustomButton 
-        title="Ajouter un commentaire et enregistrer le point" 
-        onPress={() => setIsModalVisible(true)}
-      />
-      
+    <View style={styles.container}>
       {coords ? (
         <MapView
           ref={ref => { mapRef.current = ref }}
-          style={{ width: '100%', height: '80%' }}
+          style={styles.map}
           initialRegion={{
             latitude: coords.latitude,
             longitude: coords.longitude,
             latitudeDelta: 0.003,
             longitudeDelta: 0.003,
           }}
-          showsUserLocation={true}
+          showsUserLocation
         />
       ) : (
-        <View style={{ width: '100%', height: '80%', justifyContent: 'center', alignItems: 'center' }}>
-          <Text>Position non disponible</Text>
+        <View style={styles.map}>
+          <Text>Chargement de la carte...</Text>
         </View>
       )}
+
+      <View style={styles.buttonContainer}>
+        <Pressable
+          onPress={requestLocation}
+          style={[styles.button, { backgroundColor: '#8B5CF6' }]}
+        >
+          <Text style={styles.buttonText}>Obtenir ma position</Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => setIsModalVisible(true)}
+          style={[styles.button, { backgroundColor: '#8B5CF6' }]}
+        >
+          <Text style={styles.buttonText}>Ajouter un point</Text>
+        </Pressable>
+      </View>
+
       <Modal
         visible={isModalVisible}
         transparent={true}
@@ -220,7 +224,7 @@ const getSavedPictures = () => {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Ajouter un commentaire</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input,{marginBottom: 10}]}
               placeholder="Entrez le commentaire du point"
               value={pointComment}
               onChangeText={setPointComment}
@@ -265,6 +269,11 @@ const getSavedPictures = () => {
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   modalContainer: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -287,5 +296,29 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 10,
     marginBottom: 12,
+  },
+  map: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  buttonContainer: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  button: {
+    flex: 1,
+    padding: 15,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
 });
