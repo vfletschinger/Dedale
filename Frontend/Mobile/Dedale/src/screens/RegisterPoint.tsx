@@ -3,10 +3,13 @@ import { useState } from "react";
 import CustomButton from "../components/CustomButton";
 import MapView from "react-native-maps";
 import React from "react";
-import * as Location from 'expo-location';
+import * as Location from "expo-location";
 
 export default function RegisterPointScreen() {
-  const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [location, setLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
   const [coords, setCoords] = useState({
     latitude: 48.8566, // Coordonnées par défaut (Paris)
     longitude: 2.3522,
@@ -14,8 +17,11 @@ export default function RegisterPointScreen() {
 
   const requestLocation = async () => {
     let { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission refusée', 'Impossible d\'accéder à la localisation.');
+    if (status !== "granted") {
+      Alert.alert(
+        "Permission refusée",
+        "Impossible d'accéder à la localisation."
+      );
       return null;
     }
 
@@ -34,14 +40,11 @@ export default function RegisterPointScreen() {
   return (
     <View className="flex-1">
       <Text className="text-center mt-4">Register Point Screen</Text>
-      
-      <CustomButton 
-        title="Obtenir ma position" 
-        onPress={requestLocation}
-      />
+
+      <CustomButton title="Obtenir ma position" onPress={requestLocation} />
 
       <MapView
-        style={{ width: '100%', height: '80%' }}
+        style={{ width: "100%", height: "80%" }}
         region={{
           latitude: coords.latitude,
           longitude: coords.longitude,

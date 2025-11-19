@@ -39,6 +39,14 @@
       }
     },
 
-    "plugins": ["expo-sqlite"]
+    "plugins": [
+      "expo-sqlite",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Nous avons besoin de votre position pour vous localiser sur la carte."
+        }
+      ]
+    ]
   }
 }

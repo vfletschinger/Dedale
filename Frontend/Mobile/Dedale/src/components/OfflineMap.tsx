@@ -1,7 +1,14 @@
 import * as React from "react";
-import { View, StyleSheet, Text, Platform } from "react-native";
+import {
+  View,
+  StyleSheet,
+  Alert,
+  Platform,
+  ActivityIndicator,
+} from "react-native";
 import MapView, { PROVIDER_DEFAULT, Region, UrlTile } from "react-native-maps";
 import Constants from "expo-constants";
+import * as Location from "expo-location";
 
 interface OfflineMapProps {
   initialRegion?: {
@@ -20,7 +27,14 @@ export default function OfflineMap({ initialRegion }: OfflineMapProps) {
     latitudeDelta: 0.01,
     longitudeDelta: 0.01,
   };
-  const region = initialRegion || defaultRegion;
+
+  const [currentRegion, setCurrentRegion] = React.useState<Region | undefined>(
+    initialRegion
+  );
+
+  React.useEffect(() => {
+    requestLocation();
+  }, []);
 
   // Determine the tile URL template based on the environment.
   // This logic runs only once per render, simplifying the component.
@@ -47,12 +61,50 @@ export default function OfflineMap({ initialRegion }: OfflineMapProps) {
     );
   };
 
+  const requestLocation = async () => {
+    let { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        "Permission refusée",
+        "Impossible d'accéder à la localisation."
+      );
+      return null;
+    }
+    try {
+      let loc = await Location.getCurrentPositionAsync({});
+      const userRegion = {
+        latitude: loc.coords.latitude,
+        longitude: loc.coords.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      };
+      setCurrentRegion(userRegion);
+      return userRegion;
+    } catch (error) {
+      console.error("Failed to get location", error);
+      Alert.alert("Erreur", "Impossible de récupérer la position.");
+      // Fallback to default if location fails
+      if (!currentRegion) {
+        console.log("Fallback to default region");
+        setCurrentRegion(defaultRegion);
+      }
+      return null;
+    }
+  };
+
+  if (!currentRegion) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
   return (
     <View style={styles.container}>
       <MapView
         style={styles.map}
         provider={PROVIDER_DEFAULT}
-        initialRegion={region}
+        region={currentRegion}
         showsUserLocation={true}
         showsMyLocationButton={true}
         showsCompass={true}
@@ -78,6 +130,10 @@ export default function OfflineMap({ initialRegion }: OfflineMapProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  centerContent: {
+    justifyContent: "center",
+    alignItems: "center",
   },
   map: {
     width: "100%",
