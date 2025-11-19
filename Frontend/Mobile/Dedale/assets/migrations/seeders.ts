@@ -6,7 +6,7 @@ export async function seedDatabase(db: SQLiteDatabase) {
   try {
     // Vérifier si des données existent déjà
     const existingPoints = db.getFirstSync<{ count: number }>(
-      'SELECT COUNT(*) as count FROM interest_points'
+      'SELECT COUNT(*) as count FROM point'
     );
 
     if (existingPoints && existingPoints.count > 0) {
@@ -36,7 +36,7 @@ export async function seedDatabase(db: SQLiteDatabase) {
     const typeIds: number[] = [];
     obstacleTypes.forEach(type => {
       const result = db.runSync(
-        'INSERT INTO obstacle_types (name, description, width, length) VALUES (?, ?, ?, ?)',
+        'INSERT INTO obstacle_type (name, description, width, length) VALUES (?, ?, ?, ?)',
         [type.name, type.description, type.width, type.length]
       );
       typeIds.push(result.lastInsertRowId);
@@ -55,7 +55,7 @@ export async function seedDatabase(db: SQLiteDatabase) {
     const pointIds: number[] = [];
     points.forEach(point => {
       const result = db.runSync(
-        'INSERT INTO interest_points (x, y) VALUES (?, ?)',
+        'INSERT INTO point (x, y) VALUES (?, ?)',
         [point.x, point.y]
       );
       pointIds.push(result.lastInsertRowId);
@@ -74,7 +74,7 @@ export async function seedDatabase(db: SQLiteDatabase) {
 
     comments.forEach(comment => {
       db.runSync(
-        'INSERT INTO comments (point_id, value) VALUES (?, ?)',
+        'INSERT INTO comment (point_id, value) VALUES (?, ?)',
         [comment.point_id, comment.value]
       );
     });
@@ -90,7 +90,7 @@ export async function seedDatabase(db: SQLiteDatabase) {
     ];
     pictures.forEach(picture => {
       db.runSync(
-        'INSERT INTO pictures (point_id, image) VALUES (?, ?)',
+        'INSERT INTO picture (point_id, image) VALUES (?, ?)',
         [picture.point_id, picture.image]
       );
     });
@@ -108,7 +108,7 @@ export async function seedDatabase(db: SQLiteDatabase) {
 
     obstacles.forEach(obstacle => {
       db.runSync(
-        'INSERT INTO obstacles (point_id, type_id, nombre) VALUES (?, ?, ?)',
+        'INSERT INTO obstacle (point_id, type_id, nombre) VALUES (?, ?, ?)',
         [obstacle.point_id, obstacle.type_id, obstacle.nombre]
       );
     });
@@ -131,11 +131,11 @@ export function clearDatabase(db: SQLiteDatabase): void {
   console.log('Suppression de toutes les données...');
   
   try {
-    db.execSync('DELETE FROM obstacles');
-    db.execSync('DELETE FROM pictures');
-    db.execSync('DELETE FROM comments');
-    db.execSync('DELETE FROM interest_points');
-    db.execSync('DELETE FROM obstacle_types');
+    db.execSync('DELETE FROM obstacle');
+    db.execSync('DELETE FROM picture');
+    db.execSync('DELETE FROM comment');
+    db.execSync('DELETE FROM point');
+    db.execSync('DELETE FROM obstacle_type');
     
     console.log('Base de données nettoyée');
   } catch (error) {
