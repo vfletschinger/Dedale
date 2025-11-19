@@ -18,9 +18,9 @@ export default function CustomButton({
   const getVariantClasses = () => {
     switch (variant) {
       case "primary":
-        return "bg-blue-600 active:bg-blue-700";
+        return "bg-blue-600 active:bg-blue-700 mb-2";
       case "secondary":
-        return "bg-gray-600 active:bg-gray-700";
+        return "bg-gray-600 active:bg-gray-700 mb-2";
       case "danger":
         return "bg-red-600 active:bg-red-700";
       default:

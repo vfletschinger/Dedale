@@ -92,7 +92,7 @@ export default function OfflineMap({ initialRegion }: OfflineMapProps) {
     const fetchInterestPoints = () => {
       try {
         const points = db.getAllSync<InterestPointsType>(
-          "SELECT * FROM interest_points ORDER BY id DESC"
+          "SELECT * FROM point ORDER BY id DESC"
         );
         console.log("📌 Points DB :", points);
         setListPoint(points); // pas de boucle car l’effet ne rerun jamais

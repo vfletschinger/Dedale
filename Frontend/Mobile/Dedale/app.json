@@ -12,6 +12,16 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "need it :)",
+          "locationWhenInUsePermission": "need it :)",
+          "locationAlwaysPermission": "need it :)"
+        }
+      ]
+    ],
     "ios": {
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Nous avons besoin de votre position pour vous localiser sur la carte",
@@ -42,16 +52,6 @@
       "eas": {
         "projectId": "3e1a8d04-3073-4e55-9721-c6edd46db4e5"
       }
-    },
-
-    "plugins": [
-      "expo-sqlite",
-      [
-        "expo-location",
-        {
-          "locationWhenInUsePermission": "Nous avons besoin de votre position pour vous localiser sur la carte."
-        }
-      ]
-    ]
+    }
   }
 }

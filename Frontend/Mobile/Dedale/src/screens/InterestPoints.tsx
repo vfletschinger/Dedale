@@ -19,7 +19,7 @@ export default function InterestPointsScreen() {
   const fetchInterestePoint = async () => {
     try {
       const points = db.getAllSync<InterestPointsType>(
-        "SELECT * FROM interest_points ORDER BY id DESC"
+        "SELECT * FROM point ORDER BY id DESC"
       );
       setListPoint(points);
     } catch (error) {

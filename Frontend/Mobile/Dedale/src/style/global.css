@@ -20,9 +20,9 @@
     @apply text-gray-500 text-lg;
   }
   .map {
-    @apply width: "100%", height: "100%";
+    @apply w-full h-full;
   }
   .center {
-    @apply flex: 1, justifyContent: "center", alignItems: "center";
+    @apply flex-1 justify-center items-center;
   }
 }
