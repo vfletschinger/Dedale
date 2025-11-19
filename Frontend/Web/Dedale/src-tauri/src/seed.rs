@@ -16,7 +16,7 @@ struct ObstacleSeed { point_idx: usize, type_idx: usize, number: i32 }
 
 /// Seeds the database with sample data if it's currently empty.
 #[tauri::command]
-pub async fn seed_database(app: AppHandle) -> Result<(), String> {
+/*pub async fn seed_database(app: AppHandle) -> Result<(), String> {
     let pool = get_db_pool(&app).await?;
 
     println!("🌱 Début du seeding...");
@@ -176,4 +176,4 @@ pub async fn seed_database(app: AppHandle) -> Result<(), String> {
     println!("   - {} obstacles", obstacles_data.len());
 
     Ok(())
-}
+}*/

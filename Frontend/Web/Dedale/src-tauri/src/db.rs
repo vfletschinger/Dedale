@@ -83,6 +83,9 @@ pub struct Obstacle {
     pub id: i64,
     pub name: Option<String>,
     pub number: Option<i32>,
+    pub description: Option<String>, 
+    pub width: Option<f64>,
+    pub length: Option<f64>,
 }
 
 #[derive(Debug)]
@@ -151,7 +154,20 @@ async fn fetch_pictures(pool: &SqlitePool, point_id: i64) -> Result<Vec<Picture>
 }
 
 async fn fetch_obstacles(pool: &SqlitePool, point_id: i64) -> Result<Vec<Obstacle>, String> {
-    let rows = sqlx::query("SELECT id, name, number FROM obstacle WHERE point_id = ?")
+    let query = r#"
+        SELECT 
+            o.id, 
+            o.number, 
+            ot.name,
+            ot.length,
+            ot.width,
+            ot.description
+        FROM obstacle o
+        JOIN obstacle_type ot ON o.type_id = ot.id
+        WHERE o.point_id = ?
+    "#;
+
+    let rows = sqlx::query(query)
         .bind(point_id)
         .fetch_all(pool)
         .await
@@ -161,6 +177,9 @@ async fn fetch_obstacles(pool: &SqlitePool, point_id: i64) -> Result<Vec<Obstacl
         id: row.get("id"),
         name: row.get("name"),
         number: row.get("number"),
+        length: row.get("length"),
+        width: row.get("width"),
+        description: row.get("description"),
     }).collect();
 
     Ok(obstacles)
@@ -185,16 +204,15 @@ pub async fn retrieve_data(app: &AppHandle) -> Result<Vec<Point>, String> {
 
     let mut points: Vec<Point> = Vec::new();
     
-    // Iterate and process each row to fetch related data
     for row in base_rows {
-        let point_id: i64 = row.get("point_id");
+        let id: i64 = row.get("id");
         
-        let comments = fetch_comments(&pool, point_id).await?;
-        let pictures = fetch_pictures(&pool, point_id).await?;
-        let obstacles = fetch_obstacles(&pool, point_id).await?;
+        let comments = fetch_comments(&pool, id).await?;
+        let pictures = fetch_pictures(&pool, id).await?;
+        let obstacles = fetch_obstacles(&pool, id).await?;
 
         points.push(Point {
-            id: point_id,
+            id: id,
             x: row.get("x"),
             y: row.get("y"),
             obstacles,
