@@ -3,7 +3,7 @@ import { migrations } from './migrations';
 
 export function runMigrations(db: SQLiteDatabase): void {
   try {
-    // Créer la t   able de versioning
+    // Créer la table de versioning
     db.execSync(`
       CREATE TABLE IF NOT EXISTS schema_version (
         version INTEGER PRIMARY KEY,
@@ -17,14 +17,14 @@ export function runMigrations(db: SQLiteDatabase): void {
     );
     const currentVersion = result?.version || 0;
 
-    console.log(`📊 Version actuelle du schéma : ${currentVersion}`);
+    console.log(`Version actuelle du schéma : ${currentVersion}`);
 
     // Exécuter les migrations manquantes
     let migrationsApplied = 0;
     
     migrations.forEach(migration => {
       if (migration.version > currentVersion) {
-        console.log(`🔄 Application de la migration v${migration.version} : ${migration.name}`);
+        console.log(`Application de la migration v${migration.version} : ${migration.name}`);
         
         migration.up(db);
         
@@ -34,18 +34,18 @@ export function runMigrations(db: SQLiteDatabase): void {
           [migration.version]
         );
         
-        console.log(`✅ Migration v${migration.version} appliquée`);
+        console.log(`Migration v${migration.version} appliquée`);
         migrationsApplied++;
       }
     });
 
     if (migrationsApplied === 0) {
-      console.log('✨ Base de données à jour');
+      console.log('Base de données à jour');
     } else {
-      console.log(`✨ ${migrationsApplied} migration(s) appliquée(s)`);
+      console.log(`${migrationsApplied} migration(s) appliquée(s)`);
     }
   } catch (error) {
-    console.error('❌ Erreur lors des migrations:', error);
+    console.error('Erreur lors des migrations:', error);
     throw error;
   }
 }

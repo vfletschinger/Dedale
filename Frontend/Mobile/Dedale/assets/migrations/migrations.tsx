@@ -42,7 +42,7 @@ export const migrations: Migration[] = [
         CREATE TABLE IF NOT EXISTS pictures (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           point_id INTEGER NOT NULL,
-          path TEXT NOT NULL,
+          image TEXT NOT NULL,
           FOREIGN KEY (point_id) REFERENCES interest_points (id) ON DELETE CASCADE
         );
       `);
