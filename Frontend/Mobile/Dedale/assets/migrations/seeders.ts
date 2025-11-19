@@ -108,7 +108,7 @@ export async function seedDatabase(db: SQLiteDatabase) {
 
     obstacles.forEach(obstacle => {
       db.runSync(
-        'INSERT INTO obstacle (point_id, type_id, nombre) VALUES (?, ?, ?)',
+        'INSERT INTO obstacle (point_id, type_id, number) VALUES (?, ?, ?)',
         [obstacle.point_id, obstacle.type_id, obstacle.nombre]
       );
     });

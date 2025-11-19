@@ -49,64 +49,72 @@ export default function PointDetails() {
   }
 
   return (
-    <ScrollView className="flex-1 bg-white p-4">
-      <Pressable onPress={() => navigation.goBack()} className="mb-4">
-        <Text className="back-btn-text">←</Text>
-      </Pressable>
-
-      {detailsPoint ? (
-        <View>
-          <Text className="text-3xl font-bold mb-4">Point #{detailsPoint.point_id}</Text>
-          
-          <View className="bg-gray-100 p-4 rounded-lg mb-4">
-            <Text className="text-lg font-semibold mb-2">Coordonnées</Text>
-            <Text>X: {detailsPoint.x}</Text>
-            <Text>Y: {detailsPoint.y}</Text>
+ 
+      <ScrollView className="flex-1 bg-white">
+         <View className="bg-blue-500 pt-12 pb-4 px-4 shadow-lg flex-row items-center">
+        <Pressable 
+          onPress={() => navigation.goBack()} 
+          className="mr-3"
+        >
+          <View className="bg-white/20 w-10 h-10 rounded-full items-center justify-center">
+            <Text className="text-white text-2xl font-bold">←</Text>
           </View>
-
-          {detailsPoint.name && (
+        </Pressable>
+        <Text className="text-white text-3xl font-bold">Détail du point</Text>
+      </View>
+        {detailsPoint ? (
+          <View className="p-4">
+            <Text className="text-3xl font-bold mb-4">Point #{detailsPoint.point_id}</Text>
+            
             <View className="bg-gray-100 p-4 rounded-lg mb-4">
-              <Text className="text-lg font-semibold mb-2">Nom</Text>
-              <Text>{detailsPoint.name}</Text>
+              <Text className="text-lg font-semibold mb-2">Coordonnées</Text>
+              <Text>X: {detailsPoint.x}</Text>
+              <Text>Y: {detailsPoint.y}</Text>
             </View>
-          )}
 
-          {detailsPoint.description && (
-            <View className="bg-gray-100 p-4 rounded-lg mb-4">
-              <Text className="text-lg font-semibold mb-2">Description</Text>
-              <Text>{detailsPoint.description}</Text>
-            </View>
-          )}
+            {detailsPoint.name && (
+              <View className="bg-gray-100 p-4 rounded-lg mb-4">
+                <Text className="text-lg font-semibold mb-2">Nom</Text>
+                <Text>{detailsPoint.name}</Text>
+              </View>
+            )}
 
-          {detailsPoint.value && (
-            <View className="bg-gray-100 p-4 rounded-lg mb-4">
-              <Text className="text-lg font-semibold mb-2">Valeur</Text>
-              <Text>{detailsPoint.value}</Text>
-            </View>
-          )}
+            {detailsPoint.description && (
+              <View className="bg-gray-100 p-4 rounded-lg mb-4">
+                <Text className="text-lg font-semibold mb-2">Description</Text>
+                <Text>{detailsPoint.description}</Text>
+              </View>
+            )}
 
-          {(detailsPoint.length || detailsPoint.width) && (
-            <View className="bg-gray-100 p-4 rounded-lg mb-4">
-              <Text className="text-lg font-semibold mb-2">Dimensions</Text>
-              {detailsPoint.length && <Text>Longueur: {detailsPoint.length}</Text>}
-              {detailsPoint.width && <Text>Largeur: {detailsPoint.width}</Text>}
-            </View>
-          )}
+            {detailsPoint.value && (
+              <View className="bg-gray-100 p-4 rounded-lg mb-4">
+                <Text className="text-lg font-semibold mb-2">Valeur</Text>
+                <Text>{detailsPoint.value}</Text>
+              </View>
+            )}
 
-          {detailsPoint.image && (
-            <View className="bg-gray-100 p-4 rounded-lg mb-4">
-              <Text className="text-lg font-semibold mb-2">Image</Text>
-              <Image 
-                source={{ uri: `data:image/jpeg;base64,${detailsPoint.image}` }}
-                style={{ width: '100%', height: 200, resizeMode: 'contain' }}
-                
-              />
-            </View>
-          )}
-        </View>
-      ) : (
-        <Text>Aucun détail disponible</Text>
-      )}
-    </ScrollView>
+            {(detailsPoint.length || detailsPoint.width) && (
+              <View className="bg-gray-100 p-4 rounded-lg mb-4">
+                <Text className="text-lg font-semibold mb-2">Dimensions</Text>
+                {detailsPoint.length && <Text>Longueur: {detailsPoint.length}</Text>}
+                {detailsPoint.width && <Text>Largeur: {detailsPoint.width}</Text>}
+              </View>
+            )}
+
+            {detailsPoint.image && (
+              <View className="bg-gray-100 p-4 rounded-lg mb-4">
+                <Text className="text-lg font-semibold mb-2">Image</Text>
+                <Image 
+                  source={{ uri: `data:image/jpeg;base64,${detailsPoint.image}` }}
+                  style={{ width: '100%', height: 200, resizeMode: 'contain' }}
+                  
+                />
+              </View>
+            )}
+          </View>
+        ) : (
+          <Text>Aucun détail disponible</Text>
+        )}
+      </ScrollView>
   );
 }
