@@ -61,21 +61,23 @@ pub fn init_db() -> impl tauri::plugin::Plugin<tauri::Wry> {
         },
     ];
 
+    
     // On construit et renvoie le plugin
     Builder::default()
         .add_migrations("sqlite:mydatabase.db", migrations)
         .build()
 }
 
-
-//Méthodes utiles pour la génération du pdf
-
-
 #[derive(Debug)]
 pub struct Point {
     pub id: i64,
     pub x: f64,
     pub y: f64,
+    pub obstacle_nom: Option<String>,
+    pub obstacle_description: Option<String>,
+    pub nombre: Option<i32>,
+    pub obstacle_largeur: Option<f64>,
+    pub obstacle_longueur: Option<f64>,
 }
 
 pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
@@ -101,36 +103,42 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
         .map_err(|e| format!("Failed to connect to database: {}", e))
 }
 
-pub async fn insert_test_data(app: &AppHandle) -> std::result::Result<(), String> {
-    let pool = get_db_pool(app).await?;
-    let query = "INSERT INTO point (x, y) VALUES (?, ?)";
 
-    sqlx::query(query)
-        .bind(5.0)
-        .bind(2.0)
-        .execute(&pool)
-        .await
-        .map_err(|e| format!("Database insertion failed: {}", e))?;
-    
-    Ok(())
-}
-
-pub async fn retrieve_all_points_data(app: &AppHandle) -> std::result::Result<Vec<Point>, String> {
+// Récupère tous les points avec leurs obstacles
+pub async fn retrieve_data(app: &AppHandle) -> Result<Vec<Point>, String> {
     let pool = get_db_pool(app).await?;
-    let query = "SELECT id, x, y FROM point";
+    let query = r#"
+        SELECT
+        p.id AS point_id,
+        p.x,
+        p.y,
+        ot.name AS obstacle_nom,
+        ot.description AS obstacle_description,
+        o.nombre,
+        ot.width AS obstacle_largeur,
+        ot.length AS obstacle_longueur
+    FROM point p
+    LEFT JOIN obstacles o ON o.point_id = p.id
+    LEFT JOIN obstacle_type ot ON o.type_id = ot.id
+    ORDER BY p.id
+
+    "#;
 
     let rows = sqlx::query(query)
         .fetch_all(&pool)
         .await
-        .map_err(|e| format!("Database retrieval failed: {}", e))?;
+        .map_err(|e| e.to_string())?;
 
-    let points: Vec<Point> = rows.iter().map(|row| {
-        Point {
-            id: row.get("id"),
-            x: row.get("x"),
-            y: row.get("y"),
-        }
+    let points = rows.into_iter().map(|row| Point {
+        id: row.get("point_id"),
+        x: row.get("x"),
+        y: row.get("y"),
+        obstacle_nom: row.try_get("obstacle_nom").ok(),
+        obstacle_description: row.try_get("obstacle_description").ok(),
+        nombre: row.try_get("nombre").ok(),
+        obstacle_largeur: row.try_get("obstacle_largeur").ok(),
+        obstacle_longueur: row.try_get("obstacle_longueur").ok(),
     }).collect();
-    
+
     Ok(points)
 }
