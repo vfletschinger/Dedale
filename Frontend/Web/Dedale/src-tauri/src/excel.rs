@@ -6,7 +6,7 @@ use dirs::data_dir;
 
 #[tauri::command]
 pub async fn export_points_excel(app: AppHandle) -> Result<(), String> { 
-    let mut path: PathBuf = data_dir().expect("Impossible de récupérer data_dir");
+    /*let mut path: PathBuf = data_dir().expect("Impossible de récupérer data_dir");
 
     path.push("dedale");
     path.push("recap.xlsx");
@@ -46,7 +46,7 @@ pub async fn export_points_excel(app: AppHandle) -> Result<(), String> {
     workbook.save(excel_path)
         .map_err(|e| e.to_string())?;
 
-    println!("✅ Excel saved successfully!");
+    println!("✅ Excel saved successfully!");*/
 
     Ok(())
 }

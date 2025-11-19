@@ -8,7 +8,6 @@ import Equipes from "./components/Equipe";
 import Map from "./components/Map";
 
 import logoStrasbourg from './assets/logo_strasbourg.png';
-import { invoke } from "@tauri-apps/api/core";
 
 // --- Composant de Navigation ---
 // global.d.ts
