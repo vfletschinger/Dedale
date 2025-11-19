@@ -6,22 +6,23 @@ import {
   Platform,
   ActivityIndicator,
 } from "react-native";
-import MapView, { PROVIDER_DEFAULT, Region, UrlTile } from "react-native-maps";
+import MapView, {
+  Marker,
+  PROVIDER_DEFAULT,
+  Region,
+  UrlTile,
+} from "react-native-maps";
 import Constants from "expo-constants";
 import * as Location from "expo-location";
+import { InterestPointsType } from "../types/database";
+import getDatabase from "../../assets/migrations";
 
 interface OfflineMapProps {
-  initialRegion?: {
-    latitude: number;
-    longitude: number;
-    latitudeDelta: number;
-    longitudeDelta: number;
-  };
+  initialRegion?: Region;
 }
 
 export default function OfflineMap({ initialRegion }: OfflineMapProps) {
-  // Default region centered on Strasbourg
-  const defaultRegion = {
+  const defaultRegion: Region = {
     latitude: 48.5734,
     longitude: 7.7521,
     latitudeDelta: 0.01,
@@ -31,22 +32,90 @@ export default function OfflineMap({ initialRegion }: OfflineMapProps) {
   const [currentRegion, setCurrentRegion] = React.useState<Region | undefined>(
     initialRegion
   );
+  const [loading, setLoading] = React.useState(true);
+  const [listPoint, setListPoint] = React.useState<InterestPointsType[]>([]);
 
+  const db = getDatabase();
+
+  // ----------------------------
+  // ⛔ Chargement initial — 1 seule fois
+  // ----------------------------
   React.useEffect(() => {
-    requestLocation();
-  }, []);
+    let didTimeout = false;
 
-  // Determine the tile URL template based on the environment.
-  // This logic runs only once per render, simplifying the component.
+    const timer = setTimeout(() => {
+      didTimeout = true;
+      console.log("⏳ Timeout 10s → fallback Strasbourg");
+      setCurrentRegion(defaultRegion);
+      setLoading(false);
+    }, 10000);
+
+    const requestLocation = async () => {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+
+      if (status !== "granted") {
+        Alert.alert(
+          "Permission refusée",
+          "Impossible d'accéder à la localisation."
+        );
+        clearTimeout(timer);
+        setCurrentRegion(defaultRegion);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const loc = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Highest,
+        });
+
+        if (!didTimeout) {
+          clearTimeout(timer);
+          setCurrentRegion({
+            latitude: loc.coords.latitude,
+            longitude: loc.coords.longitude,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+          });
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error("Erreur localisation :", error);
+        if (!didTimeout) {
+          clearTimeout(timer);
+          setCurrentRegion(defaultRegion);
+          setLoading(false);
+        }
+      }
+    };
+
+    const fetchInterestPoints = () => {
+      try {
+        const points = db.getAllSync<InterestPointsType>(
+          "SELECT * FROM interest_points ORDER BY id DESC"
+        );
+        console.log("📌 Points DB :", points);
+        setListPoint(points); // pas de boucle car l’effet ne rerun jamais
+      } catch (error) {
+        console.error("Erreur DB :", error);
+        setListPoint([]);
+      }
+    };
+
+    requestLocation();
+    fetchInterestPoints();
+
+    return () => clearTimeout(timer);
+  }, []); // ⛔ IMPORTANT : effet exécuté une seule fois
+
+  // ----------------------------
+  // TEMPLATE DES TUILES
+  // ----------------------------
   const getTileUrlTemplate = () => {
     if (__DEV__ && Constants.expoConfig?.hostUri) {
-      // In development with Expo Go, use a local tile server.
       const host = Constants.expoConfig.hostUri.split(":")[0];
-      const baseUrl = `http://${host}:3000/maps`;
-      console.log("Expo Go mode - Tile URL:", baseUrl);
-      return `${baseUrl}/{z}/{x}/{y}.png`;
+      return `http://${host}:3000/maps/{z}/{x}/{y}.png`;
     }
-    // In production, use native assets.
     return Platform.OS === "android"
       ? "file:///android_asset/maps/{z}/{x}/{y}.png"
       : "file://maps/{z}/{x}/{y}.png";
@@ -54,113 +123,64 @@ export default function OfflineMap({ initialRegion }: OfflineMapProps) {
 
   const tileUrlTemplate = getTileUrlTemplate();
 
-  const handleRegionChange = (region: Region) => {
-    const zoom = Math.round(Math.log(360 / region.longitudeDelta) / Math.LN2);
-    console.log(
-      `Region changed - Zoom: ${zoom}, Center: ${region.latitude.toFixed(4)}, ${region.longitude.toFixed(4)}`
-    );
-  };
-
-  const requestLocation = async () => {
-    let { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert(
-        "Permission refusée",
-        "Impossible d'accéder à la localisation."
-      );
-      return null;
-    }
-    try {
-      let loc = await Location.getCurrentPositionAsync({});
-      const userRegion = {
-        latitude: loc.coords.latitude,
-        longitude: loc.coords.longitude,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      };
-      setCurrentRegion(userRegion);
-      return userRegion;
-    } catch (error) {
-      console.error("Failed to get location", error);
-      Alert.alert("Erreur", "Impossible de récupérer la position.");
-      // Fallback to default if location fails
-      if (!currentRegion) {
-        console.log("Fallback to default region");
-        setCurrentRegion(defaultRegion);
-      }
-      return null;
-    }
-  };
-
-  if (!currentRegion) {
+  // ----------------------------
+  // LOADING
+  // ----------------------------
+  if (loading || !currentRegion) {
     return (
-      <View style={[styles.container, styles.centerContent]}>
+      <View style={[styles.container, styles.center]}>
         <ActivityIndicator size="large" />
       </View>
     );
   }
+
+  // ----------------------------
+  // RENDER MAP
+  // ----------------------------
   return (
     <View style={styles.container}>
       <MapView
         style={styles.map}
         provider={PROVIDER_DEFAULT}
-        region={currentRegion}
-        showsUserLocation={true}
-        showsMyLocationButton={true}
-        showsCompass={true}
-        rotateEnabled={true}
+        initialRegion={currentRegion}
+        showsUserLocation
+        showsMyLocationButton
+        showsCompass
+        rotateEnabled
         pitchEnabled={false}
         mapType="none"
         minZoomLevel={13}
         maxZoomLevel={16}
-        onRegionChangeComplete={handleRegionChange}
       >
         <UrlTile
           urlTemplate={tileUrlTemplate}
           maximumZ={16}
           minimumZ={13}
           tileSize={256}
-          shouldReplaceMapContent={true}
+          shouldReplaceMapContent
         />
+
+        {/* Markers de la base */}
+        {listPoint.map(
+          (p) => (
+            console.log(p),
+            (
+              <Marker
+                key={p.id}
+                coordinate={{ latitude: p.x, longitude: p.y }}
+                title={`${p.id}`}
+                pinColor="blue"
+              />
+            )
+          )
+        )}
       </MapView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  centerContent: {
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  map: {
-    width: "100%",
-    height: "100%",
-  },
-  infoBox: {
-    position: "absolute",
-    bottom: 100,
-    left: 16,
-    right: 16,
-    backgroundColor: "rgba(255, 255, 255, 0.95)",
-    padding: 16,
-    borderRadius: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  infoText: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#1f2937",
-    marginBottom: 4,
-  },
-  infoSubtext: {
-    fontSize: 14,
-    color: "#6b7280",
-  },
+  container: { flex: 1 },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
+  map: { width: "100%", height: "100%" },
 });
