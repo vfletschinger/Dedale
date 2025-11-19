@@ -97,9 +97,9 @@ export default function PointDetails() {
             <View className="bg-gray-100 p-4 rounded-lg mb-4">
               <Text className="text-lg font-semibold mb-2">Image</Text>
               <Image 
-                source={{ uri: detailsPoint.image }}
-                className="w-full h-64"
-                resizeMode="cover"
+                source={{ uri: `data:image/jpeg;base64,${detailsPoint.image}` }}
+                style={{ width: '100%', height: 200, resizeMode: 'contain' }}
+                
               />
             </View>
           )}
