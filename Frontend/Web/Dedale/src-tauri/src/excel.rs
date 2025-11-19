@@ -6,7 +6,7 @@ use dirs::data_dir;
 
 #[tauri::command]
 pub async fn export_points_excel(app: AppHandle) -> Result<(), String> { 
-    /*let mut path: PathBuf = data_dir().expect("Impossible de récupérer data_dir");
+    let mut path: PathBuf = data_dir().expect("Impossible de récupérer data_dir");
 
     path.push("dedale");
     path.push("recap.xlsx");
@@ -29,16 +29,43 @@ pub async fn export_points_excel(app: AppHandle) -> Result<(), String> {
             .map_err(|e| e.to_string())?;
     }
 
-    for (row_idx, p) in points.iter().enumerate() {
-        let row_num = row_idx + 1;
-        worksheet.write_number(row_num as u32, 0, p.id as f64).map_err(|e| e.to_string())?;
-        worksheet.write_number(row_num as u32, 1, p.x).map_err(|e| e.to_string())?;
-        worksheet.write_number(row_num as u32, 2, p.y).map_err(|e| e.to_string())?;
-        worksheet.write_string(row_num as u32, 3, p.obstacle_nom.as_deref().unwrap_or("")).map_err(|e| e.to_string())?;
-        worksheet.write_string(row_num as u32, 4, p.obstacle_description.as_deref().unwrap_or("")).map_err(|e| e.to_string())?;
-        worksheet.write_number(row_num as u32, 5, p.nombre.unwrap_or(0) as f64).map_err(|e| e.to_string())?;
-        worksheet.write_number(row_num as u32, 6, p.obstacle_largeur.unwrap_or(0.0)).map_err(|e| e.to_string())?;
-        worksheet.write_number(row_num as u32, 7, p.obstacle_longueur.unwrap_or(0.0)).map_err(|e| e.to_string())?;
+    let mut current_row: u32 = 1; 
+
+    for p in points {
+        if !p.obstacles.is_empty() {
+            for obstacle in &p.obstacles {
+                worksheet.write_number(current_row, 0, p.id as f64).map_err(|e| e.to_string())?;
+                worksheet.write_number(current_row, 1, p.x).map_err(|e| e.to_string())?;
+                worksheet.write_number(current_row, 2, p.y).map_err(|e| e.to_string())?;
+
+                let name = obstacle.name.as_deref().unwrap_or("");
+                let description = obstacle.description.as_deref().unwrap_or(""); 
+                let number = obstacle.number.unwrap_or(0) as f64;
+                let width = obstacle.width.unwrap_or(0.0);
+                let length = obstacle.length.unwrap_or(0.0);
+
+                worksheet.write_string(current_row, 3, name).map_err(|e| e.to_string())?;
+                worksheet.write_string(current_row, 4, description).map_err(|e| e.to_string())?;
+                worksheet.write_number(current_row, 5, number).map_err(|e| e.to_string())?;
+                worksheet.write_number(current_row, 6, width).map_err(|e| e.to_string())?;
+                worksheet.write_number(current_row, 7, length).map_err(|e| e.to_string())?;
+
+                current_row += 1;
+            }
+        } 
+        else {
+            worksheet.write_number(current_row, 0, p.id as f64).map_err(|e| e.to_string())?;
+            worksheet.write_number(current_row, 1, p.x).map_err(|e| e.to_string())?;
+            worksheet.write_number(current_row, 2, p.y).map_err(|e| e.to_string())?;
+            
+            worksheet.write_string(current_row, 3, "").map_err(|e| e.to_string())?; // Nom
+            worksheet.write_string(current_row, 4, "").map_err(|e| e.to_string())?; // Desc
+            worksheet.write_number(current_row, 5, 0.0).map_err(|e| e.to_string())?; // Nombre
+            worksheet.write_number(current_row, 6, 0.0).map_err(|e| e.to_string())?; // Largeur
+            worksheet.write_number(current_row, 7, 0.0).map_err(|e| e.to_string())?; // Longueur
+
+            current_row += 1;
+        }
     }
 
 
@@ -46,7 +73,7 @@ pub async fn export_points_excel(app: AppHandle) -> Result<(), String> {
     workbook.save(excel_path)
         .map_err(|e| e.to_string())?;
 
-    println!("✅ Excel saved successfully!");*/
+    println!("✅ Excel saved successfully!");
 
     Ok(())
 }

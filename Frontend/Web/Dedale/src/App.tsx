@@ -11,23 +11,48 @@ import logoStrasbourg from "./assets/logo_strasbourg.png";
 // --- Composant de Navigation ---
 // global.d.ts
 
-function Navigation({
-  page,
-  setPage,
-}: {
-  page: string;
-  setPage: (page: string) => void;
-}) {
-  
+
+function Navigation({ page, setPage }: { page: string, setPage: (page: string) => void }) {
+
   return (
-    <nav className="bg-[#171c22]">
-      {" "}
-      {/* Couleur principale 65% */}
-      <div className="px-4 sm:px-6 lg:px-8">
+    <nav className="bg-[#171c22]"> {/* Couleur principale 65% */}
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
+
           {/* Left side - Logo */}
-          <div className="shrink-0">
-            <img src={logoStrasbourg} alt="Logo" className="h-30 w-auto" />
+          <div className="flex-shrink-0">
+            <img
+              src={logoStrasbourg}
+              alt="Logo"
+              className="h-10 w-auto"
+            />
+          </div>
+
+          {/* Center - Navigation Buttons */}
+          <div className="flex space-x-4">
+            <button
+              type="button"
+              className="px-3 py-2 rounded-md text-[#ffffff] bg-[#20272f] hover:bg-[#2ad783] transition font-medium"
+              onClick={() => setPage("home")}
+            >
+              Accueil
+            </button>
+
+            <button
+              type="button"
+              className="px-3 py-2 rounded-md text-[#ffffff] bg-[#20272f] hover:bg-[#2ad783] transition font-medium"
+              onClick={() => setPage("map")}
+            >
+              Map
+            </button>
+
+            <button
+              type="button"
+              className="px-3 py-2 rounded-md text-[#ffffff] bg-[#20272f] hover:bg-[#2ad783] transition font-medium"
+              onClick={() => setPage("equipe")}
+            >
+              Equipes
+            </button>
           </div>
 
           {/* Right side - Hamburger menu for mobile */}

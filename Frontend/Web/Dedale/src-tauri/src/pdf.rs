@@ -1,5 +1,6 @@
 use crate::db;
 use tauri::AppHandle;
+use genpdf::elements;
 
 #[tauri::command]
 pub async fn create_pdf(app: AppHandle) -> Result<(), String> {
@@ -15,49 +16,43 @@ pub async fn create_pdf(app: AppHandle) -> Result<(), String> {
     decorator.set_margins(10);
     doc.set_page_decorator(decorator);
 
-    let formatted_data: String = data.iter()
-        .map(|p| {
-            // Start with Point details
-            let mut point_info = format!("--- Point {} (X: {}, Y: {}) ---\n", p.id, p.x, p.y);
+    for p in data {
+        let mut point_text = String::new();
 
-            // Add Obstacles
-            if p.obstacles.is_empty() {
-                point_info.push_str("  Obstacles: None\n");
-            } else {
-                point_info.push_str("  Obstacles:\n");
-                for o in &p.obstacles {
-                    let name = o.name.as_deref().unwrap_or("N/A");
-                    let number = o.number.map_or("N/A".to_string(), |n| n.to_string());
-                    point_info.push_str(&format!("    - ID: {}, Type: {}, Count: {}\n", o.id, name, number));
-                }
-            }
+        point_text.push_str(&format!("--- Point {} (X: {}, Y: {}) ---", p.id, p.x, p.y));
 
-            // Add Comments
-            if p.comments.is_empty() {
-                point_info.push_str("  Comments: None\n");
-            } else {
-                point_info.push_str("  Comments:\n");
-                for c in &p.comments {
-                    point_info.push_str(&format!("    - ID: {}, Value: \"{}\"\n", c.id, c.value));
-                }
-            }
+        let obs_str = if p.obstacles.is_empty() {
+            "None".to_string()
+        } else {
+            p.obstacles.iter().map(|o| {
+                let name = o.name.as_deref().unwrap_or("N/A");
+                let number = o.number.unwrap_or(0);
+                format!("{} (x{})", name, number)
+            }).collect::<Vec<String>>().join(", ")
+        };
+        point_text.push_str(&format!("Obstacles: {}.", obs_str));
 
-            // Add Pictures
-            if p.pictures.is_empty() {
-                point_info.push_str("  Pictures: None\n");
-            } else {
-                point_info.push_str("  Pictures:\n");
-                for i in &p.pictures {
-                    point_info.push_str(&format!("    - ID: {}, Image: {}\n", i.id, i.image));
-                }
-            }
-            
-            point_info
-        })
-        .collect::<Vec<String>>()
-        .join("\n");
+        let com_str = if p.comments.is_empty() {
+            "None".to_string()
+        } else {
+            p.comments.iter().map(|c| {
+                format!("\"{}\"", c.value)
+            }).collect::<Vec<String>>().join(", ")
+        };
+        point_text.push_str(&format!("Comments: {}.", com_str));
 
-    doc.push(genpdf::elements::Paragraph::new(formatted_data));
+        let pic_str = if p.pictures.is_empty() {
+            "None".to_string()
+        } else {
+            p.pictures.iter().map(|i| {
+                format!("{}", i.image) 
+            }).collect::<Vec<String>>().join(", ")
+        };
+        point_text.push_str(&format!("Pictures: {}.", pic_str));
+
+        doc.push(elements::Paragraph::new(point_text));
+        doc.push(elements::Break::new(1.5));
+    }
     
     doc.render_to_file("output.pdf")
         .map_err(|e| format!("Failed to write PDF file: {}", e))?;
