@@ -28,33 +28,6 @@ function Navigation({ page, setPage }: { page: string, setPage: (page: string) =
             />
           </div>
 
-          {/* Center - Navigation Buttons */}
-          <div className="flex space-x-4">
-            <button
-              type="button"
-              className="px-3 py-2 rounded-md text-[#ffffff] bg-[#20272f] hover:bg-[#2ad783] transition font-medium"
-              onClick={() => setPage("home")}
-            >
-              Accueil
-            </button>
-
-            <button
-              type="button"
-              className="px-3 py-2 rounded-md text-[#ffffff] bg-[#20272f] hover:bg-[#2ad783] transition font-medium"
-              onClick={() => setPage("map")}
-            >
-              Map
-            </button>
-
-            <button
-              type="button"
-              className="px-3 py-2 rounded-md text-[#ffffff] bg-[#20272f] hover:bg-[#2ad783] transition font-medium"
-              onClick={() => setPage("equipe")}
-            >
-              Equipes
-            </button>
-          </div>
-
           {/* Right side - Hamburger menu for mobile */}
           <div className="flex sm:hidden">
             <button

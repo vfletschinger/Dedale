@@ -47,23 +47,12 @@ function OfflineMapLibre() {
     setLocation([7.6, 48.5]);
   };
 
-  async function createPdf() {
-    await invoke("create_pdf");
-  }
-
   return (
     <div className="flex flex-col w-full h-screen">
       {" "}
       {/* Input au-dessus de la map */}{" "}
       <div className="p-4 bg-white shadow-md z-10">
         {" "}
-        <button
-              type="button"
-              className="px-3 py-2 rounded-md text-[#ffffff] bg-[#20272f] hover:bg-[#2ad783] transition font-medium"
-              onClick={() => createPdf()}
-            >
-              create pdf
-            </button>
         <form
           onSubmit={(e) => {
             e.preventDefault(); // Empêche le refresh
