@@ -27,6 +27,11 @@
       "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
+      "config": {
+        "googleMaps": {
+          "apiKey": "FAKE_API_KEY_FOR_LOCAL_ONLY"
+        }
+      },
       "package": "com.simonerre.Dedale"
     },
     "web": {
