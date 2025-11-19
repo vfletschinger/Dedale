@@ -41,10 +41,10 @@ export default function App() {
         // Initialiser la base de données
         const db = getDatabase();
          // EN DEV UNIQUEMENT : Uncomment pour forcer le reseed
-        if (__DEV__) {
-          const { resetAndSeed } = await import('./assets/migrations/seeders');
-          resetAndSeed(db);
-        }
+        // if (__DEV__) {
+        //   const { resetAndSeed } = await import('./assets/migrations/seeders');
+        //   resetAndSeed(db);
+        // }
         setDbReady(true);
       } catch (err) {
         console.error('Erreur initialisation DB:', err);

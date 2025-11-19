@@ -241,7 +241,7 @@ export default function RegisterPointScreen() {
               title="Enregistrer le point"
               onPress={async () => {
                 if (location) {
-                  const insertedId = await savePointToDB(location.latitude, location.longitude, pointComment);
+                  const insertedId = await savePointToDB(location.longitude, location.latitude, pointComment);
                   if (insertedId) {
                     getSavedPoints();
                     setIsModalVisible(false);
