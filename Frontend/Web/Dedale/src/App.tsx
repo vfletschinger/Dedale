@@ -14,9 +14,6 @@ import logoStrasbourg from './assets/logo_strasbourg.png';
 
 
 function Navigation({ page, setPage }: { page: string, setPage: (page: string) => void }) {
-  async function createPdf() {
-    await invoke("create_pdf");
-  }
 
   return (
     <nav className="bg-[#171c22]"> {/* Couleur principale 65% */}
@@ -30,13 +27,6 @@ function Navigation({ page, setPage }: { page: string, setPage: (page: string) =
               alt="Logo"
               className="h-10 w-auto"
             />
-            <button
-              type="button"
-              className="px-3 py-2 rounded-md text-[#ffffff] bg-[#20272f] hover:bg-[#2ad783] transition font-medium"
-              onClick={() => createPdf()}
-            >
-              Creer un pdf
-            </button>
           </div>
 
           {/* Center - Navigation Buttons */}
