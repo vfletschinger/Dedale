@@ -14,12 +14,11 @@
     "sql:allow-close",
     "sql:allow-select",
     {
-  "identifier": "http:default",
-  "allow": [
-    "http://localhost:8080/*",
-    "https://*.tauri.app"
-           ]
+      "identifier": "http:default",
+      "allow": [
+        "http://localhost:8080/*",
+        "https://*.tauri.app"
+      ]
     }
   ]
-  
 }
