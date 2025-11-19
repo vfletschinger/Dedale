@@ -2,12 +2,14 @@ import { useEffect, useState } from "react";
 import Database from '@tauri-apps/plugin-sql';
 // Les imports des composants et du CSS ont été supprimés car tout est dans ce fichier.
 // L'environnement de prévisualisation injecte Tailwind automatiquement.
-
+import { invoke } from '@tauri-apps/api/core';
 import Accueil from "./components/Accueil";
 import Equipes from "./components/Equipe";
 import Map from "./components/Map";
 
 // --- Composant de Navigation ---
+// global.d.ts
+
 
 function Navigation({ page, setPage }: { page: string, setPage: (page: string) => void }) {
 
@@ -101,6 +103,7 @@ function Navigation({ page, setPage }: { page: string, setPage: (page: string) =
 
 
 }
+
 
 
 function App() {

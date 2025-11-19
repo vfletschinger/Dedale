@@ -24,4 +24,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri-plugin-sql = {version = "2.3.1", features = ["sqlite"] }
 tauri-plugin-http = "2"
-
+tauri-plugin-fs = "2"
+rust_xlsxwriter = "0.92.0"
+sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio-native-tls", "macros"] }
+dirs = "6.0.0"
