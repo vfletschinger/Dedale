@@ -18,12 +18,12 @@ function Navigation({ page, setPage }: { page: string, setPage: (page: string) =
     await invoke("create_pdf");
   }
 
-  return (
-    <nav className="bg-[#171c22]"> {/* Couleur principale 65% */}
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-16 items-center justify-between">
-
-          {/* Left side - Logo */}
+ return (
+  <nav className="bg-[#171c22]"> {/* Couleur principale 65% */}
+    <div className="px-4 sm:px-6 lg:px-8">
+      <div className="flex h-16 items-center justify-between">
+        
+        {/* Left side - Logo */}
           <div className="flex-shrink-0">
             <img
               src={logoStrasbourg}
@@ -33,7 +33,56 @@ function Navigation({ page, setPage }: { page: string, setPage: (page: string) =
             <button
               type="button"
               className="px-3 py-2 rounded-md text-[#ffffff] bg-[#20272f] hover:bg-[#2ad783] transition font-medium"
-              onClick={() => createPdf()}
+              onClick={() => createPdf()}>
+              create pdf
+              </button>
+
+
+        {/* Center - Navigation Buttons */}
+        <div className="flex space-x-4">
+          <button
+            type="button"
+            className="px-3 py-2 rounded-md text-[#ffffff] bg-[#20272f] hover:bg-[#2ad783] transition font-medium"
+            onClick={() => setPage("home")}
+          >
+            Accueil
+          </button>
+
+          <button
+            type="button"
+            className="px-3 py-2 rounded-md text-[#ffffff] bg-[#20272f] hover:bg-[#2ad783] transition font-medium"
+            onClick={() => setPage("map")}
+          >
+            Map
+          </button>
+
+          <button
+            type="button"
+            className="px-3 py-2 rounded-md text-[#ffffff] bg-[#20272f] hover:bg-[#2ad783] transition font-medium"
+            onClick={() => setPage("equipe")}
+          >
+            Equipes
+          </button>
+        </div>
+
+        {/* Right side - Hamburger menu for mobile */}
+        <div className="flex sm:hidden">
+          <button
+            type="button"
+            className="inline-flex items-center justify-center p-2 rounded-md text-[#ffffff] hover:bg-[#2ad783] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2ad783]"
+            aria-controls="mobile-menu"
+            aria-expanded="false"
+          >
+            <span className="sr-only">Open main menu</span>
+            {/* Menu open icon */}
+            <svg
+              className="block h-6 w-6"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+>>>>>>> Frontend/Web/Dedale/src/App.tsx
             >
               Creer un pdf
             </button>
