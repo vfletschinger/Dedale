@@ -83,7 +83,7 @@ export default function RegisterPointScreen() {
 
   try {
     const pointResult: any = db.runSync(
-      'INSERT INTO interest_points (x, y) VALUES (?, ?)',
+      'INSERT INTO point (x, y) VALUES (?, ?)',
       [x, y]
     );
 
@@ -93,7 +93,7 @@ export default function RegisterPointScreen() {
     }
 
     db.runSync(
-      'INSERT INTO comments (point_id, value) VALUES (?, ?)',
+      'INSERT INTO comment (point_id, value) VALUES (?, ?)',
       [insertedPointId, commentValue]
     );
 
@@ -104,8 +104,8 @@ export default function RegisterPointScreen() {
           const hasImageCol = Array.isArray(cols) && cols.some(c => c.name === 'image');
           if (!hasImageCol) {
             try {
-              db.execSync('ALTER TABLE pictures ADD COLUMN image TEXT');
-              console.log('Colonne `image` ajoutée à la table pictures');
+              db.execSync('ALTER TABLE picture ADD COLUMN image TEXT');
+              console.log('Colonne `image` ajoutée à la table picture');
             } catch (alterErr) {
               console.warn('Impossible d\'ajouter la colonne image :', alterErr);
             }
@@ -116,7 +116,6 @@ export default function RegisterPointScreen() {
 
         try {
           const info = await FileSystem.getInfoAsync(selectedImage);
-          console.log('Image file info before save:', info);
           if (!info.exists) {
             console.warn('Le fichier image n\'existe pas ou n\'est pas accessible :', selectedImage);
             Alert.alert('Attention', "Le point a été enregistré mais le fichier image n'est pas accessible.");
@@ -133,7 +132,6 @@ export default function RegisterPointScreen() {
       }
     }
 
-    console.log(`Point (ID: ${insertedPointId}) et son commentaire enregistrés.`);
     return insertedPointId;
   } catch (error: any) {
     console.error("Erreur lors de la sauvegarde du point/commentaire :", error);
@@ -144,7 +142,7 @@ export default function RegisterPointScreen() {
 
   const getSavedPoints = () => {
   try {
-    const results = db.getAllSync('SELECT * FROM interest_points');
+    const results = db.getAllSync('SELECT * FROM point');
     console.log("Saved Points:", results);
     return results;
   } catch (error) {
@@ -156,7 +154,7 @@ export default function RegisterPointScreen() {
 
   const getSavedComments = () => {
   try {
-    const results = db.getAllSync('SELECT * FROM comments');
+    const results = db.getAllSync('SELECT * FROM comment');
     console.log("Saved Comments:", results);
     return results;
   } catch (error) {
@@ -168,7 +166,7 @@ export default function RegisterPointScreen() {
 
   const getSavedPictures = () => {
   try {
-    const results = db.getAllSync('SELECT * FROM pictures');
+    const results = db.getAllSync('SELECT * FROM picture');
     console.log("Saved Pictures:", results);
     return results;
   } catch (error) {

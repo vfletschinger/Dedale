@@ -14,16 +14,16 @@ export default function PointDetails() {
   const navigation = useNavigation();
   const [detailsPoint, setDetailsPoint] = useState<PointDetailType | null>(null);
   const [loading, setLoading] = useState(true);
-
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const fetchPoint = async () => {
     try {
       const pointInf = db.getFirstSync<PointDetailType>(
         `SELECT ip.*, ot.*, c.*, p.*, ip.id as "point_id"
-         FROM interest_points ip
-         LEFT JOIN obstacles o ON ip.id = o.point_id
-         LEFT JOIN obstacle_types ot ON ot.id = o.type_id
-         LEFT JOIN comments c ON ip.id = c.point_id 
-         LEFT JOIN pictures p ON ip.id = p.point_id
+         FROM point ip
+         LEFT JOIN obstacle o ON ip.id = o.point_id
+         LEFT JOIN obstacle_type ot ON ot.id = o.type_id
+         LEFT JOIN comment c ON ip.id = c.point_id 
+         LEFT JOIN picture p ON ip.id = p.point_id
          WHERE ip.id = ?`,
         [pointId]
       );
