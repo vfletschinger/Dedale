@@ -11,7 +11,7 @@ function OfflineMapLibre() {
 
   // Initialisation de la carte
   useEffect(() => {
-    if (!mapContainer.current) return;
+    if (mapRef.current || !mapContainer.current) return; 
 
     const mapInstance = new maplibregl.Map({
       container: mapContainer.current,
@@ -19,6 +19,12 @@ function OfflineMapLibre() {
       center: [7.7635, 48.5465],
       zoom: 13,
     });
+    
+    // Création du marker une seule foisb
+    markerRef.current = new maplibregl.Marker()
+      .setLngLat([location[0], location[1]])
+      .setPopup(new maplibregl.Popup().setText("Strasbourg !"))
+      .addTo(mapRef.current);
 
     const initialMarker = new maplibregl.Marker()
       .setLngLat([7.7635, 48.5465])
