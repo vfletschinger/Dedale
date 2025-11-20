@@ -2,7 +2,7 @@ import { StatusBar } from "expo-status-bar";
 import { StyleSheet, Text, View } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-
+import Feather from '@expo/vector-icons/Feather';
 import HomeScreen from "./src/screens/Home";
 import PointDetails from "./src/screens/PointDetails";
 import InterestPointsScreen from "./src/screens/InterestPoints";
@@ -21,9 +21,24 @@ function TabNavigator() {
   return (
     <Tab.Navigator
       initialRouteName="Home"
-      screenOptions={{
+      screenOptions={({ route }) => ({
         headerShown: false,
-      }}
+        tabBarIcon: ({ color, size }) => {
+          let iconName: string;
+
+          if (route.name === "Home") {
+            iconName = "home";
+          } else if (route.name === "InterestPoints") {
+            iconName = "map-pin";
+          } else if (route.name === "RegisterPoint") {
+            iconName = "plus-circle";
+          } else {
+            iconName = "list";
+          }
+
+          return <Feather name={iconName} size={size} color={color} />;
+        },
+      })}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="InterestPoints" component={InterestPointsScreen} />
