@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+/* Styles personnalisés pour les popups MapLibre GL */
+.maplibregl-popup.custom-popup .maplibregl-popup-content {
+  width: 350px !important;
+  max-width: none !important;
+  padding: 0 !important; /* on gère le padding dans le container React */
+  box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+}
+
+.maplibregl-popup.custom-popup .maplibregl-popup-tip {
+  display: none; /* optionnel : masque la flèche si inutile */
+}
+
+/* au cas où le bouton existe encore */
+.maplibregl-popup.custom-popup .maplibregl-popup-close-button {
+  display: none !important;
+}

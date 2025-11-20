@@ -1,8 +1,9 @@
+import "./src/style/global.css";
 import { StatusBar } from "expo-status-bar";
 import { StyleSheet, Text, View } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import Feather from '@expo/vector-icons/Feather';
+import Feather from "@expo/vector-icons/Feather";
 import HomeScreen from "./src/screens/Home";
 import PointDetails from "./src/screens/PointDetails";
 import InterestPointsScreen from "./src/screens/InterestPoints";
@@ -48,22 +49,20 @@ function TabNavigator() {
 }
 
 export default function App() {
-   const [dbReady, setDbReady] = useState(false);
+  const [dbReady, setDbReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     async function initDatabase() {
       try {
-        // Initialiser la base de données
         const db = getDatabase();
-         // EN DEV UNIQUEMENT : Uncomment pour forcer le reseed
-        // if (__DEV__) {
-        //   const { resetAndSeed } = await import('./assets/migrations/seeders');
+        //  if (__DEV__) {
+        //    const { resetAndSeed } = await import('./assets/migrations/seeders');
         //   resetAndSeed(db);
-        // }
+        //  }
         setDbReady(true);
       } catch (err) {
-        console.error('Erreur initialisation DB:', err);
-        setError(err instanceof Error ? err.message : 'Erreur inconnue');
+        console.error("Erreur initialisation DB:", err);
+        setError(err instanceof Error ? err.message : "Erreur inconnue");
       }
     }
 

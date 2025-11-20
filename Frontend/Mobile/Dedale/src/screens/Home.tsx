@@ -1,27 +1,43 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
 import OfflineMap from "../components/OfflineMap";
 
 import "../style/global.css";
-import CustomButton from "../components/CustomButton";
+import {
+  AppState,
+  Linking,
+  Platform,
+  SafeAreaView,
+  StatusBar,
+  StyleSheet,
+  View,
+  Text,
+  Pressable,
+} from "react-native";
+import {} from "react-native";
 
+import QRCodeScanner from "../components/QrCodeSacnner";
+import { useState } from "react";
+import CustomButton from "../components/CustomButton";
 export default function HomeScreen() {
+  const [scanQR, setScanQR] = useState(false);
   return (
-    <View style={styles.container}>
-      <OfflineMap
-        initialRegion={{
-          latitude: 48.5734, // Centre de Strasbourg
-          longitude: 7.7521,
-          latitudeDelta: 0.05,
-          longitudeDelta: 0.05,
-        }}
-      />
-      <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <Text style={styles.headerText}>Dedale</Text>
+    <SafeAreaView style={styles.container}>
+      <View className="bg-blue-500 pt-4 pb-4 px-4 shadow-lg flex-row items-center justify-between">
+        <View className="flex-row items-center flex-1">
+          <Text style={{ color: "white", fontSize: 24, fontWeight: "bold" }}>
+            Home
+          </Text>
+        </View>
+
+        <View className="flex-row gap-2">
+          <CustomButton onPress={() => setScanQR(true)} title="Transfert" />
         </View>
       </View>
-    </View>
+      <StatusBar barStyle="light-content" backgroundColor="#000" />
+
+      {scanQR && <QRCodeScanner setScanQR={setScanQR} />}
+      <OfflineMap />
+    </SafeAreaView>
   );
 }
 
