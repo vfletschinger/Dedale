@@ -20,11 +20,11 @@ function Navigation({ page, setPage }: { page: string, setPage: (page: string) =
         <div className="flex h-16 items-center justify-between">
 
           {/* Left side - Logo */}
-          <div className="flex-shrink-0">
+          <div className="shrink-0">
             <img
               src={logoStrasbourg}
               alt="Logo"
-              className="h-10 w-auto"
+              className="h-30 w-auto"
             />
           </div>
 
