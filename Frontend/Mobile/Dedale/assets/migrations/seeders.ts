@@ -17,27 +17,27 @@ export async function seedDatabase(db: SQLiteDatabase) {
     // 1. Seed obstacle_types
     console.log('Insertion des types d\'obstacles...');
     const obstacleTypes = [
-      { name: 'Glissière 2m', description: 'Glissière béton armé (GBA) 2m', width: 0.6, length: 2 },
-      { name: 'Glissière 1m', description: 'Glissière béton armé (GBA) 1m', width: 0.6, length: 1 },
-      { name: 'Bloc 2.5m', description: 'Bloc de béton 2.5m', width: 0.6, length: 2.5 },
-      { name: 'Bloc 1m', description: 'Bloc de béton 1m', width: 0.6, length: 1 },
-      { name: 'Barrière Vauban', description: 'Barrière de 2 mètres', width: 0.4, length: 2 },
-      { name: 'Barrière Héras', description: 'Barrière Héras (délimitation de surface d’accueil de personnes)', width: 0.1, length: 3.5 },
-      { name: 'Barrière Héras avec voile d’occultation', description: 'Barrière Héras avec voile d’occultation (délimitation de surface d’accueil de personnes)', width: 0.1, length: 3.5 },
-      { name: 'Obstacle', description: 'Obstacle pour voitures', width: 0.95, length: 1.05 },
-      { name: 'Engins de blocage 8m', description: 'Engins routiers et matériels, ensembles mobiles pour permettre le passage des secours, utilisés pour bloquer les rues.', width: 2, length: 8 },
-      { name: 'Engins de blocage 9.35m', description: 'Engins routiers et matériels, ensembles mobiles pour permettre le passage des secours, utilisés pour bloquer les rues.', width: 2, length: 9.35 },
-      { name: 'Engins de blocage 9.5m', description: 'Engins routiers et matériels, ensembles mobiles pour permettre le passage des secours, utilisés pour bloquer les rues.', width: 2, length: 9.5 },
-      { name: 'Engins de blocage 11m', description: 'Engins routiers et matériels, ensembles mobiles pour permettre le passage des secours, utilisés pour bloquer les rues.', width: 2, length: 11 },
-      { name: 'Engins de blocage 16m', description: 'Engins routiers et matériels, ensembles mobiles pour permettre le passage des secours, utilisés pour bloquer les rues.', width: 2, length: 16 },
+      { id : 1, name: 'Glissière 2m', description: 'Glissière béton armé (GBA) 2m', width: 0.6, length: 2 },
+      { id : 2, name: 'Glissière 1m', description: 'Glissière béton armé (GBA) 1m', width: 0.6, length: 1 },
+      { id : 3, name: 'Bloc 2.5m', description: 'Bloc de béton 2.5m', width: 0.6, length: 2.5 },
+      { id : 4, name: 'Bloc 1m', description: 'Bloc de béton 1m', width: 0.6, length: 1 },
+      { id : 5, name: 'Barrière Vauban', description: 'Barrière de 2 mètres', width: 0.4, length: 2 },
+      { id : 6, name: 'Barrière Héras', description: 'Barrière Héras (délimitation de surface d’accueil de personnes)', width: 0.1, length: 3.5 },
+      { id : 7, name: 'Barrière Héras avec voile d’occultation', description: 'Barrière Héras avec voile d’occultation (délimitation de surface d’accueil de personnes)', width: 0.1, length: 3.5 },
+      { id : 8, name: 'Obstacle', description: 'Obstacle pour voitures', width: 0.95, length: 1.05 },
+      { id : 9, name: 'Engins de blocage 8m', description: 'Engins routiers et matériels, ensembles mobiles pour permettre le passage des secours, utilisés pour bloquer les rues.', width: 2, length: 8 },
+      { id : 10, name: 'Engins de blocage 9.35m', description: 'Engins routiers et matériels, ensembles mobiles pour permettre le passage des secours, utilisés pour bloquer les rues.', width: 2, length: 9.35 },
+      { id : 11, name: 'Engins de blocage 9.5m', description: 'Engins routiers et matériels, ensembles mobiles pour permettre le passage des secours, utilisés pour bloquer les rues.', width: 2, length: 9.5 },
+      { id : 12, name: 'Engins de blocage 11m', description: 'Engins routiers et matériels, ensembles mobiles pour permettre le passage des secours, utilisés pour bloquer les rues.', width: 2, length: 11 },
+      { id : 13, name: 'Engins de blocage 16m', description: 'Engins routiers et matériels, ensembles mobiles pour permettre le passage des secours, utilisés pour bloquer les rues.', width: 2, length: 16 },
 
     ];
 
     const typeIds: number[] = [];
     obstacleTypes.forEach(type => {
       const result = db.runSync(
-        'INSERT INTO obstacle_type (name, description, width, length) VALUES (?, ?, ?, ?)',
-        [type.name, type.description, type.width, type.length]
+        'INSERT INTO obstacle_type (id, name, description, width, length) VALUES (?, ?, ?, ?, ?)',
+        [type.id, type.name, type.description, type.width, type.length]
       );
       typeIds.push(result.lastInsertRowId);
     });
