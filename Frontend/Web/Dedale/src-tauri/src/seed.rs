@@ -1,7 +1,6 @@
-use sqlx::{SqlitePool, Row};
 use tauri::AppHandle;
 use crate::db::get_db_pool;
-use crate::seed;
+use crate::db::ObstacleType;
 // Assuming this function is accessible (defined in db.rs or similar)
 // pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> { ... }
 
@@ -61,7 +60,7 @@ pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
         PointSeed { y: 48.5790, x: 7.7650 },
     ];
     let comments_data = [
-        CommentSeed { point_idx: 0, value: "Zone très fréquentée, attention aux piétons" },
+        CommentSeed { point_idx: 0, value: "Zone très fréquentée, attention aux piétons",  },
         CommentSeed { point_idx: 0, value: "Passage étroit, ralentir" },
         CommentSeed { point_idx: 1, value: "Belle vue sur la cathédrale" },
         CommentSeed { point_idx: 2, value: "Travaux en cours, détour possible" },
@@ -93,8 +92,8 @@ pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
         let result = sqlx::query(
             "INSERT INTO obstacle_type (name, description, width, length) VALUES (?, ?, ?, ?)"
         )
-        .bind(t.name)
-        .bind(t.description)
+        .bind(t.name.clone())
+        .bind(t.description.clone())
         .bind(t.width)
         .bind(t.length)
         .execute(&pool)

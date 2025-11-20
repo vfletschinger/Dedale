@@ -1,3 +1,22 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Define a reusable Tailwind component for RN */
+@layer components {
+  .container {
+    @apply flex-1 items-center justify-center bg-white;
+  }
+  .btn {
+    @apply mt-4 px-4 py-2 bg-blue-500 rounded;
+  }
+  .btn-text {
+    @apply text-white font-bold;
+  }
+  .back-btn {
+    @apply absolute top-16 left-4 px-3 py-2 bg-gray-300 rounded-full;
+  }
+  .back-btn-text {
+    @apply text-gray-500 text-lg;
+  }
+}

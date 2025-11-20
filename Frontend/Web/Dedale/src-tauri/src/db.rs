@@ -5,8 +5,10 @@ use tauri_plugin_sql::{Builder, Migration, MigrationKind};
 use tauri::{AppHandle, Manager};
 use std::fs;
 use std::str::FromStr;
+use sqlx::Transaction;
+use sqlx::Sqlite;
+use serde::Deserialize;
 use serde::Serialize;
-
 // Elle renvoie le plugin SQL entièrement configuré
 pub fn init_db() -> impl tauri::plugin::Plugin<tauri::Wry> {
     let migrations = vec![
@@ -21,7 +23,7 @@ pub fn init_db() -> impl tauri::plugin::Plugin<tauri::Wry> {
             description: "create_all_tables",
             sql: "
                 CREATE TABLE point (
-                    id INTEGER PRIMARY KEY,
+                    id INTEGER PRIMARY KEY ,
                     x REAL,
                     y REAL
                 );
@@ -68,7 +70,7 @@ pub fn init_db() -> impl tauri::plugin::Plugin<tauri::Wry> {
         .build()
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Point {
     pub id: i64,
     pub x: f64,
@@ -78,7 +80,7 @@ pub struct Point {
     pub pictures: Vec<Picture>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Obstacle {
     pub id: i64,
     pub name: Option<String>,
@@ -88,18 +90,39 @@ pub struct Obstacle {
     pub length: Option<f64>,
 }
 
-#[derive(Debug, Serialize)]
-pub struct Picture {
-    pub id: i64,
-    pub image: String,
+
+
+#[derive(Debug,Serialize, Deserialize)]
+pub struct PointSimple {
+    pub id: i32,     // Identifiant unique du point
+    pub x: f64,      // Coordonnée X (ou latitude)
+    pub y: f64,      // Coordonnée Y (ou longitude)
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug,Serialize, Deserialize)]
 pub struct Comment {
-    pub id: i64,
-    pub value: String,
+    pub id: i32,          // Identifiant unique du commentaire
+    pub point_id: i32,    // Lien vers le point auquel ce commentaire est attaché
+    pub value: String,    // Le texte du commentaire
+}
+#[derive(Debug,Serialize, Deserialize)]
+pub struct Picture {
+    pub id: i32,          // Identifiant unique de l'image
+    pub point_id: i32,    // Lien vers le point auquel cette image est attachée
+    pub image: String,    // Le chemin ou le contenu encodé de l'image (ex: base64, URL)
 }
 
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PointDetail {
+    pub point: PointSimple,  // Changed from Vec<PointSimple> to PointSimple
+    #[serde(rename = "comments")]
+    pub comment: Vec<Comment>,
+    #[serde(rename = "pictures")]
+    pub picture: Vec<Picture>, 
+    #[serde(rename = "obstacles")]
+    pub obstacle: Vec<Obstacle>,
+}
 pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
     let app_data_dir = app.path()
         .app_data_dir()
@@ -133,6 +156,7 @@ async fn fetch_comments(pool: &SqlitePool, point_id: i64) -> Result<Vec<Comment>
     let comments = rows.into_iter().map(|row| Comment {
         id: row.get("id"),
         value: row.get("value"),
+        point_id: row.get("point_id")
     }).collect();
 
     Ok(comments)
@@ -148,6 +172,7 @@ async fn fetch_pictures(pool: &SqlitePool, point_id: i64) -> Result<Vec<Picture>
     let pictures = rows.into_iter().map(|row| Picture {
         id: row.get("id"),
         image: row.get("image"),
+        point_id: row.get("point_id")
     }).collect();
 
     Ok(pictures)
@@ -177,6 +202,8 @@ async fn fetch_obstacles(pool: &SqlitePool, point_id: i64) -> Result<Vec<Obstacl
         id: row.get("id"),
         name: row.get("name"),
         number: row.get("number"),
+        point_id: row.get("point_id"),
+        type_id: row.get("type_id"),
         length: row.get("length"),
         width: row.get("width"),
         description: row.get("description"),
@@ -224,6 +251,118 @@ pub async fn retrieve_data(app: &AppHandle) -> Result<Vec<Point>, String> {
     Ok(points)
 }
 
+#[tauri::command]
+pub async fn insert_point_details(
+    app: &AppHandle,
+    details: Vec<PointDetail>,
+) -> Result<(), String> {
+
+    println!("[DB] 🚀 Début de l'insertion de {} PointDetail(s)", details.len());
+
+    let pool = get_db_pool(app).await?;
+    let mut tx: Transaction<Sqlite> = pool
+        .begin()
+        .await
+        .map_err(|e| format!("Erreur au démarrage de la transaction : {}", e))?;
+
+    println!("[DB] ✓ Transaction démarrée");
+
+    // ÉTAPE 1: Insérer tous les points d'abord
+    println!("[DB] 📍 Insertion des points...");
+    for detail in &details {
+        println!("[DB]   → Point ID: {}, x: {}, y: {}", detail.point.id, detail.point.x, detail.point.y);
+        sqlx::query(
+            r#"INSERT OR REPLACE INTO point (id, x, y) VALUES (?, ?, ?)"#
+        )
+        .bind(detail.point.id)
+        .bind(detail.point.x)
+        .bind(detail.point.y)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| format!("Erreur INSERT/REPLACE point ID {} : {}", detail.point.id, e))?;
+    }
+    println!("[DB] ✓ Tous les points insérés");
+
+    // ÉTAPE 2: Insérer les données liées
+    println!("[DB] 💬 Insertion des commentaires...");
+    for detail in &details {
+        for comment in &detail.comment {
+            println!("[DB]   → Comment ID: {}, point_id: {}, value: {:?}", comment.id, comment.point_id, &comment.value[..comment.value.len().min(30)]);
+            sqlx::query(
+                r#"INSERT OR REPLACE INTO comment (id, point_id, value) VALUES (?, ?, ?)"#
+            )
+            .bind(comment.id)
+            .bind(comment.point_id)
+            .bind(&comment.value)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| format!("Erreur INSERT/REPLACE comment ID {} : {}", comment.id, e))?;
+        }
+    }
+    println!("[DB] ✓ Tous les commentaires insérés");
+
+    println!("[DB] 📸 Insertion des images...");
+    for detail in &details {
+        for picture in &detail.picture {
+            println!("[DB]   → Picture ID: {}, point_id: {}, taille: {} bytes", picture.id, picture.point_id, picture.image.len());
+            sqlx::query(
+                r#"INSERT OR REPLACE INTO picture (id, point_id, path) VALUES (?, ?, ?)"#
+            )
+            .bind(picture.id)
+            .bind(picture.point_id)
+            .bind(&picture.image)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| format!("Erreur INSERT/REPLACE picture ID {} : {}", picture.id, e))?;
+        }
+    }
+    println!("[DB] ✓ Toutes les images insérées");
+
+    println!("[DB] 🚧 Insertion des obstacles...");
+    for detail in &details {
+        for obstacle in &detail.obstacle {
+            println!("[DB]   → Obstacle ID: {}, point_id: {}, type_id: {}, nombre: {}", 
+                obstacle.id, obstacle.point_id, obstacle.type_id, obstacle.number);
+            
+            // Vérifier si le type_id existe dans obstacle_type
+            let type_exists: Option<i32> = sqlx::query_scalar(
+                r#"SELECT id FROM obstacle_type WHERE id = ?"#
+            )
+            .bind(obstacle.type_id)
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(|e| format!("Erreur vérification type_id {} : {}", obstacle.type_id, e))?;
+            
+            if type_exists.is_none() {
+                eprintln!("[DB] ⚠️  WARNING: type_id {} n'existe pas dans obstacle_type, obstacle ID {} ignoré", 
+                    obstacle.type_id, obstacle.id);
+                continue; // Ignore cet obstacle si le type n'existe pas
+            }
+            
+            sqlx::query(
+                r#"INSERT OR REPLACE INTO obstacles (id, point_id, type_id, nombre) VALUES (?, ?, ?, ?)"#
+            )
+            .bind(obstacle.id)
+            .bind(obstacle.point_id)
+            .bind(obstacle.type_id)
+            .bind(obstacle.number)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| format!("Erreur INSERT/REPLACE obstacle ID {} (point_id: {}, type_id: {}) : {}", 
+                obstacle.id, obstacle.point_id, obstacle.type_id, e))?;
+        }
+    }
+    println!("[DB] ✓ Tous les obstacles insérés");
+
+    println!("[DB] 💾 Validation de la transaction...");
+    tx.commit()
+        .await
+        .map_err(|e| format!("Erreur à la validation (commit) de la transaction : {}", e))?;
+
+    println!("[DB] ✅ Transaction validée avec succès !");
+
+    Ok(())
+}
 pub async fn insert_test_data(app: &AppHandle) -> Result<(), String> {
     let pool = get_db_pool(app).await?;
 
