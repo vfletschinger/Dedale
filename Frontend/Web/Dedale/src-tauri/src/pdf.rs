@@ -1,10 +1,11 @@
 use crate::db;
 use tauri::AppHandle;
 use genpdf::elements;
+use crate::seed;
 
 #[tauri::command]
 pub async fn create_pdf(app: AppHandle) -> Result<(), String> {
-    db::insert_test_data(&app).await?;
+    seed::seed_database(&app).await?;
     let data = db::retrieve_data(&app).await?;
     
     let font_family = genpdf::fonts::from_files("./fonts", "LiberationSans", None)
@@ -30,7 +31,7 @@ pub async fn create_pdf(app: AppHandle) -> Result<(), String> {
                 format!("{} (x{})", name, number)
             }).collect::<Vec<String>>().join(", ")
         };
-        point_text.push_str(&format!("Obstacles: {}.", obs_str));
+        point_text.push_str(&format!(" Obstacles: {}.", obs_str));
 
         let com_str = if p.comments.is_empty() {
             "None".to_string()
@@ -39,7 +40,7 @@ pub async fn create_pdf(app: AppHandle) -> Result<(), String> {
                 format!("\"{}\"", c.value)
             }).collect::<Vec<String>>().join(", ")
         };
-        point_text.push_str(&format!("Comments: {}.", com_str));
+        point_text.push_str(&format!(" Comments: {}.", com_str));
 
         let pic_str = if p.pictures.is_empty() {
             "None".to_string()
@@ -48,12 +49,12 @@ pub async fn create_pdf(app: AppHandle) -> Result<(), String> {
                 format!("{}", i.image) 
             }).collect::<Vec<String>>().join(", ")
         };
-        point_text.push_str(&format!("Pictures: {}.", pic_str));
+        point_text.push_str(&format!(" Pictures: {}.", pic_str));
 
         doc.push(elements::Paragraph::new(point_text));
         doc.push(elements::Break::new(1.5));
     }
-    
+
     doc.render_to_file("output.pdf")
         .map_err(|e| format!("Failed to write PDF file: {}", e))?;
 
