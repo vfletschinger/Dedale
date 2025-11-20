@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import  { useState, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import * as path from '@tauri-apps/api/path'; 
 import QrCode from './QrCode'; 

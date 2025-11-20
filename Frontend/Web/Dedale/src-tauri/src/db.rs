@@ -70,7 +70,7 @@ pub fn init_db() -> impl tauri::plugin::Plugin<tauri::Wry> {
         .build()
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Point {
     pub id: i64,
     pub x: f64,
@@ -80,7 +80,7 @@ pub struct Point {
     pub pictures: Vec<Picture>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Obstacle {
     pub id: i64,
     pub name: Option<String>,
@@ -90,23 +90,13 @@ pub struct Obstacle {
     pub length: Option<f64>,
 }
 
-#[derive(Debug, Serialize)]
-pub struct Picture {
-    pub id: i64,
-    pub image: String,
-}
 
-#[derive(Debug, Serialize)]
-pub struct Comment {
-    pub id: i64,
-    pub value: String,
-}
+
 #[derive(Debug,Serialize, Deserialize)]
 pub struct PointSimple {
     pub id: i32,     // Identifiant unique du point
     pub x: f64,      // Coordonnée X (ou latitude)
     pub y: f64,      // Coordonnée Y (ou longitude)
-    // Vous pouvez ajouter d'autres champs de point ici (ex: name, description)
 }
 
 #[derive(Debug,Serialize, Deserialize)]
@@ -121,13 +111,7 @@ pub struct Picture {
     pub point_id: i32,    // Lien vers le point auquel cette image est attachée
     pub image: String,    // Le chemin ou le contenu encodé de l'image (ex: base64, URL)
 }
-#[derive(Debug,Serialize, Deserialize)]
-pub struct Obstacle {
-    pub id: i32,          // Identifiant unique de l'obstacle
-    pub point_id: i32,    // Lien vers le point auquel cet obstacle est attaché
-    pub type_id: i32,     // Le type d'obstacle (ex: 1 pour "pente", 2 pour "escalier")
-    pub number: i32,      // Un champ numérique lié à l'obstacle (ex: nombre de marches)
-}
+
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PointDetail {
@@ -172,6 +156,7 @@ async fn fetch_comments(pool: &SqlitePool, point_id: i64) -> Result<Vec<Comment>
     let comments = rows.into_iter().map(|row| Comment {
         id: row.get("id"),
         value: row.get("value"),
+        point_id: row.get("point_id")
     }).collect();
 
     Ok(comments)
@@ -187,6 +172,7 @@ async fn fetch_pictures(pool: &SqlitePool, point_id: i64) -> Result<Vec<Picture>
     let pictures = rows.into_iter().map(|row| Picture {
         id: row.get("id"),
         image: row.get("image"),
+        point_id: row.get("point_id")
     }).collect();
 
     Ok(pictures)
@@ -216,6 +202,8 @@ async fn fetch_obstacles(pool: &SqlitePool, point_id: i64) -> Result<Vec<Obstacl
         id: row.get("id"),
         name: row.get("name"),
         number: row.get("number"),
+        point_id: row.get("point_id"),
+        type_id: row.get("type_id"),
         length: row.get("length"),
         width: row.get("width"),
         description: row.get("description"),
