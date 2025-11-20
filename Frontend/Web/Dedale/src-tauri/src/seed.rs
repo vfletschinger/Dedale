@@ -46,11 +46,11 @@ pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
         ObstacleTypeSeed { name: "Poubelle", description: "Conteneur à déchets", width: 0.6, length: 0.6 },
     ];
     let points = [
-        PointSeed { y: 7.7521, x: 48.5734 },
-        PointSeed { y: 7.7350, x: 48.5850 },
-        PointSeed { y: 7.7580, x: 48.5920 },
-        PointSeed { y: 7.7420, x: 48.5680 },
-        PointSeed { y: 7.7650, x: 48.5790 },
+        PointSeed { y: 48.5734, x: 7.7521 },
+        PointSeed { y: 48.5850, x: 7.7350 },
+        PointSeed { y: 48.5920, x: 7.7580 },
+        PointSeed { y: 48.5680, x: 7.7420 },
+        PointSeed { y: 48.5790, x: 7.7650 },
     ];
     let comments_data = [
         CommentSeed { point_idx: 0, value: "Zone très fréquentée, attention aux piétons" },
