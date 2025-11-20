@@ -3,11 +3,12 @@ import { StyleSheet, Text, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-
+import Feather from "@expo/vector-icons/Feather";
 import HomeScreen from "./src/screens/Home";
 import PointDetails from "./src/screens/PointDetails";
 import InterestPointsScreen from "./src/screens/InterestPoints";
 import RegisterPointScreen from "./src/screens/RegisterPoint";
+import RouteNavigation from "./src/screens/RouteNavigation";
 
 import type { TabParamList, RootStackParamList } from "./src/types/navigation";
 import { NavigationContainer } from "@react-navigation/native";
@@ -23,9 +24,24 @@ function TabNavigator() {
   return (
     <Tab.Navigator
       initialRouteName="Home"
-      screenOptions={{
+      screenOptions={({ route }) => ({
         headerShown: false,
-      }}
+        tabBarIcon: ({ color, size }) => {
+          let iconName: string;
+
+          if (route.name === "Home") {
+            iconName = "home";
+          } else if (route.name === "InterestPoints") {
+            iconName = "map-pin";
+          } else if (route.name === "RegisterPoint") {
+            iconName = "plus-circle";
+          } else {
+            iconName = "list";
+          }
+
+          return <Feather name={iconName} size={size} color={color} />;
+        },
+      })}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="InterestPoints" component={InterestPointsScreen} />
@@ -73,6 +89,11 @@ export default function App() {
           <Stack.Screen
             name="CreateRoute"
             component={CreateRouteScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="RouteNavigation"
+            component={RouteNavigation}
             options={{ headerShown: false }}
           />
         </Stack.Navigator>

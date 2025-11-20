@@ -7,7 +7,7 @@ import {
   Modal,
   Alert,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import React, { useEffect, useState, useMemo } from "react";
 import { InterestPointsType } from "../types/database";
 import getDatabase from "../../assets/migrations";
@@ -20,6 +20,43 @@ import {
 import { deletePoint } from "../services/databaseAcces";
 import { get } from "react-native/Libraries/TurboModule/TurboModuleRegistry";
 import InterestPointCard from "../components/PointCard";
+
+function ModalPointItem({
+  item,
+  selected,
+  onToggle,
+}: {
+  item: InterestPointsType;
+  selected: boolean;
+  onToggle: () => void;
+}) {
+  const [address, setAddress] = useState<string>("Chargement...");
+
+  useEffect(() => {
+    const fetchAddress = async () => {
+      const addr = await getAddressFromCoords(item.y, item.x);
+      setAddress(addr || "Adresse inconnue");
+    };
+    fetchAddress();
+  }, [item.x, item.y]);
+
+  return (
+    <Pressable
+      onPress={onToggle}
+      className={`flex-row items-center justify-between p-3 rounded-lg mb-2 ${selected ? "bg-blue-50" : "bg-white"}`}
+    >
+      <View className="flex-1 mr-2">
+        <Text className="font-medium">Point #{item.id}</Text>
+        <Text className="text-xs text-gray-500" numberOfLines={2}>
+          {address}
+        </Text>
+      </View>
+      <View className="w-8 h-8 rounded-full items-center justify-center border border-gray-300">
+        <Text>{selected ? "✓" : ""}</Text>
+      </View>
+    </Pressable>
+  );
+}
 
 export default function InterestPointsScreen() {
   const navigation = useNavigation<any>();
@@ -60,10 +97,12 @@ export default function InterestPointsScreen() {
     }
   };
 
-  useEffect(() => {
-    fetchInterestPoint();
-    fetchLocation();
-  }, []);
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchInterestPoint();
+      fetchLocation();
+    }, [])
+  );
 
   const handleDelete = (pointId: number) => {
     Alert.alert(
@@ -89,7 +128,6 @@ export default function InterestPointsScreen() {
   };
 
   useEffect(() => {
-    fetchLocation();
     let sorted = [...listPoint];
     if (sortBy === "recent") {
       sorted.sort((a, b) => b.id - a.id);
@@ -111,7 +149,7 @@ export default function InterestPointsScreen() {
       });
     }
     setSortedList(sorted);
-  }, [listPoint, sortBy]);
+  }, [listPoint, sortBy, location]);
 
   const toggleSelect = (id: number) => {
     setSelectedIds((prev) => {
@@ -220,6 +258,7 @@ export default function InterestPointsScreen() {
                 navigation.navigate("PointDetails", { pointId: item.id })
               }
               onDelete={() => handleDelete(item.id)}
+              displayKnob={false}
             />
           )}
           ListFooterComponent={<View className="h-4" />}
@@ -269,25 +308,13 @@ export default function InterestPointsScreen() {
             <FlatList
               data={sortedList}
               keyExtractor={(item) => item.id.toString()}
-              renderItem={({ item }) => {
-                const selected = selectedIds.includes(item.id);
-                return (
-                  <Pressable
-                    onPress={() => toggleSelect(item.id)}
-                    className={`flex-row items-center justify-between p-3 rounded-lg mb-2 ${selected ? "bg-blue-50" : "bg-white"}`}
-                  >
-                    <View>
-                      <Text className="font-medium">Point #{item.id}</Text>
-                      <Text className="text-xs text-gray-500">
-                        {item.x.toFixed(4)}, {item.y.toFixed(4)}
-                      </Text>
-                    </View>
-                    <View className="w-8 h-8 rounded-full items-center justify-center border border-gray-300">
-                      <Text>{selected ? "✓" : ""}</Text>
-                    </View>
-                  </Pressable>
-                );
-              }}
+              renderItem={({ item }) => (
+                <ModalPointItem
+                  item={item}
+                  selected={selectedIds.includes(item.id)}
+                  onToggle={() => toggleSelect(item.id)}
+                />
+              )}
             />
 
             <View className="flex-row justify-between mt-3">

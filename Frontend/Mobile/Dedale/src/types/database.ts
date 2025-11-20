@@ -20,7 +20,7 @@ export type ObstacleType = {
     id: number;
     point_id: number;
     type_id: number;
-    nombre: number;
+    number: number;
     name?: string;
     description?: string;
     width?: number;
