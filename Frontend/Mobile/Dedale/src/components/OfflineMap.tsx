@@ -37,9 +37,6 @@ export default function OfflineMap({ initialRegion }: OfflineMapProps) {
 
   const db = getDatabase();
 
-  // ----------------------------
-  // ⛔ Chargement initial — 1 seule fois
-  // ----------------------------
   React.useEffect(() => {
     let didTimeout = false;
 
@@ -106,11 +103,7 @@ export default function OfflineMap({ initialRegion }: OfflineMapProps) {
     fetchInterestPoints();
 
     return () => clearTimeout(timer);
-  }, []); // ⛔ IMPORTANT : effet exécuté une seule fois
-
-  // ----------------------------
-  // TEMPLATE DES TUILES
-  // ----------------------------
+  }, []);
   const getTileUrlTemplate = () => {
     if (__DEV__ && Constants.expoConfig?.hostUri) {
       const host = Constants.expoConfig.hostUri.split(":")[0];
@@ -123,9 +116,6 @@ export default function OfflineMap({ initialRegion }: OfflineMapProps) {
 
   const tileUrlTemplate = getTileUrlTemplate();
 
-  // ----------------------------
-  // LOADING
-  // ----------------------------
   if (loading || !currentRegion) {
     return (
       <View style={[styles.container, styles.center]}>
@@ -134,9 +124,6 @@ export default function OfflineMap({ initialRegion }: OfflineMapProps) {
     );
   }
 
-  // ----------------------------
-  // RENDER MAP
-  // ----------------------------
   return (
     <View style={styles.container}>
       <MapView
@@ -159,8 +146,6 @@ export default function OfflineMap({ initialRegion }: OfflineMapProps) {
           tileSize={256}
           shouldReplaceMapContent
         />
-
-        {/* Markers de la base */}
         {listPoint.map(
           (p) => (
             console.log(p),
