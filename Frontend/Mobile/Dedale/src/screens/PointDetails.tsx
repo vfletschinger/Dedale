@@ -1,4 +1,4 @@
-import { View, Text, ActivityIndicator, ScrollView, Image, Alert, Modal, TextInput, Pressable } from "react-native";
+import { View, Text, ActivityIndicator, ScrollView, Image, Alert, Modal, Pressable } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import React, { useEffect, useState } from "react";
 import getDatabase from "../../assets/migrations";
@@ -13,8 +13,9 @@ import {
   updatePointCoordinates
 } from "../services/databaseAcces";
 import { imageToBase64, pickImage } from "../services/ImageHelper";
-import MapView, { Marker } from "react-native-maps";
+import MapView, { Marker, MapPressEvent } from "react-native-maps";
 import CoordinatesDisplay from "../components/CoordinatesDisplay";
+import EditModal from "../components/EditModal";
 
 type RouteParams = { pointId: number; };
 
@@ -25,14 +26,18 @@ export default function PointDetails() {
   const navigation = useNavigation();
   const [pointData, setPointData] = useState<PointDetailType | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+  
+  // États pour modal de commentaire
   const [isCommentModalVisible, setIsCommentModalVisible] = useState(false);
   const [currentComment, setCurrentComment] = useState<CommentType | null>(null);
   const [commentText, setCommentText] = useState('');
+  
+  // États pour modal de coordonnées
+  const [isCoordinatesModalVisible, setIsCoordinatesModalVisible] = useState(false);
+  const [tempCoordinates, setTempCoordinates] = useState<{ latitude: number; longitude: number }>({ latitude: 0, longitude: 0 });
 
   const fetchPoint = async () => {
     try {
-      // Récupérer le point
       const point = db.getFirstSync<InterestPointsType>(
         'SELECT * FROM point WHERE id = ?',
         [pointId]
@@ -44,19 +49,16 @@ export default function PointDetails() {
         return;
       }
 
-      // Récupérer tous les commentaires
       const comments = db.getAllSync<CommentType>(
         'SELECT * FROM comment WHERE point_id = ?',
         [pointId]
       );
 
-      // Récupérer toutes les images
       const pictures = db.getAllSync<PictureType>(
         'SELECT * FROM picture WHERE point_id = ?',
         [pointId]
       );
 
-      // Récupérer tous les obstacles avec leurs types
       const obstacles = db.getAllSync<ObstacleType>(
         `SELECT o.*, ot.name, ot.description, ot.width, ot.length
          FROM obstacle o
@@ -70,6 +72,11 @@ export default function PointDetails() {
         comments: comments || [],
         pictures: pictures || [],
         obstacles: obstacles || []
+      });
+
+      setTempCoordinates({
+        latitude: point.y,
+        longitude: point.x
       });
 
     } catch (e) {
@@ -190,6 +197,31 @@ export default function PointDetails() {
     }
   };
 
+  const handleMapPress = (event: MapPressEvent) => {
+    const { coordinate } = event.nativeEvent;
+    setTempCoordinates({
+      latitude: coordinate.latitude,
+      longitude: coordinate.longitude
+    });
+  };
+
+  const handleSaveCoordinates = () => {
+    try {
+      updatePointCoordinates(
+        pointId,
+        tempCoordinates.longitude,
+        tempCoordinates.latitude,
+        db
+      );
+      Alert.alert('Succès', 'Position modifiée avec succès');
+      setIsCoordinatesModalVisible(false);
+      fetchPoint();
+    } catch (error) {
+      console.error('Erreur:', error);
+      Alert.alert('Erreur', 'Impossible de modifier la position');
+    }
+  };
+
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center">
@@ -244,29 +276,43 @@ export default function PointDetails() {
                 showAddress={true}
               />
             </View>
-            <MapView
-              style={{ width: '100%', height: 200 }}
-              initialRegion={{
-                latitude: pointData.point.y,
-                longitude: pointData.point.x,
-                latitudeDelta: 0.1,
-                longitudeDelta: 0.1,
-              }}
-              zoomEnabled={true}
-              scrollEnabled={false}
-                minZoomLevel={17}
-                maxZoomLevel={18}
-            >
-              <Marker
-                coordinate={{
+            <View className="overflow-hidden rounded-lg mb-2">
+              <MapView
+                style={{ width: '100%', height: 200 }}
+                initialRegion={{
                   latitude: pointData.point.y,
                   longitude: pointData.point.x,
+                  latitudeDelta: 0.01,
+                  longitudeDelta: 0.01,
                 }}
-                title={`Point #${pointData.point.id}`}
-              />
-            </MapView>
-
+                zoomEnabled={true}
+                scrollEnabled={false}
+                minZoomLevel={17}
+                maxZoomLevel={18}
+              >
+                <Marker
+                  coordinate={{
+                    latitude: pointData.point.y,
+                    longitude: pointData.point.x,
+                  }}
+                  title={`Point #${pointData.point.id}`}
+                />
+              </MapView>
+            </View>
+            <Pressable
+              onPress={() => {
+                setTempCoordinates({
+                  latitude: pointData.point.y,
+                  longitude: pointData.point.x
+                });
+                setIsCoordinatesModalVisible(true);
+              }}
+              className="bg-blue-500 py-3 rounded-lg"
+            >
+              <Text className="text-white text-center font-semibold">📍 Modifier la position</Text>
+            </Pressable>
           </View>
+
           {/* Commentaires */}
           <View className="bg-gray-100 p-4 rounded-lg mb-4 mt-4">
             <View className="flex-row justify-between items-center mb-2">
@@ -304,6 +350,7 @@ export default function PointDetails() {
               <Text className="text-gray-500 text-sm">Aucun commentaire</Text>
             )}
           </View>
+
           {/* Obstacles */}
           {pointData.obstacles.length > 0 && (
             <View className="bg-gray-100 p-4 rounded-lg mb-4">
@@ -326,6 +373,7 @@ export default function PointDetails() {
               ))}
             </View>
           )}
+
           {/* Images */}
           <View className="bg-gray-100 p-4 rounded-lg mb-4">
             <View className="flex-row justify-between items-center mb-2">
@@ -362,45 +410,84 @@ export default function PointDetails() {
         </View>
       </ScrollView>
 
-      {/* Modal de commentaire */}
+      {/* Modal de modification de position */}
       <Modal
-        visible={isCommentModalVisible}
-        transparent={true}
+        visible={isCoordinatesModalVisible}
+        transparent={false}
         animationType="slide"
-        onRequestClose={() => setIsCommentModalVisible(false)}
+        onRequestClose={() => setIsCoordinatesModalVisible(false)}
       >
-        <View className="flex-1 justify-end bg-black/50">
-          <View className="bg-white rounded-t-3xl p-6">
-            <Text className="text-2xl font-bold mb-4">
-              {currentComment ? 'Modifier le commentaire' : 'Ajouter un commentaire'}
-            </Text>
+        <View className="flex-1 bg-white">
+          <View className="bg-blue-500 pt-12 pb-4 px-4 shadow-lg">
+            <Text className="text-white text-2xl font-bold mb-2">Modifier la position</Text>
+            <Text className="text-blue-100 text-sm">Appuyez sur la carte pour déplacer le point</Text>
+          </View>
 
-            <TextInput
-              value={commentText}
-              onChangeText={setCommentText}
-              multiline
-              numberOfLines={4}
-              className="border border-gray-300 rounded-lg p-3 mb-4"
-              placeholder="Votre commentaire..."
-            />
+          <View className="flex-1">
+            <MapView
+              style={{ flex: 1 }}
+              initialRegion={{
+                latitude: tempCoordinates.latitude,
+                longitude: tempCoordinates.longitude,
+                latitudeDelta: 0.005,
+                longitudeDelta: 0.005,
+              }}
+              onPress={handleMapPress}
+              zoomEnabled={true}
+              scrollEnabled={true}
+              minZoomLevel={15}
+              maxZoomLevel={20}
+            >
+              <Marker
+                coordinate={tempCoordinates}
+                title="Nouvelle position"
+                draggable
+                onDragEnd={(e) => setTempCoordinates(e.nativeEvent.coordinate)}
+              />
+            </MapView>
 
+            <View className="absolute top-4 left-4 right-4 bg-white/95 p-3 rounded-lg shadow-lg">
+              <Text className="text-xs text-gray-600 mb-1">Nouvelles coordonnées :</Text>
+              <Text className="font-mono text-sm">
+                Lat: {tempCoordinates.latitude.toFixed(6)}
+              </Text>
+              <Text className="font-mono text-sm">
+                Lon: {tempCoordinates.longitude.toFixed(6)}
+              </Text>
+            </View>
+          </View>
+
+          <View className="p-4 bg-white border-t border-gray-200">
             <View className="flex-row gap-3">
               <Pressable
-                onPress={() => setIsCommentModalVisible(false)}
-                className="flex-1 bg-gray-300 py-3 rounded-lg"
+                onPress={() => setIsCoordinatesModalVisible(false)}
+                className="flex-1 bg-gray-300 py-4 rounded-lg"
               >
-                <Text className="text-center font-semibold">Annuler</Text>
+                <Text className="text-center font-semibold text-base">Annuler</Text>
               </Pressable>
               <Pressable
-                onPress={handleSaveComment}
-                className="flex-1 bg-blue-500 py-3 rounded-lg"
+                onPress={handleSaveCoordinates}
+                className="flex-1 bg-blue-500 py-4 rounded-lg"
               >
-                <Text className="text-center text-white font-semibold">Enregistrer</Text>
+                <Text className="text-center text-white font-semibold text-base">✓ Enregistrer</Text>
               </Pressable>
             </View>
           </View>
         </View>
       </Modal>
+
+      {/* Modal de commentaire */}
+      <EditModal
+        visible={isCommentModalVisible}
+        title={currentComment ? 'Modifier le commentaire' : 'Ajouter un commentaire'}
+        value={commentText}
+        onChangeText={setCommentText}
+        onSave={handleSaveComment}
+        onCancel={() => setIsCommentModalVisible(false)}
+        placeholder="Votre commentaire..."
+        multiline={true}
+        numberOfLines={4}
+      />
     </>
   );
 }
