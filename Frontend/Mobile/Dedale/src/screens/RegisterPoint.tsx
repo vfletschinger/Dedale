@@ -84,8 +84,8 @@ export default function RegisterPointScreen() {
   const savePointToDB = async (x: number, y: number, commentValue: string = '') => {
     try {
       const pointResult: any = db.runSync(
-        'INSERT INTO point (x, y) VALUES (?, ?)',
-        [x, y]
+        'INSERT INTO point (x, y, timestamp) VALUES (?, ?, ?)',
+        [x, y, new Date().toISOString()]
       );
 
       const insertedPointId = pointResult.lastInsertRowId as number;

@@ -1,5 +1,5 @@
 import { View, Text, FlatList, ActivityIndicator, Pressable } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import React, { useEffect, useState, useMemo } from "react";
 import { InterestPointsType } from "../types/database";
 import getDatabase from "../../assets/migrations";
@@ -38,13 +38,14 @@ export default function InterestPointsScreen() {
     }
   };
 
-  useEffect(() => {
-    fetchInterestPoint();
-    fetchLocation();
-  }, []);
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchInterestPoint();
+      fetchLocation();
+    }, [])
+  );
 
   useEffect(() => {
-    fetchLocation();
     let sorted = [...listPoint];
     if (sortBy === 'recent') {
       sorted.sort((a, b) => b.id - a.id);
@@ -56,7 +57,7 @@ export default function InterestPointsScreen() {
       });
     }
     setSortedList(sorted);
-  }, [listPoint, sortBy]);
+  }, [listPoint, sortBy, location]);
 
   if (loading) {
     return (
@@ -101,7 +102,9 @@ export default function InterestPointsScreen() {
           <Text className="text-gray-500 text-base text-center leading-6">
             Commencez par enregistrer votre premier point d'intérêt
           </Text>
-          <Pressable className="mt-8 bg-blue-500 px-8 py-4 rounded-full shadow-md active:bg-blue-600">
+          <Pressable className="mt-8 bg-blue-500 px-8 py-4 rounded-full shadow-md active:bg-blue-600"
+            onPress={() => navigation.navigate("RegisterPoint")}
+          >
             <Text className="text-white font-semibold text-base">+ Ajouter un point</Text>
           </Pressable>
         </View>
