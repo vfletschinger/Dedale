@@ -16,6 +16,7 @@ import Constants from "expo-constants";
 import * as Location from "expo-location";
 import { InterestPointsType } from "../types/database";
 import getDatabase from "../../assets/migrations";
+import CustomButton from "./CustomButton";
 
 interface OfflineMapProps {
   initialRegion?: Region;
@@ -36,6 +37,7 @@ export default function OfflineMap({ initialRegion }: OfflineMapProps) {
   const [listPoint, setListPoint] = React.useState<InterestPointsType[]>([]);
 
   const db = getDatabase();
+  const mapRef = React.useRef<MapView | null>(null);
 
   React.useEffect(() => {
     const fetchInterestPoints = () => {
@@ -54,45 +56,68 @@ export default function OfflineMap({ initialRegion }: OfflineMapProps) {
     const initialize = async () => {
       fetchInterestPoints();
 
-      const locationPromise = async (): Promise<Region> => {
-        let { status } = await Location.requestForegroundPermissionsAsync();
+      // Start a timeout fallback but still apply the real location when it arrives.
+      let didSetFallback = false;
+      const fallbackTimer = setTimeout(() => {
+        if (!didSetFallback) {
+          console.log("⏳ Timeout 10s → fallback Strasbourg");
+          setCurrentRegion(defaultRegion);
+          setLoading(false);
+          didSetFallback = true;
+        }
+      }, 10000);
+
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") {
           Alert.alert(
             "Permission refusée",
             "Impossible d'accéder à la localisation."
           );
-          return defaultRegion;
+          if (!didSetFallback) {
+            setCurrentRegion(defaultRegion);
+            setLoading(false);
+            didSetFallback = true;
+          }
+          return;
         }
 
         try {
           const loc = await Location.getCurrentPositionAsync({
             accuracy: Location.Accuracy.Highest,
           });
-          return {
+
+          const realRegion: Region = {
             latitude: loc.coords.latitude,
             longitude: loc.coords.longitude,
             latitudeDelta: 0.01,
             longitudeDelta: 0.01,
           };
+
+          // If we already applied fallback earlier, override it with the real location.
+          setCurrentRegion(realRegion);
+          setLoading(false);
+          didSetFallback = true;
         } catch (error) {
           console.error("Erreur localisation :", error);
-          return defaultRegion;
+          if (!didSetFallback) {
+            setCurrentRegion(defaultRegion);
+            setLoading(false);
+            didSetFallback = true;
+          }
         }
-      };
-
-      const timeoutPromise = new Promise<Region>((resolve) =>
-        setTimeout(() => {
-          console.log("⏳ Timeout 10s → fallback Strasbourg");
-          resolve(defaultRegion);
-        }, 10000)
-      );
-
-      const region = await Promise.race([locationPromise(), timeoutPromise]);
-      setCurrentRegion(region);
-      setLoading(false);
+      } finally {
+        clearTimeout(fallbackTimer);
+      }
     };
 
+    let isActive = true;
     initialize();
+
+    return () => {
+      // mark effect as inactive to avoid state updates after unmount
+      isActive = false;
+    };
 
     // Le useEffect ne s'exécute qu'une fois, le nettoyage du timeout n'est pas strictement
     // nécessaire si le composant n'est jamais démonté rapidement, mais c'est une bonne pratique.
@@ -106,6 +131,29 @@ export default function OfflineMap({ initialRegion }: OfflineMapProps) {
     return Platform.OS === "android"
       ? "file:///android_asset/maps/{z}/{x}/{y}.png"
       : "file://maps/{z}/{x}/{y}.png";
+  };
+
+  const centerOnUserLocation = () => {
+    if (mapRef.current && currentRegion) {
+      mapRef.current.animateToRegion(
+        {
+          latitude: currentRegion.latitude,
+          longitude: currentRegion.longitude,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        },
+        500
+      );
+      return;
+    }
+
+    if (currentRegion) {
+      setCurrentRegion({
+        ...currentRegion,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      });
+    }
   };
 
   const tileUrlTemplate = getTileUrlTemplate();
@@ -123,17 +171,21 @@ export default function OfflineMap({ initialRegion }: OfflineMapProps) {
       <MapView
         style={styles.map}
         provider={PROVIDER_DEFAULT}
+        ref={(r) => {
+          mapRef.current = r;
+        }}
         initialRegion={currentRegion}
         showsUserLocation
-        showsMyLocationButton
+        showsMyLocationButton={false}
         showsCompass
         rotateEnabled
-        pitchEnabled={false}
-        mapType="none"
+        pitchEnabled={true}
+        mapType="none" // mapType="standard" pour passer en ligne
         minZoomLevel={13}
         maxZoomLevel={16}
+        toolbarEnabled={false}
       >
-        <UrlTile
+        <UrlTile // tout commenter UrlTile pour passer en ligne
           urlTemplate={tileUrlTemplate}
           maximumZ={16}
           minimumZ={13}
@@ -148,12 +200,14 @@ export default function OfflineMap({ initialRegion }: OfflineMapProps) {
                 key={p.id}
                 coordinate={{ latitude: p.x, longitude: p.y }}
                 title={`${p.id}`}
-                pinColor="blue"
               />
             )
           )
         )}
       </MapView>
+      <View style={styles.overlayContainer}>
+        <CustomButton title="Center" onPress={centerOnUserLocation} />
+      </View>
     </View>
   );
 }
@@ -162,4 +216,10 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   map: { width: "100%", height: "100%" },
+  overlayContainer: {
+    position: "absolute",
+    right: 16,
+    bottom: 16,
+    zIndex: 100,
+  },
 });
