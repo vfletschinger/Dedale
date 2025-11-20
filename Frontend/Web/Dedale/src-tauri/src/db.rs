@@ -5,7 +5,7 @@ use tauri_plugin_sql::{Builder, Migration, MigrationKind};
 use tauri::{AppHandle, Manager};
 use std::fs;
 use std::str::FromStr;
-
+use serde::Serialize;
 
 // Elle renvoie le plugin SQL entièrement configuré
 pub fn init_db() -> impl tauri::plugin::Plugin<tauri::Wry> {
@@ -68,7 +68,7 @@ pub fn init_db() -> impl tauri::plugin::Plugin<tauri::Wry> {
         .build()
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Point {
     pub id: i64,
     pub x: f64,
@@ -78,7 +78,7 @@ pub struct Point {
     pub pictures: Vec<Picture>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Obstacle {
     pub id: i64,
     pub name: Option<String>,
@@ -88,13 +88,13 @@ pub struct Obstacle {
     pub length: Option<f64>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Picture {
     pub id: i64,
     pub image: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Comment {
     pub id: i64,
     pub value: String,
