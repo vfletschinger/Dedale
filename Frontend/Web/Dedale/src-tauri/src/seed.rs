@@ -42,7 +42,7 @@ pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
         ObstacleTypeSeed { name: "Arbre", description: "Arbre sur le parcours", width: 0.5, length: 0.5 },
         ObstacleTypeSeed { name: "Rocher", description: "Rocher bloquant", width: 1.0, length: 1.0 },
         ObstacleTypeSeed { name: "Barrière", description: "Barrière métallique", width: 2.0, length: 0.1 },
-        ObstacleTypeSeed { name: "Panneau", description: "Panneau de signalisation", width: 0.8, length: 0.05 },
+        ObstacleTypeSeed { name: "Panneau", description: "Panneau de signalisation", width: 0.8, length: 0.4 },
         ObstacleTypeSeed { name: "Poubelle", description: "Conteneur à déchets", width: 0.6, length: 0.6 },
     ];
     let points = [
