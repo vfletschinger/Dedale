@@ -4,6 +4,8 @@ import {
   FlatList,
   ActivityIndicator,
   Pressable,
+  Modal,
+  Alert,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import React, { useEffect, useState, useMemo } from "react";
@@ -23,6 +25,8 @@ export default function InterestPointsScreen() {
     latitude: number;
     longitude: number;
   } | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
   const fetchInterestPoint = async () => {
     try {
@@ -78,6 +82,32 @@ export default function InterestPointsScreen() {
     }
     setSortedList(sorted);
   }, [listPoint, sortBy]);
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds((prev) => {
+      if (prev.includes(id)) return prev.filter((v) => v !== id);
+      return [...prev, id];
+    });
+  };
+
+  const openSelectionModal = () => {
+    // reset selection to empty by default (or you could persist previous)
+    setSelectedIds([]);
+    setModalVisible(true);
+  };
+
+  const validateSelection = () => {
+    if (selectedIds.length === 0) {
+      Alert.alert(
+        "Aucun point sélectionné",
+        "Veuillez sélectionner au moins un point pour créer un itinéraire."
+      );
+      return;
+    }
+    const selectedPoints = sortedList.filter((p) => selectedIds.includes(p.id));
+    setModalVisible(false);
+    navigation.navigate("CreateRoute", { points: selectedPoints });
+  };
 
   if (loading) {
     return (
@@ -208,15 +238,79 @@ export default function InterestPointsScreen() {
 
       {/* Persistent centered button at bottom */}
       <Pressable
-        onPress={() => navigation.navigate("RegisterPoint")}
-        className="absolute bottom-6 left-0 right-0 items-center"
+        onPress={openSelectionModal}
+        className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-blue-500 rounded-full p-4 shadow-lg active:bg-blue-600"
+        style={{
+          transform: [{ scale: 1 }],
+          zIndex: 1000,
+        }}
       >
-        <View className="bg-blue-500 px-6 py-3 rounded-full shadow-md active:bg-blue-600">
-          <Text className="text-white font-semibold text-base">
-            + Ajouter un point
-          </Text>
-        </View>
+        <Text className="text-white font-bold text-lg">
+          + Créer un itinéraire
+        </Text>
       </Pressable>
+
+      {/* Selection Modal */}
+      <Modal
+        visible={modalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View className="flex-1 justify-end bg-black/40">
+          <View className="bg-white rounded-t-2xl p-4 max-h-3/4">
+            <View className="flex-row items-center justify-between mb-3">
+              <Text className="text-lg font-semibold">
+                Sélectionner des points
+              </Text>
+              <Pressable onPress={() => setModalVisible(false)} className="p-2">
+                <Text className="text-blue-600 font-semibold">Fermer</Text>
+              </Pressable>
+            </View>
+
+            <FlatList
+              data={sortedList}
+              keyExtractor={(item) => item.id.toString()}
+              renderItem={({ item }) => {
+                const selected = selectedIds.includes(item.id);
+                return (
+                  <Pressable
+                    onPress={() => toggleSelect(item.id)}
+                    className={`flex-row items-center justify-between p-3 rounded-lg mb-2 ${selected ? "bg-blue-50" : "bg-white"}`}
+                  >
+                    <View>
+                      <Text className="font-medium">Point #{item.id}</Text>
+                      <Text className="text-xs text-gray-500">
+                        {item.x.toFixed(4)}, {item.y.toFixed(4)}
+                      </Text>
+                    </View>
+                    <View className="w-8 h-8 rounded-full items-center justify-center border border-gray-300">
+                      <Text>{selected ? "✓" : ""}</Text>
+                    </View>
+                  </Pressable>
+                );
+              }}
+            />
+
+            <View className="flex-row justify-between mt-3">
+              <Pressable
+                onPress={() => setModalVisible(false)}
+                className="flex-1 mr-2 bg-gray-200 rounded-full p-3 items-center"
+              >
+                <Text>Annuler</Text>
+              </Pressable>
+              <Pressable
+                onPress={validateSelection}
+                className="flex-1 ml-2 bg-blue-500 rounded-full p-3 items-center"
+              >
+                <Text className="text-white font-semibold">
+                  Valider ({selectedIds.length})
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

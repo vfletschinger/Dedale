@@ -1,5 +1,6 @@
 import { StatusBar } from "expo-status-bar";
 import { StyleSheet, Text, View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
@@ -13,6 +14,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import { useEffect, useState } from "react";
 import getDatabase from "./assets/migrations";
 import React from "react";
+import CreateRouteScreen from "./src/screens/CreateRoute";
 
 const Tab = createBottomTabNavigator<TabParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -33,41 +35,48 @@ function TabNavigator() {
 }
 
 export default function App() {
-   const [dbReady, setDbReady] = useState(false);
+  const [dbReady, setDbReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     async function initDatabase() {
       try {
         // Initialiser la base de données
         const db = getDatabase();
-         // EN DEV UNIQUEMENT : Uncomment pour forcer le reseed
+        // EN DEV UNIQUEMENT : Uncomment pour forcer le reseed
         // if (__DEV__) {
-        //   const { resetAndSeed } = await import('./assets/migrations/seeders');
+        //   const { resetAndSeed } = await import("./assets/migrations/seeders");
         //   resetAndSeed(db);
         // }
         setDbReady(true);
       } catch (err) {
-        console.error('Erreur initialisation DB:', err);
-        setError(err instanceof Error ? err.message : 'Erreur inconnue');
+        console.error("Erreur initialisation DB:", err);
+        setError(err instanceof Error ? err.message : "Erreur inconnue");
       }
     }
 
     initDatabase();
   }, []);
   return (
-    <NavigationContainer>
-      <Stack.Navigator>
-        <Stack.Screen
-          name="Tabs"
-          component={TabNavigator}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="PointDetails"
-          component={PointDetails}
-          options={{ headerShown: false }}
-        />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <NavigationContainer>
+        <Stack.Navigator>
+          <Stack.Screen
+            name="Tabs"
+            component={TabNavigator}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="PointDetails"
+            component={PointDetails}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="CreateRoute"
+            component={CreateRouteScreen}
+            options={{ headerShown: false }}
+          />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </GestureHandlerRootView>
   );
 }

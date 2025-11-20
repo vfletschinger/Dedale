@@ -192,18 +192,13 @@ export default function OfflineMap({ initialRegion }: OfflineMapProps) {
           tileSize={256}
           shouldReplaceMapContent
         />
-        {listPoint.map(
-          (p) => (
-            console.log(p),
-            (
-              <Marker
-                key={p.id}
-                coordinate={{ latitude: p.x, longitude: p.y }}
-                title={`${p.id}`}
-              />
-            )
-          )
-        )}
+        {listPoint.map((p) => (
+          <Marker
+            key={p.id}
+            coordinate={{ longitude: p.x, latitude: p.y }}
+            title={`${p.id}`}
+          />
+        ))}
       </MapView>
       <View style={styles.overlayContainer}>
         <CustomButton title="Center" onPress={centerOnUserLocation} />
