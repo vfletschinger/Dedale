@@ -10,14 +10,24 @@ import {
   addComment,
   deletePicture,
   addPicture,
-  updatePointCoordinates
+  updatePointCoordinates,
+  addObstacle,
+  deleteObstacle,
+  updateTimeStamp
 } from "../services/databaseAcces";
 import { imageToBase64, pickImage } from "../services/ImageHelper";
 import MapView, { Marker, MapPressEvent } from "react-native-maps";
 import CoordinatesDisplay from "../components/CoordinatesDisplay";
 import EditModal from "../components/EditModal";
+import ObstacleSelector from "../components/ObstacleSelector";
 
 type RouteParams = { pointId: number; };
+
+type SelectedObstacle = {
+  type_id: number;
+  name: string;
+  number: number;
+};
 
 export default function PointDetails() {
   const db = getDatabase();
@@ -26,15 +36,19 @@ export default function PointDetails() {
   const navigation = useNavigation();
   const [pointData, setPointData] = useState<PointDetailType | null>(null);
   const [loading, setLoading] = useState(true);
-  
+
   // États pour modal de commentaire
   const [isCommentModalVisible, setIsCommentModalVisible] = useState(false);
   const [currentComment, setCurrentComment] = useState<CommentType | null>(null);
   const [commentText, setCommentText] = useState('');
-  
+
   // États pour modal de coordonnées
   const [isCoordinatesModalVisible, setIsCoordinatesModalVisible] = useState(false);
   const [tempCoordinates, setTempCoordinates] = useState<{ latitude: number; longitude: number }>({ latitude: 0, longitude: 0 });
+
+  // États pour modal d'obstacles
+  const [isObstacleSelectorVisible, setIsObstacleSelectorVisible] = useState(false);
+  const [editingObstacles, setEditingObstacles] = useState(false);
 
   const fetchPoint = async () => {
     setLoading(true);
@@ -94,17 +108,6 @@ export default function PointDetails() {
     }, [pointId])
   );
 
-  const updateTimeStamp = () => {
-    try {
-      db.runSync(
-        'UPDATE point SET modified_at = ? WHERE id = ?',
-        [new Date().toISOString(), pointId]
-      );
-      console.log(`Point ${pointId} timestamp updated.`);
-    } catch (error) {
-      console.error("Failed to update point's modified_at timestamp:", error);
-    }
-  };
 
   const handleDelete = () => {
     Alert.alert(
@@ -140,7 +143,7 @@ export default function PointDetails() {
           style: 'destructive',
           onPress: () => {
             deleteComment(commentId, db);
-            updateTimeStamp();
+            updateTimeStamp(pointId, db);
             fetchPoint();
           }
         }
@@ -169,11 +172,10 @@ export default function PointDetails() {
     try {
       if (currentComment) {
         updateComment(currentComment.id, commentText, db);
-        updateTimeStamp();
       } else {
         addComment(pointId, commentText, db);
-        updateTimeStamp();
       }
+      updateTimeStamp(pointId, db);
       setIsCommentModalVisible(false);
       fetchPoint();
     } catch (error) {
@@ -193,7 +195,7 @@ export default function PointDetails() {
           style: 'destructive',
           onPress: () => {
             deletePicture(pictureId, db);
-            updateTimeStamp();
+            updateTimeStamp(pointId, db);
             fetchPoint();
           }
         }
@@ -207,7 +209,7 @@ export default function PointDetails() {
       if (uri) {
         const base64 = await imageToBase64(uri);
         addPicture(pointId, base64, db);
-        updateTimeStamp();
+        updateTimeStamp(pointId, db);
         Alert.alert('Succès', 'Image ajoutée');
         fetchPoint();
       }
@@ -233,6 +235,7 @@ export default function PointDetails() {
         tempCoordinates.latitude,
         db
       );
+      updateTimeStamp(pointId, db);
       Alert.alert('Succès', 'Position modifiée avec succès');
       setIsCoordinatesModalVisible(false);
       fetchPoint();
@@ -240,6 +243,73 @@ export default function PointDetails() {
       console.error('Erreur:', error);
       Alert.alert('Erreur', 'Impossible de modifier la position');
     }
+  };
+
+  const handleSaveObstacles = (obstacles: SelectedObstacle[]) => {
+    if (obstacles.length === 0) {
+      if (editingObstacles) {
+        // Mode édition : supprimer tous les obstacles existants
+        Alert.alert(
+          'Confirmer',
+          'Supprimer tous les obstacles ?',
+          [
+            { text: 'Annuler', style: 'cancel' },
+            {
+              text: 'Supprimer',
+              style: 'destructive',
+              onPress: () => {
+                try {
+                  pointData?.obstacles.forEach(obstacle => {
+                    deleteObstacle(obstacle.id, db);
+                  });
+                  updateTimeStamp(pointId, db);
+                  fetchPoint();
+                  Alert.alert('Succès', 'Obstacles supprimés');
+                } catch (error) {
+                  console.error('Erreur:', error);
+                  Alert.alert('Erreur', 'Impossible de supprimer les obstacles');
+                }
+              }
+            }
+          ]
+        );
+      }
+      return;
+    }
+
+    try {
+      if (editingObstacles) {
+        // Mode édition : supprimer les anciens obstacles
+        pointData?.obstacles.forEach(obstacle => {
+          deleteObstacle(obstacle.id, db);
+        });
+      }
+
+      // Ajouter les nouveaux obstacles
+      for (const obstacle of obstacles) {
+        addObstacle(pointId, obstacle.type_id, obstacle.number, db);
+      }
+
+      updateTimeStamp(pointId, db);
+      Alert.alert('Succès', editingObstacles ? 'Obstacles mis à jour' : 'Obstacles ajoutés');
+      fetchPoint();
+      setEditingObstacles(false);
+      
+    } catch (error) {
+      console.error('Erreur:', error);
+      Alert.alert('Erreur', 'Impossible de sauvegarder les obstacles');
+    }
+  };
+
+  const handleAddObstacles = () => {
+    setEditingObstacles(false);
+    setIsObstacleSelectorVisible(true);
+  };
+
+  const handleEditObstacles = () => {
+
+    setEditingObstacles(true);
+    setIsObstacleSelectorVisible(true);
   };
 
   if (loading) {
@@ -369,31 +439,43 @@ export default function PointDetails() {
             ) : (
               <Text className="text-gray-500 text-sm">Aucun commentaire</Text>
             )}
-            
           </View>
 
           {/* Obstacles */}
-          {pointData.obstacles.length > 0 && (
-            <View className="bg-gray-100 p-4 rounded-lg mb-4">
-              <Text className="text-lg font-semibold mb-2">
+          <View className="bg-gray-100 p-4 rounded-lg mb-4">
+            <View className="flex-row justify-between items-center mb-2">
+              <Text className="text-lg font-semibold">
                 Obstacles ({pointData.obstacles.length})
               </Text>
-              {pointData.obstacles.map((obstacle) => (
+              <View className="flex-row gap-2">
+                <Pressable
+                  onPress={handleEditObstacles}
+                  className="bg-blue-500 px-3 py-1 rounded-lg"
+                >
+                  <Text className="text-white text-xs font-semibold">{pointData.obstacles.length > 0 ? '✏️ Modifier' : '+ Ajouter'}</Text>
+                </Pressable>
+              </View>
+            </View>
+            {pointData.obstacles.length > 0 ? (
+              pointData.obstacles.map((obstacle) => (
                 <View key={obstacle.id} className="bg-white p-3 rounded-lg mb-2">
                   <Text className="font-semibold">{obstacle.name}</Text>
                   {obstacle.description && (
                     <Text className="text-sm text-gray-600">{obstacle.description}</Text>
                   )}
-                  <Text className="text-sm mt-1">Nombre: {obstacle.nombre}</Text>
+                  <Text className="text-sm mt-1">Nombre: {obstacle.number}</Text>
                   {(obstacle.length || obstacle.width) && (
                     <Text className="text-sm">
                       Dimensions: {obstacle.length}m x {obstacle.width}m
                     </Text>
                   )}
+
                 </View>
-              ))}
-            </View>
-          )}
+              ))
+            ) : (
+              <Text className="text-gray-500 text-sm">Aucun obstacle</Text>
+            )}
+          </View>
 
           {/* Images */}
           <View className="bg-gray-100 p-4 rounded-lg mb-4">
@@ -508,6 +590,26 @@ export default function PointDetails() {
         placeholder="Votre commentaire..."
         multiline={true}
         numberOfLines={4}
+      />
+
+      {/* Modal de sélection d'obstacles - Maintenant centré */}
+      <ObstacleSelector
+        visible={isObstacleSelectorVisible}
+        onClose={() => {
+          setIsObstacleSelectorVisible(false);
+          setEditingObstacles(false);
+        }}
+        onSave={handleSaveObstacles}
+        initialObstacles={
+          editingObstacles
+            ? pointData?.obstacles.map(obstacle => ({
+              type_id: obstacle.type_id,
+              name: obstacle.name ?? 'Nom inconnu',
+              number: obstacle.number
+            })) || []
+            : []
+        }
+        editMode={editingObstacles}
       />
     </>
   );

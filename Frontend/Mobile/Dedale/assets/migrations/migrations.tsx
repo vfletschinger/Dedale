@@ -1,5 +1,5 @@
-import { SQLiteDatabase } from 'expo-sqlite';
-import { version } from 'react';
+import { SQLiteDatabase } from "expo-sqlite";
+import { version } from "react";
 
 export interface Migration {
   version: number;
@@ -10,7 +10,7 @@ export interface Migration {
 export const migrations: Migration[] = [
   {
     version: 1,
-    name: 'Initial schema',
+    name: "Initial schema",
     up: (db: SQLiteDatabase) => {
       db.execSync(`
         CREATE TABLE IF NOT EXISTS obstacle_types (
@@ -27,8 +27,9 @@ export const migrations: Migration[] = [
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           x REAL NOT NULL,
           y REAL NOT NULL,
-          timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           modified_at DATETIME DEFAULT CURRENT_TIMESTAMP
+
         );
       `);
 
@@ -60,36 +61,48 @@ export const migrations: Migration[] = [
           FOREIGN KEY (type_id) REFERENCES obstacle_types (id)
         );
       `);
-    }
+    },
   },
   {
     version: 2,
-    name: 'change column name',
+    name: "change column name",
     up: (db: SQLiteDatabase) => {
       const tables = db.getAllSync<{ name: string }>(
         "SELECT name FROM sqlite_master WHERE type='table'"
       );
-      
-      const tableNames = tables.map(t => t.name);
-      
-      if (tableNames.includes('interest_points')) {
+
+      const tableNames = tables.map((t) => t.name);
+
+      if (tableNames.includes("interest_points")) {
         db.execSync(`ALTER TABLE interest_points RENAME TO point;`);
       }
-      if (tableNames.includes('obstacles')) {
+      if (tableNames.includes("obstacles")) {
         db.execSync(`ALTER TABLE obstacles RENAME TO obstacle;`);
       }
-      if (tableNames.includes('pictures')) {
+      if (tableNames.includes("pictures")) {
         db.execSync(`ALTER TABLE pictures RENAME TO picture;`);
       }
-      if (tableNames.includes('comments')) {
+      if (tableNames.includes("comments")) {
         db.execSync(`ALTER TABLE comments RENAME TO comment;`);
       }
-      if (tableNames.includes('obstacle_types')) {
+      if (tableNames.includes("obstacle_types")) {
         db.execSync(`ALTER TABLE obstacle_types RENAME TO obstacle_type;`);
       }
-      
+
       // Supprimer cette ligne car la colonne s'appelle déjà 'image'
       db.execSync(`ALTER TABLE obstacle RENAME COLUMN nombre TO number;`);
-    }
-  }
+    },
+  },
+  {
+    version: 3,
+    name: "add time stam",
+    up: (db: SQLiteDatabase) => {
+      db.execSync(`
+        CREATE TABLE IF NOT EXISTS session (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          date DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+    },
+  },
 ];

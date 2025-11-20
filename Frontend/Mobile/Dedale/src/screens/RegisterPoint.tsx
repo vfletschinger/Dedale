@@ -12,29 +12,36 @@ import {
 } from "react-native";
 import React, { useState, useRef } from "react";
 import CustomButton from "../components/CustomButton";
-import MapView, { Marker } from "react-native-maps";
+import ObstacleSelector from "../components/ObstacleSelector";
+import MapView from "react-native-maps";
 import * as Location from "expo-location";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
 import getDatabase from "../../assets/migrations";
 import * as ImageHelper from "../services/ImageHelper";
 
+type SelectedObstacle = {
+  type_id: number;
+  name: string;
+  number: number;
+};
+
 export default function RegisterPointScreen() {
   const [location, setLocation] = useState<{
     latitude: number;
     longitude: number;
   } | null>(null);
-  
   const [coords, setCoords] = useState<{
     latitude: number;
     longitude: number;
   } | null>(null);
-  
   const mapRef = useRef<MapView | null>(null);
   const db: any = getDatabase();
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isObstacleSelectorVisible, setIsObstacleSelectorVisible] = useState(false);
   const [pointComment, setPointComment] = useState("");
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
+  const [selectedObstacles, setSelectedObstacles] = useState<SelectedObstacle[]>([]);
 
   React.useEffect(() => {
     requestLocation();
@@ -58,7 +65,7 @@ export default function RegisterPointScreen() {
     };
 
     setCoords(newCoords);
-    
+    setLocation(newCoords);
     if (mapRef.current) {
       try {
         mapRef.current.animateToRegion(
@@ -111,91 +118,81 @@ export default function RegisterPointScreen() {
     y: number,
     commentValue: string = ""
   ) => {
-      try {
-        const pointResult: any = db.runSync(
-          "INSERT INTO point (x, y, timestamp) VALUES (?, ?, ?)",
-          [x, y, new Date().toISOString()]
-        );
+    try {
+      const pointResult: any = db.runSync(
+        "INSERT INTO point (x, y) VALUES (?, ?)",
+        [x, y]
+      );
 
       const insertedPointId = pointResult.lastInsertRowId as number;
       if (!insertedPointId || insertedPointId === 0) {
-        throw new Error("Impossible de récupérer l'ID du point qui vient d'être créé.");
+        throw new Error(
+          "Impossible de récupérer l'ID du point qui vient d'être créé."
+        );
       }
 
-      db.runSync(
-        'INSERT INTO comment (point_id, value) VALUES (?, ?)',
-        [insertedPointId, commentValue]
-      );
-
+      // Sauvegarder les images
       if (selectedImages.length > 0) {
         for (const imageUri of selectedImages) {
           try {
-            try {
-              const cols: any[] = db.getAllSync("PRAGMA table_info('picture')");
-              const hasImageCol = Array.isArray(cols) && cols.some(c => c.name === 'image');
-              if (!hasImageCol) {
-                db.execSync('ALTER TABLE picture ADD COLUMN image TEXT');
-              }
-            } catch (pragmaErr) { console.warn(pragmaErr); }
-
             await ImageHelper.saveImageToBDD(imageUri, insertedPointId);
           } catch (imgErr) {
-            console.error(`Erreur image ${imageUri} :`, imgErr);
+            console.error(
+              `Erreur lors de la sauvegarde de l'image ${imageUri} :`,
+              imgErr
+            );
+            const errMessage =
+              (imgErr && (imgErr as any).message) || String(imgErr);
+            Alert.alert(
+              "Attention",
+              `Le point a été enregistré mais la sauvegarde d'une image a échoué. (${errMessage})`
+            );
           }
         }
       }
 
-        return insertedPointId;
-      } catch (error: any) {
-        console.error(
-        "Erreur sauvegarde :",
+      // Sauvegarder le commentaire
+      if (commentValue.trim()) {
+        db.runSync("INSERT INTO comment (point_id, value) VALUES (?, ?)", [
+          insertedPointId,
+          commentValue,
+        ]);
+      }
+
+      // Sauvegarder les obstacles
+      if (selectedObstacles.length > 0) {
+        for (const obstacle of selectedObstacles) {
+          try {
+            db.runSync(
+              "INSERT INTO obstacle (point_id, type_id, number) VALUES (?, ?, ?)",
+              [insertedPointId, obstacle.type_id, obstacle.number]
+            );
+          } catch (obstErr) {
+            console.error("Erreur lors de la sauvegarde de l'obstacle:", obstErr);
+            Alert.alert(
+              "Attention",
+              `Le point a été enregistré mais un obstacle n'a pas pu être ajouté.`
+            );
+          }
+        }
+      }
+
+      return insertedPointId;
+    } catch (error: any) {
+      console.error(
+        "Erreur lors de la sauvegarde du point/commentaire :",
         error
       );
-        Alert.alert(
-        "Erreur",
-        "Impossible d'enregistrer le point."
-      );
-        return null;
-      }
-  };
-
-  const getSavedPoints = () => {
-    try {
-      const results = db.getAllSync("SELECT * FROM point");
-      console.log("Saved Points:", results);
-      return results;
-    } catch (error) {
-      console.error("Erreur lors de la récupération des points :", error);
-      Alert.alert("Erreur", "Impossible de récupérer les points enregistrés.");
-      return [];
-    }
-  };
-
-  const getSavedComments = () => {
-    try {
-      const results = db.getAllSync("SELECT * FROM comment");
-      console.log("Saved Comments:", results);
-      return results;
-    } catch (error) {
-      console.error("Erreur lors de la récupération des commentaires :", error);
       Alert.alert(
         "Erreur",
-        "Impossible de récupérer les commentaires enregistrés."
+        "Impossible d'enregistrer le point et son commentaire."
       );
-      return [];
+      return null;
     }
   };
 
-  const getSavedPictures = () => {
-    try {
-      const results = db.getAllSync("SELECT * FROM picture");
-      console.log("Saved Pictures:", results);
-      return results;
-    } catch (error) {
-      console.error("Erreur lors de la récupération des images :", error);
-      Alert.alert("Erreur", "Impossible de récupérer les images enregistrées.");
-      return [];
-    }
+  const handleSaveObstacles = (obstacles: SelectedObstacle[]) => {
+    setSelectedObstacles(obstacles);
   };
 
   return (
@@ -212,22 +209,8 @@ export default function RegisterPointScreen() {
             latitudeDelta: 0.003,
             longitudeDelta: 0.003,
           }}
-          showsUserLocation={true}
-          onPress={(e) => {
-            const clickedCoords = e.nativeEvent.coordinate;
-            setLocation(clickedCoords);
-            setIsModalVisible(true);
-          }}
-        >
-          {location && (
-            <Marker 
-              coordinate={location} 
-              title="Nouveau point"
-              description="Point à enregistrer"
-              pinColor="red"
-            />
-          )}
-        </MapView>
+          showsUserLocation
+        />
       ) : (
         <View style={styles.map}>
           <Text>Chargement de la carte...</Text>
@@ -239,24 +222,18 @@ export default function RegisterPointScreen() {
           onPress={requestLocation}
           style={[styles.button, { backgroundColor: "#8B5CF6" }]}
         >
-          <Text style={styles.buttonText}>Ma position</Text>
+          <Text style={styles.buttonText}>Obtenir ma position</Text>
         </Pressable>
 
         <Pressable
-          onPress={() => {
-             if(coords) {
-                 setLocation(coords);
-                 setIsModalVisible(true);
-             } else {
-                 Alert.alert("Erreur", "Position introuvable");
-             }
-          }}
-          style={[styles.button, { backgroundColor: '#8B5CF6' }]}
+          onPress={() => setIsModalVisible(true)}
+          style={[styles.button, { backgroundColor: "#8B5CF6" }]}
         >
-          <Text style={styles.buttonText}>Ajouter un point ici</Text>
+          <Text style={styles.buttonText}>Ajouter un point</Text>
         </Pressable>
       </View>
 
+      {/* Modal principale */}
       <Modal
         visible={isModalVisible}
         transparent={true}
@@ -265,21 +242,53 @@ export default function RegisterPointScreen() {
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Nouveau Point</Text>
+            <Text style={styles.modalTitle}>Ajouter un point d'intérêt</Text>
             
-            {location && (
-               <Text style={{fontSize: 12, color: 'gray', marginBottom: 10}}>
-                 Lat: {location.latitude.toFixed(5)}, Lon: {location.longitude.toFixed(5)}
-               </Text>
-            )}
-
+            {/* Commentaire */}
             <TextInput
               style={[styles.input, { marginBottom: 10 }]}
               placeholder="Entrez le commentaire du point"
               value={pointComment}
               onChangeText={setPointComment}
+              multiline
             />
+
+            {/* Bouton pour ajouter des obstacles */}
+            <CustomButton 
+              title={`Ajouter des obstacles ${selectedObstacles.length > 0 ? `(${selectedObstacles.length})` : ''}`}
+              onPress={() => setIsObstacleSelectorVisible(true)} 
+            />
+
+            {/* Affichage des obstacles sélectionnés */}
+            {selectedObstacles.length > 0 && (
+              <View style={{ marginVertical: 10 }}>
+                <Text style={{ fontWeight: '600', marginBottom: 5 }}>
+                  Obstacles sélectionnés :
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {selectedObstacles.map((obs, idx) => (
+                    <View 
+                      key={idx}
+                      style={{
+                        backgroundColor: '#DBEAFE',
+                        paddingHorizontal: 12,
+                        paddingVertical: 6,
+                        borderRadius: 20,
+                      }}
+                    >
+                      <Text style={{ color: '#1E40AF', fontWeight: '500' }}>
+                        {obs.name} ({obs.number})
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* Bouton pour prendre une photo */}
             <CustomButton title="Prendre une photo" onPress={pickImage} />
+
+            {/* Liste des images */}
             {selectedImages.length > 0 ? (
               <FlatList
                 horizontal
@@ -305,37 +314,51 @@ export default function RegisterPointScreen() {
                 style={{ marginVertical: 8 }}
               />
             ) : null}
-            
+
+            {/* Bouton enregistrer */}
             <CustomButton
               title="Enregistrer le point"
               onPress={async () => {
                 if (location) {
-                  const insertedId = await savePointToDB(location.longitude, location.latitude, pointComment);
+                  const insertedId = await savePointToDB(
+                    location.longitude, 
+                    location.latitude, 
+                    pointComment
+                  );
                   if (insertedId) {
+                    Alert.alert('Succès', 'Point enregistré avec succès');
                     setIsModalVisible(false);
                     setPointComment("");
                     setSelectedImages([]);
-
-                    setLocation(null);                     
-                    Alert.alert("Succès", "Point enregistré !");
+                    setSelectedObstacles([]);
                   }
                 } else {
                   Alert.alert("Erreur", "Aucune position à enregistrer.");
                 }
               }}
             />
+
+            {/* Bouton annuler */}
             <CustomButton
               title="Annuler"
               onPress={() => {
                 setIsModalVisible(false);
                 setPointComment("");
                 setSelectedImages([]);
-                // setLocation(null);
+                setSelectedObstacles([]);
               }}
             />
           </View>
         </View>
       </Modal>
+
+      {/* Composant ObstacleSelector */}
+      <ObstacleSelector
+        visible={isObstacleSelectorVisible}
+        onClose={() => setIsObstacleSelectorVisible(false)}
+        onSave={handleSaveObstacles}
+        initialObstacles={selectedObstacles}
+      />
     </View>
   );
 }
@@ -356,6 +379,7 @@ const styles = StyleSheet.create({
     padding: 20,
     borderTopLeftRadius: 12,
     borderTopRightRadius: 12,
+    maxHeight: '80%',
   },
   modalTitle: {
     fontSize: 18,
@@ -368,6 +392,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 10,
     marginBottom: 12,
+    minHeight: 60,
   },
   map: {
     ...StyleSheet.absoluteFillObject,

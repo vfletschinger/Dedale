@@ -30,16 +30,18 @@ export default function EditModal({
     <Modal
       visible={visible}
       transparent={true}
-      animationType="slide"
+      animationType="fade"
       onRequestClose={onCancel}
     >
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         className="flex-1"
-      >
-        <View className="flex-1 justify-end bg-black/50">
-          <View className="bg-white rounded-t-3xl p-6">
-            <Text className="text-2xl font-bold mb-4">{title}</Text>
+      >      
+    
+
+        <View className="flex-1 justify-center items-center bg-black/50 p-4">
+          <View className="bg-white rounded-3xl p-6 w-full max-w-lg max-h-[85%]">
+            <Text className="text-2xl font-bold mb-4 text-center">{title}</Text>
 
             <TextInput
               value={value}
