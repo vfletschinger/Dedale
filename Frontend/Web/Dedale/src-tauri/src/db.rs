@@ -23,7 +23,7 @@ pub fn init_db() -> impl tauri::plugin::Plugin<tauri::Wry> {
             description: "create_all_tables",
             sql: "
                 CREATE TABLE point (
-                    id INTEGER PRIMARY KEY,
+                    id INTEGER PRIMARY KEY ,
                     x REAL,
                     y REAL
                 );
@@ -46,15 +46,15 @@ pub fn init_db() -> impl tauri::plugin::Plugin<tauri::Wry> {
                 CREATE TABLE picture (
                     id INTEGER PRIMARY KEY,
                     point_id INTEGER,
-                    path TEXT,
+                    image TEXT,
                     FOREIGN KEY (point_id) REFERENCES point (id)
                 );
 
-                CREATE TABLE obstacles (
+                CREATE TABLE obstacle (
                     id INTEGER PRIMARY KEY,
                     point_id INTEGER,
                     type_id INTEGER,
-                    nombre INTEGER,
+                    number INTEGER,
                     FOREIGN KEY (point_id) REFERENCES point (id),
                     FOREIGN KEY (type_id) REFERENCES obstacle_type (id)
                 );
@@ -70,16 +70,36 @@ pub fn init_db() -> impl tauri::plugin::Plugin<tauri::Wry> {
         .build()
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Point {
     pub id: i64,
     pub x: f64,
     pub y: f64,
-    pub obstacle_nom: Option<String>,
-    pub obstacle_description: Option<String>,
-    pub nombre: Option<i32>,
-    pub obstacle_largeur: Option<f64>,
-    pub obstacle_longueur: Option<f64>,
+    pub obstacles: Vec<Obstacle>,
+    pub comments: Vec<Comment>,
+    pub pictures: Vec<Picture>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct Obstacle {
+    pub id: i64,
+    pub name: Option<String>,
+    pub number: Option<i32>,
+    pub description: Option<String>, 
+    pub width: Option<f64>,
+    pub length: Option<f64>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct Picture {
+    pub id: i64,
+    pub image: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct Comment {
+    pub id: i64,
+    pub value: String,
 }
 #[derive(Debug,Serialize, Deserialize)]
 pub struct PointSimple {
@@ -109,11 +129,14 @@ pub struct Obstacle {
     pub number: i32,      // Un champ numérique lié à l'obstacle (ex: nombre de marches)
 }
 
-#[derive(Debug, Serialize,Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PointDetail {
-    pub point: Vec<PointSimple>,
+    pub point: PointSimple,  // Changed from Vec<PointSimple> to PointSimple
+    #[serde(rename = "comments")]
     pub comment: Vec<Comment>,
+    #[serde(rename = "pictures")]
     pub picture: Vec<Picture>, 
+    #[serde(rename = "obstacles")]
     pub obstacle: Vec<Obstacle>,
 }
 pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
@@ -139,49 +162,114 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
         .map_err(|e| format!("Failed to connect to database: {}", e))
 }
 
+async fn fetch_comments(pool: &SqlitePool, point_id: i64) -> Result<Vec<Comment>, String> {
+    let rows = sqlx::query("SELECT id, value FROM comment WHERE point_id = ?")
+        .bind(point_id)
+        .fetch_all(pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let comments = rows.into_iter().map(|row| Comment {
+        id: row.get("id"),
+        value: row.get("value"),
+    }).collect();
+
+    Ok(comments)
+}
+
+async fn fetch_pictures(pool: &SqlitePool, point_id: i64) -> Result<Vec<Picture>, String> {
+    let rows = sqlx::query("SELECT id, image FROM picture WHERE point_id = ?")
+        .bind(point_id)
+        .fetch_all(pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let pictures = rows.into_iter().map(|row| Picture {
+        id: row.get("id"),
+        image: row.get("image"),
+    }).collect();
+
+    Ok(pictures)
+}
+
+async fn fetch_obstacles(pool: &SqlitePool, point_id: i64) -> Result<Vec<Obstacle>, String> {
+    let query = r#"
+        SELECT 
+            o.id, 
+            o.number, 
+            ot.name,
+            ot.length,
+            ot.width,
+            ot.description
+        FROM obstacle o
+        JOIN obstacle_type ot ON o.type_id = ot.id
+        WHERE o.point_id = ?
+    "#;
+
+    let rows = sqlx::query(query)
+        .bind(point_id)
+        .fetch_all(pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let obstacles = rows.into_iter().map(|row| Obstacle {
+        id: row.get("id"),
+        name: row.get("name"),
+        number: row.get("number"),
+        length: row.get("length"),
+        width: row.get("width"),
+        description: row.get("description"),
+    }).collect();
+
+    Ok(obstacles)
+}
 
 // Récupère tous les points avec leurs obstacles
 pub async fn retrieve_data(app: &AppHandle) -> Result<Vec<Point>, String> {
     let pool = get_db_pool(app).await?;
     let query = r#"
         SELECT
-        p.id AS point_id,
+        p.id,
         p.x,
-        p.y,
-        ot.name AS obstacle_nom,
-        ot.description AS obstacle_description,
-        o.nombre,
-        ot.width AS obstacle_largeur,
-        ot.length AS obstacle_longueur
+        p.y
     FROM point p
-    LEFT JOIN obstacles o ON o.point_id = p.id
-    LEFT JOIN obstacle_type ot ON o.type_id = ot.id
     ORDER BY p.id
     "#;
 
-    let rows = sqlx::query(query)
+    let base_rows = sqlx::query(query)
         .fetch_all(&pool)
         .await
         .map_err(|e| e.to_string())?;
 
-    let points = rows.into_iter().map(|row| Point {
-        id: row.get("point_id"),
-        x: row.get("x"),
-        y: row.get("y"),
-        obstacle_nom: row.try_get("obstacle_nom").ok(),
-        obstacle_description: row.try_get("obstacle_description").ok(),
-        nombre: row.try_get("nombre").ok(),
-        obstacle_largeur: row.try_get("obstacle_largeur").ok(),
-        obstacle_longueur: row.try_get("obstacle_longueur").ok(),
-    }).collect();
+    let mut points: Vec<Point> = Vec::new();
+    
+    for row in base_rows {
+        let id: i64 = row.get("id");
+        
+        let comments = fetch_comments(&pool, id).await?;
+        let pictures = fetch_pictures(&pool, id).await?;
+        let obstacles = fetch_obstacles(&pool, id).await?;
+
+        points.push(Point {
+            id: id,
+            x: row.get("x"),
+            y: row.get("y"),
+            obstacles,
+            comments,
+            pictures,
+        });
+    }
 
     Ok(points)
 }
 
+#[tauri::command]
 pub async fn insert_point_details(
     app: &AppHandle,
     details: Vec<PointDetail>,
 ) -> Result<(), String> {
+
+    println!("[DB] 🚀 Début de l'insertion de {} PointDetail(s)", details.len());
 
     let pool = get_db_pool(app).await?;
     let mut tx: Transaction<Sqlite> = pool
@@ -189,21 +277,29 @@ pub async fn insert_point_details(
         .await
         .map_err(|e| format!("Erreur au démarrage de la transaction : {}", e))?;
 
-    for detail in details {
-        // Iterate over the point vector (though typically it should have only 1 element)
-        for point in &detail.point {
-            sqlx::query(
-                r#"INSERT OR REPLACE INTO point (id, x, y) VALUES (?, ?, ?)"#
-            )
-            .bind(point.id)
-            .bind(point.x)
-            .bind(point.y)
-            .execute(&mut *tx)
-            .await
-            .map_err(|e| format!("Erreur INSERT/REPLACE point ID {} : {}", point.id, e))?;
-        }
+    println!("[DB] ✓ Transaction démarrée");
 
+    // ÉTAPE 1: Insérer tous les points d'abord
+    println!("[DB] 📍 Insertion des points...");
+    for detail in &details {
+        println!("[DB]   → Point ID: {}, x: {}, y: {}", detail.point.id, detail.point.x, detail.point.y);
+        sqlx::query(
+            r#"INSERT OR REPLACE INTO point (id, x, y) VALUES (?, ?, ?)"#
+        )
+        .bind(detail.point.id)
+        .bind(detail.point.x)
+        .bind(detail.point.y)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| format!("Erreur INSERT/REPLACE point ID {} : {}", detail.point.id, e))?;
+    }
+    println!("[DB] ✓ Tous les points insérés");
+
+    // ÉTAPE 2: Insérer les données liées
+    println!("[DB] 💬 Insertion des commentaires...");
+    for detail in &details {
         for comment in &detail.comment {
+            println!("[DB]   → Comment ID: {}, point_id: {}, value: {:?}", comment.id, comment.point_id, &comment.value[..comment.value.len().min(30)]);
             sqlx::query(
                 r#"INSERT OR REPLACE INTO comment (id, point_id, value) VALUES (?, ?, ?)"#
             )
@@ -214,8 +310,13 @@ pub async fn insert_point_details(
             .await
             .map_err(|e| format!("Erreur INSERT/REPLACE comment ID {} : {}", comment.id, e))?;
         }
+    }
+    println!("[DB] ✓ Tous les commentaires insérés");
 
+    println!("[DB] 📸 Insertion des images...");
+    for detail in &details {
         for picture in &detail.picture {
+            println!("[DB]   → Picture ID: {}, point_id: {}, taille: {} bytes", picture.id, picture.point_id, picture.image.len());
             sqlx::query(
                 r#"INSERT OR REPLACE INTO picture (id, point_id, path) VALUES (?, ?, ?)"#
             )
@@ -226,8 +327,30 @@ pub async fn insert_point_details(
             .await
             .map_err(|e| format!("Erreur INSERT/REPLACE picture ID {} : {}", picture.id, e))?;
         }
+    }
+    println!("[DB] ✓ Toutes les images insérées");
 
+    println!("[DB] 🚧 Insertion des obstacles...");
+    for detail in &details {
         for obstacle in &detail.obstacle {
+            println!("[DB]   → Obstacle ID: {}, point_id: {}, type_id: {}, nombre: {}", 
+                obstacle.id, obstacle.point_id, obstacle.type_id, obstacle.number);
+            
+            // Vérifier si le type_id existe dans obstacle_type
+            let type_exists: Option<i32> = sqlx::query_scalar(
+                r#"SELECT id FROM obstacle_type WHERE id = ?"#
+            )
+            .bind(obstacle.type_id)
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(|e| format!("Erreur vérification type_id {} : {}", obstacle.type_id, e))?;
+            
+            if type_exists.is_none() {
+                eprintln!("[DB] ⚠️  WARNING: type_id {} n'existe pas dans obstacle_type, obstacle ID {} ignoré", 
+                    obstacle.type_id, obstacle.id);
+                continue; // Ignore cet obstacle si le type n'existe pas
+            }
+            
             sqlx::query(
                 r#"INSERT OR REPLACE INTO obstacles (id, point_id, type_id, nombre) VALUES (?, ?, ?, ?)"#
             )
@@ -237,13 +360,103 @@ pub async fn insert_point_details(
             .bind(obstacle.number)
             .execute(&mut *tx)
             .await
-            .map_err(|e| format!("Erreur INSERT/REPLACE obstacle ID {} : {}", obstacle.id, e))?;
+            .map_err(|e| format!("Erreur INSERT/REPLACE obstacle ID {} (point_id: {}, type_id: {}) : {}", 
+                obstacle.id, obstacle.point_id, obstacle.type_id, e))?;
         }
     }
+    println!("[DB] ✓ Tous les obstacles insérés");
 
+    println!("[DB] 💾 Validation de la transaction...");
     tx.commit()
         .await
         .map_err(|e| format!("Erreur à la validation (commit) de la transaction : {}", e))?;
 
+    println!("[DB] ✅ Transaction validée avec succès !");
+
+    Ok(())
+}
+pub async fn insert_test_data(app: &AppHandle) -> Result<(), String> {
+    let pool = get_db_pool(app).await?;
+
+    // --- 0. (Optional but recommended) Cleanup old data ---
+    // (Ensure you run this if you haven't adopted the cleanup method)
+    // DELETE FROM obstacle;
+    // DELETE FROM comment;
+    // DELETE FROM picture;
+    // DELETE FROM point;
+    // DELETE FROM obstacle_type;
+
+    // --- 1. Insert obstacle_type data and get their starting ID ---
+    let obstacle_types_query = r#"
+        INSERT INTO obstacle_type (name, description, width, length) VALUES
+        ('Rock', 'A large, immovable stone.', 1.5, 1.0),
+        ('Tree Stump', 'A remnant of a cut-down tree.', 0.5, 0.5),
+        ('Water Puddle', 'A collection of standing water.', 2.0, 3.0);
+    "#;
+    sqlx::query(obstacle_types_query)
+        .execute(&pool)
+        .await
+        .map_err(|e| format!("Failed to insert obstacle_type test data: {}", e))?;
+    
+    // Get the ID of the first inserted obstacle_type (assuming sequential insertion)
+    let type_start_id: i64 = sqlx::query("SELECT id FROM obstacle_type ORDER BY id LIMIT 1")
+        .fetch_one(&pool)
+        .await
+        .map_err(|e| format!("Failed to get obstacle_type start ID: {}", e))?
+        .get("id");
+
+    // --- 2. Insert Point data and get their starting ID ---
+    let points_query = r#"
+        INSERT INTO point (x, y) VALUES
+        (10.5, 20.1),
+        (55.0, 80.0),
+        (1.2, 5.8);
+    "#;
+    sqlx::query(points_query)
+        .execute(&pool)
+        .await
+        .map_err(|e| format!("Failed to insert point test data: {}", e))?;
+
+    // Get the ID of the first inserted point
+    let point_start_id: i64 = sqlx::query("SELECT id FROM point ORDER BY id LIMIT 1")
+        .fetch_one(&pool)
+        .await
+        .map_err(|e| format!("Failed to get point start ID: {}", e))?
+        .get("id");
+    
+    // Calculate IDs based on the starting IDs:
+    // P1 = point_start_id, P2 = point_start_id + 1, P3 = point_start_id + 2
+    // T1 = type_start_id, T2 = type_start_id + 1, T3 = type_start_id + 2
+    
+    // --- 3. Insert Comment and Picture data (linking logic omitted for brevity, but needed) ---
+    // If you need to link comments/pictures, you'll need a similar process to get the IDs.
+    // However, the error is specifically on the obstacle table, so we focus there.
+
+    // --- 4. Insert Obstacle data (linked dynamically) ---
+    let obstacles_query = format!(
+        r#"
+            INSERT INTO obstacle (point_id, type_id, number) VALUES
+            ({}, {}, 3), 
+            ({}, {}, 1), 
+            ({}, {}, 1), 
+            ({}, {}, 1); 
+        "#,
+        // Point 1 (P1): point_start_id, Type 1 (T1): type_start_id
+        point_start_id, type_start_id,
+        // Point 2 (P2): point_start_id + 1, Type 2 (T2): type_start_id + 1
+        point_start_id + 1, type_start_id + 1,
+        // Point 2 (P2): point_start_id + 1, Type 3 (T3): type_start_id + 2
+        point_start_id + 1, type_start_id + 2,
+        // Point 3 (P3): point_start_id + 2, Type 1 (T1): type_start_id
+        point_start_id + 2, type_start_id
+    );
+
+    sqlx::query(&obstacles_query)
+        .execute(&pool)
+        .await
+        .map_err(|e| format!("Failed to insert obstacle test data: {}", e))?;
+
+    println!("✅ Successfully inserted test data into the database.");
+    
     Ok(())
 }

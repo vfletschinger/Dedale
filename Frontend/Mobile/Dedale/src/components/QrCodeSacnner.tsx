@@ -39,7 +39,19 @@ const QRCodeScanner = ({ setScanQR }: { setScanQR: (value: boolean) => void }) =
           'SELECT id, point_id, image FROM picture WHERE point_id = ?', [point.id]
       );
       const obstacles = db.getAllSync<ObstacleType>(
-          'SELECT id, point_id, type_id, number FROM obstacle WHERE point_id = ?', [point.id]
+          `SELECT 
+            o.id, 
+            o.point_id, 
+            o.type_id, 
+            o.number,
+            ot.name,
+            ot.description,
+            ot.width,
+            ot.length
+          FROM obstacle o
+          LEFT JOIN obstacle_type ot ON o.type_id = ot.id
+          WHERE o.point_id = ?`, 
+          [point.id]
       );
       
       allPointDetails.push({ point: point, comments: comments, pictures: pictures, obstacles: obstacles });

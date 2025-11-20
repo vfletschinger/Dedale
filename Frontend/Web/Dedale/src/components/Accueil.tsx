@@ -25,6 +25,7 @@ async function generate_excel() {
         );
         alert("Exportation Excel réussie dans " + excel_path_str);
 
+  
     } catch (error) {
         console.error("Erreur lors de l'exportation Excel:", error);
         alert(`Erreur d'exportation: ${error}`);
@@ -83,6 +84,13 @@ function Accueil() {
                     Exporter Excel
                 </button>
                 <button
+        type="button"
+        className="px-3 py-2 rounded-md text-[#ffffff] bg-[#20272f] hover:bg-[#2ad783] transition font-medium"
+        onClick={() => createPdf()}
+      >
+        Creer un pdf
+      </button>
+                <button
                     className={connectBtnClass}
                     onClick={qr_code}
                     disabled={isLoading}
@@ -122,6 +130,9 @@ function Accueil() {
             </div>
         </div>
     );
+async function createPdf() {
+  await invoke("create_pdf");
+}
 }
 
 export default Accueil;
