@@ -1,5 +1,5 @@
-import { View, Text, Alert, Modal, TextInput, StyleSheet, Image, Pressable } from "react-native";
-import React, { useEffect, useState, useRef } from "react";
+import { View, Text, Alert, Modal, TextInput, StyleSheet, Image, Pressable, FlatList, TouchableOpacity } from "react-native";
+import React, { useState, useRef } from "react";
 import CustomButton from "../components/CustomButton";
 import MapView from "react-native-maps";
 import * as Location from 'expo-location';
@@ -15,7 +15,7 @@ export default function RegisterPointScreen() {
   const db: any = getDatabase();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [pointComment, setPointComment] = useState("");
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedImages, setSelectedImages] = useState<string[]>([]);
 
   React.useEffect(() => {
     requestLocation();
@@ -67,7 +67,7 @@ export default function RegisterPointScreen() {
 
       const uri = result?.assets?.[0]?.uri ?? result?.uri;
       if (uri) {
-        setSelectedImage(uri);
+        setSelectedImages(prevImages => [...prevImages, uri]);
       }
     } catch (error) {
       console.error('Erreur lors de la prise de photo :', error);
@@ -75,12 +75,11 @@ export default function RegisterPointScreen() {
     }
   };
 
-  const savePointToDB = async (x: number, y: number, commentValue: string = '') => {
-  if (!commentValue.trim()) {
-    Alert.alert('Erreur', 'Veuillez entrer un commentaire pour le point.');
-    return null;
-  }
+  const removeImage = (uriToRemove: string) => {
+    setSelectedImages(prevImages => prevImages.filter(uri => uri !== uriToRemove));
+  };
 
+  const savePointToDB = async (x: number, y: number, commentValue: string = '') => {
   try {
     const pointResult: any = db.runSync(
       'INSERT INTO point (x, y) VALUES (?, ?)',
@@ -97,38 +96,41 @@ export default function RegisterPointScreen() {
       [insertedPointId, commentValue]
     );
 
-    if (selectedImage) {
-      try {
+    if (selectedImages.length > 0) {
+      for (const imageUri of selectedImages) {
         try {
-          const cols: any[] = db.getAllSync("PRAGMA table_info('pictures')");
-          const hasImageCol = Array.isArray(cols) && cols.some(c => c.name === 'image');
-          if (!hasImageCol) {
-            try {
-              db.execSync('ALTER TABLE picture ADD COLUMN image TEXT');
-              console.log('Colonne `image` ajoutée à la table picture');
-            } catch (alterErr) {
-              console.warn('Impossible d\'ajouter la colonne image :', alterErr);
+          try {
+            const cols: any[] = db.getAllSync("PRAGMA table_info('picture')");
+            const hasImageCol = Array.isArray(cols) && cols.some(c => c.name === 'image');
+            if (!hasImageCol) {
+              try {
+                db.execSync('ALTER TABLE picture ADD COLUMN image TEXT');
+                console.log('Colonne `image` ajoutée à la table pictures');
+              } catch (alterErr) {
+                console.warn('Impossible d\'ajouter la colonne image :', alterErr);
+              }
             }
+          } catch (pragmaErr) {
+            console.warn('Impossible de vérifier les colonnes de la table pictures :', pragmaErr);
           }
-        } catch (pragmaErr) {
-          console.warn('Impossible de vérifier les colonnes de la table pictures :', pragmaErr);
-        }
 
-        try {
-          const info = await FileSystem.getInfoAsync(selectedImage);
-          if (!info.exists) {
-            console.warn('Le fichier image n\'existe pas ou n\'est pas accessible :', selectedImage);
-            Alert.alert('Attention', "Le point a été enregistré mais le fichier image n'est pas accessible.");
+          try {
+            const info = await FileSystem.getInfoAsync(imageUri);
+            console.log('Image file info before save:', info);
+            if (!info.exists) {
+              console.warn('Le fichier image n\'existe pas ou n\'est pas accessible :', imageUri);
+              Alert.alert('Attention', "Le point a été enregistré mais un fichier image n'est pas accessible.");
+            }
+          } catch (fsErr) {
+            console.warn('Erreur lors de la vérification du fichier image :', fsErr);
           }
-        } catch (fsErr) {
-          console.warn('Erreur lors de la vérification du fichier image :', fsErr);
-        }
 
-        await ImageHelper.saveImageToBDD(selectedImage, insertedPointId);
-      } catch (imgErr) {
-        console.error('Erreur lors de la sauvegarde de l\'image :', imgErr);
-        const errMessage = (imgErr && (imgErr as any).message) || String(imgErr);
-        Alert.alert('Attention', `Le point a été enregistré mais la sauvegarde de l'image a échoué. (${errMessage})`);
+          await ImageHelper.saveImageToBDD(imageUri, insertedPointId);
+        } catch (imgErr) {
+          console.error(`Erreur lors de la sauvegarde de l'image ${imageUri} :`, imgErr);
+          const errMessage = (imgErr && (imgErr as any).message) || String(imgErr);
+          Alert.alert('Attention', `Le point a été enregistré mais la sauvegarde d'une image a échoué. (${errMessage})`);
+        }
       }
     }
 
@@ -231,10 +233,20 @@ export default function RegisterPointScreen() {
               title="Prendre une photo"
               onPress={pickImage}
             />
-            {selectedImage ? (
-              <Image
-                source={{ uri: selectedImage }}
-                style={{ width: 120, height: 120, marginVertical: 8, alignSelf: 'center' }}
+            {selectedImages.length > 0 ? (
+              <FlatList
+                horizontal
+                data={selectedImages}
+                keyExtractor={(item) => item}
+                renderItem={({ item }) => (
+                  <View style={{ position: 'relative', marginRight: 10, marginVertical: 8 }}>
+                    <Image source={{ uri: item }} style={styles.thumbnail} />
+                    <TouchableOpacity onPress={() => removeImage(item)} style={styles.removeButton}>
+                      <Text style={styles.removeButtonText}>X</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+                style={{ marginVertical: 8 }}
               />
             ) : null}
             <CustomButton
@@ -243,12 +255,12 @@ export default function RegisterPointScreen() {
                 if (location) {
                   const insertedId = await savePointToDB(location.longitude, location.latitude, pointComment);
                   if (insertedId) {
-                    getSavedPoints();
+                    //getSavedPoints();
                     setIsModalVisible(false);
                     setPointComment("");
-                    setSelectedImage(null);
-                    getSavedComments();
-                    getSavedPictures();
+                    setSelectedImages([]);
+                    //getSavedComments();
+                    //getSavedPictures();
                   }
                 } else {
                   Alert.alert('Erreur', 'Aucune position à enregistrer.');
@@ -257,7 +269,11 @@ export default function RegisterPointScreen() {
             />
             <CustomButton
               title="Annuler"
-              onPress={() => setIsModalVisible(false)}
+              onPress={() => {
+                setIsModalVisible(false);
+                setPointComment("");
+                setSelectedImages([]);
+              }}
             />
           </View>
         </View>
@@ -318,5 +334,26 @@ const styles = StyleSheet.create({
   buttonText: {
     color: 'white',
     fontWeight: 'bold',
+  },
+  thumbnail: {
+    width: 100,
+    height: 100,
+    borderRadius: 8,
+  },
+  removeButton: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: 'red',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  removeButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 12,
   },
 });
