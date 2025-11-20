@@ -142,6 +142,18 @@ export default function InterestPointsScreen() {
           ListFooterComponent={<View className="h-4" />}
         />
       )}
+
+      {/* Persistent centered button at bottom */}
+      <Pressable
+        onPress={() => navigation.navigate("RegisterPoint")}
+        className="absolute bottom-6 left-0 right-0 items-center"
+      >
+        <View className="bg-blue-500 px-6 py-3 rounded-full shadow-md active:bg-blue-600">
+          <Text className="text-white font-semibold text-base">
+            + Ajouter un point
+          </Text>
+        </View>
+      </Pressable>
     </View>
   );
 }
