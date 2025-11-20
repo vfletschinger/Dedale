@@ -45,11 +45,11 @@ export async function seedDatabase(db: SQLiteDatabase) {
     // 2. Seed interest_points
     console.log('Insertion des points d\'intérêt...');
     const points = [
-      { x: 48.5734, y: 7.7521 }, 
-      { x: 48.5850, y: 7.7350 },
-      { x: 48.5920, y: 7.7580 },
-      { x: 48.5680, y: 7.7420 },
-      { x: 48.5790, y: 7.7650 },
+      { x: 7.7521, y: 48.5734 }, 
+      { x: 7.7350, y: 48.5850 },
+      { x: 7.7580, y: 48.5920 },
+      { x: 7.7420, y: 48.5680 },
+      { x: 7.7650, y: 48.5790 },
     ];
 
     const pointIds: number[] = [];
@@ -108,7 +108,7 @@ export async function seedDatabase(db: SQLiteDatabase) {
 
     obstacles.forEach(obstacle => {
       db.runSync(
-        'INSERT INTO obstacle (point_id, type_id, nombre) VALUES (?, ?, ?)',
+        'INSERT INTO obstacle (point_id, type_id, number) VALUES (?, ?, ?)',
         [obstacle.point_id, obstacle.type_id, obstacle.nombre]
       );
     });

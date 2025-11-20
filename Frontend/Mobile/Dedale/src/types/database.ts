@@ -4,12 +4,32 @@ export type InterestPointsType = {
     y: number;
 }
 
-export type PointDetailType = InterestPointsType & {
+export type CommentType = {
+    id: number;
+    point_id: number;
     value: string;
-    description: string;
-    length: number;
-    name: string;
+}
+
+export type PictureType = {
+    id: number;
+    point_id: number;
     image: string;
-    width: number;
-    point_id: number
+}
+
+export type ObstacleType = {
+    id: number;
+    point_id: number;
+    type_id: number;
+    nombre: number;
+    name?: string;
+    description?: string;
+    width?: number;
+    length?: number;
+}
+
+export type PointDetailType = {
+    point: InterestPointsType;
+    comments: CommentType[];
+    pictures: PictureType[];
+    obstacles: ObstacleType[];
 }
