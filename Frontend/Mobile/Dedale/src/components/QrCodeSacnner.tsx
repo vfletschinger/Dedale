@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Text, View, StyleSheet, Button, Dimensions } from 'react-native';
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
-import WebSocketClient , {CommandMessage} from './WebSocketClient';
+import WebSocketClient from './WebSocketClient';
 const { width } = Dimensions.get('window');
 const SCANNER_SIZE = width * 0.7; 
+import { getDatabase } from '../../assets/migrations';
+import { CommentType, InterestPointsType, ObstacleType, PictureType, PointDetailType } from '../types/database';
 
 const QRCodeScanner = () => {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
+  const db = getDatabase();
 
   if (!permission || !permission.granted) {
       return (
@@ -21,26 +24,39 @@ const QRCodeScanner = () => {
         </View>
       );
   }
-    
+  const fetchData = async () => {
+    const points = db.getAllSync<InterestPointsType>('SELECT id, x, y FROM point');
+    const allPointDetails: PointDetailType[] = [];
+
+    for (const point of points) {
+      
+      const comments = db.getAllSync<CommentType>(
+          'SELECT id, point_id, value FROM comment WHERE point_id = ?', [point.id]
+      );
+      const pictures = db.getAllSync<PictureType>(
+          'SELECT id, point_id, image FROM picture WHERE point_id = ?', [point.id]
+      );
+      const obstacles = db.getAllSync<ObstacleType>(
+          'SELECT id, point_id, type_id, number FROM obstacle WHERE point_id = ?', [point.id]
+      );
+      
+      allPointDetails.push({ point: point, comments: comments, pictures: pictures, obstacles: obstacles });
+
+    }
+    return allPointDetails;
+  }
+  
  const handleBarCodeScanned = ({ type, data }: BarcodeScanningResult) => {
     if (!scanned) {
       setScanned(true); 
       
-      console.log('------------------------------------');
-      console.log(`Données scannées (URI): ${data}`); 
-      console.log('------------------------------------');
-
       const websocketUri: string = data.startsWith('ws') ? data : `ws://${data}`; 
       const client = new WebSocketClient(websocketUri);
       
       client.connect()
-        .then(() => {
-          const dynamicMessage: CommandMessage = {
-            command: "scan_result",
-            device_id: "react_native_app_001",
-            timestamp: new Date().toISOString(),
-            };
-                    client.send(dynamicMessage);
+        .then(async () => {
+          const data = await  fetchData();
+          client.send(data);
           alert(`Connexion à ${websocketUri} réussie. JSON envoyé!`);
         })
         .catch((error: string) => {

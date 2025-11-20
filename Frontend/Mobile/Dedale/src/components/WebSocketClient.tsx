@@ -1,11 +1,4 @@
-// components/WebSocketClient.ts
-
-// Interface pour définir la structure du message JSON que nous envoyons
-export interface CommandMessage {
-  command: string;
-  device_id: string;
-  timestamp: string;
-}
+import { PointDetailType } from "../types/database";
 
 /**
  * Gère la connexion et la communication avec une WebSocket.
@@ -13,7 +6,7 @@ export interface CommandMessage {
 class WebSocketClient {
   private uri: string;
   private ws: WebSocket | null = null;
-  private messageQueue: CommandMessage[] = []; 
+  private messageQueue: PointDetailType[][] = []; 
   public isConnected: boolean = false;
 
   constructor(uri: string) {
@@ -36,12 +29,10 @@ class WebSocketClient {
       };
 
       this.ws.onmessage = (e: WebSocketMessageEvent) => {
-        // Le type de e.data est souvent 'string' ou 'ArrayBuffer' en React Native
         console.log('🔔 Message reçu:', e.data);
       };
 
       this.ws.onerror = (e: WebSocketErrorEvent) => {
-        // TypeScript nous donne le type exact pour l'événement d'erreur
         console.error('❌ Erreur WebSocket:', e.message);
         this.isConnected = false;
         reject(e.message);
@@ -58,7 +49,7 @@ class WebSocketClient {
    * Envoie un message JSON.
    * @param data L'objet JSON (typé CommandMessage) à envoyer.
    */
-  public send(data: CommandMessage): void {
+  public send(data: PointDetailType[]): void {
     if (!this.isConnected || this.ws?.readyState !== WebSocket.OPEN) {
       console.log('⏳ Connexion non établie. Mise en file d\'attente du message.');
       this.messageQueue.push(data);
