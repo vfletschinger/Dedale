@@ -5,8 +5,10 @@ use tauri_plugin_sql::{Builder, Migration, MigrationKind};
 use tauri::{AppHandle, Manager};
 use std::fs;
 use std::str::FromStr;
-
-
+use sqlx::Transaction;
+use sqlx::Sqlite;
+use serde::Deserialize;
+use serde::Serialize;
 // Elle renvoie le plugin SQL entièrement configuré
 pub fn init_db() -> impl tauri::plugin::Plugin<tauri::Wry> {
     let migrations = vec![
@@ -79,7 +81,41 @@ pub struct Point {
     pub obstacle_largeur: Option<f64>,
     pub obstacle_longueur: Option<f64>,
 }
+#[derive(Debug,Serialize, Deserialize)]
+pub struct PointSimple {
+    pub id: i32,     // Identifiant unique du point
+    pub x: f64,      // Coordonnée X (ou latitude)
+    pub y: f64,      // Coordonnée Y (ou longitude)
+    // Vous pouvez ajouter d'autres champs de point ici (ex: name, description)
+}
 
+#[derive(Debug,Serialize, Deserialize)]
+pub struct Comment {
+    pub id: i32,          // Identifiant unique du commentaire
+    pub point_id: i32,    // Lien vers le point auquel ce commentaire est attaché
+    pub value: String,    // Le texte du commentaire
+}
+#[derive(Debug,Serialize, Deserialize)]
+pub struct Picture {
+    pub id: i32,          // Identifiant unique de l'image
+    pub point_id: i32,    // Lien vers le point auquel cette image est attachée
+    pub image: String,    // Le chemin ou le contenu encodé de l'image (ex: base64, URL)
+}
+#[derive(Debug,Serialize, Deserialize)]
+pub struct Obstacle {
+    pub id: i32,          // Identifiant unique de l'obstacle
+    pub point_id: i32,    // Lien vers le point auquel cet obstacle est attaché
+    pub type_id: i32,     // Le type d'obstacle (ex: 1 pour "pente", 2 pour "escalier")
+    pub number: i32,      // Un champ numérique lié à l'obstacle (ex: nombre de marches)
+}
+
+#[derive(Debug, Serialize,Deserialize)]
+pub struct PointDetail {
+    pub point: Vec<PointSimple>,
+    pub comment: Vec<Comment>,
+    pub picture: Vec<Picture>, 
+    pub obstacle: Vec<Obstacle>,
+}
 pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
     let app_data_dir = app.path()
         .app_data_dir()
@@ -121,7 +157,6 @@ pub async fn retrieve_data(app: &AppHandle) -> Result<Vec<Point>, String> {
     LEFT JOIN obstacles o ON o.point_id = p.id
     LEFT JOIN obstacle_type ot ON o.type_id = ot.id
     ORDER BY p.id
-
     "#;
 
     let rows = sqlx::query(query)
@@ -141,4 +176,74 @@ pub async fn retrieve_data(app: &AppHandle) -> Result<Vec<Point>, String> {
     }).collect();
 
     Ok(points)
+}
+
+pub async fn insert_point_details(
+    app: &AppHandle,
+    details: Vec<PointDetail>,
+) -> Result<(), String> {
+
+    let pool = get_db_pool(app).await?;
+    let mut tx: Transaction<Sqlite> = pool
+        .begin()
+        .await
+        .map_err(|e| format!("Erreur au démarrage de la transaction : {}", e))?;
+
+    for detail in details {
+        // Iterate over the point vector (though typically it should have only 1 element)
+        for point in &detail.point {
+            sqlx::query(
+                r#"INSERT OR REPLACE INTO point (id, x, y) VALUES (?, ?, ?)"#
+            )
+            .bind(point.id)
+            .bind(point.x)
+            .bind(point.y)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| format!("Erreur INSERT/REPLACE point ID {} : {}", point.id, e))?;
+        }
+
+        for comment in &detail.comment {
+            sqlx::query(
+                r#"INSERT OR REPLACE INTO comment (id, point_id, value) VALUES (?, ?, ?)"#
+            )
+            .bind(comment.id)
+            .bind(comment.point_id)
+            .bind(&comment.value)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| format!("Erreur INSERT/REPLACE comment ID {} : {}", comment.id, e))?;
+        }
+
+        for picture in &detail.picture {
+            sqlx::query(
+                r#"INSERT OR REPLACE INTO picture (id, point_id, path) VALUES (?, ?, ?)"#
+            )
+            .bind(picture.id)
+            .bind(picture.point_id)
+            .bind(&picture.image)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| format!("Erreur INSERT/REPLACE picture ID {} : {}", picture.id, e))?;
+        }
+
+        for obstacle in &detail.obstacle {
+            sqlx::query(
+                r#"INSERT OR REPLACE INTO obstacles (id, point_id, type_id, nombre) VALUES (?, ?, ?, ?)"#
+            )
+            .bind(obstacle.id)
+            .bind(obstacle.point_id)
+            .bind(obstacle.type_id)
+            .bind(obstacle.number)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| format!("Erreur INSERT/REPLACE obstacle ID {} : {}", obstacle.id, e))?;
+        }
+    }
+
+    tx.commit()
+        .await
+        .map_err(|e| format!("Erreur à la validation (commit) de la transaction : {}", e))?;
+
+    Ok(())
 }
