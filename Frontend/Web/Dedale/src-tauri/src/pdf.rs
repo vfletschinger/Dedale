@@ -3,7 +3,7 @@ use tauri::AppHandle;
 use genpdf::elements;
 use crate::seed;
 use crate::utils;
-use std::path::PathBuf;
+
 
 #[tauri::command]
 pub async fn create_pdf(app: AppHandle) -> Result<(), String> {
