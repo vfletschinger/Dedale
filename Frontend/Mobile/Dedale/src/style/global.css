@@ -19,4 +19,10 @@
   .back-btn-text {
     @apply text-gray-500 text-lg;
   }
+  .map {
+    @apply w-full h-full;
+  }
+  .center {
+    @apply flex-1 justify-center items-center;
+  }
 }
