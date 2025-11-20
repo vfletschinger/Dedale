@@ -1,6 +1,6 @@
 import { View, Text, ActivityIndicator, ScrollView, Image, Alert, Modal, Pressable } from "react-native";
-import { useNavigation, useRoute } from "@react-navigation/native";
-import React, { useEffect, useState } from "react";
+import { useNavigation, useRoute, useFocusEffect } from "@react-navigation/native";
+import React, { useCallback, useState } from "react";
 import getDatabase from "../../assets/migrations";
 import { PointDetailType, CommentType, PictureType, ObstacleType, InterestPointsType } from "../types/database";
 import {
@@ -37,6 +37,7 @@ export default function PointDetails() {
   const [tempCoordinates, setTempCoordinates] = useState<{ latitude: number; longitude: number }>({ latitude: 0, longitude: 0 });
 
   const fetchPoint = async () => {
+    setLoading(true);
     try {
       const point = db.getFirstSync<InterestPointsType>(
         'SELECT * FROM point WHERE id = ?',
@@ -87,9 +88,23 @@ export default function PointDetails() {
     }
   };
 
-  useEffect(() => {
-    fetchPoint();
-  }, [pointId]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchPoint();
+    }, [pointId])
+  );
+
+  const updateTimeStamp = () => {
+    try {
+      db.runSync(
+        'UPDATE point SET modified_at = ? WHERE id = ?',
+        [new Date().toISOString(), pointId]
+      );
+      console.log(`Point ${pointId} timestamp updated.`);
+    } catch (error) {
+      console.error("Failed to update point's modified_at timestamp:", error);
+    }
+  };
 
   const handleDelete = () => {
     Alert.alert(
@@ -125,6 +140,7 @@ export default function PointDetails() {
           style: 'destructive',
           onPress: () => {
             deleteComment(commentId, db);
+            updateTimeStamp();
             fetchPoint();
           }
         }
@@ -153,8 +169,10 @@ export default function PointDetails() {
     try {
       if (currentComment) {
         updateComment(currentComment.id, commentText, db);
+        updateTimeStamp();
       } else {
         addComment(pointId, commentText, db);
+        updateTimeStamp();
       }
       setIsCommentModalVisible(false);
       fetchPoint();
@@ -175,6 +193,7 @@ export default function PointDetails() {
           style: 'destructive',
           onPress: () => {
             deletePicture(pictureId, db);
+            updateTimeStamp();
             fetchPoint();
           }
         }
@@ -188,6 +207,7 @@ export default function PointDetails() {
       if (uri) {
         const base64 = await imageToBase64(uri);
         addPicture(pointId, base64, db);
+        updateTimeStamp();
         Alert.alert('Succès', 'Image ajoutée');
         fetchPoint();
       }
@@ -349,6 +369,7 @@ export default function PointDetails() {
             ) : (
               <Text className="text-gray-500 text-sm">Aucun commentaire</Text>
             )}
+            
           </View>
 
           {/* Obstacles */}

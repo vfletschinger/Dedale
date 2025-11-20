@@ -1,4 +1,5 @@
 import { SQLiteDatabase } from 'expo-sqlite';
+import { version } from 'react';
 
 export interface Migration {
   version: number;
@@ -25,7 +26,9 @@ export const migrations: Migration[] = [
         CREATE TABLE IF NOT EXISTS interest_points (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           x REAL NOT NULL,
-          y REAL NOT NULL
+          y REAL NOT NULL,
+          timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+          modified_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
       `);
 
