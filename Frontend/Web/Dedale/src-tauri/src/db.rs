@@ -6,6 +6,7 @@ use tauri::{AppHandle, Manager};
 use std::fs;
 use std::str::FromStr;
 use serde::Serialize;
+use serde::Deserialize;
 
 // Elle renvoie le plugin SQL entièrement configuré
 pub fn init_db() -> impl tauri::plugin::Plugin<tauri::Wry> {
@@ -100,6 +101,22 @@ pub struct Comment {
     pub value: String,
 }
 
+#[derive(Debug, Serialize)]
+pub struct Obstacle_type {
+    pub id: i64,
+    pub name: String,
+    pub description: String,
+    pub width: f64,
+    pub length: f64
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ObstacleInput {
+    pub typeId: i64,
+    pub number: i32,
+    pub obstacleId: Option<i64>,
+}
+
 pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
     let app_data_dir = app.path()
         .app_data_dir()
@@ -183,6 +200,70 @@ async fn fetch_obstacles(pool: &SqlitePool, point_id: i64) -> Result<Vec<Obstacl
     }).collect();
 
     Ok(obstacles)
+}
+
+#[tauri::command]
+pub async fn fetch_obstacle_types(app: AppHandle) -> Result<Vec<Obstacle_type>, String> {
+    let pool = get_db_pool(&app).await?;
+    
+    let rows = sqlx::query("SELECT id, name, description, width, length FROM obstacle_type")
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let obstacles = rows.into_iter().map(|row| Obstacle_type {
+        id: row.get("id"),
+        name: row.get("name"),
+        description: row.get("description"),
+        width: row.get("width"),
+        length: row.get("length"),
+    }).collect();
+
+    Ok(obstacles)
+}
+
+#[tauri::command]
+pub async fn insert_obstacles(
+    app: AppHandle,
+    point_id: i64,
+    obstacles: Vec<ObstacleInput>,
+) -> Result<(), String> {
+    let pool = get_db_pool(&app).await?;
+
+    for obstacle in obstacles {
+        if let Some(id) = obstacle.obstacleId {
+            if obstacle.number == 0 {
+                // Supprimer l'obstacle si le nombre est 0
+                sqlx::query("DELETE FROM obstacle WHERE id = ?")
+                    .bind(id)
+                    .execute(&pool)
+                    .await
+                    .map_err(|e| format!("Failed to delete obstacle: {}", e))?;
+            } else {
+                // Mettre à jour le nombre
+                sqlx::query("UPDATE obstacle SET number = ? WHERE id = ?")
+                    .bind(obstacle.number)
+                    .bind(id)
+                    .execute(&pool)
+                    .await
+                    .map_err(|e| format!("Failed to update obstacle: {}", e))?;
+            }
+        } else if obstacle.number > 0 {
+            // Insérer seulement si le nombre est > 0
+            sqlx::query(
+                "INSERT INTO obstacle (point_id, type_id, number) VALUES (?, ?, ?)"
+            )
+            .bind(point_id)
+            .bind(obstacle.typeId)
+            .bind(obstacle.number)
+            .execute(&pool)
+            .await
+            .map_err(|e| format!("Failed to insert obstacle: {}", e))?;
+        }
+    }
+
+    println!("✅ Successfully inserted/updated obstacles for point {}", point_id);
+    Ok(())
 }
 
 // Récupère tous les points avec leurs obstacles

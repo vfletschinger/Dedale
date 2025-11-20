@@ -2,8 +2,8 @@
 
 mod db;
 mod excel;
-mod pdf;
 mod map;
+mod pdf;
 mod seed;
 mod utils;
 
@@ -17,7 +17,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             excel::export_points_excel,
             pdf::create_pdf,
-            map::get_points
+            map::get_points,
+            db::fetch_obstacle_types,
+            db::insert_obstacles
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
