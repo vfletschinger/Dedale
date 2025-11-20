@@ -4,6 +4,7 @@ mod db;
 mod excel;
 mod pdf;
 mod map;
+mod seed;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {

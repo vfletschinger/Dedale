@@ -10,39 +10,32 @@ use crate::seed;
 struct ObstacleTypeSeed { name: &'static str, description: &'static str, width: f64, length: f64 }
 struct PointSeed { x: f64, y: f64 }
 struct CommentSeed { point_idx: usize, value: &'static str }
-struct PictureSeed { point_idx: usize, path: &'static str }
+struct PictureSeed { point_idx: usize, image: &'static str }
 struct ObstacleSeed { point_idx: usize, type_idx: usize, number: i32 }
 
 
 /// Seeds the database with sample data if it's currently empty.
 #[tauri::command]
-/*pub async fn seed_database(app: AppHandle) -> Result<(), String> {
-    let pool = get_db_pool(&app).await?;
-
-    println!("🌱 Début du seeding...");
+pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
     
-    // 1. Check if data exists
-    let existing_points: i64 = match sqlx::query_scalar::<_, i64>(
-        "SELECT COUNT(id) FROM point"
-    )
-    .fetch_one(&pool)
-    .await 
-    // The expression ends here, and the match block immediately follows.
-    {
-        Ok(Some(count)) => count, // Success: We got a Some(count), extract the count
-        Ok(None) => 0,            // Success: Query returned no row (safe to treat as 0 for COUNT)
-        Err(e) => return Err(format!("Database query failed during check: {}", e)), // Failure: Propagate the error
-    };
+    println!("🌱 Début du seeding...");
+
+    let pool = get_db_pool(&app).await?;
+    let query = r#"
+        SELECT
+        count(*)
+        FROM point
+    "#;
+
+    let (existing_points,): (i64,) = sqlx::query_as(query)
+        .fetch_one(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
 
     if existing_points > 0 {
-        println!("⚠️ Des données existent déjà ({} points), seeding annulé.", existing_points);
+        println!("⚠️ Des données existent déjà, seeding annulé.");
         return Ok(());
     }
-
-    // Use a transaction for atomic data insertion
-    let mut tx = pool.begin()
-        .await
-        .map_err(|e| format!("Failed to begin transaction: {}", e))?;
 
     // --- Data Definitions ---
     let obstacle_types = [
@@ -53,7 +46,7 @@ struct ObstacleSeed { point_idx: usize, type_idx: usize, number: i32 }
         ObstacleTypeSeed { name: "Poubelle", description: "Conteneur à déchets", width: 0.6, length: 0.6 },
     ];
     let points = [
-        PointSeed { x: 48.5734, y: 7.7521 }, // Strasbourg
+        PointSeed { x: 48.5734, y: 7.7521 },
         PointSeed { x: 48.5850, y: 7.7350 },
         PointSeed { x: 48.5920, y: 7.7580 },
         PointSeed { x: 48.5680, y: 7.7420 },
@@ -68,11 +61,11 @@ struct ObstacleSeed { point_idx: usize, type_idx: usize, number: i32 }
         CommentSeed { point_idx: 4, value: "Attention au verglas en hiver" },
     ];
     let pictures_data = [
-        PictureSeed { point_idx: 0, path: "/images/point1_photo1.jpg" },
-        PictureSeed { point_idx: 0, path: "/images/point1_photo2.jpg" },
-        PictureSeed { point_idx: 1, path: "/images/point2_photo1.jpg" },
-        PictureSeed { point_idx: 2, path: "/images/point3_photo1.jpg" },
-        PictureSeed { point_idx: 4, path: "/images/point5_photo1.jpg" },
+        PictureSeed { point_idx: 0, image: "/images/point1_photo1.jpg" },
+        PictureSeed { point_idx: 0, image: "/images/point1_photo2.jpg" },
+        PictureSeed { point_idx: 1, image: "/images/point2_photo1.jpg" },
+        PictureSeed { point_idx: 2, image: "/images/point3_photo1.jpg" },
+        PictureSeed { point_idx: 4, image: "/images/point5_photo1.jpg" },
     ];
     let obstacles_data = [
         ObstacleSeed { point_idx: 0, type_idx: 0, number: 2 }, // Point 1: 2 Arbre
@@ -96,7 +89,7 @@ struct ObstacleSeed { point_idx: usize, type_idx: usize, number: i32 }
         .bind(t.description)
         .bind(t.width)
         .bind(t.length)
-        .execute(&mut *tx)
+        .execute(&pool)
         .await
         .map_err(|e| format!("Failed to insert obstacle type: {}", e))?;
         type_ids.push(result.last_insert_rowid());
@@ -110,7 +103,7 @@ struct ObstacleSeed { point_idx: usize, type_idx: usize, number: i32 }
         )
         .bind(p.x)
         .bind(p.y)
-        .execute(&mut *tx)
+        .execute(&pool)
         .await
         .map_err(|e| format!("Failed to insert point: {}", e))?;
         point_ids.push(result.last_insert_rowid());
@@ -125,7 +118,7 @@ struct ObstacleSeed { point_idx: usize, type_idx: usize, number: i32 }
         )
         .bind(point_id)
         .bind(c.value)
-        .execute(&mut *tx)
+        .execute(&pool)
         .await
         .map_err(|e| format!("Failed to insert comment: {}", e))?;
     }
@@ -134,13 +127,12 @@ struct ObstacleSeed { point_idx: usize, type_idx: usize, number: i32 }
     println!("📸 Insertion des photos...");
     for i in pictures_data.iter() {
         let point_id = *point_ids.get(i.point_idx).ok_or("Invalid point index for picture")?;
-        // Note: The column is assumed to be 'path' based on previous context.
         sqlx::query(
-            "INSERT INTO picture (point_id, path) VALUES (?, ?)"
+            "INSERT INTO picture (point_id, image) VALUES (?, ?)"
         )
         .bind(point_id)
-        .bind(i.path)
-        .execute(&mut *tx)
+        .bind(i.image)
+        .execute(&pool)
         .await
         .map_err(|e| format!("Failed to insert picture: {}", e))?;
     }
@@ -158,15 +150,10 @@ struct ObstacleSeed { point_idx: usize, type_idx: usize, number: i32 }
         .bind(point_id)
         .bind(type_id)
         .bind(o.number)
-        .execute(&mut *tx)
+        .execute(&pool)
         .await
         .map_err(|e| format!("Failed to insert obstacle: {}", e))?;
     }
-
-    // Commit the transaction
-    tx.commit()
-        .await
-        .map_err(|e| format!("Failed to commit transaction: {}", e))?;
 
     println!("✅ Seeding terminé avec succès !");
     println!("   - {} types d'obstacles", obstacle_types.len());
@@ -176,4 +163,4 @@ struct ObstacleSeed { point_idx: usize, type_idx: usize, number: i32 }
     println!("   - {} obstacles", obstacles_data.len());
 
     Ok(())
-}*/
+}
