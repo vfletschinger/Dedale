@@ -18,10 +18,14 @@
     "babel-preset-expo": "~54.0.0",
     "expo": "~54.0.23",
     "expo-constants": "~18.0.10",
+<<<<<<< HEAD
+=======
     "expo-dev-client": "~6.0.17",
+>>>>>>> 190f53691b13aef49bb4bde0fed00adbe3b18769
     "expo-file-system": "~19.0.19",
     "expo-image-picker": "~17.0.8",
     "expo-location": "~19.0.7",
+    "expo-notifications": "~0.32.13",
     "expo-sqlite": "~16.0.9",
     "expo-status-bar": "~3.0.8",
     "express": "^5.1.0",
