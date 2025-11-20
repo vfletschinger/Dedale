@@ -127,9 +127,6 @@ export default function InterestPointsScreen() {
                   </View>
                   <View>
                     <Text className="text-gray-800 font-bold text-lg">Point #{item.id}</Text>
-                    <Text className="text-gray-500 text-xs">
-                      {index === 0 ? 'Récent' : `Il y a ${index} point${index > 1 ? 's' : ''}`}
-                    </Text>
                   </View>
                 </View>
                 <View className="bg-blue-50 rounded-full px-3 py-1">
