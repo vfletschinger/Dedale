@@ -13,14 +13,8 @@
       "backgroundColor": "#ffffff"
     },
     "plugins": [
-      [
-        "expo-location",
-        {
-          "locationAlwaysAndWhenInUsePermission": "need it :)",
-          "locationWhenInUsePermission": "need it :)",
-          "locationAlwaysPermission": "need it :)"
-        }
-      ]
+      "expo-sqlite",
+      "expo-barcode-scanner"
     ],
     "ios": {
       "supportsTablet": true,
@@ -43,9 +37,6 @@
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
-    },
-    "plugins": [
-      "expo-sqlite"
-    ]
+    }
   }
 }

@@ -1,13 +1,30 @@
-import { View, Text, Pressable } from "react-native";
-import React from "react";
-import "../style/global.css";
-import CustomButton from "../components/CustomButton";
+import {
+  AppState,
+  Linking,
+  Platform,
+  SafeAreaView,
+  StatusBar,
+  StyleSheet,
+  View
+} from "react-native";
+import { useEffect, useRef } from "react";
 
+import QRCodeScanner from "../components/QrCodeSacnner"; 
 export default function HomeScreen() {
+  
   return (
-    <View className="container">
-      <Text className="text-xl font-bold text-blue-500">Welcome to Dedale</Text>
-
-    </View>
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#000" />
+      
+      <QRCodeScanner />
+      
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1, 
+    backgroundColor: '#000', 
+  },
+});
