@@ -12,7 +12,14 @@ import React, { useEffect, useState, useMemo } from "react";
 import { InterestPointsType } from "../types/database";
 import getDatabase from "../../assets/migrations";
 
-import { calculateDistance, getUserLocation } from "../services/Helper";
+import {
+  calculateDistance,
+  getAddressFromCoords,
+  getUserLocation,
+} from "../services/Helper";
+import { deletePoint } from "../services/databaseAcces";
+import { get } from "react-native/Libraries/TurboModule/TurboModuleRegistry";
+import InterestPointCard from "../components/PointCard";
 
 export default function InterestPointsScreen() {
   const navigation = useNavigation<any>();
@@ -57,6 +64,29 @@ export default function InterestPointsScreen() {
     fetchInterestPoint();
     fetchLocation();
   }, []);
+
+  const handleDelete = (pointId: number) => {
+    Alert.alert(
+      "Confirmer la suppression",
+      "Êtes-vous sûr de vouloir supprimer ce point ? Cette action est irréversible.",
+      [
+        { text: "Annuler", style: "cancel" },
+        {
+          text: "Supprimer",
+          style: "destructive",
+          onPress: () => {
+            const success = deletePoint(pointId, db);
+            if (success) {
+              Alert.alert("Succès", "Point supprimé avec succès");
+              fetchInterestPoint();
+            } else {
+              Alert.alert("Erreur", "Impossible de supprimer le point");
+            }
+          },
+        },
+      ]
+    );
+  };
 
   useEffect(() => {
     fetchLocation();
@@ -123,7 +153,7 @@ export default function InterestPointsScreen() {
   return (
     <View className="flex-1 bg-gray-50">
       {/* Header */}
-      <View className="bg-blue-500 pt-12 pb-6 px-4 shadow-lg">
+      <View className="bg-blue-500 pt-12 pb-6 px-4 shadow-sm">
         <Text className="text-white text-3xl font-bold mb-2">
           Points d'intérêt
         </Text>
@@ -167,7 +197,10 @@ export default function InterestPointsScreen() {
           <Text className="text-gray-500 text-base text-center leading-6">
             Commencez par enregistrer votre premier point d'intérêt
           </Text>
-          <Pressable className="mt-8 bg-blue-500 px-8 py-4 rounded-full shadow-md active:bg-blue-600">
+          <Pressable
+            className="mt-8 bg-blue-500 px-8 py-4 rounded-full shadow-md active:bg-blue-600"
+            onPress={() => navigation.navigate("RegisterPoint")}
+          >
             <Text className="text-white font-semibold text-base">
               + Ajouter un point
             </Text>
@@ -180,57 +213,14 @@ export default function InterestPointsScreen() {
           contentContainerClassName="p-4"
           showsVerticalScrollIndicator={false}
           renderItem={({ item, index }) => (
-            <Pressable
+            <InterestPointCard
+              item={item}
+              index={index}
               onPress={() =>
                 navigation.navigate("PointDetails", { pointId: item.id })
               }
-              className="bg-white rounded-2xl p-5 mb-4 shadow-sm active:shadow-md"
-              style={{
-                transform: [{ scale: 1 }],
-              }}
-            >
-              {/* Badge numéro */}
-              <View className="flex-row items-center justify-between mb-3">
-                <View className="flex-row items-center">
-                  <View className="bg-blue-500 rounded-full w-10 h-10 items-center justify-center mr-3">
-                    <Text className="text-white font-bold text-base">
-                      #{item.id}
-                    </Text>
-                  </View>
-                  <View>
-                    <Text className="text-gray-800 font-bold text-lg">
-                      Point #{item.id}
-                    </Text>
-                  </View>
-                </View>
-                <View className="bg-blue-50 rounded-full px-3 py-1">
-                  <Text className="text-blue-600 text-xs font-semibold">→</Text>
-                </View>
-              </View>
-
-              <View className="h-px bg-gray-100 mb-3" />
-              {/* Coordonnées */}
-              <View className="flex-row items-center">
-                <Text className="text-2xl mr-2">📍</Text>
-                <View>
-                  <Text className="text-gray-600 text-xs font-medium mb-1">
-                    Coordonnées GPS
-                  </Text>
-                  <View className="flex-row">
-                    <View className="bg-gray-50 rounded-lg px-3 py-1 mr-2">
-                      <Text className="text-gray-700 text-sm font-mono">
-                        {item.x.toFixed(4)}
-                      </Text>
-                    </View>
-                    <View className="bg-gray-50 rounded-lg px-3 py-1">
-                      <Text className="text-gray-700 text-sm font-mono">
-                        {item.y.toFixed(4)}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-            </Pressable>
+              onDelete={() => handleDelete(item.id)}
+            />
           )}
           ListFooterComponent={<View className="h-4" />}
         />
@@ -253,12 +243,20 @@ export default function InterestPointsScreen() {
       {/* Selection Modal */}
       <Modal
         visible={modalVisible}
-        animationType="slide"
+        animationType="fade"
         transparent={true}
         onRequestClose={() => setModalVisible(false)}
       >
-        <View className="flex-1 justify-end bg-black/40">
-          <View className="bg-white rounded-t-2xl p-4 max-h-3/4">
+        <Pressable
+          onPress={() => setModalVisible(false)}
+          className="flex-1 bg-black/40 justify-center items-center"
+          style={{ padding: 12 }}
+        >
+          <Pressable
+            onPress={() => {}}
+            className="bg-white rounded-2xl w-11/12 h-5/6"
+            style={{ padding: 16 }}
+          >
             <View className="flex-row items-center justify-between mb-3">
               <Text className="text-lg font-semibold">
                 Sélectionner des points
@@ -308,8 +306,8 @@ export default function InterestPointsScreen() {
                 </Text>
               </Pressable>
             </View>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
     </View>
   );
