@@ -18,6 +18,12 @@ async function generate_excel() {
   });
 
 }
+
+async function qr_code() {
+    
+    await invoke('start_server');
+
+}
 function Accueil() {
   return (
   <div className="p-4">
@@ -30,6 +36,12 @@ function Accueil() {
       onClick={generate_excel}
     >
       Exporter Excel
+    </button>
+     <button
+      className="inline-flex items-center justify-center px-4 py-2 bg-[#1f9d55] text-white font-medium rounded-md hover:bg-[#2ad783] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2ad783]"
+      onClick={qr_code}
+    >
+      connecter tel
     </button>
   </div>
 );
