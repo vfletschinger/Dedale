@@ -100,11 +100,11 @@ export default function RegisterPointScreen() {
       for (const imageUri of selectedImages) {
         try {
           try {
-            const cols: any[] = db.getAllSync("PRAGMA table_info('pictures')");
+            const cols: any[] = db.getAllSync("PRAGMA table_info('picture')");
             const hasImageCol = Array.isArray(cols) && cols.some(c => c.name === 'image');
             if (!hasImageCol) {
               try {
-                db.execSync('ALTER TABLE pictures ADD COLUMN image TEXT');
+                db.execSync('ALTER TABLE picture ADD COLUMN image TEXT');
                 console.log('Colonne `image` ajoutée à la table pictures');
               } catch (alterErr) {
                 console.warn('Impossible d\'ajouter la colonne image :', alterErr);
