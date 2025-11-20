@@ -31,7 +31,7 @@ export default function PointDetails() {
       setDetailsPoint(pointInf);
 
       const pictureResults = db.getAllSync(
-        `SELECT * FROM pictures WHERE point_id = ?`,
+        `SELECT * FROM picture WHERE point_id = ?`,
         [pointId]
       );
       setPictures(pictureResults);
