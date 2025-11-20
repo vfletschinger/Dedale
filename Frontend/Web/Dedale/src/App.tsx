@@ -16,15 +16,15 @@ function Navigation({ page, setPage }: { page: string, setPage: (page: string) =
 
  return (
   <nav className="bg-[#171c22]"> {/* Couleur principale 65% */}
-    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <div className="px-4 sm:px-6 lg:px-8">
       <div className="flex h-16 items-center justify-between">
         
         {/* Left side - Logo */}
         <div className="flex-shrink-0">
           <img 
-            src="./assets/logo_strasbourg.png" 
+            src="src/assets/logo_strasbourg.png" 
             alt="Logo" 
-            className="h-10 w-auto"
+            className="h-30 w-auto"
           />
         </div>
 
