@@ -13,6 +13,7 @@ export default function PointDetails() {
   const { pointId } = route.params as RouteParams;
   const navigation = useNavigation();
   const [detailsPoint, setDetailsPoint] = useState<PointDetailType | null>(null);
+  const [pictures, setPictures] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const fetchPoint = async () => {
@@ -28,7 +29,15 @@ export default function PointDetails() {
         [pointId]
       );
       setDetailsPoint(pointInf);
-      console.log('Point:', pointInf?.image ? 'Image exists' : 'No image');
+
+      const pictureResults = db.getAllSync(
+        `SELECT * FROM picture WHERE point_id = ?`,
+        [pointId]
+      );
+      setPictures(pictureResults);
+
+      console.log('Point:', pointInf);
+      console.log('Pictures:', pictureResults.length > 0 ? `${pictureResults.length} images found` : 'No image');
     } catch (e) {
       console.log('Erreur:', e);
     } finally {
@@ -93,14 +102,16 @@ export default function PointDetails() {
             </View>
           )}
 
-          {detailsPoint.image && (
+          {pictures.length > 0 && (
             <View className="bg-gray-100 p-4 rounded-lg mb-4">
-              <Text className="text-lg font-semibold mb-2">Image</Text>
-              <Image 
-                source={{ uri: `data:image/jpeg;base64,${detailsPoint.image}` }}
-                style={{ width: '100%', height: 200, resizeMode: 'contain' }}
-                
-              />
+              <Text className="text-lg font-semibold mb-2">Images</Text>
+              {pictures.map((pic) => (
+                <Image
+                  key={pic.id}
+                  source={{ uri: `data:image/jpeg;base64,${pic.image}` }}
+                  style={{ width: '100%', height: 200, resizeMode: 'contain', marginBottom: 10 }}
+                />
+              ))}
             </View>
           )}
         </View>
