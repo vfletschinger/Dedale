@@ -81,16 +81,29 @@ pub struct Point {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Obstacle {
+pub struct ObstacleType {
     pub id: i64,
-    pub name: Option<String>,
-    pub number: Option<i32>,
-    pub description: Option<String>, 
-    pub width: Option<f64>,
-    pub length: Option<f64>,
+    pub name: String,
+    pub description: String, 
+    pub width: f64,
+    pub length: f64,
 }
 
-
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Obstacle {
+    pub id: i32,
+    pub point_id: i32,
+    pub type_id: i32,
+    pub number: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>, 
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub width: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub length: Option<f64>,
+}
 
 #[derive(Debug,Serialize, Deserialize)]
 pub struct PointSimple {
@@ -105,6 +118,7 @@ pub struct Comment {
     pub point_id: i32,    // Lien vers le point auquel ce commentaire est attaché
     pub value: String,    // Le texte du commentaire
 }
+
 #[derive(Debug,Serialize, Deserialize)]
 pub struct Picture {
     pub id: i32,          // Identifiant unique de l'image
@@ -182,11 +196,13 @@ async fn fetch_obstacles(pool: &SqlitePool, point_id: i64) -> Result<Vec<Obstacl
     let query = r#"
         SELECT 
             o.id, 
+            o.point_id,
+            o.type_id,
             o.number, 
             ot.name,
-            ot.length,
+            ot.description,
             ot.width,
-            ot.description
+            ot.length
         FROM obstacle o
         JOIN obstacle_type ot ON o.type_id = ot.id
         WHERE o.point_id = ?
@@ -200,13 +216,13 @@ async fn fetch_obstacles(pool: &SqlitePool, point_id: i64) -> Result<Vec<Obstacl
 
     let obstacles = rows.into_iter().map(|row| Obstacle {
         id: row.get("id"),
-        name: row.get("name"),
-        number: row.get("number"),
         point_id: row.get("point_id"),
         type_id: row.get("type_id"),
-        length: row.get("length"),
-        width: row.get("width"),
+        number: row.get("number"),
+        name: row.get("name"),
         description: row.get("description"),
+        width: row.get("width"),
+        length: row.get("length"),
     }).collect();
 
     Ok(obstacles)
@@ -318,29 +334,34 @@ pub async fn insert_point_details(
     }
     println!("[DB] ✓ Toutes les images insérées");
 
-    println!("[DB] 🚧 Insertion des obstacles...");
+    println!("[DB] 🚧 Insertion des obstacle_types et obstacles...");
     for detail in &details {
         for obstacle in &detail.obstacle {
             println!("[DB]   → Obstacle ID: {}, point_id: {}, type_id: {}, nombre: {}", 
                 obstacle.id, obstacle.point_id, obstacle.type_id, obstacle.number);
             
-            // Vérifier si le type_id existe dans obstacle_type
-            let type_exists: Option<i32> = sqlx::query_scalar(
-                r#"SELECT id FROM obstacle_type WHERE id = ?"#
-            )
-            .bind(obstacle.type_id)
-            .fetch_optional(&mut *tx)
-            .await
-            .map_err(|e| format!("Erreur vérification type_id {} : {}", obstacle.type_id, e))?;
-            
-            if type_exists.is_none() {
-                eprintln!("[DB] ⚠️  WARNING: type_id {} n'existe pas dans obstacle_type, obstacle ID {} ignoré", 
-                    obstacle.type_id, obstacle.id);
-                continue; // Ignore cet obstacle si le type n'existe pas
+            // Si l'obstacle a des données de type (name, description, width, length), 
+            // on l'insère dans obstacle_type
+            if obstacle.name.is_some() || obstacle.description.is_some() || 
+               obstacle.width.is_some() || obstacle.length.is_some() {
+                println!("[DB]     → Insertion/vérification obstacle_type ID: {}", obstacle.type_id);
+                sqlx::query(
+                    r#"INSERT OR IGNORE INTO obstacle_type (id, name, description, width, length) 
+                       VALUES (?, ?, ?, ?, ?)"#
+                )
+                .bind(obstacle.type_id)
+                .bind(obstacle.name.as_ref().unwrap_or(&"Unknown".to_string()))
+                .bind(obstacle.description.as_ref().unwrap_or(&"".to_string()))
+                .bind(obstacle.width.unwrap_or(0.0))
+                .bind(obstacle.length.unwrap_or(0.0))
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| format!("Erreur INSERT obstacle_type ID {} : {}", obstacle.type_id, e))?;
             }
             
+            // Insérer l'obstacle lui-même
             sqlx::query(
-                r#"INSERT OR REPLACE INTO obstacles (id, point_id, type_id, nombre) VALUES (?, ?, ?, ?)"#
+                r#"INSERT OR REPLACE INTO obstacle (id, point_id, type_id, number) VALUES (?, ?, ?, ?)"#
             )
             .bind(obstacle.id)
             .bind(obstacle.point_id)
@@ -352,7 +373,7 @@ pub async fn insert_point_details(
                 obstacle.id, obstacle.point_id, obstacle.type_id, e))?;
         }
     }
-    println!("[DB] ✓ Tous les obstacles insérés");
+    println!("[DB] ✓ Tous les obstacles et types insérés");
 
     println!("[DB] 💾 Validation de la transaction...");
     tx.commit()

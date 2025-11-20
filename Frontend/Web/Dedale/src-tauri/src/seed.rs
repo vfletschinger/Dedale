@@ -1,6 +1,7 @@
 use tauri::AppHandle;
 use crate::db::get_db_pool;
-use crate::db::ObstacleType;
+use crate::db::{ObstacleType};
+use crate::seed;
 // Assuming this function is accessible (defined in db.rs or similar)
 // pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> { ... }
 
