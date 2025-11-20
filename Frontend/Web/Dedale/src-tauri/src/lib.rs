@@ -3,6 +3,8 @@
 mod db;
 mod excel;
 mod pdf;
+mod map;
+mod seed;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -13,7 +15,8 @@ pub fn run() {
         .plugin(db::init_db())
         .invoke_handler(tauri::generate_handler![
             excel::export_points_excel,
-            pdf::create_pdf
+            pdf::create_pdf,
+            map::get_points
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { invoke } from '@tauri-apps/api/core';
 
 function OfflineMapLibre() {
   const mapContainer = useRef<HTMLDivElement | null>(null);
@@ -18,6 +19,67 @@ function OfflineMapLibre() {
       style: 'http://localhost:8080/styles/basic-preview/style.json',
       center: [7.7635, 48.5465],
       zoom: 13,
+    });
+
+    // Récupère les points via la commande Tauri `get_points` et les ajoute en source GeoJSON
+    const fetchAndDisplayPoints = async (mapObj: maplibregl.Map) => {
+      try {
+        const points = await invoke<any[]>('get_points'); // [{ id, x, y, obstacles, comments, pictures }, ...]
+
+        const geojson = {
+          type: "FeatureCollection",
+          features: points.map((p: any) => ({
+            type: "Feature",
+            geometry: {
+              type: "Point",
+              coordinates: [Number(p.x), Number(p.y)] as [number, number] // lon, lat
+            },
+            properties: {
+              id: p.id,
+              obstacles: p.obstacles,
+              comments: p.comments,
+              pictures: p.pictures,
+            },
+          })),
+        } as GeoJSON.FeatureCollection<GeoJSON.Point, any>;
+
+        if (!mapObj.getSource('db-points')) {
+          mapObj.addSource('db-points', { type: 'geojson', data: geojson, cluster: true, clusterRadius: 50 });
+          
+          mapObj.addLayer({
+            id: 'db-points-layer',
+            type: 'circle',
+            source: 'db-points',
+            paint: {
+              'circle-radius': 6,
+              'circle-color': '#FF5722',
+              'circle-stroke-color': '#fff',
+              'circle-stroke-width': 1,
+            },
+          });
+
+          mapObj.on('click', 'db-points-layer', (e) => {
+            const f = e.features?.[0];
+            if (!f) return;
+            const coords = (f.geometry as any).coordinates.slice();
+            const props = f.properties;
+            new maplibregl.Popup()
+              .setLngLat(coords)
+              .setText(props?.id ? `Point ${props.id}` : JSON.stringify(props))
+              .addTo(mapObj);
+          });
+
+          mapObj.on('mouseenter', 'db-points-layer', () => mapObj.getCanvas().style.cursor = 'pointer');
+          mapObj.on('mouseleave', 'db-points-layer', () => mapObj.getCanvas().style.cursor = '');
+        } else {
+          (mapObj.getSource('db-points') as maplibregl.GeoJSONSource).setData(geojson);
+        }} catch (err) {
+        console.error('fetchAndDisplayPoints error', err);
+      }
+    };
+
+    mapInstance.on('load', () => {
+      fetchAndDisplayPoints(mapInstance);
     });
 
     const initialMarker = new maplibregl.Marker()
