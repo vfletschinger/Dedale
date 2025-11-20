@@ -1,7 +1,7 @@
 import { View, Text, Alert, Modal, TextInput, StyleSheet, Image, Pressable, FlatList, TouchableOpacity } from "react-native";
 import React, { useState, useRef } from "react";
 import CustomButton from "../components/CustomButton";
-import MapView from "react-native-maps";
+import MapView, { Marker } from "react-native-maps";
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
@@ -10,7 +10,9 @@ import * as ImageHelper from '../services/ImageHelper';
 
 export default function RegisterPointScreen() {
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  
   const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  
   const mapRef = useRef<MapView | null>(null);
   const db: any = getDatabase();
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -36,7 +38,7 @@ export default function RegisterPointScreen() {
     };
 
     setCoords(newCoords);
-    setLocation(newCoords);
+    
     if (mapRef.current) {
       try {
         mapRef.current.animateToRegion({
@@ -80,102 +82,46 @@ export default function RegisterPointScreen() {
   };
 
   const savePointToDB = async (x: number, y: number, commentValue: string = '') => {
-  try {
-    const pointResult: any = db.runSync(
-      'INSERT INTO point (x, y) VALUES (?, ?)',
-      [x, y]
-    );
+    try {
+      const pointResult: any = db.runSync(
+        'INSERT INTO point (x, y) VALUES (?, ?)',
+        [x, y]
+      );
 
-    const insertedPointId = pointResult.lastInsertRowId as number;
-    if (!insertedPointId || insertedPointId === 0) {
-      throw new Error("Impossible de récupérer l'ID du point qui vient d'être créé.");
-    }
+      const insertedPointId = pointResult.lastInsertRowId as number;
+      if (!insertedPointId || insertedPointId === 0) {
+        throw new Error("Impossible de récupérer l'ID du point qui vient d'être créé.");
+      }
 
-    db.runSync(
-      'INSERT INTO comment (point_id, value) VALUES (?, ?)',
-      [insertedPointId, commentValue]
-    );
+      db.runSync(
+        'INSERT INTO comment (point_id, value) VALUES (?, ?)',
+        [insertedPointId, commentValue]
+      );
 
-    if (selectedImages.length > 0) {
-      for (const imageUri of selectedImages) {
-        try {
+      if (selectedImages.length > 0) {
+        for (const imageUri of selectedImages) {
           try {
-            const cols: any[] = db.getAllSync("PRAGMA table_info('picture')");
-            const hasImageCol = Array.isArray(cols) && cols.some(c => c.name === 'image');
-            if (!hasImageCol) {
-              try {
+            try {
+              const cols: any[] = db.getAllSync("PRAGMA table_info('picture')");
+              const hasImageCol = Array.isArray(cols) && cols.some(c => c.name === 'image');
+              if (!hasImageCol) {
                 db.execSync('ALTER TABLE picture ADD COLUMN image TEXT');
-                console.log('Colonne `image` ajoutée à la table pictures');
-              } catch (alterErr) {
-                console.warn('Impossible d\'ajouter la colonne image :', alterErr);
               }
-            }
-          } catch (pragmaErr) {
-            console.warn('Impossible de vérifier les colonnes de la table pictures :', pragmaErr);
-          }
+            } catch (pragmaErr) { console.warn(pragmaErr); }
 
-          try {
-            const info = await FileSystem.getInfoAsync(imageUri);
-            console.log('Image file info before save:', info);
-            if (!info.exists) {
-              console.warn('Le fichier image n\'existe pas ou n\'est pas accessible :', imageUri);
-              Alert.alert('Attention', "Le point a été enregistré mais un fichier image n'est pas accessible.");
-            }
-          } catch (fsErr) {
-            console.warn('Erreur lors de la vérification du fichier image :', fsErr);
+            await ImageHelper.saveImageToBDD(imageUri, insertedPointId);
+          } catch (imgErr) {
+            console.error(`Erreur image ${imageUri} :`, imgErr);
           }
-
-          await ImageHelper.saveImageToBDD(imageUri, insertedPointId);
-        } catch (imgErr) {
-          console.error(`Erreur lors de la sauvegarde de l'image ${imageUri} :`, imgErr);
-          const errMessage = (imgErr && (imgErr as any).message) || String(imgErr);
-          Alert.alert('Attention', `Le point a été enregistré mais la sauvegarde d'une image a échoué. (${errMessage})`);
         }
       }
+
+      return insertedPointId;
+    } catch (error: any) {
+      console.error("Erreur sauvegarde :", error);
+      Alert.alert('Erreur', "Impossible d'enregistrer le point.");
+      return null;
     }
-
-    return insertedPointId;
-  } catch (error: any) {
-    console.error("Erreur lors de la sauvegarde du point/commentaire :", error);
-    Alert.alert('Erreur', "Impossible d'enregistrer le point et son commentaire.");
-    return null;
-  }
-  };
-
-  const getSavedPoints = () => {
-  try {
-    const results = db.getAllSync('SELECT * FROM point');
-    console.log("Saved Points:", results);
-    return results;
-  } catch (error) {
-    console.error("Erreur lors de la récupération des points :", error); 
-    Alert.alert('Erreur', 'Impossible de récupérer les points enregistrés.');
-    return [];
-  }
-  };
-
-  const getSavedComments = () => {
-  try {
-    const results = db.getAllSync('SELECT * FROM comment');
-    console.log("Saved Comments:", results);
-    return results;
-  } catch (error) {
-    console.error("Erreur lors de la récupération des commentaires :", error); 
-    Alert.alert('Erreur', 'Impossible de récupérer les commentaires enregistrés.');
-    return [];
-  }
-  };
-
-  const getSavedPictures = () => {
-  try {
-    const results = db.getAllSync('SELECT * FROM picture');
-    console.log("Saved Pictures:", results);
-    return results;
-  } catch (error) {
-    console.error("Erreur lors de la récupération des images :", error); 
-    Alert.alert('Erreur', 'Impossible de récupérer les images enregistrées.');
-    return [];
-  }
   };
 
   return (
@@ -190,8 +136,22 @@ export default function RegisterPointScreen() {
             latitudeDelta: 0.003,
             longitudeDelta: 0.003,
           }}
-          showsUserLocation
-        />
+          showsUserLocation={true}
+          onPress={(e) => {
+            const clickedCoords = e.nativeEvent.coordinate;
+            setLocation(clickedCoords);
+            setIsModalVisible(true);
+          }}
+        >
+          {location && (
+            <Marker 
+              coordinate={location} 
+              title="Nouveau point"
+              description="Point à enregistrer"
+              pinColor="red"
+            />
+          )}
+        </MapView>
       ) : (
         <View style={styles.map}>
           <Text>Chargement de la carte...</Text>
@@ -203,14 +163,21 @@ export default function RegisterPointScreen() {
           onPress={requestLocation}
           style={[styles.button, { backgroundColor: '#8B5CF6' }]}
         >
-          <Text style={styles.buttonText}>Obtenir ma position</Text>
+          <Text style={styles.buttonText}>Ma position</Text>
         </Pressable>
 
         <Pressable
-          onPress={() => setIsModalVisible(true)}
+          onPress={() => {
+             if(coords) {
+                 setLocation(coords);
+                 setIsModalVisible(true);
+             } else {
+                 Alert.alert("Erreur", "Position introuvable");
+             }
+          }}
           style={[styles.button, { backgroundColor: '#8B5CF6' }]}
         >
-          <Text style={styles.buttonText}>Ajouter un point</Text>
+          <Text style={styles.buttonText}>Ajouter un point ici</Text>
         </Pressable>
       </View>
 
@@ -222,7 +189,14 @@ export default function RegisterPointScreen() {
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Ajouter un commentaire</Text>
+            <Text style={styles.modalTitle}>Nouveau Point</Text>
+            
+            {location && (
+               <Text style={{fontSize: 12, color: 'gray', marginBottom: 10}}>
+                 Lat: {location.latitude.toFixed(5)}, Lon: {location.longitude.toFixed(5)}
+               </Text>
+            )}
+
             <TextInput
               style={[styles.input,{marginBottom: 10}]}
               placeholder="Entrez le commentaire du point"
@@ -249,18 +223,19 @@ export default function RegisterPointScreen() {
                 style={{ marginVertical: 8 }}
               />
             ) : null}
+            
             <CustomButton
               title="Enregistrer le point"
               onPress={async () => {
                 if (location) {
                   const insertedId = await savePointToDB(location.longitude, location.latitude, pointComment);
                   if (insertedId) {
-                    //getSavedPoints();
                     setIsModalVisible(false);
                     setPointComment("");
                     setSelectedImages([]);
-                    //getSavedComments();
-                    //getSavedPictures();
+
+                    setLocation(null);                     
+                    Alert.alert("Succès", "Point enregistré !");
                   }
                 } else {
                   Alert.alert('Erreur', 'Aucune position à enregistrer.');
@@ -273,6 +248,7 @@ export default function RegisterPointScreen() {
                 setIsModalVisible(false);
                 setPointComment("");
                 setSelectedImages([]);
+                // setLocation(null);
               }}
             />
           </View>
