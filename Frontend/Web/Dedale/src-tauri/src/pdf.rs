@@ -2,6 +2,8 @@ use crate::db;
 use tauri::AppHandle;
 use genpdf::elements;
 use crate::seed;
+use crate::utils;
+use std::path::PathBuf;
 
 #[tauri::command]
 pub async fn create_pdf(app: AppHandle) -> Result<(), String> {
@@ -12,7 +14,7 @@ pub async fn create_pdf(app: AppHandle) -> Result<(), String> {
         .map_err(|e| format!("Failed to load font family: {}", e))?;
 
     let mut doc = genpdf::Document::new(font_family);
-    doc.set_title("Demo document");
+    doc.set_title("recap");
     let mut decorator = genpdf::SimplePageDecorator::new();
     decorator.set_margins(10);
     doc.set_page_decorator(decorator);
@@ -55,8 +57,16 @@ pub async fn create_pdf(app: AppHandle) -> Result<(), String> {
         doc.push(elements::Break::new(1.5));
     }
 
-    doc.render_to_file("output.pdf")
-        .map_err(|e| format!("Failed to write PDF file: {}", e))?;
+    
+    let (dir_path, file_name) = utils::create_file_name("pdf".to_string());
+    if let Some(file_path) = utils::show_save_dialog(&file_name, &dir_path, "pdf".to_string()) {
+        doc.render_to_file(file_path)
+            .map_err(|e| format!("Failed to write PDF file: {}", e))?;
+            
+        println!("PDF successfully saved.");
+    } else {
+        println!("Save cancelled by user");
+    }
 
     Ok(())
 }
