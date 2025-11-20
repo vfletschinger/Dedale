@@ -1,17 +1,34 @@
-import { View, Text, Alert, Modal, TextInput, StyleSheet, Image, Pressable, FlatList, TouchableOpacity } from "react-native";
+import {
+  View,
+  Text,
+  Alert,
+  Modal,
+  TextInput,
+  StyleSheet,
+  Image,
+  Pressable,
+  FlatList,
+  TouchableOpacity,
+} from "react-native";
 import React, { useState, useRef } from "react";
 import CustomButton from "../components/CustomButton";
 import MapView, { Marker } from "react-native-maps";
-import * as Location from 'expo-location';
-import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
+import * as Location from "expo-location";
+import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system";
 import getDatabase from "../../assets/migrations";
-import * as ImageHelper from '../services/ImageHelper';
+import * as ImageHelper from "../services/ImageHelper";
 
 export default function RegisterPointScreen() {
-  const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [location, setLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
   
-  const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [coords, setCoords] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
   
   const mapRef = useRef<MapView | null>(null);
   const db: any = getDatabase();
@@ -25,8 +42,11 @@ export default function RegisterPointScreen() {
 
   const requestLocation = async () => {
     let { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission refusée', 'Impossible d\'accéder à la localisation.');
+    if (status !== "granted") {
+      Alert.alert(
+        "Permission refusée",
+        "Impossible d'accéder à la localisation."
+      );
       return null;
     }
 
@@ -41,14 +61,17 @@ export default function RegisterPointScreen() {
     
     if (mapRef.current) {
       try {
-        mapRef.current.animateToRegion({
-          latitude: newCoords.latitude,
-          longitude: newCoords.longitude,
-          latitudeDelta: 0.002,
-          longitudeDelta: 0.002,
-        }, 800);
+        mapRef.current.animateToRegion(
+          {
+            latitude: newCoords.latitude,
+            longitude: newCoords.longitude,
+            latitudeDelta: 0.002,
+            longitudeDelta: 0.002,
+          },
+          800
+        );
       } catch (e) {
-          // ignore animate errors
+        // ignore animate errors
       }
     }
     return newCoords;
@@ -57,8 +80,8 @@ export default function RegisterPointScreen() {
   const pickImage = async () => {
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission refusée', 'Autorisation caméra refusée.');
+      if (status !== "granted") {
+        Alert.alert("Permission refusée", "Autorisation caméra refusée.");
         return;
       }
 
@@ -69,24 +92,30 @@ export default function RegisterPointScreen() {
 
       const uri = result?.assets?.[0]?.uri ?? result?.uri;
       if (uri) {
-        setSelectedImages(prevImages => [...prevImages, uri]);
+        setSelectedImages((prevImages) => [...prevImages, uri]);
       }
     } catch (error) {
-      console.error('Erreur lors de la prise de photo :', error);
-      Alert.alert('Erreur', "Impossible d'accéder à la caméra.");
+      console.error("Erreur lors de la prise de photo :", error);
+      Alert.alert("Erreur", "Impossible d'accéder à la caméra.");
     }
   };
 
   const removeImage = (uriToRemove: string) => {
-    setSelectedImages(prevImages => prevImages.filter(uri => uri !== uriToRemove));
+    setSelectedImages((prevImages) =>
+      prevImages.filter((uri) => uri !== uriToRemove)
+    );
   };
 
-  const savePointToDB = async (x: number, y: number, commentValue: string = '') => {
-    try {
-      const pointResult: any = db.runSync(
-        'INSERT INTO point (x, y, timestamp) VALUES (?, ?, ?)',
-        [x, y, new Date().toISOString()]
-      );
+  const savePointToDB = async (
+    x: number,
+    y: number,
+    commentValue: string = ""
+  ) => {
+      try {
+        const pointResult: any = db.runSync(
+          "INSERT INTO point (x, y, timestamp) VALUES (?, ?, ?)",
+          [x, y, new Date().toISOString()]
+        );
 
       const insertedPointId = pointResult.lastInsertRowId as number;
       if (!insertedPointId || insertedPointId === 0) {
@@ -116,11 +145,56 @@ export default function RegisterPointScreen() {
         }
       }
 
-      return insertedPointId;
-    } catch (error: any) {
-      console.error("Erreur sauvegarde :", error);
-      Alert.alert('Erreur', "Impossible d'enregistrer le point.");
-      return null;
+        return insertedPointId;
+      } catch (error: any) {
+        console.error(
+        "Erreur sauvegarde :",
+        error
+      );
+        Alert.alert(
+        "Erreur",
+        "Impossible d'enregistrer le point."
+      );
+        return null;
+      }
+  };
+
+  const getSavedPoints = () => {
+    try {
+      const results = db.getAllSync("SELECT * FROM point");
+      console.log("Saved Points:", results);
+      return results;
+    } catch (error) {
+      console.error("Erreur lors de la récupération des points :", error);
+      Alert.alert("Erreur", "Impossible de récupérer les points enregistrés.");
+      return [];
+    }
+  };
+
+  const getSavedComments = () => {
+    try {
+      const results = db.getAllSync("SELECT * FROM comment");
+      console.log("Saved Comments:", results);
+      return results;
+    } catch (error) {
+      console.error("Erreur lors de la récupération des commentaires :", error);
+      Alert.alert(
+        "Erreur",
+        "Impossible de récupérer les commentaires enregistrés."
+      );
+      return [];
+    }
+  };
+
+  const getSavedPictures = () => {
+    try {
+      const results = db.getAllSync("SELECT * FROM picture");
+      console.log("Saved Pictures:", results);
+      return results;
+    } catch (error) {
+      console.error("Erreur lors de la récupération des images :", error);
+      Alert.alert("Erreur", "Impossible de récupérer les images enregistrées.");
+      return [];
     }
   };
 
@@ -128,7 +202,9 @@ export default function RegisterPointScreen() {
     <View style={styles.container}>
       {coords ? (
         <MapView
-          ref={ref => { mapRef.current = ref }}
+          ref={(ref) => {
+            mapRef.current = ref;
+          }}
           style={styles.map}
           initialRegion={{
             latitude: coords.latitude,
@@ -161,7 +237,7 @@ export default function RegisterPointScreen() {
       <View style={styles.buttonContainer}>
         <Pressable
           onPress={requestLocation}
-          style={[styles.button, { backgroundColor: '#8B5CF6' }]}
+          style={[styles.button, { backgroundColor: "#8B5CF6" }]}
         >
           <Text style={styles.buttonText}>Ma position</Text>
         </Pressable>
@@ -198,24 +274,30 @@ export default function RegisterPointScreen() {
             )}
 
             <TextInput
-              style={[styles.input,{marginBottom: 10}]}
+              style={[styles.input, { marginBottom: 10 }]}
               placeholder="Entrez le commentaire du point"
               value={pointComment}
               onChangeText={setPointComment}
             />
-            <CustomButton
-              title="Prendre une photo"
-              onPress={pickImage}
-            />
+            <CustomButton title="Prendre une photo" onPress={pickImage} />
             {selectedImages.length > 0 ? (
               <FlatList
                 horizontal
                 data={selectedImages}
                 keyExtractor={(item) => item}
                 renderItem={({ item }) => (
-                  <View style={{ position: 'relative', marginRight: 10, marginVertical: 8 }}>
+                  <View
+                    style={{
+                      position: "relative",
+                      marginRight: 10,
+                      marginVertical: 8,
+                    }}
+                  >
                     <Image source={{ uri: item }} style={styles.thumbnail} />
-                    <TouchableOpacity onPress={() => removeImage(item)} style={styles.removeButton}>
+                    <TouchableOpacity
+                      onPress={() => removeImage(item)}
+                      style={styles.removeButton}
+                    >
                       <Text style={styles.removeButtonText}>X</Text>
                     </TouchableOpacity>
                   </View>
@@ -238,7 +320,7 @@ export default function RegisterPointScreen() {
                     Alert.alert("Succès", "Point enregistré !");
                   }
                 } else {
-                  Alert.alert('Erreur', 'Aucune position à enregistrer.');
+                  Alert.alert("Erreur", "Aucune position à enregistrer.");
                 }
               }}
             />
@@ -261,55 +343,55 @@ export default function RegisterPointScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   modalContainer: {
     flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.5)",
   },
   modalContent: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     padding: 20,
     borderTopLeftRadius: 12,
     borderTopRightRadius: 12,
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: 12,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: "#ccc",
     borderRadius: 8,
     padding: 10,
     marginBottom: 12,
   },
   map: {
     ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   buttonContainer: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 20,
     left: 20,
     right: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     gap: 10,
   },
   button: {
     flex: 1,
     padding: 15,
     borderRadius: 12,
-    alignItems: 'center',
+    alignItems: "center",
   },
   buttonText: {
-    color: 'white',
-    fontWeight: 'bold',
+    color: "white",
+    fontWeight: "bold",
   },
   thumbnail: {
     width: 100,
@@ -317,19 +399,19 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   removeButton: {
-    position: 'absolute',
+    position: "absolute",
     top: -5,
     right: -5,
-    backgroundColor: 'red',
+    backgroundColor: "red",
     borderRadius: 12,
     width: 24,
     height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   removeButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
+    color: "white",
+    fontWeight: "bold",
     fontSize: 12,
   },
 });
