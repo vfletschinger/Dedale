@@ -3,17 +3,18 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import React, { useEffect, useState } from "react";
 import getDatabase from "../../assets/migrations";
 import { PointDetailType, CommentType, PictureType, ObstacleType, InterestPointsType } from "../types/database";
-import { 
-  deletePoint, 
-  updateComment, 
-  deleteComment, 
+import {
+  deletePoint,
+  updateComment,
+  deleteComment,
   addComment,
   deletePicture,
   addPicture,
-  updatePointCoordinates 
+  updatePointCoordinates
 } from "../services/databaseAcces";
 import { imageToBase64, pickImage } from "../services/ImageHelper";
 import MapView, { Marker } from "react-native-maps";
+import CoordinatesDisplay from "../components/CoordinatesDisplay";
 
 type RouteParams = { pointId: number; };
 
@@ -210,8 +211,8 @@ export default function PointDetails() {
       <ScrollView className="flex-1 bg-white">
         <View className="bg-blue-500 pt-12 pb-4 px-4 shadow-lg flex-row items-center justify-between">
           <View className="flex-row items-center flex-1">
-            <Pressable 
-              onPress={() => navigation.goBack()} 
+            <Pressable
+              onPress={() => navigation.goBack()}
               className="mr-3"
             >
               <View className="bg-white/20 w-10 h-10 rounded-full items-center justify-center">
@@ -220,11 +221,11 @@ export default function PointDetails() {
             </Pressable>
             <Text className="text-white text-3xl font-bold">Détail du point</Text>
           </View>
-          
+
           <View className="flex-row gap-2">
-            <Pressable 
+            <Pressable
               onPress={handleDelete}
-              className="bg-red-500/50 w-10 h-10 rounded-full items-center justify-center"
+              className="bg-red-500/70 w-10 h-10 rounded-full items-center justify-center"
             >
               <Text className="text-white text-xl">🗑️</Text>
             </Pressable>
@@ -233,42 +234,46 @@ export default function PointDetails() {
 
         <View className="p-4">
           <Text className="text-3xl font-bold mb-4">Point #{pointData.point.id}</Text>
-          
+
           {/* Coordonnées */}
           <View>
-          <View className="bg-gray-100 p-4 rounded-lg mb-4">
-            <Text className="text-lg font-semibold mb-2">Coordonnées</Text>
-            <Text>X: {pointData.point.x}</Text>
-            <Text>Y: {pointData.point.y}</Text>
-          </View>
+            <View className="mb-3">
+              <CoordinatesDisplay
+                latitude={pointData.point.y}
+                longitude={pointData.point.x}
+                showAddress={true}
+              />
+            </View>
             <MapView
-            style={{ width: '100%', height: 200 }}
-            initialRegion={{
-              latitude: pointData.point.y,
-              longitude: pointData.point.x,
-              latitudeDelta: 0.1, 
-              longitudeDelta: 0.1, 
-            }}
-            zoomEnabled={true}
-            scrollEnabled={true}
-            >
-            <Marker
-              coordinate={{
-              latitude: pointData.point.y,
-              longitude: pointData.point.x,
+              style={{ width: '100%', height: 200 }}
+              initialRegion={{
+                latitude: pointData.point.y,
+                longitude: pointData.point.x,
+                latitudeDelta: 0.1,
+                longitudeDelta: 0.1,
               }}
-              title={`Point #${pointData.point.id}`}
-            />
+              zoomEnabled={true}
+              scrollEnabled={false}
+                minZoomLevel={17}
+                maxZoomLevel={18}
+            >
+              <Marker
+                coordinate={{
+                  latitude: pointData.point.y,
+                  longitude: pointData.point.x,
+                }}
+                title={`Point #${pointData.point.id}`}
+              />
             </MapView>
 
-        </View>
+          </View>
           {/* Commentaires */}
-          <View className="bg-gray-100 p-4 rounded-lg mb-4">
+          <View className="bg-gray-100 p-4 rounded-lg mb-4 mt-4">
             <View className="flex-row justify-between items-center mb-2">
               <Text className="text-lg font-semibold">
                 Commentaires ({pointData.comments.length})
               </Text>
-              <Pressable 
+              <Pressable
                 onPress={handleAddComment}
                 className="bg-blue-500 px-3 py-1 rounded-lg"
               >
@@ -280,13 +285,13 @@ export default function PointDetails() {
                 <View key={comment.id} className="bg-white p-3 rounded-lg mb-2">
                   <Text className="mb-2">{comment.value}</Text>
                   <View className="flex-row gap-2">
-                    <Pressable 
+                    <Pressable
                       onPress={() => handleEditComment(comment)}
                       className="bg-blue-100 px-3 py-1 rounded"
                     >
                       <Text className="text-blue-600 text-xs">Modifier</Text>
                     </Pressable>
-                    <Pressable 
+                    <Pressable
                       onPress={() => handleDeleteComment(comment.id)}
                       className="bg-red-100 px-3 py-1 rounded"
                     >
@@ -299,41 +304,6 @@ export default function PointDetails() {
               <Text className="text-gray-500 text-sm">Aucun commentaire</Text>
             )}
           </View>
-
-          {/* Images */}
-          <View className="bg-gray-100 p-4 rounded-lg mb-4">
-            <View className="flex-row justify-between items-center mb-2">
-              <Text className="text-lg font-semibold">
-                Images ({pointData.pictures.length})
-              </Text>
-              <Pressable 
-                onPress={handleAddPicture}
-                className="bg-blue-500 px-3 py-1 rounded-lg"
-              >
-                <Text className="text-white text-xs font-semibold">+ Ajouter</Text>
-              </Pressable>
-            </View>
-            {pointData.pictures.length > 0 ? (
-              pointData.pictures.map((picture) => (
-                <View key={picture.id} className="bg-white p-3 rounded-lg mb-2">
-                  <Image 
-                    source={{ uri: `data:image/jpeg;base64,${picture.image}` }}
-                    style={{ width: '100%', height: 200, resizeMode: 'contain' }}
-                    className="mb-2"
-                  />
-                  <Pressable 
-                    onPress={() => handleDeletePicture(picture.id)}
-                    className="bg-red-100 px-3 py-1 rounded self-start"
-                  >
-                    <Text className="text-red-600 text-xs">Supprimer</Text>
-                  </Pressable>
-                </View>
-              ))
-            ) : (
-              <Text className="text-gray-500 text-sm">Aucune image</Text>
-            )}
-          </View>
-
           {/* Obstacles */}
           {pointData.obstacles.length > 0 && (
             <View className="bg-gray-100 p-4 rounded-lg mb-4">
@@ -356,6 +326,39 @@ export default function PointDetails() {
               ))}
             </View>
           )}
+          {/* Images */}
+          <View className="bg-gray-100 p-4 rounded-lg mb-4">
+            <View className="flex-row justify-between items-center mb-2">
+              <Text className="text-lg font-semibold">
+                Images ({pointData.pictures.length})
+              </Text>
+              <Pressable
+                onPress={handleAddPicture}
+                className="bg-blue-500 px-3 py-1 rounded-lg"
+              >
+                <Text className="text-white text-xs font-semibold">+ Ajouter</Text>
+              </Pressable>
+            </View>
+            {pointData.pictures.length > 0 ? (
+              pointData.pictures.map((picture) => (
+                <View key={picture.id} className="bg-white p-3 rounded-lg mb-2">
+                  <Image
+                    source={{ uri: `data:image/jpeg;base64,${picture.image}` }}
+                    style={{ width: '100%', height: 200, resizeMode: 'contain' }}
+                    className="mb-2"
+                  />
+                  <Pressable
+                    onPress={() => handleDeletePicture(picture.id)}
+                    className="bg-red-100 px-3 py-1 rounded self-start"
+                  >
+                    <Text className="text-red-600 text-xs">Supprimer</Text>
+                  </Pressable>
+                </View>
+              ))
+            ) : (
+              <Text className="text-gray-500 text-sm">Aucune image</Text>
+            )}
+          </View>
         </View>
       </ScrollView>
 
@@ -371,7 +374,7 @@ export default function PointDetails() {
             <Text className="text-2xl font-bold mb-4">
               {currentComment ? 'Modifier le commentaire' : 'Ajouter un commentaire'}
             </Text>
-            
+
             <TextInput
               value={commentText}
               onChangeText={setCommentText}
@@ -380,7 +383,7 @@ export default function PointDetails() {
               className="border border-gray-300 rounded-lg p-3 mb-4"
               placeholder="Votre commentaire..."
             />
-            
+
             <View className="flex-row gap-3">
               <Pressable
                 onPress={() => setIsCommentModalVisible(false)}
