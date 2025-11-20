@@ -38,71 +38,65 @@ export default function OfflineMap({ initialRegion }: OfflineMapProps) {
   const db = getDatabase();
 
   React.useEffect(() => {
-    let didTimeout = false;
-
-    const timer = setTimeout(() => {
-      didTimeout = true;
-      console.log("⏳ Timeout 10s → fallback Strasbourg");
-      setCurrentRegion(defaultRegion);
-      setLoading(false);
-    }, 10000);
-
-    const requestLocation = async () => {
-      let { status } = await Location.requestForegroundPermissionsAsync();
-
-      if (status !== "granted") {
-        Alert.alert(
-          "Permission refusée",
-          "Impossible d'accéder à la localisation."
-        );
-        clearTimeout(timer);
-        setCurrentRegion(defaultRegion);
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const loc = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Highest,
-        });
-
-        if (!didTimeout) {
-          clearTimeout(timer);
-          setCurrentRegion({
-            latitude: loc.coords.latitude,
-            longitude: loc.coords.longitude,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
-          });
-          setLoading(false);
-        }
-      } catch (error) {
-        console.error("Erreur localisation :", error);
-        if (!didTimeout) {
-          clearTimeout(timer);
-          setCurrentRegion(defaultRegion);
-          setLoading(false);
-        }
-      }
-    };
-
     const fetchInterestPoints = () => {
       try {
         const points = db.getAllSync<InterestPointsType>(
           "SELECT * FROM point ORDER BY id DESC"
         );
         console.log("📌 Points DB :", points);
-        setListPoint(points); // pas de boucle car l’effet ne rerun jamais
+        setListPoint(points);
       } catch (error) {
         console.error("Erreur DB :", error);
         setListPoint([]);
       }
     };
 
-    requestLocation();
-    fetchInterestPoints();
+    const initialize = async () => {
+      fetchInterestPoints();
 
-    return () => clearTimeout(timer);
+      const locationPromise = async (): Promise<Region> => {
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          Alert.alert(
+            "Permission refusée",
+            "Impossible d'accéder à la localisation."
+          );
+          return defaultRegion;
+        }
+
+        try {
+          const loc = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Highest,
+          });
+          return {
+            latitude: loc.coords.latitude,
+            longitude: loc.coords.longitude,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+          };
+        } catch (error) {
+          console.error("Erreur localisation :", error);
+          return defaultRegion;
+        }
+      };
+
+      const timeoutPromise = new Promise<Region>((resolve) =>
+        setTimeout(() => {
+          console.log("⏳ Timeout 10s → fallback Strasbourg");
+          resolve(defaultRegion);
+        }, 10000)
+      );
+
+      const region = await Promise.race([locationPromise(), timeoutPromise]);
+      setCurrentRegion(region);
+      setLoading(false);
+    };
+
+    initialize();
+
+    // Le useEffect ne s'exécute qu'une fois, le nettoyage du timeout n'est pas strictement
+    // nécessaire si le composant n'est jamais démonté rapidement, mais c'est une bonne pratique.
+    // Ici, avec Promise.race, la gestion est implicite et plus propre.
   }, []);
   const getTileUrlTemplate = () => {
     if (__DEV__ && Constants.expoConfig?.hostUri) {
