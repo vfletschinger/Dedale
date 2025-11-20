@@ -6,21 +6,28 @@ import {
   Pressable,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { InterestPointsType } from "../types/database";
 import getDatabase from "../../assets/migrations";
+
+import { calculateDistance, getUserLocation } from "../services/Helper";
 
 export default function InterestPointsScreen() {
   const navigation = useNavigation<any>();
   const [listPoint, setListPoint] = useState<InterestPointsType[]>([]);
+  const [sortedList, setSortedList] = useState<InterestPointsType[]>([]);
+  const [sortBy, setSortBy] = useState<"recent" | "distance">("recent");
   const db = getDatabase();
   const [loading, setLoading] = useState(true);
+  const [location, setLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
 
-  const fetchInterestePoint = async () => {
+  const fetchInterestPoint = async () => {
     try {
-      const points = db.getAllSync<InterestPointsType>(
-        "SELECT * FROM point ORDER BY id DESC"
-      );
+      const points = db.getAllSync<InterestPointsType>("SELECT * FROM point");
+      console.log("Points récupérés:", points);
       setListPoint(points);
     } catch (error) {
       console.error("Erreur lors de la récupération:", error);
@@ -30,9 +37,47 @@ export default function InterestPointsScreen() {
     }
   };
 
+  const fetchLocation = async () => {
+    try {
+      const userLocation = await getUserLocation();
+      setLocation(userLocation);
+    } catch (error) {
+      console.error(
+        "Erreur lors de la récupération de la localisation:",
+        error
+      );
+    }
+  };
+
   useEffect(() => {
-    fetchInterestePoint();
+    fetchInterestPoint();
+    fetchLocation();
   }, []);
+
+  useEffect(() => {
+    fetchLocation();
+    let sorted = [...listPoint];
+    if (sortBy === "recent") {
+      sorted.sort((a, b) => b.id - a.id);
+    } else if (sortBy === "distance" && location) {
+      sorted.sort((a, b) => {
+        const distA = calculateDistance(
+          location.longitude,
+          location.latitude,
+          a.x,
+          a.y
+        );
+        const distB = calculateDistance(
+          location.longitude,
+          location.latitude,
+          b.x,
+          b.y
+        );
+        return distA - distB;
+      });
+    }
+    setSortedList(sorted);
+  }, [listPoint, sortBy]);
 
   if (loading) {
     return (
@@ -53,12 +98,35 @@ export default function InterestPointsScreen() {
           Points d'intérêt
         </Text>
         <Text className="text-blue-100 text-base">
-          {listPoint.length}{" "}
-          {listPoint.length > 1 ? "points enregistrés" : "point enregistré"}
+          {sortedList.length}{" "}
+          {sortedList.length > 1 ? "points enregistrés" : "point enregistré"}
         </Text>
+        {/* Boutons de tri */}
+        <View className="flex-row mt-4 bg-blue-400/50 rounded-full p-1">
+          <Pressable
+            onPress={() => setSortBy("recent")}
+            className={`flex-1 py-2 rounded-full ${sortBy === "recent" ? "bg-white" : ""}`}
+          >
+            <Text
+              className={`text-center font-semibold ${sortBy === "recent" ? "text-blue-600" : "text-white"}`}
+            >
+              Plus récent
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setSortBy("distance")}
+            className={`flex-1 py-2 rounded-full ${sortBy === "distance" ? "bg-white" : ""}`}
+          >
+            <Text
+              className={`text-center font-semibold ${sortBy === "distance" ? "text-blue-600" : "text-white"}`}
+            >
+              Plus proche
+            </Text>
+          </Pressable>
+        </View>
       </View>
 
-      {listPoint.length === 0 ? (
+      {sortedList.length === 0 && !loading ? (
         <View className="flex-1 items-center justify-center px-8">
           <View className="bg-white rounded-full w-24 h-24 items-center justify-center mb-6 shadow-md">
             <Text className="text-5xl">📍</Text>
@@ -77,7 +145,7 @@ export default function InterestPointsScreen() {
         </View>
       ) : (
         <FlatList
-          data={listPoint}
+          data={sortedList}
           keyExtractor={(item) => item.id.toString()}
           contentContainerClassName="p-4"
           showsVerticalScrollIndicator={false}
@@ -102,11 +170,6 @@ export default function InterestPointsScreen() {
                   <View>
                     <Text className="text-gray-800 font-bold text-lg">
                       Point #{item.id}
-                    </Text>
-                    <Text className="text-gray-500 text-xs">
-                      {index === 0
-                        ? "Récent"
-                        : `Il y a ${index} point${index > 1 ? "s" : ""}`}
                     </Text>
                   </View>
                 </View>
