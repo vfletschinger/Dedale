@@ -13,7 +13,7 @@ import {
 import React, { useState, useRef } from "react";
 import CustomButton from "../components/CustomButton";
 import ObstacleSelector from "../components/ObstacleSelector";
-import MapView from "react-native-maps";
+import MapView, { Marker } from "react-native-maps";
 import * as Location from "expo-location";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
@@ -197,7 +197,7 @@ export default function RegisterPointScreen() {
 
   return (
     <View style={styles.container}>
-      {coords ? (
+         {coords ? (
         <MapView
           ref={(ref) => {
             mapRef.current = ref;
@@ -209,8 +209,22 @@ export default function RegisterPointScreen() {
             latitudeDelta: 0.003,
             longitudeDelta: 0.003,
           }}
-          showsUserLocation
-        />
+          showsUserLocation={true}
+          onPress={(e) => {
+            const clickedCoords = e.nativeEvent.coordinate;
+            setLocation(clickedCoords);
+            setIsModalVisible(true);
+          }}
+        >
+          {location && (
+            <Marker 
+              coordinate={location} 
+              title="Nouveau point"
+              description="Point à enregistrer"
+              pinColor="red"
+            />
+          )}
+        </MapView>
       ) : (
         <View style={styles.map}>
           <Text>Chargement de la carte...</Text>
