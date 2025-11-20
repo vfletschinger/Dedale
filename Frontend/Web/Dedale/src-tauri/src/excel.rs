@@ -1,19 +1,10 @@
 use crate::db::Point;
 use rust_xlsxwriter::Workbook;
 use tauri::AppHandle;
-use std::path::PathBuf;
-use dirs::data_dir;
+use crate::utils;
 
 #[tauri::command]
 pub async fn export_points_excel(app: AppHandle) -> Result<(), String> { 
-    let mut path: PathBuf = data_dir().expect("Impossible de récupérer data_dir");
-
-    path.push("dedale");
-    path.push("recap.xlsx");
-
-    let excel_path = path.to_str().ok_or("Chemin Excel invalide")?;
-    println!("📂 Excel path: {:?}", excel_path);
-
     let points: Vec<Point> = crate::db::retrieve_data(&app).await?;
     println!("📊 Retrieved {} points", points.len());
 
@@ -22,7 +13,7 @@ pub async fn export_points_excel(app: AppHandle) -> Result<(), String> {
 
     let headers = [
         "Point ID", "X", "Y", "Obstacle Nom", 
-        "Obstacle Description", "Nombre", "Largeur", "Longueur"
+        "Obstacle Description", "Nombre", "Largeur", "Longueur", 
     ];
     for (col, header) in headers.iter().enumerate() {
         worksheet.write_string(0, col as u16, *header)
@@ -68,12 +59,15 @@ pub async fn export_points_excel(app: AppHandle) -> Result<(), String> {
         }
     }
 
-
-    println!("💾 Saving workbook...");
-    workbook.save(excel_path)
-        .map_err(|e| e.to_string())?;
-
-    println!("✅ Excel saved successfully!");
+    let (dir_path, file_name) = utils::create_file_name("xlsx".to_string());
+    if let Some(file_path) = utils::show_save_dialog(&file_name, &dir_path, "xlsx".to_string()) {
+        println!("💾 Saving workbook... {}", file_path.display());
+        workbook.save(file_path)
+            .map_err(|e| e.to_string())?;
+        println!("✅ Excel saved successfully!");
+    } else {
+        println!("Save cancelled by user");
+    }
 
     Ok(())
 }
