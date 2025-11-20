@@ -13,6 +13,7 @@ import {
   updatePointCoordinates 
 } from "../services/databaseAcces";
 import { imageToBase64, pickImage } from "../services/ImageHelper";
+import MapView, { Marker } from "react-native-maps";
 
 type RouteParams = { pointId: number; };
 
@@ -234,12 +235,33 @@ export default function PointDetails() {
           <Text className="text-3xl font-bold mb-4">Point #{pointData.point.id}</Text>
           
           {/* Coordonnées */}
+          <View>
           <View className="bg-gray-100 p-4 rounded-lg mb-4">
             <Text className="text-lg font-semibold mb-2">Coordonnées</Text>
             <Text>X: {pointData.point.x}</Text>
             <Text>Y: {pointData.point.y}</Text>
           </View>
+            <MapView
+            style={{ width: '100%', height: 200 }}
+            initialRegion={{
+              latitude: pointData.point.y,
+              longitude: pointData.point.x,
+              latitudeDelta: 0.1, 
+              longitudeDelta: 0.1, 
+            }}
+            zoomEnabled={true}
+            scrollEnabled={true}
+            >
+            <Marker
+              coordinate={{
+              latitude: pointData.point.y,
+              longitude: pointData.point.x,
+              }}
+              title={`Point #${pointData.point.id}`}
+            />
+            </MapView>
 
+        </View>
           {/* Commentaires */}
           <View className="bg-gray-100 p-4 rounded-lg mb-4">
             <View className="flex-row justify-between items-center mb-2">
