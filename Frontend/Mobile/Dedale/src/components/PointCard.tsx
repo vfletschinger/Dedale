@@ -9,6 +9,9 @@ interface PointCardProps {
   index: number;
   onPress: () => void;
   onDelete: () => void;
+  displayCoordinates?: boolean;
+  displayAddress?: boolean;
+  displayDeleteButton?: boolean;
 }
 
 export default function PointCard({
@@ -16,6 +19,9 @@ export default function PointCard({
   index,
   onPress,
   onDelete,
+  displayCoordinates = true,
+  displayAddress = true,
+  displayDeleteButton = true,
 }: PointCardProps) {
   const [address, setAddress] = useState<string>('Chargement...');
 
@@ -56,29 +62,27 @@ export default function PointCard({
       </View>
 
       <View className="h-px bg-gray-100 mb-3" />
-      
-      {/* Pin et titre */}
-      <View className="flex-row items-center mb-3">
-        <Text className="text-xl mr-2">📍</Text>
-        <Text className="text-gray-800 text-sm font-semibold">
-          Point d'intérêt #{index + 1}
-        </Text>
-      </View>
-      
+            
       {/* Coordonnées et bouton supprimer */}
       <View className="flex-row items-start justify-between">
+        {displayCoordinates &&
         <CoordinatesDisplay
+          showCoordinates={displayCoordinates}
           latitude={item.y}
           longitude={item.x}
-          showAddress={true}
+          showAddress={displayAddress}
         />
+        }
+        
 
+        {displayDeleteButton &&
         <Pressable
           onPress={onDelete}
           className="bg-red-500 w-12 h-12 rounded-full items-center justify-center shadow-sm active:bg-red-600 ml-2"
         >
           <Text className="text-white text-xl">🗑️</Text>
         </Pressable>
+        }
       </View>
     </Pressable>
   );

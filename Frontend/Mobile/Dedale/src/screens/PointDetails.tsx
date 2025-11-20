@@ -237,11 +237,13 @@ export default function PointDetails() {
 
           {/* Coordonnées */}
           <View>
-            <CoordinatesDisplay
-              latitude={pointData.point.y}
-              longitude={pointData.point.x}
-              showAddress={true}
-            />
+            <View className="mb-3">
+              <CoordinatesDisplay
+                latitude={pointData.point.y}
+                longitude={pointData.point.x}
+                showAddress={true}
+              />
+            </View>
             <MapView
               style={{ width: '100%', height: 200 }}
               initialRegion={{
@@ -251,7 +253,9 @@ export default function PointDetails() {
                 longitudeDelta: 0.1,
               }}
               zoomEnabled={true}
-              scrollEnabled={true}
+              scrollEnabled={false}
+                minZoomLevel={17}
+                maxZoomLevel={18}
             >
               <Marker
                 coordinate={{
@@ -264,7 +268,7 @@ export default function PointDetails() {
 
           </View>
           {/* Commentaires */}
-          <View className="bg-gray-100 p-4 rounded-lg mb-4">
+          <View className="bg-gray-100 p-4 rounded-lg mb-4 mt-4">
             <View className="flex-row justify-between items-center mb-2">
               <Text className="text-lg font-semibold">
                 Commentaires ({pointData.comments.length})
@@ -300,7 +304,28 @@ export default function PointDetails() {
               <Text className="text-gray-500 text-sm">Aucun commentaire</Text>
             )}
           </View>
-
+          {/* Obstacles */}
+          {pointData.obstacles.length > 0 && (
+            <View className="bg-gray-100 p-4 rounded-lg mb-4">
+              <Text className="text-lg font-semibold mb-2">
+                Obstacles ({pointData.obstacles.length})
+              </Text>
+              {pointData.obstacles.map((obstacle) => (
+                <View key={obstacle.id} className="bg-white p-3 rounded-lg mb-2">
+                  <Text className="font-semibold">{obstacle.name}</Text>
+                  {obstacle.description && (
+                    <Text className="text-sm text-gray-600">{obstacle.description}</Text>
+                  )}
+                  <Text className="text-sm mt-1">Nombre: {obstacle.nombre}</Text>
+                  {(obstacle.length || obstacle.width) && (
+                    <Text className="text-sm">
+                      Dimensions: {obstacle.length}m x {obstacle.width}m
+                    </Text>
+                  )}
+                </View>
+              ))}
+            </View>
+          )}
           {/* Images */}
           <View className="bg-gray-100 p-4 rounded-lg mb-4">
             <View className="flex-row justify-between items-center mb-2">
@@ -334,29 +359,6 @@ export default function PointDetails() {
               <Text className="text-gray-500 text-sm">Aucune image</Text>
             )}
           </View>
-
-          {/* Obstacles */}
-          {pointData.obstacles.length > 0 && (
-            <View className="bg-gray-100 p-4 rounded-lg mb-4">
-              <Text className="text-lg font-semibold mb-2">
-                Obstacles ({pointData.obstacles.length})
-              </Text>
-              {pointData.obstacles.map((obstacle) => (
-                <View key={obstacle.id} className="bg-white p-3 rounded-lg mb-2">
-                  <Text className="font-semibold">{obstacle.name}</Text>
-                  {obstacle.description && (
-                    <Text className="text-sm text-gray-600">{obstacle.description}</Text>
-                  )}
-                  <Text className="text-sm mt-1">Nombre: {obstacle.nombre}</Text>
-                  {(obstacle.length || obstacle.width) && (
-                    <Text className="text-sm">
-                      Dimensions: {obstacle.length}m x {obstacle.width}m
-                    </Text>
-                  )}
-                </View>
-              ))}
-            </View>
-          )}
         </View>
       </ScrollView>
 

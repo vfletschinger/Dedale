@@ -6,12 +6,14 @@ interface CoordinatesDisplayProps {
   latitude: number;
   longitude: number;
   showAddress?: boolean;
+  showCoordinates?: boolean;
   index?: number;
 }
 
 export default function CoordinatesDisplay({
   latitude,
   longitude,
+  showCoordinates = true,
   showAddress = true,
   index,
 }: CoordinatesDisplayProps) {
@@ -42,6 +44,7 @@ export default function CoordinatesDisplay({
       )}
 
       {/* Coordonnées GPS */}
+      {showCoordinates && (
       <View>
         <Text className="text-gray-500 text-xs mb-1">Coordonnées GPS</Text>
         <View className="flex-row items-center">
@@ -67,6 +70,7 @@ export default function CoordinatesDisplay({
           </View>
         </View>
       </View>
+      )}
     </View>
   );
 }
