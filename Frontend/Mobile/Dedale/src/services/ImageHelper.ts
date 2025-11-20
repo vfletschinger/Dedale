@@ -12,7 +12,7 @@ export const saveImageToBDD = async (file: string, pointId: number) => {
       console.log('Image converted to base64, length:', base64.length);
       
       const result = db.runSync(
-        'INSERT INTO pictures (point_id, image) VALUES (?, ?)',
+        'INSERT INTO picture (point_id, image) VALUES (?, ?)',
         [pointId, base64]
       );
       

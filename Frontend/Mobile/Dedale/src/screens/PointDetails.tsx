@@ -13,22 +13,31 @@ export default function PointDetails() {
   const { pointId } = route.params as RouteParams;
   const navigation = useNavigation();
   const [detailsPoint, setDetailsPoint] = useState<PointDetailType | null>(null);
+  const [pictures, setPictures] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const fetchPoint = async () => {
     try {
       const pointInf = db.getFirstSync<PointDetailType>(
         `SELECT ip.*, ot.*, c.*, p.*, ip.id as "point_id"
-         FROM interest_points ip
-         LEFT JOIN obstacles o ON ip.id = o.point_id
-         LEFT JOIN obstacle_types ot ON ot.id = o.type_id
-         LEFT JOIN comments c ON ip.id = c.point_id 
-         LEFT JOIN pictures p ON ip.id = p.point_id
+         FROM point ip
+         LEFT JOIN obstacle o ON ip.id = o.point_id
+         LEFT JOIN obstacle_type ot ON ot.id = o.type_id
+         LEFT JOIN comment c ON ip.id = c.point_id 
+         LEFT JOIN picture p ON ip.id = p.point_id
          WHERE ip.id = ?`,
         [pointId]
       );
       setDetailsPoint(pointInf);
-      console.log('Point:', pointInf?.image ? 'Image exists' : 'No image');
+
+      const pictureResults = db.getAllSync(
+        `SELECT * FROM pictures WHERE point_id = ?`,
+        [pointId]
+      );
+      setPictures(pictureResults);
+
+      console.log('Point:', pointInf);
+      console.log('Pictures:', pictureResults.length > 0 ? `${pictureResults.length} images found` : 'No image');
     } catch (e) {
       console.log('Erreur:', e);
     } finally {
@@ -93,14 +102,16 @@ export default function PointDetails() {
             </View>
           )}
 
-          {detailsPoint.image && (
+          {pictures.length > 0 && (
             <View className="bg-gray-100 p-4 rounded-lg mb-4">
-              <Text className="text-lg font-semibold mb-2">Image</Text>
-              <Image 
-                source={{ uri: `data:image/jpeg;base64,${detailsPoint.image}` }}
-                style={{ width: '100%', height: 200, resizeMode: 'contain' }}
-                
-              />
+              <Text className="text-lg font-semibold mb-2">Images</Text>
+              {pictures.map((pic) => (
+                <Image
+                  key={pic.id}
+                  source={{ uri: `data:image/jpeg;base64,${pic.image}` }}
+                  style={{ width: '100%', height: 200, resizeMode: 'contain', marginBottom: 10 }}
+                />
+              ))}
             </View>
           )}
         </View>
