@@ -45,11 +45,11 @@ export async function seedDatabase(db: SQLiteDatabase) {
     // 2. Seed interest_points
     console.log('Insertion des points d\'intérêt...');
     const points = [
-      { x: 7.7521, y: 48.5734 }, 
-      { x: 7.7350, y: 48.5850 },
-      { x: 7.7580, y: 48.5920 },
-      { x: 7.7420, y: 48.5680 },
-      { x: 7.7650, y: 48.5790 },
+      { x: 12.7521, y: 48.5734 }, 
+      { x: 13.7350, y: 48.5850 },
+      { x: 13.7580, y: 48.5920 },
+      { x: 12.7420, y: 48.5680 },
+      { x: 12.7650, y: 48.5790 },
     ];
 
     const pointIds: number[] = [];

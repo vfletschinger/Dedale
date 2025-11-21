@@ -403,7 +403,7 @@ pub async fn insert_point_details(
         for picture in &detail.picture {
             println!("[DB]   → Picture ID: {}, point_id: {}, taille: {} bytes", picture.id, picture.point_id, picture.image.len());
             sqlx::query(
-                r#"INSERT OR REPLACE INTO picture (id, point_id, path) VALUES (?, ?, ?)"#
+                r#"INSERT OR REPLACE INTO picture (id, point_id, image) VALUES (?, ?, ?)"#
             )
             .bind(picture.id)
             .bind(picture.point_id)
