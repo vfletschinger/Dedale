@@ -2,10 +2,10 @@
 
 mod db;
 mod excel;
-mod socket;
-mod pdf;
 mod map;
+mod pdf;
 mod seed;
+mod socket;
 mod utils;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -19,6 +19,8 @@ pub fn run() {
             excel::export_points_excel,
             pdf::create_pdf,
             map::get_points,
+            db::fetch_obstacle_types,
+            db::insert_obstacles,
             socket::start_server
         ])
         .run(tauri::generate_context!())
