@@ -38,10 +38,13 @@ export default function RegisterPointScreen() {
   const mapRef = useRef<MapView | null>(null);
   const db: any = getDatabase();
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [isObstacleSelectorVisible, setIsObstacleSelectorVisible] = useState(false);
+  const [isObstacleSelectorVisible, setIsObstacleSelectorVisible] =
+    useState(false);
   const [pointComment, setPointComment] = useState("");
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
-  const [selectedObstacles, setSelectedObstacles] = useState<SelectedObstacle[]>([]);
+  const [selectedObstacles, setSelectedObstacles] = useState<
+    SelectedObstacle[]
+  >([]);
 
   React.useEffect(() => {
     requestLocation();
@@ -168,7 +171,10 @@ export default function RegisterPointScreen() {
               [insertedPointId, obstacle.type_id, obstacle.number]
             );
           } catch (obstErr) {
-            console.error("Erreur lors de la sauvegarde de l'obstacle:", obstErr);
+            console.error(
+              "Erreur lors de la sauvegarde de l'obstacle:",
+              obstErr
+            );
             Alert.alert(
               "Attention",
               `Le point a été enregistré mais un obstacle n'a pas pu être ajouté.`
@@ -197,7 +203,7 @@ export default function RegisterPointScreen() {
 
   return (
     <View style={styles.container}>
-         {coords ? (
+      {coords ? (
         <MapView
           ref={(ref) => {
             mapRef.current = ref;
@@ -217,8 +223,8 @@ export default function RegisterPointScreen() {
           }}
         >
           {location && (
-            <Marker 
-              coordinate={location} 
+            <Marker
+              coordinate={location}
               title="Nouveau point"
               description="Point à enregistrer"
               pinColor="red"
@@ -257,7 +263,7 @@ export default function RegisterPointScreen() {
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Ajouter un point d'intérêt</Text>
-            
+
             {/* Commentaire */}
             <TextInput
               style={[styles.input, { marginBottom: 10 }]}
@@ -268,29 +274,31 @@ export default function RegisterPointScreen() {
             />
 
             {/* Bouton pour ajouter des obstacles */}
-            <CustomButton 
-              title={`Ajouter des obstacles ${selectedObstacles.length > 0 ? `(${selectedObstacles.length})` : ''}`}
-              onPress={() => setIsObstacleSelectorVisible(true)} 
+            <CustomButton
+              title={`Ajouter des obstacles ${selectedObstacles.length > 0 ? `(${selectedObstacles.length})` : ""}`}
+              onPress={() => setIsObstacleSelectorVisible(true)}
             />
 
             {/* Affichage des obstacles sélectionnés */}
             {selectedObstacles.length > 0 && (
               <View style={{ marginVertical: 10 }}>
-                <Text style={{ fontWeight: '600', marginBottom: 5 }}>
+                <Text style={{ fontWeight: "600", marginBottom: 5 }}>
                   Obstacles sélectionnés :
                 </Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                <View
+                  style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}
+                >
                   {selectedObstacles.map((obs, idx) => (
-                    <View 
+                    <View
                       key={idx}
                       style={{
-                        backgroundColor: '#DBEAFE',
+                        backgroundColor: "#DBEAFE",
                         paddingHorizontal: 12,
                         paddingVertical: 6,
                         borderRadius: 20,
                       }}
                     >
-                      <Text style={{ color: '#1E40AF', fontWeight: '500' }}>
+                      <Text style={{ color: "#1E40AF", fontWeight: "500" }}>
                         {obs.name} ({obs.number})
                       </Text>
                     </View>
@@ -335,12 +343,12 @@ export default function RegisterPointScreen() {
               onPress={async () => {
                 if (location) {
                   const insertedId = await savePointToDB(
-                    location.longitude, 
-                    location.latitude, 
+                    location.longitude,
+                    location.latitude,
                     pointComment
                   );
                   if (insertedId) {
-                    Alert.alert('Succès', 'Point enregistré avec succès');
+                    Alert.alert("Succès", "Point enregistré avec succès");
                     setIsModalVisible(false);
                     setPointComment("");
                     setSelectedImages([]);
@@ -393,7 +401,7 @@ const styles = StyleSheet.create({
     padding: 20,
     borderTopLeftRadius: 12,
     borderTopRightRadius: 12,
-    maxHeight: '80%',
+    maxHeight: "80%",
   },
   modalTitle: {
     fontSize: 18,

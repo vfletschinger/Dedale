@@ -1,5 +1,13 @@
-import React from 'react';
-import { View, Text, Modal, TextInput, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
+import React from "react";
+import {
+  View,
+  Text,
+  Modal,
+  TextInput,
+  Pressable,
+  KeyboardAvoidingView,
+  Platform,
+} from "react-native";
 
 type EditModalProps = {
   visible: boolean;
@@ -11,7 +19,7 @@ type EditModalProps = {
   placeholder?: string;
   multiline?: boolean;
   numberOfLines?: number;
-  keyboardType?: 'default' | 'numeric' | 'email-address';
+  keyboardType?: "default" | "numeric" | "email-address";
 };
 
 export default function EditModal({
@@ -21,10 +29,10 @@ export default function EditModal({
   onChangeText,
   onSave,
   onCancel,
-  placeholder = '',
+  placeholder = "",
   multiline = false,
   numberOfLines = 1,
-  keyboardType = 'default'
+  keyboardType = "default",
 }: EditModalProps) {
   return (
     <Modal
@@ -33,12 +41,10 @@ export default function EditModal({
       animationType="fade"
       onRequestClose={onCancel}
     >
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         className="flex-1"
-      >      
-    
-
+      >
         <View className="flex-1 justify-center items-center bg-black/50 p-4">
           <View className="bg-white rounded-3xl p-6 w-full max-w-lg max-h-[85%]">
             <Text className="text-2xl font-bold mb-4 text-center">{title}</Text>
@@ -64,7 +70,9 @@ export default function EditModal({
                 onPress={onSave}
                 className="flex-1 bg-blue-500 py-3 rounded-lg"
               >
-                <Text className="text-center text-white font-semibold">Enregistrer</Text>
+                <Text className="text-center text-white font-semibold">
+                  Enregistrer
+                </Text>
               </Pressable>
             </View>
           </View>

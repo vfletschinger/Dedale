@@ -14,7 +14,7 @@
     @apply text-white font-bold;
   }
   .back-btn {
-    @apply absolute top-16 left-4 px-3 py-2 bg-gray-300 rounded-full;
+    @apply absolute top-12 left-4 px-3 py-2 bg-gray-300 rounded-full;
   }
   .back-btn-text {
     @apply text-gray-500 text-lg;

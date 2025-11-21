@@ -1,6 +1,7 @@
 import "./src/style/global.css";
 import { StatusBar } from "expo-status-bar";
 import { StyleSheet, Text, View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import Feather from "@expo/vector-icons/Feather";
@@ -8,12 +9,14 @@ import HomeScreen from "./src/screens/Home";
 import PointDetails from "./src/screens/PointDetails";
 import InterestPointsScreen from "./src/screens/InterestPoints";
 import RegisterPointScreen from "./src/screens/RegisterPoint";
+import RouteNavigation from "./src/screens/RouteNavigation";
 
 import type { TabParamList, RootStackParamList } from "./src/types/navigation";
 import { NavigationContainer } from "@react-navigation/native";
 import { useEffect, useState } from "react";
 import getDatabase from "./assets/migrations";
 import React from "react";
+import CreateRouteScreen from "./src/screens/CreateRoute";
 
 const Tab = createBottomTabNavigator<TabParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -69,19 +72,31 @@ export default function App() {
     initDatabase();
   }, []);
   return (
-    <NavigationContainer>
-      <Stack.Navigator>
-        <Stack.Screen
-          name="Tabs"
-          component={TabNavigator}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="PointDetails"
-          component={PointDetails}
-          options={{ headerShown: false }}
-        />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <NavigationContainer>
+        <Stack.Navigator>
+          <Stack.Screen
+            name="Tabs"
+            component={TabNavigator}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="PointDetails"
+            component={PointDetails}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="CreateRoute"
+            component={CreateRouteScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="RouteNavigation"
+            component={RouteNavigation}
+            options={{ headerShown: false }}
+          />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </GestureHandlerRootView>
   );
 }
