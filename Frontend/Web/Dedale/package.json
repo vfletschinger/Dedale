@@ -1,0 +1,39 @@
+{
+  "name": "dedale",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@tailwindplus/elements": "^1.0.18",
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-fs": "^2.4.4",
+    "@tauri-apps/plugin-http": "^2.5.4",
+    "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-sql": "^2.3.1",
+    "leaflet": "^1.9.4",
+    "maplibre-gl": "^5.12.0",
+    "react": "^19.0.0-rc.1",
+    "react-dom": "^19.0.0-rc.1",
+    "react-leaflet": "^5.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.17",
+    "@tailwindcss/vite": "^4.1.17",
+    "@tauri-apps/cli": "^2",
+    "@types/leaflet": "^1.9.21",
+    "@types/maplibre-gl": "^1.13.2",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.6.0",
+    "tailwindcss": "^4.1.17",
+    "tsx": "^4.20.6",
+    "typescript": "~5.8.3",
+    "vite": "^7.0.4"
+  }
+}

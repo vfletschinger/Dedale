@@ -1,0 +1,18 @@
+stages:
+  - info
+
+print_mr_link:
+  stage: info
+  script:
+    - |
+      if [[ "$CI_COMMIT_BRANCH" == feature/* ]]; then
+        echo ""
+        echo "🧠 Tu viens de pousser sur la branche : $CI_COMMIT_BRANCH"
+        echo "-------------------------------------------"
+        echo "💡 Crée ta Merge Request ici :"
+        echo "👉 ${CI_PROJECT_URL}/-/merge_requests/new?merge_request[source_branch]=${CI_COMMIT_BRANCH}"
+        echo "-------------------------------------------"
+        echo ""
+      fi
+  only:
+    - /^feature\/.*$/
