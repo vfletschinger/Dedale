@@ -9,7 +9,6 @@ use sqlx::Transaction;
 use sqlx::Sqlite;
 use serde::Deserialize;
 use serde::Serialize;
-use serde::Deserialize;
 
 // Elle renvoie le plugin SQL entièrement configuré
 pub fn init_db() -> impl tauri::plugin::Plugin<tauri::Wry> {
