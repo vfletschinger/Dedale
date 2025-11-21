@@ -123,76 +123,89 @@ export default function PointDetails({ point, onClose, onRefresh }: { point: Poi
     };
 
     return (
-        <div style={{ padding: 12, minWidth: 300, fontFamily: "sans-serif" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <strong>Point #{point.id}</strong>
-                <button onClick={onClose}>✕</button>
+        <div className="point-popup" style={{ minWidth: 300 }}>
+            <div className="pp-header">
+                <div className="pp-title">Point #{point.id}</div>
+                <button onClick={onClose} className="pp-close" aria-label="Fermer">✕</button>
             </div>
 
-            <div style={{ marginTop: 8 }}>
-                <div><strong>Coordonnées :</strong> {point.x.toFixed(3)}, {point.y.toFixed(3)}</div>
+            <div className="pp-section">
+                <div className="pp-section-title">Coordonnées</div>
+                <div className="pp-coords">{point.x.toFixed(3)}, {point.y.toFixed(3)}</div>
             </div>
 
-            <div style={{ marginTop: 10 }}>
-                <strong>Obstacles ({point.obstacles.length}) <button onClick={() => setShowObstaclesPopup(true)}>[modifier]</button></strong>
+            <div className="pp-section">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div className="pp-section-title">Obstacles ({point.obstacles.length})</div>
+                    <button onClick={() => setShowObstaclesPopup(true)} className="action-primary">modifier</button>
+                </div>
+
                 {showObstaclesPopup && (
-                    <div style={{
+                    <div className="pp-card" style={{
                         position: "absolute",
                         top: 0,
                         left: 0,
-                        backgroundColor: "white",
-                        border: "1px solid #ccc",
-                        borderRadius: "4px",
-                        boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                        padding: "12px",
                         zIndex: 1000,
-                        minWidth: "280px",
-                        maxHeight: "400px",
+                        minWidth: 280,
+                        maxHeight: 400,
                         overflowY: "auto"
                     }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                             <strong>Modification des obstacles</strong>
-                            <button onClick={() => setShowObstaclesPopup(false)}>✕</button>
+                            <button onClick={() => setShowObstaclesPopup(false)} className="pp-close">✕</button>
                         </div>
-                        <ul style={{ margin: 0, paddingLeft: "20px" }}>
+                        <ul style={{ margin: 0, paddingLeft: 20 }}>
                             {mergedObstacles.map(o => (
-                                <li key={o.id}>
-                                    <div><em>{o.name ?? "Type inconnu"}</em> x {o.number ?? "-"} <button onClick={() => decrementObstacle(o.typeId)}>[-]</button> <button onClick={() => incrementObstacle(o.typeId)}>[+]</button></div>
+                                <li key={o.typeId} style={{ marginBottom: 8 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                                        <div>
+                                            <div style={{ fontWeight: 600 }}>{o.name ?? "Type inconnu"}</div>
+                                            <div className="muted">{o.description}</div>
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            <button onClick={() => decrementObstacle(o.typeId)} className="action-ghost">−</button>
+                                            <div style={{ minWidth: 28, textAlign: 'center' }}>{o.number}</div>
+                                            <button onClick={() => incrementObstacle(o.typeId)} className="action-primary">+</button>
+                                        </div>
+                                    </div>
                                 </li>
                             ))}
                         </ul>
-                        <button onClick={() => saveObstacles()}>[Save]</button>
+                        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                            <button onClick={() => setShowObstaclesPopup(false)} className="action-ghost">Annuler</button>
+                            <button onClick={() => saveObstacles()} className="action-primary">Enregistrer</button>
+                        </div>
                     </div>
                 )}
-                <ul>
+
+                <ul className="pp-list">
                     {point.obstacles.map(o => (
                         <li key={o.id}>
                             <div><em>{o.name ?? "Type inconnu"}</em> x {o.number ?? "-"}</div>
-                            {o.description ? <div style={{ fontSize: 12 }}>{o.description}</div> : null}
-                            <div style={{ fontSize: 12 }}>L×l: {o.length ?? "-"} × {o.width ?? "-"}</div>
+                            {o.description ? <div className="muted">{o.description}</div> : null}
+                            <div className="muted">L×l: {o.length ?? "-"} × {o.width ?? "-"}</div>
                         </li>
                     ))}
                 </ul>
             </div>
 
-            <div style={{ marginTop: 10 }}>
-                <strong>Commentaires ({point.comments.length})</strong>
-                <ul>
+            <div className="pp-section">
+                <div className="pp-section-title">Commentaires ({point.comments.length})</div>
+                <ul className="pp-list">
                     {point.comments.map(c => <li key={c.id}>{c.value}</li>)}
                 </ul>
             </div>
 
-            <div style={{ marginTop: 10 }}>
-                <strong>Photos ({point.pictures.length})</strong>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
+            <div className="pp-section">
+                <div className="pp-section-title">Photos ({point.pictures.length})</div>
+                <div className="pp-photo-grid">
                     {point.pictures.map(p => (
-                        <div key={p.id} style={{ width: 100, height: 80, overflow: "hidden", border: "1px solid #ddd" }}>
-                            <img
-                                alt={`pic-${p.id}`}
-                                src={resolveImageSrc(p.image)}
-                                style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                            />
-                        </div>
+                        <img
+                            key={p.id}
+                            alt={`pic-${p.id}`}
+                            src={resolveImageSrc(p.image)}
+                            className="pp-photo"
+                        />
                     ))}
                 </div>
             </div>

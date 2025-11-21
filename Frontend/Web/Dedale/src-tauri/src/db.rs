@@ -7,7 +7,6 @@ use std::fs;
 use std::str::FromStr;
 use sqlx::Transaction;
 use sqlx::Sqlite;
-use serde::Deserialize;
 use serde::Serialize;
 use serde::Deserialize;
 
@@ -87,6 +86,8 @@ pub struct Obstacle {
     pub id: i64,
     pub name: Option<String>,
     pub number: Option<i32>,
+    pub point_id: i64,
+    pub type_id: i64,
     pub description: Option<String>, 
     pub width: Option<f64>,
     pub length: Option<f64>,
@@ -126,7 +127,7 @@ pub struct PointDetail {
     pub obstacle: Vec<Obstacle>,
 }
 #[derive(Debug, Serialize)]
-pub struct Obstacle_type {
+pub struct ObstacleType {
     pub id: i64,
     pub name: String,
     pub description: String,
@@ -136,9 +137,9 @@ pub struct Obstacle_type {
 
 #[derive(Debug, Deserialize)]
 pub struct ObstacleInput {
-    pub typeId: i64,
+    pub type_id: i64,
     pub number: i32,
-    pub obstacleId: Option<i64>,
+    pub obstacle_id: Option<i64>,
 }
 
 pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
@@ -165,7 +166,7 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
 }
 
 async fn fetch_comments(pool: &SqlitePool, point_id: i64) -> Result<Vec<Comment>, String> {
-    let rows = sqlx::query("SELECT id, value FROM comment WHERE point_id = ?")
+    let rows = sqlx::query("SELECT id, value, point_id FROM comment WHERE point_id = ?")
         .bind(point_id)
         .fetch_all(pool)
         .await
@@ -181,7 +182,7 @@ async fn fetch_comments(pool: &SqlitePool, point_id: i64) -> Result<Vec<Comment>
 }
 
 async fn fetch_pictures(pool: &SqlitePool, point_id: i64) -> Result<Vec<Picture>, String> {
-    let rows = sqlx::query("SELECT id, image FROM picture WHERE point_id = ?")
+    let rows = sqlx::query("SELECT id, image, point_id FROM picture WHERE point_id = ?")
         .bind(point_id)
         .fetch_all(pool)
         .await
@@ -203,6 +204,8 @@ async fn fetch_obstacles(pool: &SqlitePool, point_id: i64) -> Result<Vec<Obstacl
             o.number, 
             ot.name,
             ot.length,
+            o.point_id,
+            o.type_id,
             ot.width,
             ot.description
         FROM obstacle o
@@ -231,7 +234,7 @@ async fn fetch_obstacles(pool: &SqlitePool, point_id: i64) -> Result<Vec<Obstacl
 }
 
 #[tauri::command]
-pub async fn fetch_obstacle_types(app: AppHandle) -> Result<Vec<Obstacle_type>, String> {
+pub async fn fetch_obstacle_types(app: AppHandle) -> Result<Vec<ObstacleType>, String> {
     let pool = get_db_pool(&app).await?;
     
     let rows = sqlx::query("SELECT id, name, description, width, length FROM obstacle_type")
@@ -239,7 +242,7 @@ pub async fn fetch_obstacle_types(app: AppHandle) -> Result<Vec<Obstacle_type>, 
         .await
         .map_err(|e| e.to_string())?;
 
-    let obstacles = rows.into_iter().map(|row| Obstacle_type {
+    let obstacles = rows.into_iter().map(|row| ObstacleType {
         id: row.get("id"),
         name: row.get("name"),
         description: row.get("description"),
@@ -259,7 +262,7 @@ pub async fn insert_obstacles(
     let pool = get_db_pool(&app).await?;
 
     for obstacle in obstacles {
-        if let Some(id) = obstacle.obstacleId {
+        if let Some(id) = obstacle.obstacle_id {
             if obstacle.number == 0 {
                 // Supprimer l'obstacle si le nombre est 0
                 sqlx::query("DELETE FROM obstacle WHERE id = ?")
@@ -282,7 +285,7 @@ pub async fn insert_obstacles(
                 "INSERT INTO obstacle (point_id, type_id, number) VALUES (?, ?, ?)"
             )
             .bind(point_id)
-            .bind(obstacle.typeId)
+            .bind(obstacle.type_id)
             .bind(obstacle.number)
             .execute(&pool)
             .await
@@ -404,7 +407,7 @@ pub async fn insert_point_details(
     for detail in &details {
         for obstacle in &detail.obstacle {
             println!("[DB]   → Obstacle ID: {}, point_id: {}, type_id: {}, nombre: {}", 
-                obstacle.id, obstacle.point_id, obstacle.type_id, obstacle.number);
+                obstacle.id, obstacle.point_id, obstacle.type_id, obstacle.number.unwrap_or(0));
             
             // Vérifier si le type_id existe dans obstacle_type
             let type_exists: Option<i32> = sqlx::query_scalar(

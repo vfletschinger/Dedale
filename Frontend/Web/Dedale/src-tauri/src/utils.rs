@@ -1,6 +1,5 @@
 use dirs::data_dir;
 use rfd::FileDialog;
-use std::option::Option::None;
 use std::path::Path;
 use std::path::PathBuf;
 
