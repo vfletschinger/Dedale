@@ -14,6 +14,7 @@ import MapView, {
 } from "react-native-maps";
 import Constants from "expo-constants";
 import * as Location from "expo-location";
+import { useFocusEffect } from "@react-navigation/native";
 import { InterestPointsType } from "../types/database";
 import getDatabase from "../../assets/migrations";
 import CustomButton from "./CustomButton";
@@ -39,8 +40,9 @@ export default function OfflineMap({ initialRegion }: OfflineMapProps) {
   const db = getDatabase();
   const mapRef = React.useRef<MapView | null>(null);
 
-  React.useEffect(() => {
-    const fetchInterestPoints = () => {
+  // Refresh points list when screen gains focus
+  useFocusEffect(
+    React.useCallback(() => {
       try {
         const points = db.getAllSync<InterestPointsType>(
           "SELECT * FROM point ORDER BY id DESC"
@@ -51,11 +53,11 @@ export default function OfflineMap({ initialRegion }: OfflineMapProps) {
         console.error("Erreur DB :", error);
         setListPoint([]);
       }
-    };
+    }, [])
+  );
 
+  React.useEffect(() => {
     const initialize = async () => {
-      fetchInterestPoints();
-
       // Start a timeout fallback but still apply the real location when it arrives.
       let didSetFallback = false;
       const fallbackTimer = setTimeout(() => {
