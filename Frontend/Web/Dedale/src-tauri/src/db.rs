@@ -178,7 +178,7 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
 }
 
 async fn fetch_comments(pool: &SqlitePool, point_id: i64) -> Result<Vec<Comment>, String> {
-    let rows = sqlx::query("SELECT id, value FROM comment WHERE point_id = ?")
+    let rows = sqlx::query("SELECT id, point_id, value FROM comment WHERE point_id = ?")
         .bind(point_id)
         .fetch_all(pool)
         .await
@@ -186,15 +186,15 @@ async fn fetch_comments(pool: &SqlitePool, point_id: i64) -> Result<Vec<Comment>
 
     let comments = rows.into_iter().map(|row| Comment {
         id: row.get("id"),
-        value: row.get("value"),
-        point_id: row.get("point_id")
+        point_id: row.get("point_id"),
+        value: row.get("value")
     }).collect();
 
     Ok(comments)
 }
 
 async fn fetch_pictures(pool: &SqlitePool, point_id: i64) -> Result<Vec<Picture>, String> {
-    let rows = sqlx::query("SELECT id, image FROM picture WHERE point_id = ?")
+    let rows = sqlx::query("SELECT id, image, point_id FROM picture WHERE point_id = ?")
         .bind(point_id)
         .fetch_all(pool)
         .await
