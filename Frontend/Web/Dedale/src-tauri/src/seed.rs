@@ -1,6 +1,6 @@
-use sqlx::{SqlitePool, Row};
 use tauri::AppHandle;
 use crate::db::get_db_pool;
+use crate::db::{ObstacleType};
 use crate::seed;
 // Assuming this function is accessible (defined in db.rs or similar)
 // pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> { ... }
@@ -39,11 +39,19 @@ pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
 
     // --- Data Definitions ---
     let obstacle_types = [
-        ObstacleTypeSeed { name: "Arbre", description: "Arbre sur le parcours", width: 0.5, length: 0.5 },
-        ObstacleTypeSeed { name: "Rocher", description: "Rocher bloquant", width: 1.0, length: 1.0 },
-        ObstacleTypeSeed { name: "Barrière", description: "Barrière métallique", width: 2.0, length: 0.1 },
-        ObstacleTypeSeed { name: "Panneau", description: "Panneau de signalisation", width: 0.8, length: 0.4 },
-        ObstacleTypeSeed { name: "Poubelle", description: "Conteneur à déchets", width: 0.6, length: 0.6 },
+        ObstacleType { id: 1, name: "Glissière 2m".to_string(), description: "Glissière béton armé (GBA) 2m".to_string(), width: 0.6, length: 2.0 },
+        ObstacleType { id: 2, name: "Glissière 1m".to_string(), description: "Glissière béton armé (GBA) 1m".to_string(), width: 0.6, length: 1.0 },
+        ObstacleType { id: 3, name: "Bloc 2.5m".to_string(), description: "Bloc de béton 2.5m".to_string(), width: 0.6, length: 2.5 },
+        ObstacleType { id: 4, name: "Bloc 1m".to_string(), description: "Bloc de béton 1m".to_string(), width: 0.6, length: 1.0 },
+        ObstacleType { id: 5, name: "Barrière Vauban".to_string(), description: "Barrière de 2 mètres".to_string(), width: 0.4, length: 2.0 },
+        ObstacleType { id: 6, name: "Barrière Héras".to_string(), description: "Barrière Héras (délimitation de surface d’accueil de personnes)".to_string(), width: 0.1, length: 3.5 },
+        ObstacleType { id: 7, name: "Barrière Héras avec voile d’occultation".to_string(), description: "Barrière Héras avec voile d’occultation (délimitation de surface d’accueil de personnes)".to_string(), width: 0.1, length: 3.5 },
+        ObstacleType { id: 8, name: "Obstacle".to_string(), description: "Obstacle pour voitures".to_string(), width: 0.95, length: 1.05 },
+        ObstacleType { id: 9, name: "Engins de blocage 8m".to_string(), description: "Engins routiers et matériels, ensembles mobiles pour permettre le passage des secours, utilisés pour bloquer les rues.".to_string(), width: 2.0, length: 8.0 },
+        ObstacleType { id: 10, name: "Engins de blocage 9.35m".to_string(), description: "Engins routiers et matériels, ensembles mobiles pour permettre le passage des secours, utilisés pour bloquer les rues.".to_string(), width: 2.0, length: 9.35 },
+        ObstacleType { id: 11, name: "Engins de blocage 9.5m".to_string(), description: "Engins routiers et matériels, ensembles mobiles pour permettre le passage des secours, utilisés pour bloquer les rues.".to_string(), width: 2.0, length: 9.5 },
+        ObstacleType { id: 12, name: "Engins de blocage 11m".to_string(), description: "Engins routiers et matériels, ensembles mobiles pour permettre le passage des secours, utilisés pour bloquer les rues.".to_string(), width: 2.0, length: 11.0 },
+        ObstacleType { id: 13, name: "Engins de blocage 16m".to_string(), description: "Engins routiers et matériels, ensembles mobiles pour permettre le passage des secours, utilisés pour bloquer les rues.".to_string(), width: 2.0, length: 16.0 },
     ];
     let points = [
         PointSeed { y: 48.5734, x: 7.7521 },
@@ -53,7 +61,7 @@ pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
         PointSeed { y: 48.5790, x: 7.7650 },
     ];
     let comments_data = [
-        CommentSeed { point_idx: 0, value: "Zone très fréquentée, attention aux piétons" },
+        CommentSeed { point_idx: 0, value: "Zone très fréquentée, attention aux piétons",  },
         CommentSeed { point_idx: 0, value: "Passage étroit, ralentir" },
         CommentSeed { point_idx: 1, value: "Belle vue sur la cathédrale" },
         CommentSeed { point_idx: 2, value: "Travaux en cours, détour possible" },
@@ -85,8 +93,8 @@ pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
         let result = sqlx::query(
             "INSERT INTO obstacle_type (name, description, width, length) VALUES (?, ?, ?, ?)"
         )
-        .bind(t.name)
-        .bind(t.description)
+        .bind(t.name.clone())
+        .bind(t.description.clone())
         .bind(t.width)
         .bind(t.length)
         .execute(&pool)

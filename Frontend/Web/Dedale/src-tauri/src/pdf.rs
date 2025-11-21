@@ -3,7 +3,7 @@ use tauri::AppHandle;
 use genpdf::elements;
 use crate::seed;
 use crate::utils;
-use std::path::PathBuf;
+
 
 #[tauri::command]
 pub async fn create_pdf(app: AppHandle) -> Result<(), String> {
@@ -29,7 +29,7 @@ pub async fn create_pdf(app: AppHandle) -> Result<(), String> {
         } else {
             p.obstacles.iter().map(|o| {
                 let name = o.name.as_deref().unwrap_or("N/A");
-                let number = o.number.unwrap_or(0);
+                let number = o.number;
                 format!("{} (x{})", name, number)
             }).collect::<Vec<String>>().join(", ")
         };
