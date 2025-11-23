@@ -25,3 +25,13 @@ export const calculateDistance = (x1: number, y1: number, x2: number, y2: number
   return Math.sqrt(dx * dx + dy * dy);
 };
 
+export const getAddressFromCoords = async (latitude: number, longitude: number) => {
+  try {
+    const [address] = await Location.reverseGeocodeAsync({ latitude, longitude })
+    const addressString = `${address.name ? address.name + ', ' : ''}${address.street ? address.street + ', ' : ''}${address.city ? address.city + ', ' : ''}${address.region ? address.region + ', ' : ''}${address.postalCode ? address.postalCode + ', ' : ''}${address.country ? address.country : ''}`;
+    return addressString;
+  } catch (error) {
+    console.error('Error in reverse geocoding:', error);
+    return null;
+  }
+};

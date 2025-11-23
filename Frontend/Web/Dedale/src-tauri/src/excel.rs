@@ -31,7 +31,7 @@ pub async fn export_points_excel(app: AppHandle) -> Result<(), String> {
 
                 let name = obstacle.name.as_deref().unwrap_or("");
                 let description = obstacle.description.as_deref().unwrap_or(""); 
-                let number = obstacle.number as f64;
+                let number = obstacle.number.unwrap_or(0) as f64;
                 let width = obstacle.width.unwrap_or(0.0);
                 let length = obstacle.length.unwrap_or(0.0);
 

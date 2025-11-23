@@ -23,23 +23,87 @@ async fn handle_websocket(app: &AppHandle, mut websocket: tungstenite::WebSocket
             Ok(msg) => {
                 println!("Reçu : {}", msg);
                 // insert de donnée 
+                let mut should_echo = true;
                 if let Message::Text(text) = msg.clone() {
                     match serde_json::from_str::<Vec<PointDetail>>(&text) {
                         Ok(point_details_vec) => {
-                            println!("Désérialisation réussie. Nombre de points reçus : {}", point_details_vec.len());
+                            println!("🔄 Désérialisation réussie. Nombre de points reçus : {}", point_details_vec.len());
+                            should_echo = false; // Ne pas renvoyer le message original
 
-                            if let Err(e) = insert_point_details(&app, point_details_vec).await {
-                                eprintln!("Erreur d'insertion dans la DB : {}", e);
+                            println!("🚀 Début de l'insertion en base de données...");
+                            match insert_point_details(&app, point_details_vec).await {
+                                Ok(_) => {
+                                    println!("✅ Insertion terminée avec succès ! Envoi du message 'fini'...");
+                                    
+                                    // Envoyer un message de confirmation
+                                    let success_msg = Message::Text("fini".to_string().into());
+                                    match websocket.write(success_msg) {
+                                        Ok(_) => {
+                                            println!("📤 Message 'fini' envoyé avec succès !");
+                                            // Force le flush du message
+                                            if let Err(e) = websocket.flush() {
+                                                eprintln!("⚠️ Erreur flush WebSocket : {}", e);
+                                            } else {
+                                                println!("🔄 WebSocket flush réussi");
+                                            }
+                                        }
+                                        Err(e) => {
+                                            eprintln!("❌ Erreur envoi message 'fini' : {}", e);
+                                            return Err(format!("Erreur envoi message 'fini' : {}", e));
+                                        }
+                                    }
+                                    
+                                    // Attendre un peu pour s'assurer que le message est envoyé
+                                    std::thread::sleep(std::time::Duration::from_millis(100));
+                                }
+                                Err(e) => {
+                                    eprintln!("❌ Erreur d'insertion dans la DB : {}", e);
+                                    // Envoyer un message d'erreur
+                                    let error_msg = Message::Text(format!("erreur: {}", e).into());
+                                    match websocket.write(error_msg) {
+                                        Ok(_) => {
+                                            println!("📤 Message d'erreur envoyé avec succès !");
+                                            if let Err(e) = websocket.flush() {
+                                                eprintln!("⚠️ Erreur flush WebSocket (erreur) : {}", e);
+                                            }
+                                        }
+                                        Err(e) => {
+                                            eprintln!("Erreur envoi message d'erreur : {}", e);
+                                            return Err(format!("Erreur envoi message d'erreur : {}", e));
+                                        }
+                                    }
+                                    std::thread::sleep(std::time::Duration::from_millis(100));
+                                }
                             }
                         }
                         Err(e) => {
                             eprintln!("Erreur de désérialisation JSON : {}", e);
+                            should_echo = false; // Ne pas renvoyer le message original
+                            // Envoyer un message d'erreur de désérialisation
+                            let error_msg = Message::Text(format!("erreur_json: {}", e).into());
+                            match websocket.write(error_msg) {
+                                Ok(_) => {
+                                    println!("📤 Message d'erreur JSON envoyé avec succès !");
+                                    if let Err(e) = websocket.flush() {
+                                        eprintln!("⚠️ Erreur flush WebSocket (erreur JSON) : {}", e);
+                                    }
+                                }
+                                Err(e) => {
+                                    eprintln!("Erreur envoi message d'erreur JSON : {}", e);
+                                    return Err(format!("Erreur envoi message d'erreur JSON : {}", e));
+                                }
+                            }
+                            std::thread::sleep(std::time::Duration::from_millis(100));
                         }
                     }
                 }
-                if let Err(e) = websocket.write(msg) {
-                    eprintln!("Erreur écriture message : {}", e);
-                    return Err(format!("Erreur d'écriture WebSocket : {}", e));
+                
+                // Ne renvoyer le message original que si ce n'est pas des données JSON à traiter
+                if should_echo {
+                    if let Err(e) = websocket.write(msg) {
+                        eprintln!("Erreur écriture message : {}", e);
+                        return Err(format!("Erreur d'écriture WebSocket : {}", e));
+                    }
                 }
             }
             Err(e) => {

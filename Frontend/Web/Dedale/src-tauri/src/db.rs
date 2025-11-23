@@ -7,8 +7,8 @@ use std::fs;
 use std::str::FromStr;
 use sqlx::Transaction;
 use sqlx::Sqlite;
-use serde::Deserialize;
 use serde::Serialize;
+use serde::Deserialize;
 
 // Elle renvoie le plugin SQL entièrement configuré
 pub fn init_db() -> impl tauri::plugin::Plugin<tauri::Wry> {
@@ -98,7 +98,9 @@ pub struct Obstacle {
     pub number: i32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    pub number: Option<i32>,
+    pub point_id: i64,
+    pub type_id: i64,
     pub description: Option<String>, 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub width: Option<f64>,
@@ -154,6 +156,22 @@ pub struct PointDetail {
     #[serde(rename = "obstacles")]
     pub obstacle: Vec<Obstacle>,
 }
+#[derive(Debug, Serialize)]
+pub struct ObstacleType {
+    pub id: i64,
+    pub name: String,
+    pub description: String,
+    pub width: f64,
+    pub length: f64
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ObstacleInput {
+    pub type_id: i64,
+    pub number: i32,
+    pub obstacle_id: Option<i64>,
+}
+
 pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
     let app_data_dir = app.path()
         .app_data_dir()
@@ -178,7 +196,7 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
 }
 
 async fn fetch_comments(pool: &SqlitePool, point_id: i64) -> Result<Vec<Comment>, String> {
-    let rows = sqlx::query("SELECT id, point_id, value FROM comment WHERE point_id = ?")
+    let rows = sqlx::query("SELECT id, value, point_id FROM comment WHERE point_id = ?")
         .bind(point_id)
         .fetch_all(pool)
         .await
@@ -217,7 +235,9 @@ async fn fetch_obstacles(pool: &SqlitePool, point_id: i64) -> Result<Vec<Obstacl
             o.type_id,
             o.number, 
             ot.name,
-            ot.description,
+            ot.length,
+            o.point_id,
+            o.type_id,
             ot.width,
             ot.length
         FROM obstacle o
@@ -266,6 +286,26 @@ pub async fn fetch_obstacle_types(app: AppHandle) -> Result<Vec<Obstacle_type>, 
 }
 
 #[tauri::command]
+pub async fn fetch_obstacle_types(app: AppHandle) -> Result<Vec<ObstacleType>, String> {
+    let pool = get_db_pool(&app).await?;
+    
+    let rows = sqlx::query("SELECT id, name, description, width, length FROM obstacle_type")
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let obstacles = rows.into_iter().map(|row| ObstacleType {
+        id: row.get("id"),
+        name: row.get("name"),
+        description: row.get("description"),
+        width: row.get("width"),
+        length: row.get("length"),
+    }).collect();
+
+    Ok(obstacles)
+}
+
+#[tauri::command]
 pub async fn insert_obstacles(
     app: AppHandle,
     point_id: i64,
@@ -274,7 +314,7 @@ pub async fn insert_obstacles(
     let pool = get_db_pool(&app).await?;
 
     for obstacle in obstacles {
-        if let Some(id) = obstacle.obstacleId {
+        if let Some(id) = obstacle.obstacle_id {
             if obstacle.number == 0 {
                 // Supprimer l'obstacle si le nombre est 0
                 sqlx::query("DELETE FROM obstacle WHERE id = ?")
@@ -297,7 +337,7 @@ pub async fn insert_obstacles(
                 "INSERT INTO obstacle (point_id, type_id, number) VALUES (?, ?, ?)"
             )
             .bind(point_id)
-            .bind(obstacle.typeId)
+            .bind(obstacle.type_id)
             .bind(obstacle.number)
             .execute(&pool)
             .await
@@ -419,7 +459,7 @@ pub async fn insert_point_details(
     for detail in &details {
         for obstacle in &detail.obstacle {
             println!("[DB]   → Obstacle ID: {}, point_id: {}, type_id: {}, nombre: {}", 
-                obstacle.id, obstacle.point_id, obstacle.type_id, obstacle.number);
+                obstacle.id, obstacle.point_id, obstacle.type_id, obstacle.number.unwrap_or(0));
             
             // Si l'obstacle a des données de type (name, description, width, length), 
             // on l'insère dans obstacle_type
