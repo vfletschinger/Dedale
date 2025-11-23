@@ -125,6 +125,36 @@ export default function PointDetails({
     }
   }
 
+  const btnStyle: React.CSSProperties = {
+    padding: "8px 12px",
+    borderRadius: 8,
+    border: "none",
+    cursor: "pointer",
+    background: "#2563eb",
+    color: "#fff",
+    fontWeight: 600,
+  };
+
+  const btnDangerStyle: React.CSSProperties = {
+    ...btnStyle,
+    background: "#dc2626",
+  };
+
+  async function handleDelete() {
+    if (!point) return;
+
+    if (!confirm(`Supprimer le point #${point.id} ?`)) return;
+
+    try {
+        await invoke("delete_point", { pointId: point.id });
+        if (onRefresh) onRefresh();
+        if (onClose) onClose();
+    } catch (error) {
+      console.error("Failed to delete point:", error);
+      alert("Erreur lors de la suppression du point.");
+    }
+  }
+
   if (!point) {
     return (
       <div className="point-popup" style={{ minWidth: 260 }}>
@@ -167,23 +197,7 @@ export default function PointDetails({
       </div>
 
       <div className="pp-section">
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <div className="pp-section-title">
-            Obstacles ({point.obstacles.length})
-          </div>
-          <button
-            onClick={() => setShowObstaclesPopup(true)}
-            className="action-primary"
-          >
-            modifier
-          </button>
-        </div>
+        <div className="pp-section-title">Obstacles ({point.obstacles.length})</div>
 
         {showObstaclesPopup && (
           <div
@@ -194,7 +208,7 @@ export default function PointDetails({
               left: 0,
               zIndex: 1000,
               minWidth: 280,
-              maxHeight: 400,
+              maxHeight: 450,
               overflowY: "auto",
             }}
           >
@@ -255,16 +269,10 @@ export default function PointDetails({
               ))}
             </ul>
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              <button
-                onClick={() => setShowObstaclesPopup(false)}
-                className="action-ghost"
-              >
+              <button onClick={() => setShowObstaclesPopup(false)} style={btnStyle}>
                 Annuler
               </button>
-              <button
-                onClick={() => saveObstacles()}
-                className="action-primary"
-              >
+              <button onClick={() => saveObstacles()} style={btnStyle}>
                 Enregistrer
               </button>
             </div>
@@ -310,6 +318,19 @@ export default function PointDetails({
               className="pp-photo"
             />
           ))}
+        </div>
+      </div>
+
+      <div style={{ display: "flex", width: "100%", gap: 8, marginTop: 12, justifyContent: "space-between", alignItems: "center" }}>
+        <div>
+          <button onClick={() => setShowObstaclesPopup(true)} style={btnStyle}>
+            Modifier
+          </button>
+        </div>
+        <div>
+          <button onClick={handleDelete} style={btnDangerStyle}>
+            Supprimer
+          </button>
         </div>
       </div>
     </div>

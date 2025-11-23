@@ -87,9 +87,9 @@ function OfflineMapLibre() {
             // DOM Setup
             const container = document.createElement("div");
             container.style.maxWidth = "600px";
-            container.style.maxHeight = "600px";
+            container.style.maxHeight = "450px";
             container.style.width = "350px";
-            container.style.height = "450px";
+            container.style.minHeight = "200px";
             container.style.overflow = "auto";
             container.style.padding = "8px";
 

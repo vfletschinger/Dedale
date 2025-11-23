@@ -458,3 +458,16 @@ pub async fn insert_point_details(
     Ok(())
 }
 
+#[tauri::command]
+pub async fn delete_point(app: AppHandle, point_id: i64) -> Result<(), String> {
+    let pool = get_db_pool(&app).await?;
+
+    sqlx::query("DELETE FROM point WHERE id = ?")
+        .bind(point_id)
+        .execute(&pool)
+        .await
+        .map_err(|e| format!("Failed to delete point: {}", e))?;
+
+    println!("✅ Successfully deleted point {}", point_id);
+    Ok(())
+}
