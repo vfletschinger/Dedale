@@ -1,17 +1,15 @@
 use tauri::AppHandle;
 use crate::db::get_db_pool;
 use crate::db::{ObstacleType};
-use crate::seed;
 // Assuming this function is accessible (defined in db.rs or similar)
 // pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> { ... }
 
 
 // --- Helper Structs for Seeding Data ---
-struct ObstacleTypeSeed { name: &'static str, description: &'static str, width: f64, length: f64 }
 struct PointSeed { x: f64, y: f64 }
 struct CommentSeed { point_idx: usize, value: &'static str }
 struct PictureSeed { point_idx: usize, image: &'static str }
-struct ObstacleSeed { point_idx: usize, type_idx: usize, number: i32 }
+struct ObstacleSeed { point_idx: usize, type_idx: usize, number: i32, description: Option<String> }
 
 
 /// Seeds the database with sample data if it's currently empty.
@@ -76,12 +74,12 @@ pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
         PictureSeed { point_idx: 4, image: "/images/point5_photo1.jpg" },
     ];
     let obstacles_data = [
-        ObstacleSeed { point_idx: 0, type_idx: 0, number: 2 }, // Point 1: 2 Arbre
-        ObstacleSeed { point_idx: 0, type_idx: 4, number: 1 }, // Point 1: 1 Poubelle
-        ObstacleSeed { point_idx: 1, type_idx: 2, number: 1 }, // Point 2: 1 Barrière
-        ObstacleSeed { point_idx: 2, type_idx: 1, number: 3 }, // Point 3: 3 Rocher
-        ObstacleSeed { point_idx: 3, type_idx: 3, number: 2 }, // Point 4: 2 Panneau
-        ObstacleSeed { point_idx: 4, type_idx: 0, number: 5 }, // Point 5: 5 Arbre
+        ObstacleSeed { point_idx: 0, type_idx: 0, number: 2, description: Some("Deux grands arbres".to_string()) }, // Point 1: 2 Arbre
+        ObstacleSeed { point_idx: 0, type_idx: 4, number: 1, description: Some("Une poubelle métallique".to_string()) }, // Point 1: 1 Poubelle
+        ObstacleSeed { point_idx: 1, type_idx: 2, number: 1, description: Some("Une barrière en bois".to_string()) }, // Point 2: 1 Barrière
+        ObstacleSeed { point_idx: 2, type_idx: 1, number: 3, description: Some("Trois rochers de taille moyenne".to_string()) }, // Point 3: 3 Rocher
+        ObstacleSeed { point_idx: 3, type_idx: 3, number: 2, description: Some("Deux panneaux de signalisation".to_string()) }, // Point 4: 2 Panneau
+        ObstacleSeed { point_idx: 4, type_idx: 0, number: 5, description: Some("Cinq petits arbres".to_string()) }, // Point 5: 5 Arbre
     ];
 
     let mut point_ids: Vec<i64> = Vec::new();
@@ -153,11 +151,12 @@ pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
         
         // Note: The column is assumed to be 'number' based on previous context.
         sqlx::query(
-            "INSERT INTO obstacle (point_id, type_id, number) VALUES (?, ?, ?)"
+            "INSERT INTO obstacle (point_id, type_id, number, description) VALUES (?, ?, ?, ?)"
         )
         .bind(point_id)
         .bind(type_id)
         .bind(o.number)
+        .bind(o.description.clone())
         .execute(&pool)
         .await
         .map_err(|e| format!("Failed to insert obstacle: {}", e))?;

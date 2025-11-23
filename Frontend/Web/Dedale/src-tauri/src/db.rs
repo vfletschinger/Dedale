@@ -56,6 +56,7 @@ pub fn init_db() -> impl tauri::plugin::Plugin<tauri::Wry> {
                     point_id INTEGER,
                     type_id INTEGER,
                     number INTEGER,
+                    description TEXT,
                     FOREIGN KEY (point_id) REFERENCES point (id),
                     FOREIGN KEY (type_id) REFERENCES obstacle_type (id)
                 );
@@ -93,9 +94,6 @@ pub struct ObstacleType {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Obstacle {
     pub id: i32,
-    pub point_id: i32,
-    pub type_id: i32,
-    pub number: i32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     pub number: Option<i32>,
@@ -122,22 +120,6 @@ pub struct Comment {
     pub value: String,    // Le texte du commentaire
 }
 
-#[derive(Debug, Serialize)]
-pub struct Obstacle_type {
-    pub id: i64,
-    pub name: String,
-    pub description: String,
-    pub width: f64,
-    pub length: f64
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ObstacleInput {
-    pub typeId: i64,
-    pub number: i32,
-    pub obstacleId: Option<i64>,
-}
-
 #[derive(Debug,Serialize, Deserialize)]
 pub struct Picture {
     pub id: i32,          // Identifiant unique de l'image
@@ -155,14 +137,6 @@ pub struct PointDetail {
     pub picture: Vec<Picture>, 
     #[serde(rename = "obstacles")]
     pub obstacle: Vec<Obstacle>,
-}
-#[derive(Debug, Serialize)]
-pub struct ObstacleType {
-    pub id: i64,
-    pub name: String,
-    pub description: String,
-    pub width: f64,
-    pub length: f64
 }
 
 #[derive(Debug, Deserialize)]
@@ -234,12 +208,10 @@ async fn fetch_obstacles(pool: &SqlitePool, point_id: i64) -> Result<Vec<Obstacl
             o.point_id,
             o.type_id,
             o.number, 
-            ot.name,
-            ot.length,
-            o.point_id,
-            o.type_id,
-            ot.width,
-            ot.length
+            ot.name AS name,
+            ot.description AS description,
+            ot.width AS width,
+            ot.length AS length
         FROM obstacle o
         JOIN obstacle_type ot ON o.type_id = ot.id
         WHERE o.point_id = ?
@@ -256,26 +228,6 @@ async fn fetch_obstacles(pool: &SqlitePool, point_id: i64) -> Result<Vec<Obstacl
         point_id: row.get("point_id"),
         type_id: row.get("type_id"),
         number: row.get("number"),
-        name: row.get("name"),
-        description: row.get("description"),
-        width: row.get("width"),
-        length: row.get("length"),
-    }).collect();
-
-    Ok(obstacles)
-}
-
-#[tauri::command]
-pub async fn fetch_obstacle_types(app: AppHandle) -> Result<Vec<Obstacle_type>, String> {
-    let pool = get_db_pool(&app).await?;
-    
-    let rows = sqlx::query("SELECT id, name, description, width, length FROM obstacle_type")
-        .fetch_all(&pool)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let obstacles = rows.into_iter().map(|row| Obstacle_type {
-        id: row.get("id"),
         name: row.get("name"),
         description: row.get("description"),
         width: row.get("width"),
@@ -505,88 +457,4 @@ pub async fn insert_point_details(
 
     Ok(())
 }
-pub async fn insert_test_data(app: &AppHandle) -> Result<(), String> {
-    let pool = get_db_pool(app).await?;
 
-    // --- 0. (Optional but recommended) Cleanup old data ---
-    // (Ensure you run this if you haven't adopted the cleanup method)
-    // DELETE FROM obstacle;
-    // DELETE FROM comment;
-    // DELETE FROM picture;
-    // DELETE FROM point;
-    // DELETE FROM obstacle_type;
-
-    // --- 1. Insert obstacle_type data and get their starting ID ---
-    let obstacle_types_query = r#"
-        INSERT INTO obstacle_type (name, description, width, length) VALUES
-        ('Rock', 'A large, immovable stone.', 1.5, 1.0),
-        ('Tree Stump', 'A remnant of a cut-down tree.', 0.5, 0.5),
-        ('Water Puddle', 'A collection of standing water.', 2.0, 3.0);
-    "#;
-    sqlx::query(obstacle_types_query)
-        .execute(&pool)
-        .await
-        .map_err(|e| format!("Failed to insert obstacle_type test data: {}", e))?;
-    
-    // Get the ID of the first inserted obstacle_type (assuming sequential insertion)
-    let type_start_id: i64 = sqlx::query("SELECT id FROM obstacle_type ORDER BY id LIMIT 1")
-        .fetch_one(&pool)
-        .await
-        .map_err(|e| format!("Failed to get obstacle_type start ID: {}", e))?
-        .get("id");
-
-    // --- 2. Insert Point data and get their starting ID ---
-    let points_query = r#"
-        INSERT INTO point (x, y) VALUES
-        (10.5, 20.1),
-        (55.0, 80.0),
-        (1.2, 5.8);
-    "#;
-    sqlx::query(points_query)
-        .execute(&pool)
-        .await
-        .map_err(|e| format!("Failed to insert point test data: {}", e))?;
-
-    // Get the ID of the first inserted point
-    let point_start_id: i64 = sqlx::query("SELECT id FROM point ORDER BY id LIMIT 1")
-        .fetch_one(&pool)
-        .await
-        .map_err(|e| format!("Failed to get point start ID: {}", e))?
-        .get("id");
-    
-    // Calculate IDs based on the starting IDs:
-    // P1 = point_start_id, P2 = point_start_id + 1, P3 = point_start_id + 2
-    // T1 = type_start_id, T2 = type_start_id + 1, T3 = type_start_id + 2
-    
-    // --- 3. Insert Comment and Picture data (linking logic omitted for brevity, but needed) ---
-    // If you need to link comments/pictures, you'll need a similar process to get the IDs.
-    // However, the error is specifically on the obstacle table, so we focus there.
-
-    // --- 4. Insert Obstacle data (linked dynamically) ---
-    let obstacles_query = format!(
-        r#"
-            INSERT INTO obstacle (point_id, type_id, number) VALUES
-            ({}, {}, 3), 
-            ({}, {}, 1), 
-            ({}, {}, 1), 
-            ({}, {}, 1); 
-        "#,
-        // Point 1 (P1): point_start_id, Type 1 (T1): type_start_id
-        point_start_id, type_start_id,
-        // Point 2 (P2): point_start_id + 1, Type 2 (T2): type_start_id + 1
-        point_start_id + 1, type_start_id + 1,
-        // Point 2 (P2): point_start_id + 1, Type 3 (T3): type_start_id + 2
-        point_start_id + 1, type_start_id + 2,
-        // Point 3 (P3): point_start_id + 2, Type 1 (T1): type_start_id
-        point_start_id + 2, type_start_id
-    );
-
-    sqlx::query(&obstacles_query)
-        .execute(&pool)
-        .await
-        .map_err(|e| format!("Failed to insert obstacle test data: {}", e))?;
-
-    println!("✅ Successfully inserted test data into the database.");
-    
-    Ok(())
-}
