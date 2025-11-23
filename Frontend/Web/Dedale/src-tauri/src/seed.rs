@@ -67,11 +67,11 @@ pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
         CommentSeed { point_idx: 4, value: "Attention au verglas en hiver" },
     ];
     let pictures_data = [
-        PictureSeed { point_idx: 0, image: "/images/point1_photo1.jpg" },
-        PictureSeed { point_idx: 0, image: "/images/point1_photo2.jpg" },
-        PictureSeed { point_idx: 1, image: "/images/point2_photo1.jpg" },
-        PictureSeed { point_idx: 2, image: "/images/point3_photo1.jpg" },
-        PictureSeed { point_idx: 4, image: "/images/point5_photo1.jpg" },
+        PictureSeed { point_idx: 0, image: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQYV2NkYGD4DwABBAEAgr5ZhgAAAABJRU5ErkJggg==" },
+        PictureSeed { point_idx: 0, image: "iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAIAAAACUFjqAAAAEklEQVR4nGP8z4APMOGVHbHSAEEsAROxCnMTAAAAAElFTkSuQmCC" },
+        PictureSeed { point_idx: 1, image: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQYV2NkYGD4DwABBAEAgr5ZhgAAAABJRU5ErkJggg==" },
+        PictureSeed { point_idx: 2, image: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQYV2NkYGD4DwABBAEAgr5ZhgAAAABJRU5ErkJggg==" },
+        PictureSeed { point_idx: 4, image: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQYV2NkYGD4DwABBAEAgr5ZhgAAAABJRU5ErkJggg==" },
     ];
     let obstacles_data = [
         ObstacleSeed { point_idx: 0, type_idx: 0, number: 2, description: Some("Deux grands arbres".to_string()) }, // Point 1: 2 Arbre
