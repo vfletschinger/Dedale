@@ -91,10 +91,22 @@ export default function PointDetails({ point, onClose, onRefresh }: { point: Poi
     async function saveObstacles() {
         try {
             if (point) {
+                //Convert camelCase to snake_case for backend
+                const obstaclesSnakeCase = mergedObstacles.map(o => ({
+                    type_id: o.typeId ?? o.type_id ?? null,
+                    obstacle_id: o.obstacleId ?? o.obstacle_id ?? null,
+                    number: o.number ?? null,
+                    width: o.width ?? null,
+                    length: o.length ?? null,
+                    name: o.name ?? null,
+                    description: o.description ?? null,
+                }));
+                
                 await invoke('insert_obstacles', {
                     pointId: point.id,
-                    obstacles: mergedObstacles,
+                    obstacles: obstaclesSnakeCase,
                 });
+                
                 setShowObstaclesPopup(false);
                 if (onRefresh) {
                     onRefresh();
