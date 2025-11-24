@@ -5,6 +5,37 @@ import { invoke } from "@tauri-apps/api/core";
 import PointDetails from "./PointDetails";
 import ReactDOM from "react-dom/client";
 
+// Local style constants to avoid inline clutter in JSX
+const LEFT_PANEL_STYLE: React.CSSProperties = {
+  width: 320,
+  background: "#fff",
+  padding: 8,
+  overflowY: "auto",
+  boxShadow: "2px 0 6px rgba(0,0,0,0.06)",
+  zIndex: 12,
+};
+
+
+// Create GeoJSON from points array
+function formatPointsGeoJSON(points: any[]) {
+  return {
+    type: "FeatureCollection",
+    features: points.map((p: any) => ({
+      type: "Feature",
+      geometry: {
+        type: "Point",
+        coordinates: [Number(p.x), Number(p.y)] as [number, number],
+      },
+      properties: {
+        id: p.id,
+        obstacles: p.obstacles,
+        comments: p.comments,
+        pictures: p.pictures,
+      },
+    })),
+  } as GeoJSON.FeatureCollection<GeoJSON.Point, any>;
+}
+
 function OfflineMapLibre() {
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
@@ -36,22 +67,7 @@ function OfflineMapLibre() {
         pointsRef.current = points;
         setPoints(points);
 
-        const geojson = {
-          type: "FeatureCollection",
-          features: points.map((p: any) => ({
-            type: "Feature",
-            geometry: {
-              type: "Point",
-              coordinates: [Number(p.x), Number(p.y)] as [number, number],
-            },
-            properties: {
-              id: p.id,
-              obstacles: p.obstacles,
-              comments: p.comments,
-              pictures: p.pictures,
-            },
-          })),
-        } as GeoJSON.FeatureCollection<GeoJSON.Point, any>;
+        const geojson = formatPointsGeoJSON(points);
 
         if (!mapObj.getSource("db-points")) {
           mapObj.addSource("db-points", {
@@ -270,7 +286,7 @@ function OfflineMapLibre() {
   return (
     <div style={{ display: "flex", height: "100vh", width: "100%" }}>
       {/* Panneau gauche: liste des points */}
-      <div className="left-panel" style={{ width: 320, background: "#fff", padding: 8, overflowY: "auto", boxShadow: "2px 0 6px rgba(0,0,0,0.06)", zIndex: 12 }}>
+      <div className="left-panel" style={LEFT_PANEL_STYLE}>
         <div className="panel-header" style={{ marginBottom: 6 }}>
           <h3 style={{ margin: 0 }}>Points</h3>
           <button
@@ -278,9 +294,6 @@ function OfflineMapLibre() {
             onClick={() => {
               // placeholder action: ouvrir l'UI d'ajout plus tard
               try {
-                // For now: simple prompt / placeholder
-                // In the future this should open the register point screen
-                // or a dedicated modal
                 // eslint-disable-next-line no-alert
                 alert("Ajouter un point — fonctionnalité non implémentée");
               } catch (err) {

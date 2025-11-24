@@ -37,6 +37,29 @@ export type ObstacleType = {
   length: number;
 };
 
+// Button styles extracted to avoid recreating objects on each render
+const BTN_STYLE: React.CSSProperties = {
+  padding: "8px 12px",
+  borderRadius: 8,
+  border: "none",
+  cursor: "pointer",
+  background: "#2563eb",
+  color: "#fff",
+  fontWeight: 600,
+};
+
+const BTN_DANGER_STYLE: React.CSSProperties = {
+  ...BTN_STYLE,
+  background: "#dc2626",
+};
+
+// Resolve image src helper (support data:image or base64 string)
+function resolveImageSrc(image: string) {
+  if (!image) return "";
+  if (image.startsWith("data:")) return image;
+  return `data:image/png;base64,${image}`;
+}
+
 export default function PointDetails({
   point,
   onClose,
@@ -52,16 +75,16 @@ export default function PointDetails({
 
   useEffect(() => {
     if (showObstaclesPopup && point) {
-      get_types();
+      fetchTypes();
     }
   }, [showObstaclesPopup, point]);
 
-  async function get_types() {
+  // Fetch and merge obstacle types with the point's obstacles
+  async function fetchTypes() {
     try {
       const types: ObstacleType[] = await invoke("fetch_obstacle_types");
       setObstacleTypes(types);
 
-      // Fusionner les types avec les obstacles du point
       const merged = types.map((type) => {
         const existing = point?.obstacles.find((o) => o.name === type.name);
         return {
@@ -125,20 +148,9 @@ export default function PointDetails({
     }
   }
 
-  const btnStyle: React.CSSProperties = {
-    padding: "8px 12px",
-    borderRadius: 8,
-    border: "none",
-    cursor: "pointer",
-    background: "#2563eb",
-    color: "#fff",
-    fontWeight: 600,
-  };
-
-  const btnDangerStyle: React.CSSProperties = {
-    ...btnStyle,
-    background: "#dc2626",
-  };
+  // Use extracted constants
+  const btnStyle = BTN_STYLE;
+  const btnDangerStyle = BTN_DANGER_STYLE;
 
   async function handleDelete() {
     if (!point) return;
@@ -168,17 +180,7 @@ export default function PointDetails({
     );
   }
 
-  const resolveImageSrc = (image: string) => {
-    if (!image) return "";
-
-    // Si déjà au format data:image/...
-    if (image.startsWith("data:")) {
-      return image;
-    }
-
-    // Sinon on suppose que c'est du PNG en Base64
-    return `data:image/png;base64,${image}`;
-  };
+  // Use the shared resolveImageSrc helper defined above
 
   return (
     <div className="point-popup" style={{ minWidth: 300 }}>
