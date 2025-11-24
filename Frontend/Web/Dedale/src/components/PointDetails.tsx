@@ -107,9 +107,11 @@ export default function PointDetails({ point, onClose, onRefresh }: { point: Poi
 
     if (!point) {
         return (
-            <div style={{ padding: 12, minWidth: 260 }}>
-                <div>Aucune donnée pour ce point.</div>
-                <button onClick={onClose}>Fermer</button>
+            <div className="point-popup" style={{ minWidth: 260 }}>
+                <div className="pp-card">Aucune donnée pour ce point.</div>
+                <div style={{ marginTop: 8 }}>
+                    <button onClick={onClose} className="button">Fermer</button>
+                </div>
             </div>
         );
     }
