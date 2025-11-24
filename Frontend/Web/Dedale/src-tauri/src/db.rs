@@ -462,11 +462,39 @@ pub async fn insert_point_details(
 pub async fn delete_point(app: AppHandle, point_id: i64) -> Result<(), String> {
     let pool = get_db_pool(&app).await?;
 
+    // Start a transaction and remove dependent rows first to keep DB consistent
+    let mut tx: Transaction<Sqlite> = pool
+        .begin()
+        .await
+        .map_err(|e| format!("Failed to start transaction: {}", e))?;
+
+    sqlx::query("DELETE FROM comment WHERE point_id = ?")
+        .bind(point_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| format!("Failed to delete comments: {}", e))?;
+
+    sqlx::query("DELETE FROM picture WHERE point_id = ?")
+        .bind(point_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| format!("Failed to delete pictures: {}", e))?;
+
+    sqlx::query("DELETE FROM obstacle WHERE point_id = ?")
+        .bind(point_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| format!("Failed to delete obstacles: {}", e))?;
+
     sqlx::query("DELETE FROM point WHERE id = ?")
         .bind(point_id)
-        .execute(&pool)
+        .execute(&mut *tx)
         .await
         .map_err(|e| format!("Failed to delete point: {}", e))?;
+
+    tx.commit()
+        .await
+        .map_err(|e| format!("Failed to commit transaction: {}", e))?;
 
     println!("✅ Successfully deleted point {}", point_id);
     Ok(())
