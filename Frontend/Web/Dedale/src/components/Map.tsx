@@ -10,6 +10,7 @@ function OfflineMapLibre() {
   const [map, setMap] = useState<maplibregl.Map | null>(null);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<any[]>([]);
+  const [points, setPoints] = useState<any[]>([]);
   const [currentMarker, setCurrentMarker] = useState<maplibregl.Marker | null>(
     null
   );
@@ -33,6 +34,7 @@ function OfflineMapLibre() {
         const points = await invoke<any[]>("get_points");
 
         pointsRef.current = points;
+        setPoints(points);
 
         const geojson = {
           type: "FeatureCollection",
@@ -78,65 +80,9 @@ function OfflineMapLibre() {
             const coords = (f.geometry as any).coordinates.slice();
             const pointId = f.properties?.id;
 
-            // Remove previous popup
-            if (currentPopup) {
-              currentPopup.remove();
-              setCurrentPopup(null);
-            }
-
-            // DOM Setup
-            const container = document.createElement("div");
-            container.style.maxWidth = "600px";
-            container.style.maxHeight = "450px";
-            container.style.width = "350px";
-            container.style.minHeight = "200px";
-            container.style.overflow = "auto";
-            container.style.padding = "8px";
-
-            const popup = new maplibregl.Popup({
-              offset: 12,
-              closeButton: false,
-              className: "custom-popup",
-            })
-              .setLngLat(coords)
-              .setDOMContent(container)
-              .addTo(mapObj);
-
-            setCurrentPopup(popup);
-            const root = ReactDOM.createRoot(container);
-
-            const handleClose = () => popup.remove();
-
-            const renderPopupUI = () => {
-              const freshPoint = pointsRef.current.find(
-                (p) => String(p.id) === String(pointId)
-              );
-
-              // If point was deleted, close the popup
-              if (!freshPoint) {
-                handleClose();
-                return;
-              }
-
-              root.render(
-                <PointDetails
-                  point={freshPoint}
-                  onClose={handleClose}
-                  onRefresh={async () => {
-                    await fetchAndDisplayPoints(mapObj);
-                    renderPopupUI();
-                  }}
-                />
-              );
-            };
-
-            // Initial render
-            renderPopupUI();
-
-            // Cleanup
-            popup.on("close", () => {
-              setTimeout(() => root.unmount(), 0);
-              setCurrentPopup(null);
+            // Use shared popup helper and pass a refresh function
+            createPopup(mapObj, coords, pointId, async () => {
+              await fetchAndDisplayPoints(mapObj);
             });
           });
           // --- CLICK LISTENER END ---
@@ -157,6 +103,9 @@ function OfflineMapLibre() {
       fetchAndDisplayPoints(mapInstance);
     });
 
+    // expose for later refreshes (debug helper)
+    (window as any).__fetchAndDisplayPoints = fetchAndDisplayPoints;
+
     const initialMarker = new maplibregl.Marker()
       .setLngLat([7.7635, 48.5465])
       .setPopup(new maplibregl.Popup().setText("Strasbourg !"))
@@ -167,6 +116,111 @@ function OfflineMapLibre() {
 
     return () => mapInstance.remove();
   }, []);
+
+  // Helper pour créer et afficher un popup pour un point (réutilisé)
+  const createPopup = (
+    mapInstance: maplibregl.Map,
+    coords: [number, number],
+    pointId: string | number,
+    refreshFn?: () => Promise<void>
+  ) => {
+    // retire l'éventuel popup précédent
+    if (currentPopup) {
+      currentPopup.remove();
+      setCurrentPopup(null);
+    }
+
+    // DOM Setup
+    const container = document.createElement("div");
+    container.style.maxWidth = "600px";
+    container.style.maxHeight = "450px";
+    container.style.width = "350px";
+    container.style.minHeight = "200px";
+    container.style.overflow = "auto";
+    container.style.padding = "8px";
+
+    const popup = new maplibregl.Popup({
+      offset: 12,
+      closeButton: false,
+      className: "custom-popup",
+    })
+      .setLngLat(coords)
+      .setDOMContent(container)
+      .addTo(mapInstance);
+
+    setCurrentPopup(popup);
+    const root = ReactDOM.createRoot(container);
+
+    const handleClose = () => popup.remove();
+
+    const renderPopupUI = () => {
+      const freshPoint = pointsRef.current.find(
+        (p) => String(p.id) === String(pointId)
+      );
+
+      // If point was deleted, close the popup
+      if (!freshPoint) {
+        handleClose();
+        return;
+      }
+
+      root.render(
+        <PointDetails
+          point={freshPoint}
+          onClose={handleClose}
+          onRefresh={async () => {
+            try {
+              if (refreshFn) await refreshFn();
+              renderPopupUI();
+            } catch (err) {
+              console.error("refresh in popup error", err);
+            }
+          }}
+        />
+      );
+    };
+
+    // Initial render
+    renderPopupUI();
+
+    // Cleanup
+    popup.on("close", () => {
+      setTimeout(() => root.unmount(), 0);
+      setCurrentPopup(null);
+    });
+  };
+
+  // Ouvre un popup pour un point (utilisé par la liste à gauche)
+  const openPopupForPoint = async (point: any) => {
+    if (!map || !point) return;
+
+    const coords: [number, number] = [Number(point.x), Number(point.y)];
+
+    // recentre la carte
+    map.flyTo({ center: coords, zoom: 15 });
+
+    // utilise le helper partagé; refresh mettra à jour la source et l'état `points`
+    createPopup(map, coords, point.id, async () => {
+      try {
+        const fresh = await invoke<any[]>("get_points");
+        pointsRef.current = fresh;
+        setPoints(fresh);
+        if (map.getSource("db-points")) {
+          const geojson = {
+            type: "FeatureCollection",
+            features: fresh.map((p: any) => ({
+              type: "Feature",
+              geometry: { type: "Point", coordinates: [Number(p.x), Number(p.y)] },
+              properties: { id: p.id, obstacles: p.obstacles, comments: p.comments, pictures: p.pictures },
+            })),
+          } as GeoJSON.FeatureCollection<GeoJSON.Point, any>;
+          (map.getSource("db-points") as maplibregl.GeoJSONSource).setData(geojson);
+        }
+      } catch (err) {
+        console.error("refresh in openPopupForPoint error", err);
+      }
+    });
+  };
 
   // Fonction pour sélectionner une suggestion
   const handleSelect = (place: any) => {
@@ -214,7 +268,22 @@ function OfflineMapLibre() {
   }, [query]);
 
   return (
-    <div style={{ position: "relative", height: "100vh", width: "100%" }}>
+    <div style={{ display: "flex", height: "100vh", width: "100%" }}>
+      {/* Panneau gauche: liste des points */}
+      <div style={{ width: 320, background: "#fff", padding: 8, overflowY: "auto", boxShadow: "2px 0 6px rgba(0,0,0,0.06)", zIndex: 12 }}>
+        <h3 style={{ margin: "6px 0" }}>Points</h3>
+        {points.length === 0 && <div style={{ color: "#666" }}>Aucun point</div>}
+        <div>
+          {points.map((p: any) => (
+            <div key={p.id} style={{ padding: 8, borderBottom: "1px solid #eee", cursor: "pointer" }} onClick={() => openPopupForPoint(p)}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>Point #{p.id}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Zone carte à droite */}
+      <div style={{ flex: 1, position: "relative" }}>
       {/* Barre de recherche */}
       <div
         style={{
@@ -259,8 +328,9 @@ function OfflineMapLibre() {
         )}
       </div>
 
-      {/* Conteneur de la carte */}
-      <div ref={mapContainer} style={{ height: "100%", width: "100%" }} />
+        {/* Conteneur de la carte */}
+        <div ref={mapContainer} style={{ height: "100%", width: "100%" }} />
+      </div>
     </div>
   );
 }
