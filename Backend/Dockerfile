@@ -1,16 +1,7 @@
-# frontend/Dockerfile.dev
-FROM node:22
+FROM maptiler/tileserver-gl:latest
 
-WORKDIR /app
+WORKDIR /data
 
-COPY /api/package*.json ./
+EXPOSE 8080
 
-RUN npm install 
-
-COPY ./api .
-
-RUN npx prisma generate
-
-EXPOSE 3000
-
-CMD ["npm", "run", "start:dev"]
+CMD ["tileserver-gl", "--file", "tiles.mbtiles"]
