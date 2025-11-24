@@ -270,13 +270,42 @@ function OfflineMapLibre() {
   return (
     <div style={{ display: "flex", height: "100vh", width: "100%" }}>
       {/* Panneau gauche: liste des points */}
-      <div style={{ width: 320, background: "#fff", padding: 8, overflowY: "auto", boxShadow: "2px 0 6px rgba(0,0,0,0.06)", zIndex: 12 }}>
-        <h3 style={{ margin: "6px 0" }}>Points</h3>
+      <div className="left-panel" style={{ width: 320, background: "#fff", padding: 8, overflowY: "auto", boxShadow: "2px 0 6px rgba(0,0,0,0.06)", zIndex: 12 }}>
+        <div className="panel-header" style={{ marginBottom: 6 }}>
+          <h3 style={{ margin: 0 }}>Points</h3>
+          <button
+            className="add-btn"
+            onClick={() => {
+              // placeholder action: ouvrir l'UI d'ajout plus tard
+              try {
+                // For now: simple prompt / placeholder
+                // In the future this should open the register point screen
+                // or a dedicated modal
+                // eslint-disable-next-line no-alert
+                alert("Ajouter un point — fonctionnalité non implémentée");
+              } catch (err) {
+                console.error(err);
+              }
+            }}
+            aria-label="Ajouter"
+          >
+            Ajouter
+          </button>
+        </div>
+
         {points.length === 0 && <div style={{ color: "#666" }}>Aucun point</div>}
         <div>
           {points.map((p: any) => (
-            <div key={p.id} style={{ padding: 8, borderBottom: "1px solid #eee", cursor: "pointer" }} onClick={() => openPopupForPoint(p)}>
-              <div style={{ fontSize: 13, fontWeight: 600 }}>Point #{p.id}</div>
+            <div
+              key={p.id}
+              className="list-item"
+              onClick={() => openPopupForPoint(p)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => (e.key === "Enter" ? openPopupForPoint(p) : null)}
+            >
+              <div className="title">Point #{p.id}</div>
+              <div className="meta">{p.obstacles?.length ?? 0} obstacles</div>
             </div>
           ))}
         </div>

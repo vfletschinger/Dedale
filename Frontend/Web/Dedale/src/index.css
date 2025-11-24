@@ -104,3 +104,53 @@
 }
 
 /* Keep explicit popup width intact (set elsewhere) */
+
+/* Styles for left points panel */
+.left-panel .panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.left-panel .panel-header h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #0b63d6;
+}
+.left-panel .add-btn {
+  background: #16a34a; /* green-600 */
+  color: #fff;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.left-panel .add-btn:hover {
+  filter: brightness(0.95);
+}
+.left-panel .list-item {
+  padding: 8px;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(15,23,42,0.04);
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.left-panel .list-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(2,6,23,0.08);
+}
+.left-panel .list-item .title {
+  font-weight: 600;
+  font-size: 13px;
+  color: #0f172a;
+}
+.left-panel .list-item .meta {
+  font-size: 12px;
+  color: #64748b;
+}
