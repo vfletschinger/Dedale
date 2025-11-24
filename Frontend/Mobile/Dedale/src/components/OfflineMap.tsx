@@ -182,18 +182,18 @@ export default function OfflineMap({ initialRegion }: OfflineMapProps) {
         showsCompass
         rotateEnabled
         pitchEnabled={true}
-        mapType="none" // mapType="standard" pour passer en ligne
+        mapType="standard" // mapType="standard" pour passer en ligne
         minZoomLevel={13}
-        maxZoomLevel={16}
+        maxZoomLevel={20}
         toolbarEnabled={false}
       >
-        <UrlTile // tout commenter UrlTile pour passer en ligne
+        {/* <UrlTile // tout commenter UrlTile pour passer en ligne
           urlTemplate={tileUrlTemplate}
           maximumZ={16}
           minimumZ={13}
           tileSize={256}
           shouldReplaceMapContent
-        />
+        /> */}
         {listPoint.map((p) => (
           <Marker
             key={p.id}

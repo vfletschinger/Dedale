@@ -12,7 +12,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "plugins": ["expo-sqlite", "expo-barcode-scanner"],
+    "plugins": [
+      "expo-sqlite"
+    ],
     "ios": {
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Nous avons besoin de votre position pour vous localiser sur la carte",
@@ -25,7 +27,10 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"],
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "config": {
@@ -38,6 +43,11 @@
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "3e1a8d04-3073-4e55-9721-c6edd46db4e5"
+      }
     }
   }
 }
