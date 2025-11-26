@@ -12,7 +12,10 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "plugins": ["expo-sqlite", "expo-barcode-scanner"],
+    "plugins": [
+      "expo-sqlite",
+      "expo-barcode-scanner"
+    ],
     "ios": {
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Nous avons besoin de votre position pour vous localiser sur la carte",
@@ -25,7 +28,11 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"],
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "android.permission.CAMERA"
+      ],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "config": {
@@ -33,11 +40,17 @@
           "apiKey": "FAKE_API_KEY_FOR_LOCAL_ONLY"
         }
       },
-      "package": "com.simonerre.Dedale"
+      "package": "com.t5-crs.Dedale"
     },
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "acc13400-d2ce-4fac-aebf-8b64ef3aad51"
+      }
+    },
+    "owner": "acouotn"
   }
 }
