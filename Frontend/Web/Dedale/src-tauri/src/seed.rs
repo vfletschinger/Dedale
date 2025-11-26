@@ -1,6 +1,5 @@
-use crate::db::get_db_pool;
 use crate::db::ObstacleType;
-use tauri::AppHandle;
+use sqlx::SqlitePool;
 // Assuming this function is accessible (defined in db.rs or similar)
 // pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> { ... }
 
@@ -24,12 +23,31 @@ struct ObstacleSeed {
     description: Option<String>,
 }
 
+#[derive(Debug, Clone)]
+pub struct PersonSeed {
+    pub id: i64,
+    pub firstname: String,
+    pub lastname: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct TeamSeed {
+    pub id: i64,
+    pub name: String,
+    pub number: i32,
+}
+
+#[derive(Debug, Clone)]
+pub struct MemberSeed {
+    pub team_id: i64,
+    pub person_id: i64,
+}
+
 /// Seeds the database with sample data if it's currently empty.
 #[tauri::command]
-pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
+pub async fn seed_database(pool: &SqlitePool) -> Result<(), String> {
     println!("🌱 Début du seeding...");
 
-    let pool = get_db_pool(&app).await?;
     let query = r#"
         SELECT
         count(*)
@@ -37,7 +55,7 @@ pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
     "#;
 
     let (existing_points,): (i64,) = sqlx::query_as(query)
-        .fetch_one(&pool)
+        .fetch_one(pool)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -156,6 +174,84 @@ pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
         }, // Point 5: 5 Arbre
     ];
 
+    let persons = vec![
+        PersonSeed {
+            id: 1,
+            firstname: "Jean".to_string(),
+            lastname: "Dupont".to_string(),
+        },
+        PersonSeed {
+            id: 2,
+            firstname: "Marie".to_string(),
+            lastname: "Martin".to_string(),
+        },
+        PersonSeed {
+            id: 3,
+            firstname: "Pierre".to_string(),
+            lastname: "Bernard".to_string(),
+        },
+        PersonSeed {
+            id: 4,
+            firstname: "Sophie".to_string(),
+            lastname: "Lefevre".to_string(),
+        },
+        PersonSeed {
+            id: 5,
+            firstname: "Luc".to_string(),
+            lastname: "Moreau".to_string(),
+        },
+        PersonSeed {
+            id: 6,
+            firstname: "Anne".to_string(),
+            lastname: "Laurent".to_string(),
+        },
+    ];
+
+    let teams = vec![
+        TeamSeed {
+            id: 1,
+            name: "Équipe Alpha".to_string(),
+            number: 1,
+        },
+        TeamSeed {
+            id: 2,
+            name: "Équipe Beta".to_string(),
+            number: 2,
+        },
+        TeamSeed {
+            id: 3,
+            name: "Équipe Gamma".to_string(),
+            number: 3,
+        },
+    ];
+
+    let members = vec![
+        MemberSeed {
+            team_id: 1,
+            person_id: 1,
+        },
+        MemberSeed {
+            team_id: 1,
+            person_id: 2,
+        },
+        MemberSeed {
+            team_id: 1,
+            person_id: 3,
+        },
+        MemberSeed {
+            team_id: 2,
+            person_id: 4,
+        },
+        MemberSeed {
+            team_id: 2,
+            person_id: 5,
+        },
+        MemberSeed {
+            team_id: 3,
+            person_id: 6,
+        },
+    ];
+
     let mut point_ids: Vec<i64> = Vec::new();
     let mut type_ids: Vec<i64> = Vec::new();
 
@@ -169,7 +265,7 @@ pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
         .bind(t.description.clone())
         .bind(t.width)
         .bind(t.length)
-        .execute(&pool)
+        .execute(pool)
         .await
         .map_err(|e| format!("Failed to insert obstacle type: {}", e))?;
         type_ids.push(result.last_insert_rowid());
@@ -181,7 +277,7 @@ pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
         let result = sqlx::query("INSERT INTO point (x, y) VALUES (?, ?)")
             .bind(p.x)
             .bind(p.y)
-            .execute(&pool)
+            .execute(pool)
             .await
             .map_err(|e| format!("Failed to insert point: {}", e))?;
         point_ids.push(result.last_insert_rowid());
@@ -196,7 +292,7 @@ pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
         sqlx::query("INSERT INTO comment (point_id, value) VALUES (?, ?)")
             .bind(point_id)
             .bind(c.value)
-            .execute(&pool)
+            .execute(pool)
             .await
             .map_err(|e| format!("Failed to insert comment: {}", e))?;
     }
@@ -210,7 +306,7 @@ pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
         sqlx::query("INSERT INTO picture (point_id, image) VALUES (?, ?)")
             .bind(point_id)
             .bind(i.image)
-            .execute(&pool)
+            .execute(pool)
             .await
             .map_err(|e| format!("Failed to insert picture: {}", e))?;
     }
@@ -233,9 +329,62 @@ pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
         .bind(type_id)
         .bind(o.number)
         .bind(o.description.clone())
-        .execute(&pool)
+        .execute(pool)
         .await
         .map_err(|e| format!("Failed to insert obstacle: {}", e))?;
+    }
+
+    println!("👥 Insertion des personnes...");
+    for person in &persons {
+        sqlx::query(
+            r#"INSERT INTO person (id, firstname, lastname) 
+               VALUES (?, ?, ?)"#,
+        )
+        .bind(person.id)
+        .bind(&person.firstname)
+        .bind(&person.lastname)
+        .execute(pool)
+        .await
+        .map_err(|e| {
+            format!(
+                "Erreur lors de l'insertion de la personne {} : {}",
+                person.id, e
+            )
+        })?;
+    }
+
+    // Insérer les équipes
+    println!("👨‍💼 Insertion des équipes...");
+    for team in &teams {
+        sqlx::query(
+            r#"INSERT INTO team (id, name, number) 
+               VALUES (?, ?, ?)"#,
+        )
+        .bind(team.id)
+        .bind(&team.name)
+        .bind(team.number)
+        .execute(pool)
+        .await
+        .map_err(|e| format!("Erreur lors de l'insertion de l'équipe {} : {}", team.id, e))?;
+    }
+
+    // Insérer les membres (relations team-person)
+    println!("🔗 Insertion des membres (relations team-person)...");
+    for member in &members {
+        sqlx::query(
+            r#"INSERT INTO member (team_id, person_id) 
+               VALUES (?, ?)"#,
+        )
+        .bind(member.team_id)
+        .bind(member.person_id)
+        .execute(pool)
+        .await
+        .map_err(|e| {
+            format!(
+                "Erreur lors de l'insertion du membre team_id={}, person_id={} : {}",
+                member.team_id, member.person_id, e
+            )
+        })?;
     }
 
     println!("✅ Seeding terminé avec succès !");
@@ -244,6 +393,9 @@ pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
     println!("   - {} commentaires", comments_data.len());
     println!("   - {} photos", pictures_data.len());
     println!("   - {} obstacles", obstacles_data.len());
+    println!("   - {} personnes", persons.len());
+    println!("   - {} equipes", teams.len());
+    println!("   - {} membres", members.len());
 
     Ok(())
 }

@@ -1,4 +1,5 @@
 // On importe les dépendances nécessaires
+use crate::seed::seed_database;
 use serde::Deserialize;
 use serde::Serialize;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
@@ -59,6 +60,35 @@ pub fn init_db() -> impl tauri::plugin::Plugin<tauri::Wry> {
                     description TEXT,
                     FOREIGN KEY (point_id) REFERENCES point (id),
                     FOREIGN KEY (type_id) REFERENCES obstacle_type (id)
+                );
+            ",
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 3,
+            description: "create_team_person_tables",
+            sql: "
+                CREATE TABLE team (
+                    id INTEGER PRIMARY KEY ,
+                    name TEXT,
+                    number INTEGER
+                );
+                
+                CREATE TABLE person (
+                    id INTEGER PRIMARY KEY,
+                    firstname TEXT,
+                    lastname TEXT,
+                    address TEXT,
+                    email TEXT,
+                    phone_number TEXT
+                );
+
+                CREATE TABLE member (
+                    team_id INTEGER,
+                    person_id INTEGER,
+                    PRIMARY KEY (team_id, person_id),
+                    FOREIGN KEY (team_id) REFERENCES team (id),
+                    FOREIGN KEY (person_id) REFERENCES person (id)
                 );
             ",
             kind: MigrationKind::Up,
@@ -166,10 +196,14 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
         .map_err(|e| format!("Failed to parse DB URL: {}", e))?
         .create_if_missing(true);
 
-    SqlitePoolOptions::new()
+    let pool = SqlitePoolOptions::new()
         .connect_with(connect_options)
         .await
-        .map_err(|e| format!("Failed to connect to database: {}", e))
+        .map_err(|e| format!("Failed to connect to database: {}", e))?;
+
+    seed_database(&pool).await?;
+
+    Ok(pool)
 }
 
 async fn fetch_comments(pool: &SqlitePool, point_id: i64) -> Result<Vec<Comment>, String> {

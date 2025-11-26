@@ -1,5 +1,4 @@
 use crate::db;
-use crate::seed;
 use crate::utils;
 use base64::{engine::general_purpose, Engine as _};
 use genpdf::elements;
@@ -7,7 +6,6 @@ use tauri::AppHandle;
 
 #[tauri::command]
 pub async fn create_pdf(app: AppHandle) -> Result<(), String> {
-    seed::seed_database(&app).await?;
     let data = db::retrieve_data(&app).await?;
 
     let font_family = genpdf::fonts::from_files("./fonts", "LiberationSans", None)
