@@ -1,0 +1,22 @@
+stages: 
+  - quality
+  - build
+
+image: node:22-slim
+before_script:
+  - npm install -g eas-cli
+  - npm install -ci
+
+lint:
+  stage: quality
+  script:
+    - npx expo lint > mobile_lint.txt
+  artifacts:
+    paths: 
+      - ./mobile_lint.txt
+    expire_in: 1 week
+
+build:
+  stage: build
+  script: 
+    - eas build --platform all --profile production --non-interactive --no-wait

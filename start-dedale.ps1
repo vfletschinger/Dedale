@@ -1,5 +1,5 @@
 # Script de lancement unifié pour le projet Dédale
-$ProjectRoot = "c:\Users\alexc\Documents\But_informatique\t5-crs"
+$ProjectRoot = Get-Location
 Set-Location $ProjectRoot
 
 Write-Host "=== Lancement du projet Dédale ===" -ForegroundColor Cyan
