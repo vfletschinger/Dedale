@@ -43,7 +43,7 @@ switch ($choice) {
         Write-Host "🚀 Tauri..." -ForegroundColor Cyan
         Push-Location "Frontend\Web\Dedale"
         try {
-            npm install
+            npm install -ci
             npm run tauri dev
         } finally {
             Pop-Location
@@ -57,7 +57,7 @@ switch ($choice) {
         Write-Host "🚀 Tauri..." -ForegroundColor Cyan
         Push-Location "Frontend\Web\Dedale"
         try {
-            npm install
+            npm install -ci
             npm run tauri dev
         } finally {
             Pop-Location
@@ -70,7 +70,7 @@ switch ($choice) {
         Write-Host "🚀 Expo..." -ForegroundColor Cyan
         Push-Location "Frontend\Mobile\Dedale"
         try {
-            npm install
+            npm install -ci
             npx expo start -c
         } finally {
             Pop-Location
@@ -84,7 +84,7 @@ switch ($choice) {
         Write-Host "🚀 Expo..." -ForegroundColor Cyan
         Push-Location "Frontend\Mobile\Dedale"
         try {
-            npm install
+            npm install -ci
             npx expo start -c
         } finally {
             Pop-Location
@@ -102,7 +102,7 @@ switch ($choice) {
         Write-Host "🚀 Lancement Expo..." -ForegroundColor Cyan
         Push-Location "Frontend\Mobile\Dedale"
         try {
-            npm install
+            npm install -ci
             npx expo start -c
         } finally {
             Pop-Location
@@ -124,7 +124,7 @@ switch ($choice) {
         Write-Host "🚀 Lancement Expo..." -ForegroundColor Cyan
         Push-Location "Frontend\Mobile\Dedale"
         try {
-            npm install
+            npm install -ci
             npx expo start -c
         } finally {
             Pop-Location
