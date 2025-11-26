@@ -227,12 +227,6 @@ export default function RouteNavigation() {
         showsMyLocationButton={false}
         onRegionChangeComplete={handleRegionChangeComplete}
       >
-        <UrlTile
-          urlTemplate="http://192.168.1.26:8080/tile/{z}/{x}/{y}.png"
-          maximumZ={19}
-          flipY={false}
-        />
-
         {/* Draw route polyline following roads */}
         {routeCoordinates.length > 0 && (
           <Polyline
