@@ -1,44 +1,46 @@
 services:
-  frontend:
-    hostname: nginx-dedale
-    profiles: [dev, production]
-    build:
-      context: ./Frontend/web
-      dockerfile: Dockerfile.dev
-      args:
-        NODE_ENV: dev
-    develop:
-      watch:
-        - action: sync
-          path: ./Frontend/web/app
-          target: /app/app
-        - action: rebuild
-          path: ./Frontend/web/package.json
-          target: /app/package.json
+  # Profil "web"
+  tile-server:
+    build: ./Backend
+    profiles: ["web"]
     ports:
-      - "3000:5173"
-    depends_on:
-      - backend-api
-      
-  backend-api:
-    build:
-      context: ./Backend
-      dockerfile: Dockerfile
+      - "8082:8080"
+    volumes:
+      - ./Backend/tiles:/data
+
+  nominatim:
+    image: mediagis/nominatim:5.2
+    profiles: ["web"]
+    environment:
+      PBF_URL: https://download.geofabrik.de/europe/france/alsace-latest.osm.pbf
+      NOMINATIM_CORS: '*'
+    ports:
+      - "8081:8080"
+    volumes:
+      - nominatim-data:/var/lib/postgresql/16/main
+
+  # Profil "mobile"
+  mobile-tile-server:
+    image: node:22
+    profiles: ["mobile"]
+    working_dir: /app
+    command: >
+      bash -c "npm install && 
+      node ./tile-server.js"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./Frontend/Mobile/Dedale:/app
+      - /app/node_modules
     develop:
       watch:
-        - action: sync
-          path: ./Backend/api/src
-          target: /app/src
+        - path: ./Frontend/Mobile/Dedale
+          action: sync
+          target: /app
           ignore:
             - node_modules/
-        - action: sync
-          path: ./Backend/api/prisma
-          target: /app/prisma
-        - action: rebuild
-          path: ./Backend/api/package.json
-          target: /app/package.json
-    ports:
-      - "8000:3000"
-    environment:
-      - DATABASE_URL=sqlite://root:rootpassword@db:3306/database
-    command: npm run start:dev
+        - path: ./Frontend/Mobile/Dedale/package.json
+          action: rebuild
+   
+volumes:
+  nominatim-data:
