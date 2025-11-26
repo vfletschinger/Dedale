@@ -17,6 +17,7 @@
       "expo-barcode-scanner"
     ],
     "ios": {
+      "bundleIdentifier": "com.t5crs.dedale",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Nous avons besoin de votre position pour vous localiser sur la carte",
         "NSLocationAlwaysUsageDescription": "Nous avons besoin de votre position pour vous localiser sur la carte"
