@@ -14,6 +14,7 @@ function OfflineMapLibre() {
     null
   );
   const [currentPopup, setCurrentPopup] = useState<maplibregl.Popup | null>(null);
+  const pointsRef = useRef<any[]>([]);
 
   // Initialisation de la carte
   useEffect(() => {
@@ -21,15 +22,17 @@ function OfflineMapLibre() {
 
     const mapInstance = new maplibregl.Map({
       container: mapContainer.current,
-      style: "http://localhost:8080/styles/basic-preview/style.json",
+      style: "http://localhost:8082/styles/basic-preview/style.json",
       center: [7.7635, 48.5465],
       zoom: 13,
     });
 
-    // Récupère les points via la commande Tauri `get_points` et les ajoute en source GeoJSON
+    // Récupère les points via la commande Tauri `get_points`
     const fetchAndDisplayPoints = async (mapObj: maplibregl.Map) => {
       try {
-        const points = await invoke<any[]>("get_points"); // [{ id, x, y, obstacles, comments, pictures }, ...]
+        const points = await invoke<any[]>("get_points");
+
+        pointsRef.current = points;
 
         const geojson = {
           type: "FeatureCollection",
@@ -37,7 +40,7 @@ function OfflineMapLibre() {
             type: "Feature",
             geometry: {
               type: "Point",
-              coordinates: [Number(p.x), Number(p.y)] as [number, number], // lon, lat
+              coordinates: [Number(p.x), Number(p.y)] as [number, number],
             },
             properties: {
               id: p.id,
@@ -68,87 +71,82 @@ function OfflineMapLibre() {
             },
           });
 
+          // --- CLICK LISTENER START ---
           mapObj.on("click", "db-points-layer", async (e: any) => {
             const f = e.features?.[0];
             if (!f) return;
             const coords = (f.geometry as any).coordinates.slice();
-            const props = f.properties;
-            const pointId = props?.id;
+            const pointId = f.properties?.id;
 
-            // remove previous popup if any
+            // Remove previous popup
             if (currentPopup) {
               currentPopup.remove();
               setCurrentPopup(null);
             }
 
-            // Crée un conteneur DOM pour le Popup et le composant React
+            // DOM Setup
             const container = document.createElement("div");
-            // style minimal afin que le popup ait une taille raisonnable
-            container.style.maxWidth = "600px";         // agrandi
-            container.style.maxHeight = "600px";        // agrandi
-            container.style.width = "350px";            // taille par défaut
+            container.style.maxWidth = "600px";
+            container.style.maxHeight = "600px";
+            container.style.width = "350px";
             container.style.height = "450px";
             container.style.overflow = "auto";
-            container.style.boxSizing = "border-box";
             container.style.padding = "8px";
-            container.style.background = "white";
 
-            const popup = new maplibregl.Popup({ offset: 12, closeButton: false, className: "custom-popup" })
+            const popup = new maplibregl.Popup({
+              offset: 12,
+              closeButton: false,
+              className: "custom-popup",
+            })
               .setLngLat(coords)
               .setDOMContent(container)
               .addTo(mapObj);
-            setCurrentPopup(popup);
 
-            // Monte le composant React dans le container
+            setCurrentPopup(popup);
             const root = ReactDOM.createRoot(container);
 
-            // Fonction de fermeture pour le bouton "Fermer" dans le composant
-            const handleClose = () => {
-              popup.remove();
+            const handleClose = () => popup.remove();
+
+            const renderPopupUI = () => {
+              const freshPoint = pointsRef.current.find(
+                (p) => String(p.id) === String(pointId)
+              );
+
+              // If point was deleted, close the popup
+              if (!freshPoint) {
+                handleClose();
+                return;
+              }
+
+              root.render(
+                <PointDetails
+                  point={freshPoint}
+                  onClose={handleClose}
+                  onRefresh={async () => {
+                    await fetchAndDisplayPoints(mapObj);
+                    renderPopupUI();
+                  }}
+                />
+              );
             };
 
-            try {
-              // Appel Tauri pour récupérer tous les points, puis filtrage par id
-              const point =
-                points.find((p) => String(p.id) === String(pointId)) ?? null;
+            // Initial render
+            renderPopupUI();
 
-              root.render(<PointDetails point={point} onClose={handleClose} />);
-            } catch (err) {
-              // En cas d'erreur, afficher l'erreur dans le popup
-              root.render(
-                <div style={{ padding: 12 }}>
-                  Erreur: {String(err)}
-                  <br />
-                  <button onClick={handleClose}>Fermer</button>
-                </div>
-              );
-            }
-
-            // Quand le popup est fermé par l'utilisateur, démonter React
+            // Cleanup
             popup.on("close", () => {
-              try {
-                root.unmount();
-              } catch (_) {
-                /* ignore */
-              }
+              setTimeout(() => root.unmount(), 0);
               setCurrentPopup(null);
             });
           });
+          // --- CLICK LISTENER END ---
 
-          mapObj.on(
-            "mouseenter",
-            "db-points-layer",
-            () => (mapObj.getCanvas().style.cursor = "pointer")
-          );
-          mapObj.on(
-            "mouseleave",
-            "db-points-layer",
-            () => (mapObj.getCanvas().style.cursor = "")
-          );
+          // Mouse cursors
+          mapObj.on("mouseenter", "db-points-layer", () => (mapObj.getCanvas().style.cursor = "pointer"));
+          mapObj.on("mouseleave", "db-points-layer", () => (mapObj.getCanvas().style.cursor = ""));
+
         } else {
-          (mapObj.getSource("db-points") as maplibregl.GeoJSONSource).setData(
-            geojson
-          );
+          (mapObj.getSource("db-points") as maplibregl.GeoJSONSource).setData(geojson);
         }
       } catch (err) {
         console.error("fetchAndDisplayPoints error", err);

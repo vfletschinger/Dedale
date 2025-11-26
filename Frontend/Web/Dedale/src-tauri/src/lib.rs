@@ -2,10 +2,10 @@
 
 mod db;
 mod excel;
-mod socket;
-mod pdf;
 mod map;
+mod pdf;
 mod seed;
+mod socket;
 mod utils;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -19,7 +19,9 @@ pub fn run() {
             excel::export_points_excel,
             pdf::create_pdf,
             map::get_points,
-            socket::start_server
+            socket::start_server,
+            db::fetch_obstacle_types,
+            db::insert_obstacles
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
