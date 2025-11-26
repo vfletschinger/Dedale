@@ -40,7 +40,7 @@
           "apiKey": "FAKE_API_KEY_FOR_LOCAL_ONLY"
         }
       },
-      "package": "com.t5-crs.Dedale"
+      "package": "com.t5crs.dedale"
     },
     "web": {
       "favicon": "./assets/favicon.png",
