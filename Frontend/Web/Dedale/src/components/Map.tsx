@@ -3,18 +3,58 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { invoke } from "@tauri-apps/api/core";
 import PointDetails from "./PointDetails";
-import ReactDOM from "react-dom/client";
+import AddPointForm from "./AddPointForm";
+
+// Local style constants to avoid inline clutter in JSX
+const LEFT_PANEL_STYLE: React.CSSProperties = {
+  width: 320,
+  background: "#fff",
+  padding: 8,
+  overflowY: "auto",
+  boxShadow: "2px 0 6px rgba(0,0,0,0.06)",
+  zIndex: 12,
+};
+
+
+// Create GeoJSON from points array
+function formatPointsGeoJSON(points: any[]) {
+  return {
+    type: "FeatureCollection",
+    features: points.map((p: any) => ({
+      type: "Feature",
+      geometry: {
+        type: "Point",
+        coordinates: [Number(p.x), Number(p.y)] as [number, number],
+      },
+      properties: {
+        id: p.id,
+        obstacles: p.obstacles,
+        comments: p.comments,
+        pictures: p.pictures,
+      },
+    })),
+  } as GeoJSON.FeatureCollection<GeoJSON.Point, any>;
+}
 
 function OfflineMapLibre() {
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<any[]>([]);
+  const [points, setPoints] = useState<any[]>([]);
   const [currentMarker, setCurrentMarker] = useState<maplibregl.Marker | null>(
     null
   );
-  const [currentPopup, setCurrentPopup] = useState<maplibregl.Popup | null>(null);
+  // popups replaced by drawer UI; keep ref for markers only
+  // const [currentPopup, setCurrentPopup] = useState<maplibregl.Popup | null>(null);
   const pointsRef = useRef<any[]>([]);
+  const [awaitingMapClick, setAwaitingMapClick] = useState(false);
+  // Drawer state to show details or add form on the left side
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerMode, setDrawerMode] = useState<"details" | "add" | null>(null);
+  const [drawerPoint, setDrawerPoint] = useState<any | null>(null);
+  const [drawerRefreshFn, setDrawerRefreshFn] = useState<(() => Promise<void>) | null>(null);
+  const [addInitialCoords, setAddInitialCoords] = useState<[number, number] | null>(null);
 
   // Initialisation de la carte
   useEffect(() => {
@@ -33,23 +73,9 @@ function OfflineMapLibre() {
         const points = await invoke<any[]>("get_points");
 
         pointsRef.current = points;
+        setPoints(points);
 
-        const geojson = {
-          type: "FeatureCollection",
-          features: points.map((p: any) => ({
-            type: "Feature",
-            geometry: {
-              type: "Point",
-              coordinates: [Number(p.x), Number(p.y)] as [number, number],
-            },
-            properties: {
-              id: p.id,
-              obstacles: p.obstacles,
-              comments: p.comments,
-              pictures: p.pictures,
-            },
-          })),
-        } as GeoJSON.FeatureCollection<GeoJSON.Point, any>;
+        const geojson = formatPointsGeoJSON(points);
 
         if (!mapObj.getSource("db-points")) {
           mapObj.addSource("db-points", {
@@ -75,68 +101,11 @@ function OfflineMapLibre() {
           mapObj.on("click", "db-points-layer", async (e: any) => {
             const f = e.features?.[0];
             if (!f) return;
-            const coords = (f.geometry as any).coordinates.slice();
             const pointId = f.properties?.id;
 
-            // Remove previous popup
-            if (currentPopup) {
-              currentPopup.remove();
-              setCurrentPopup(null);
-            }
-
-            // DOM Setup
-            const container = document.createElement("div");
-            container.style.maxWidth = "600px";
-            container.style.maxHeight = "600px";
-            container.style.width = "350px";
-            container.style.height = "450px";
-            container.style.overflow = "auto";
-            container.style.padding = "8px";
-
-            const popup = new maplibregl.Popup({
-              offset: 12,
-              closeButton: false,
-              className: "custom-popup",
-            })
-              .setLngLat(coords)
-              .setDOMContent(container)
-              .addTo(mapObj);
-
-            setCurrentPopup(popup);
-            const root = ReactDOM.createRoot(container);
-
-            const handleClose = () => popup.remove();
-
-            const renderPopupUI = () => {
-              const freshPoint = pointsRef.current.find(
-                (p) => String(p.id) === String(pointId)
-              );
-
-              // If point was deleted, close the popup
-              if (!freshPoint) {
-                handleClose();
-                return;
-              }
-
-              root.render(
-                <PointDetails
-                  point={freshPoint}
-                  onClose={handleClose}
-                  onRefresh={async () => {
-                    await fetchAndDisplayPoints(mapObj);
-                    renderPopupUI();
-                  }}
-                />
-              );
-            };
-
-            // Initial render
-            renderPopupUI();
-
-            // Cleanup
-            popup.on("close", () => {
-              setTimeout(() => root.unmount(), 0);
-              setCurrentPopup(null);
+            // Open details in drawer and provide refresh function
+            openDrawerForPoint(pointId, async () => {
+              await fetchAndDisplayPoints(mapObj);
             });
           });
           // --- CLICK LISTENER END ---
@@ -157,6 +126,9 @@ function OfflineMapLibre() {
       fetchAndDisplayPoints(mapInstance);
     });
 
+    // expose for later refreshes (debug helper)
+    (window as any).__fetchAndDisplayPoints = fetchAndDisplayPoints;
+
     const initialMarker = new maplibregl.Marker()
       .setLngLat([7.7635, 48.5465])
       .setPopup(new maplibregl.Popup().setText("Strasbourg !"))
@@ -167,6 +139,64 @@ function OfflineMapLibre() {
 
     return () => mapInstance.remove();
   }, []);
+
+  // When awaiting a user click to add a point, show a special cursor on the map
+  useEffect(() => {
+    if (!map) return;
+    try {
+      const canvas = map.getCanvas();
+      if (awaitingMapClick) {
+        canvas.style.cursor = "crosshair";
+      } else {
+        canvas.style.cursor = "";
+      }
+    } catch (err) {
+      // ignore
+    }
+
+    return () => {
+      try {
+        if (map) map.getCanvas().style.cursor = "";
+      } catch (e) {}
+    };
+  }, [awaitingMapClick, map]);
+
+  // Open the left drawer showing PointDetails
+  const openDrawerForPoint = (pointId: string | number, refreshFn?: () => Promise<void>) => {
+    const freshPoint = pointsRef.current.find((p) => String(p.id) === String(pointId));
+    if (!freshPoint) return;
+    setDrawerPoint(freshPoint);
+    setDrawerRefreshFn(() => refreshFn ?? null);
+    setDrawerMode("details");
+    setDrawerOpen(true);
+  };
+
+  // Ouvre un popup pour un point (utilisé par la liste à gauche)
+  const openPopupForPoint = async (point: any) => {
+    if (!map || !point) return;
+
+    const coords: [number, number] = [Number(point.x), Number(point.y)];
+
+    // recentre la carte
+    map.flyTo({ center: coords, zoom: 15 });
+
+    // open details in drawer and refresh will update points
+    openDrawerForPoint(point.id, async () => {
+      try {
+        const fresh = await invoke<any[]>("get_points");
+        pointsRef.current = fresh;
+        setPoints(fresh);
+        if (map.getSource("db-points")) {
+          const geojson = formatPointsGeoJSON(fresh);
+          (map.getSource("db-points") as maplibregl.GeoJSONSource).setData(geojson);
+        }
+      } catch (err) {
+        console.error("refresh in openPopupForPoint error", err);
+      }
+    });
+  };
+
+  // Add form is now shown in the drawer (state-driven)
 
   // Fonction pour sélectionner une suggestion
   const handleSelect = (place: any) => {
@@ -214,7 +244,137 @@ function OfflineMapLibre() {
   }, [query]);
 
   return (
-    <div style={{ position: "relative", height: "100vh", width: "100%" }}>
+    <div style={{ display: "flex", height: "100vh", width: "100%" }}>
+      {/* Panneau gauche: liste des points */}
+      <div className="left-panel" style={LEFT_PANEL_STYLE}>
+        <div className="panel-header" style={{ marginBottom: 6 }}>
+          <h3 style={{ margin: 0 }}>Points</h3>
+          <button
+            className="add-btn"
+            onClick={() => {
+              if (!map) {
+                alert("Carte non initialisée");
+                return;
+              }
+
+              setAwaitingMapClick(true);
+              // one-time click on the map to pick coordinates
+              map.once("click", (e: any) => {
+                if (!e || !e.lngLat) {
+                  setAwaitingMapClick(false);
+                  return;
+                }
+                const lngLat = [e.lngLat.lng, e.lngLat.lat] as [number, number];
+                // open add form in drawer
+                setAddInitialCoords(lngLat);
+                setDrawerMode("add");
+                setDrawerOpen(true);
+                setAwaitingMapClick(false);
+              });
+            }}
+            aria-label="Ajouter"
+          >
+            Ajouter
+          </button>
+        </div>
+
+        {points.length === 0 && <div style={{ color: "#666" }}>Aucun point</div>}
+        <div>
+          {points.map((p: any) => (
+            <div
+              key={p.id}
+              className="list-item"
+              onClick={() => openPopupForPoint(p)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => (e.key === "Enter" ? openPopupForPoint(p) : null)}
+            >
+              <div className="title">Point #{p.id}</div>
+              <div className="meta">{p.obstacles?.length ?? 0} obstacles</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Drawer is rendered inside the map container to stay below top nav and align to the right of the map. */}
+
+      {/* Zone carte à droite */}
+      <div style={{ flex: 1, position: "relative" }}>
+      {/* Drawer: render inside the map container so it sits to the right of the map and under the navbar */}
+      {drawerOpen && (
+        <div
+          className="drawer"
+          style={{
+            position: "absolute",
+            right: 0,
+            top: 0,
+            height: "100%",
+            width: 380,
+            zIndex: 20,
+            background: "#fff",
+            boxShadow: "-2px 0 12px rgba(0,0,0,0.12)",
+            overflow: "auto",
+          }}
+        >
+          <div style={{ padding: 8 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontWeight: 700 }}>{drawerMode === "details" ? `Point #${drawerPoint?.id}` : "Nouveau point"}</div>
+              <button className="pp-close" onClick={() => setDrawerOpen(false)} aria-label="Fermer">✕</button>
+            </div>
+
+            <div style={{ marginTop: 8 }}>
+              {drawerMode === "details" && drawerPoint && (
+                <PointDetails
+                  point={drawerPoint}
+                  onClose={() => setDrawerOpen(false)}
+                  onRefresh={async () => {
+                    try {
+                      if (drawerRefreshFn) await drawerRefreshFn();
+                      const fresh = await invoke<any[]>("get_points");
+                      pointsRef.current = fresh;
+                      setPoints(fresh);
+                      if (map && map.getSource("db-points")) {
+                        (map.getSource("db-points") as maplibregl.GeoJSONSource).setData(formatPointsGeoJSON(fresh));
+                      }
+
+                      // Update the drawerPoint to the refreshed version so PointDetails
+                      // receives the latest obstacles/comments/pictures without re-opening.
+                      if (fresh && drawerPoint) {
+                        const updated = fresh.find((p) => String(p.id) === String(drawerPoint.id));
+                        if (updated) {
+                          setDrawerPoint(updated);
+                        }
+                      }
+                    } catch (err) {
+                      console.error(err);
+                    }
+                  }}
+                />
+              )}
+
+              {drawerMode === "add" && addInitialCoords && (
+                <AddPointForm
+                  initialCoords={{ lng: addInitialCoords[0], lat: addInitialCoords[1] }}
+                  onClose={() => setDrawerOpen(false)}
+                  onSaved={async () => {
+                    try {
+                      const fresh = await invoke<any[]>("get_points");
+                      pointsRef.current = fresh;
+                      setPoints(fresh);
+                      if (map && map.getSource("db-points")) {
+                        (map.getSource("db-points") as maplibregl.GeoJSONSource).setData(formatPointsGeoJSON(fresh));
+                      }
+                    } catch (err) {
+                      console.error(err);
+                    }
+                    setDrawerOpen(false);
+                  }}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       {/* Barre de recherche */}
       <div
         style={{
@@ -259,8 +419,9 @@ function OfflineMapLibre() {
         )}
       </div>
 
-      {/* Conteneur de la carte */}
-      <div ref={mapContainer} style={{ height: "100%", width: "100%" }} />
+        {/* Conteneur de la carte */}
+        <div ref={mapContainer} style={{ height: "100%", width: "100%" }} />
+      </div>
     </div>
   );
 }
