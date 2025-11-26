@@ -22,6 +22,7 @@ lint:
 build:
   stage: build
   before_script:
+    - apt-get update && apt-get install -y git
     - cd Frontend/Mobile/Dedale
     - npm install -g eas-cli
     - npm install
