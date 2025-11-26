@@ -3,20 +3,25 @@ stages:
   - build
 
 image: node:22-slim
-before_script:
-  - npm install -g eas-cli
-  - npm install -ci
 
 lint:
   stage: quality
+  before_script:
+    - cd Frontend/Mobile/Dedale
+    - npm install -g eas-cli
+    - npm install
   script:
     - npx expo lint > mobile_lint.txt
   artifacts:
     paths: 
-      - ./mobile_lint.txt
+      - Frontend/Mobile/Dedale/mobile_lint.txt
     expire_in: 1 week
 
 build:
   stage: build
+  before_script:
+    - cd Frontend/Mobile/Dedale
+    - npm install -g eas-cli
+    - npm install
   script: 
     - eas build --platform all --profile production --non-interactive --no-wait
