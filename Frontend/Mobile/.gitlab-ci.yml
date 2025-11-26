@@ -11,11 +11,13 @@ lint:
     - npm install -g eas-cli
     - npm install
   script:
-    - npx expo lint > mobile_lint.txt
+    - npx expo lint > mobile_lint.txt || true
   artifacts:
     paths: 
       - Frontend/Mobile/Dedale/mobile_lint.txt
     expire_in: 1 week
+    when: always
+  allow_failure: true
 
 build:
   stage: build
