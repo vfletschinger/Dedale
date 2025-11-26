@@ -184,12 +184,6 @@ export default function PointDetails({
 
   return (
     <div className="point-popup" style={{ minWidth: 300 }}>
-      <div className="pp-header">
-        <div className="pp-title">Point #{point.id}</div>
-        <button onClick={onClose} className="pp-close" aria-label="Fermer">
-          ✕
-        </button>
-      </div>
 
       <div className="pp-section">
         <div className="pp-section-title">Coordonnées</div>

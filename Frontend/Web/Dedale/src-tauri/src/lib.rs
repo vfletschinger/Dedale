@@ -23,6 +23,7 @@ pub fn run() {
             db::fetch_obstacle_types,
             db::insert_obstacles,
             db::delete_point,
+            db::insert_point,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
