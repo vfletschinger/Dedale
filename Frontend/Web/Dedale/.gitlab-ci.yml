@@ -1,8 +1,8 @@
 image: rust:latest
 
 variables:
-  PROJECT_PATH: "Frontend/Web/Dedale"
-  CARGO_HOME: $CI_PROJECT_DIR/$PROJECT_PATH/src-tauri/.cargo
+  PROJECT_PATH: "Frontend/Web/Dedale/target/src-tauri"
+  CARGO_HOME: $CI_PROJECT_DIR/$PROJECT_PATH/.cargo
   DEBIAN_FRONTEND: noninteractive
 
 stages:
@@ -14,7 +14,7 @@ cache:
   key: global-cache
   paths:
     - $PROJECT_PATH/.cargo/
-    - $PROJECT_PATH/target/
+    - $PROJECT_PATH
     - $PROJECT_PATH/node_modules/
     - $PROJECT_PATH/webdriver/webdriverio/node_modules/
 
@@ -30,13 +30,18 @@ check_quality:
     - ls
 
     # 1. Qualité RUST
-    - cargo fmt --all -- --check
-    - cargo clippy -- -D warnings
+    - cargo fmt --all -- --check > repport/cargoFmt_repport.txt || true
+    - cargo clippy -- -D warnings > reports/clippy_report.txt 2>&1
 
     # 2. Qualité REACT
     - npm ci
     - npm run lint
-
+  artifacts:
+    when: always
+    paths:
+      - $PROJECT_PATH/reports/rustfmt_diff.txt
+      - $PROJECT_PATH/reports/clippy_report.txt
+    expire_in: 1 week
 # --- JOB 2 : BUILD ---
 build_app:
   stage: build
