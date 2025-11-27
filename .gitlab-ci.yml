@@ -21,7 +21,7 @@ print_mr_link:
 trigger_mobile:
   stage: trigger
   trigger:
-    include: Frontend/Mobile/.gitlab-ci.yml
+    include: Frontend/Mobile/Dedale.gitlab-ci.yml
   rules:
       - changes:
           - Frontend/Mobile/**/*
