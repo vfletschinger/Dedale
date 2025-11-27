@@ -27,10 +27,10 @@ check_quality:
     - rustup component add clippy rustfmt
   script:
     - cd $PROJECT_PATH
-    - ls
 
     # 1. Qualité RUST
-    - cargo fmt --all -- --check > repport/cargoFmt_repport.txt || true
+    - mkdir -p reports
+    - cargo fmt --all -- --check > reports/cargoFmt_repport.txt || true
     - cargo clippy -- -D warnings > reports/clippy_report.txt 2>&1
 
     # 2. Qualité REACT
