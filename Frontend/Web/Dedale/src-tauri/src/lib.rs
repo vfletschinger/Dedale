@@ -22,8 +22,9 @@ pub fn run() {
             socket::start_server,
             db::fetch_obstacle_types,
             db::insert_obstacles,
+            db::delete_point,
+            db::insert_point,
             db::fetch_events,
-            seed::seed_database,
             db::insert_event
         ])
         .run(tauri::generate_context!())

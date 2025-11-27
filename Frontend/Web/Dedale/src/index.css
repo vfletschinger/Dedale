@@ -105,48 +105,123 @@
 
 /* Keep explicit popup width intact (set elsewhere) */
 
-/* Styles pour le header fixe */
-.fixed-header {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 50;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(8px);
-  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-}
-
-/* Ajuster le contenu principal pour compenser le header fixe */
-.main-content {
-  padding-top: 80px; /* Ajustez selon la hauteur de votre header */
-}
-
-/* Pour les navigations avec logo */
-.header-nav {
+/* Styles for left points panel */
+.left-panel .panel-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem 2rem;
-  max-width: 1200px;
-  margin: 0 auto;
+  gap: 8px;
+}
+.left-panel .panel-header h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #0b63d6;
+}
+.left-panel .add-btn {
+  background: #16a34a; /* green-600 */
+  color: #fff;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.left-panel .add-btn:hover {
+  filter: brightness(0.95);
+}
+.left-panel .list-item {
+  padding: 8px;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(15,23,42,0.04);
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.left-panel .list-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(2,6,23,0.08);
+}
+.left-panel .list-item .title {
+  font-weight: 600;
+  font-size: 13px;
+  color: #0f172a;
+}
+.left-panel .list-item .meta {
+  font-size: 12px;
+  color: #64748b;
 }
 
-/* Animation douce lors du scroll */
-.fixed-header {
-  transition: all 0.3s ease-in-out;
+/* Generic button styles used across popups/drawer */
+.button {
+  display: inline-block;
+  background: #2563eb; /* matches BTN_STYLE in PointDetails */
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+}
+.button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
-/* Variant pour header transparent qui devient opaque au scroll */
-.header-transparent {
+/* Small action buttons (used for + / -) */
+.action-primary {
+  background: #0b63d6;
+  color: white;
+  border: none;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.action-ghost {
   background: transparent;
-  border-bottom: 1px solid transparent;
-  box-shadow: none;
+  color: #0f172a;
+  border: 1px solid #e6eef8;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
 }
 
-.header-scrolled {
-  background: rgba(255, 255, 255, 0.95);
-  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+/* Upload box */
+.upload-box {
+  border: 1px dashed #cbd5e1; /* slate-300 */
+  border-radius: 8px;
+  padding: 10px;
+  text-align: center;
+  color: #475569;
+  display: inline-block;
+  width: 100%;
+  cursor: pointer;
+}
+.upload-box input[type="file"] {
+  display: none;
+}
+.upload-preview {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.upload-preview img {
+  width: 100px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid #e6eef8;
+}
+
+/* Drawer close button global */
+.pp-close {
+  background: transparent;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  color: #475569;
 }

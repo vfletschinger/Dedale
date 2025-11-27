@@ -2,7 +2,7 @@ import { useState } from "react";
 import Accueil from "./components/Accueil";
 import Equipes from "./components/Equipe";
 import Map from "./components/Map";
-import Event from "./components/Event";
+import Event from "./components/Events";
 import DataTransfer from "./components/DataTransfer";
 import logoStrasbourg from "./assets/logo_strasbourg.png";
 
@@ -91,7 +91,7 @@ function App() {
       case "event":
         return <Event onEventClick={handleEventClick} onEventsLoaded={setEvents} />;
       case "transfer":
-        return <DataTransfer />;
+       // return <DataTransfer />;
       case "home":
         return <Accueil />;
       default:
