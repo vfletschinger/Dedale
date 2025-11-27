@@ -1,7 +1,8 @@
 image: rust:latest
 
 variables:
-  CARGO_HOME: Frontend/Web/Dedale/.cargo
+  PROJECT_PATH: "Frontend/Web/Dedale"
+  CARGO_HOME: $CI_PROJECT_DIR/$PROJECT_PATH/.cargo
   DEBIAN_FRONTEND: noninteractive
 
 stages:
@@ -12,46 +13,45 @@ stages:
 cache:
   key: global-cache
   paths:
-    - .cargo/
-    - target/
+    - $PROJECT_PATH/.cargo/
+    - $PROJECT_PATH/target/
+    - $PROJECT_PATH/node_modules/
+    - $PROJECT_PATH/webdriver/webdriverio/node_modules/
 
-# --- JOB 1 : QUALITÉ DU CODE (LINT) ---
+# --- JOB 1 : QUALITÉ DU CODE ---
 check_quality:
   stage: quality
   before_script:
-    # On installe juste Node.js pour le linter JS (pas besoin des librairies graphiques ici)
     - curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
     - apt-get install -y nodejs
-    - npm install -g yarn
-    # On ajoute les composants de formatage Rust
     - rustup component add clippy rustfmt
   script:
-    # 1. Vérification du formatage Rust
-    - cargo fmt --all -- --check
+    - cd $PROJECT_PATH
 
-    # 2. Vérification des bonnes pratiques Rust (Clippy)
+    # 1. Qualité RUST
+    - cargo fmt --all -- --check
     - cargo clippy -- -D warnings
 
-    # 3. Vérification du code JavaScript (ESLint / Prettier)
-    - cd webdriver/webdriverio
-    - yarn install
-    - yarn lint # Assure-toi d'avoir un script "lint" dans ton package.json
+    # 2. Qualité REACT
+    - npm ci
+    - npm run lint
 
 # --- JOB 2 : BUILD ---
 build_app:
   stage: build
-  needs: ["check_quality"] # On ne build que si la qualité est OK
+  needs: ["check_quality"]
   before_script:
     - apt-get update && apt-get install -y libgtk-3-dev libayatana-appindicator3-dev libwebkit2gtk-4.0-dev
   script:
+    - cd $PROJECT_PATH
     - cargo build --release
   artifacts:
     paths:
-      - target/release/
-      - target/release/bundle/
+      - $PROJECT_PATH/target/release/dedale
+      - $PROJECT_PATH/target/release/bundle/
     expire_in: 1 hour
 
-# --- JOB 3 : TESTS FONCTIONNELS (WebdriverIO) ---
+# --- JOB 3 : TESTS FONCTIONNELS ---
 test_e2e:
   stage: test
   needs: ["build_app"]
@@ -59,9 +59,13 @@ test_e2e:
     - apt-get update && apt-get install -y libgtk-3-dev libayatana-appindicator3-dev libwebkit2gtk-4.0-dev webkit2gtk-driver xvfb curl
     - curl -fsSL https://deb.nodesource.com/setup_16.x | bash -
     - apt-get install -y nodejs
-    - npm install -g yarn
   script:
+    - cd $PROJECT_PATH
+
     - cargo install tauri-driver
+
     - cd webdriver/webdriverio
-    - yarn install
-    - xvfb-run yarn test
+    - npm ci
+
+    # Lancement des tests via NPM
+    - xvfb-run npm run test
