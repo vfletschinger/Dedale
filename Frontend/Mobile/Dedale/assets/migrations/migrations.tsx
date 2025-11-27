@@ -13,7 +13,7 @@ export const migrations: Migration[] = [
     name: "Initial schema",
     up: (db: SQLiteDatabase) => {
       db.execSync(`
-        CREATE TABLE IF NOT EXISTS obstacle_types (
+        CREATE TABLE IF NOT EXISTS obstacle_type (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           name VARCHAR(25) NOT NULL,
           description TEXT,
@@ -23,80 +23,58 @@ export const migrations: Migration[] = [
       `);
 
       db.execSync(`
-        CREATE TABLE IF NOT EXISTS interest_points (
+        CREATE TABLE IF NOT EXISTS event (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT,
+          description TEXT,
+          dateDebut DATE,
+          dateFin DATE,
+          statut TEXT,
+          geometry TEXT
+        );
+      `);
+
+      db.execSync(`
+        CREATE TABLE IF NOT EXISTS point (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          event_id INTEGER NOT NULL,
           x REAL NOT NULL,
           y REAL NOT NULL,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          modified_at DATETIME DEFAULT CURRENT_TIMESTAMP
-
+          modified_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (event_id) REFERENCES event (id) ON DELETE CASCADE
         );
       `);
 
       db.execSync(`
-        CREATE TABLE IF NOT EXISTS comments (
+        CREATE TABLE IF NOT EXISTS comment (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           point_id INTEGER NOT NULL,
           value TEXT,
-          FOREIGN KEY (point_id) REFERENCES interest_points (id) ON DELETE CASCADE
+          FOREIGN KEY (point_id) REFERENCES point (id) ON DELETE CASCADE
         );
       `);
 
       db.execSync(`
-        CREATE TABLE IF NOT EXISTS pictures (
+        CREATE TABLE IF NOT EXISTS picture (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           point_id INTEGER NOT NULL,
           image TEXT NOT NULL,
-          FOREIGN KEY (point_id) REFERENCES interest_points (id) ON DELETE CASCADE
+          FOREIGN KEY (point_id) REFERENCES point (id) ON DELETE CASCADE
         );
       `);
 
       db.execSync(`
-        CREATE TABLE IF NOT EXISTS obstacles (
+        CREATE TABLE IF NOT EXISTS obstacle (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           point_id INTEGER NOT NULL,
           type_id INTEGER NOT NULL,
-          nombre INTEGER DEFAULT 1,
-          FOREIGN KEY (point_id) REFERENCES interest_points (id) ON DELETE CASCADE,
-          FOREIGN KEY (type_id) REFERENCES obstacle_types (id)
+          number INTEGER DEFAULT 1,
+          FOREIGN KEY (point_id) REFERENCES point (id) ON DELETE CASCADE,
+          FOREIGN KEY (type_id) REFERENCES obstacle_type (id)
         );
       `);
-    },
-  },
-  {
-    version: 2,
-    name: "change column name",
-    up: (db: SQLiteDatabase) => {
-      const tables = db.getAllSync<{ name: string }>(
-        "SELECT name FROM sqlite_master WHERE type='table'"
-      );
 
-      const tableNames = tables.map((t) => t.name);
-
-      if (tableNames.includes("interest_points")) {
-        db.execSync(`ALTER TABLE interest_points RENAME TO point;`);
-      }
-      if (tableNames.includes("obstacles")) {
-        db.execSync(`ALTER TABLE obstacles RENAME TO obstacle;`);
-      }
-      if (tableNames.includes("pictures")) {
-        db.execSync(`ALTER TABLE pictures RENAME TO picture;`);
-      }
-      if (tableNames.includes("comments")) {
-        db.execSync(`ALTER TABLE comments RENAME TO comment;`);
-      }
-      if (tableNames.includes("obstacle_types")) {
-        db.execSync(`ALTER TABLE obstacle_types RENAME TO obstacle_type;`);
-      }
-
-      // Supprimer cette ligne car la colonne s'appelle déjà 'image'
-      db.execSync(`ALTER TABLE obstacle RENAME COLUMN nombre TO number;`);
-    },
-  },
-  {
-    version: 3,
-    name: "add time stam",
-    up: (db: SQLiteDatabase) => {
       db.execSync(`
         CREATE TABLE IF NOT EXISTS session (
           id INTEGER PRIMARY KEY AUTOINCREMENT,

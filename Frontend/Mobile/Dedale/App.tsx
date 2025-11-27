@@ -10,6 +10,7 @@ import PointDetails from "./src/screens/PointDetails";
 import InterestPointsScreen from "./src/screens/InterestPoints";
 import RegisterPointScreen from "./src/screens/RegisterPoint";
 import RouteNavigation from "./src/screens/RouteNavigation";
+import ConnectEvent from "./src/screens/ConnectEvent";
 
 import type { TabParamList, RootStackParamList } from "./src/types/navigation";
 import { NavigationContainer } from "@react-navigation/native";
@@ -58,10 +59,11 @@ export default function App() {
     async function initDatabase() {
       try {
         const db = getDatabase();
-        //  if (__DEV__) {
-        //    const { resetAndSeed } = await import('./assets/migrations/seeders');
+
+        // if (__DEV__) {
+        //   const { resetAndSeed } = await import("./assets/migrations/seeders");
         //   resetAndSeed(db);
-        //  }
+        // }
         setDbReady(true);
       } catch (err) {
         console.error("Erreur initialisation DB:", err);
@@ -74,7 +76,12 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <NavigationContainer>
-        <Stack.Navigator>
+        <Stack.Navigator initialRouteName="ConnectEvent">
+          <Stack.Screen
+            name="ConnectEvent"
+            component={ConnectEvent}
+            options={{ headerShown: false }}
+          />
           <Stack.Screen
             name="Tabs"
             component={TabNavigator}

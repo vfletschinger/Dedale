@@ -1,18 +1,8 @@
 import React from "react";
-import OfflineMap from "../components/OfflineMap";
+import OfflineMap from "../components/Map";
 
 import "../style/global.css";
-import {
-  AppState,
-  Linking,
-  Platform,
-  SafeAreaView,
-  StatusBar,
-  StyleSheet,
-  View,
-  Text,
-  Pressable,
-} from "react-native";
+import { SafeAreaView, StatusBar, StyleSheet, View, Text } from "react-native";
 import {} from "react-native";
 
 import QRCodeScanner from "../components/QrCodeSacnner";
@@ -20,6 +10,7 @@ import { useState } from "react";
 import CustomButton from "../components/CustomButton";
 export default function HomeScreen() {
   const [scanQR, setScanQR] = useState(false);
+
   return (
     <SafeAreaView style={styles.container}>
       <View className="bg-blue-500 pt-4 pb-4 px-4 shadow-lg flex-row items-center justify-between">
@@ -30,13 +21,12 @@ export default function HomeScreen() {
         </View>
 
         <View className="flex-row gap-2">
-          <CustomButton onPress={() => setScanQR(true)} title="Transfert" />
+          <CustomButton onPress={() => setScanQR(!scanQR)} title="Transfert" />
         </View>
       </View>
       <StatusBar barStyle="light-content" backgroundColor="#000" />
 
-      {scanQR && <QRCodeScanner setScanQR={setScanQR} />}
-      <OfflineMap />
+      {scanQR ? <QRCodeScanner setScanQR={setScanQR} /> : <OfflineMap />}
     </SafeAreaView>
   );
 }

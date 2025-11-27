@@ -11,6 +11,7 @@ import MapView, {
   PROVIDER_DEFAULT,
   Region,
   UrlTile,
+  Polygon,
 } from "react-native-maps";
 import Constants from "expo-constants";
 import * as Location from "expo-location";
@@ -21,6 +22,13 @@ import CustomButton from "./CustomButton";
 
 interface OfflineMapProps {
   initialRegion?: Region;
+}
+
+interface PolygonProps {
+  coordinates: { latitude: number; longitude: number }[];
+  strokeColor?: string;
+  fillColor?: string;
+  strokeWidth?: number;
 }
 
 export default function OfflineMap({ initialRegion }: OfflineMapProps) {
@@ -40,12 +48,24 @@ export default function OfflineMap({ initialRegion }: OfflineMapProps) {
   const db = getDatabase();
   const mapRef = React.useRef<MapView | null>(null);
 
+  const polygon: PolygonProps = {
+    coordinates: [
+      { latitude: 48.5734, longitude: 7.7521 },
+      { latitude: 48.568, longitude: 7.742 },
+      { latitude: 48.585, longitude: 7.735 },
+      { latitude: 48.592, longitude: 7.758 },
+    ],
+    strokeColor: "#FF0000",
+    fillColor: "rgba(255,0,0,0.5)",
+    strokeWidth: 2,
+  };
+
   // Refresh points list when screen gains focus
   useFocusEffect(
     React.useCallback(() => {
       try {
         const points = db.getAllSync<InterestPointsType>(
-          "SELECT * FROM point ORDER BY id DESC"
+          "SELECT * FROM point WHERE event_id = 2 ORDER BY id DESC"
         );
         console.log("📌 Points DB :", points);
         setListPoint(points);
@@ -125,15 +145,6 @@ export default function OfflineMap({ initialRegion }: OfflineMapProps) {
     // nécessaire si le composant n'est jamais démonté rapidement, mais c'est une bonne pratique.
     // Ici, avec Promise.race, la gestion est implicite et plus propre.
   }, []);
-  const getTileUrlTemplate = () => {
-    if (__DEV__ && Constants.expoConfig?.hostUri) {
-      const host = Constants.expoConfig.hostUri.split(":")[0];
-      return `http://${host}:3000/maps/{z}/{x}/{y}.png`;
-    }
-    return Platform.OS === "android"
-      ? "file:///android_asset/maps/{z}/{x}/{y}.png"
-      : "file://maps/{z}/{x}/{y}.png";
-  };
 
   const centerOnUserLocation = () => {
     if (mapRef.current && currentRegion) {
@@ -158,8 +169,6 @@ export default function OfflineMap({ initialRegion }: OfflineMapProps) {
     }
   };
 
-  const tileUrlTemplate = getTileUrlTemplate();
-
   if (loading || !currentRegion) {
     return (
       <View style={[styles.container, styles.center]}>
@@ -183,8 +192,8 @@ export default function OfflineMap({ initialRegion }: OfflineMapProps) {
         rotateEnabled
         pitchEnabled={true}
         mapType="standard"
-        minZoomLevel={13}
-        maxZoomLevel={20}
+        minZoomLevel={10}
+        maxZoomLevel={25}
         toolbarEnabled={false}
       >
         {listPoint.map((p) => (
@@ -194,6 +203,7 @@ export default function OfflineMap({ initialRegion }: OfflineMapProps) {
             title={`${p.id}`}
           />
         ))}
+        <Polygon {...polygon}></Polygon>
       </MapView>
       <View style={styles.overlayContainer}>
         <CustomButton title="Center" onPress={centerOnUserLocation} />

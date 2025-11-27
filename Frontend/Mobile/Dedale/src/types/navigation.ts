@@ -10,4 +10,5 @@ export type RootStackParamList = {
   Tabs: undefined;
   CreateRoute: undefined;
   RouteNavigation: undefined;
+  ConnectEvent: undefined;
 };
