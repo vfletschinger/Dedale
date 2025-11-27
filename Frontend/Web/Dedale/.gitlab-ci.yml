@@ -2,7 +2,7 @@ image: rust:latest
 
 variables:
   PROJECT_PATH: "Frontend/Web/Dedale"
-  CARGO_HOME: $CI_PROJECT_DIR/$PROJECT_PATH/.cargo
+  CARGO_HOME: $CI_PROJECT_DIR/$PROJECT_PATH/src-tauri/.cargo
   DEBIAN_FRONTEND: noninteractive
 
 stages:
@@ -57,7 +57,7 @@ test_e2e:
   needs: ["build_app"]
   before_script:
     - apt-get update && apt-get install -y libgtk-3-dev libayatana-appindicator3-dev libwebkit2gtk-4.0-dev webkit2gtk-driver xvfb curl
-    - curl -fsSL https://deb.nodesource.com/setup_16.x | bash -
+    - curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
     - apt-get install -y nodejs
   script:
     - cd $PROJECT_PATH
