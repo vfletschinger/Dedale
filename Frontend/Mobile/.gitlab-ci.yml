@@ -28,3 +28,5 @@ build:
     - npm install
   script: 
     - eas build --platform all --profile production --non-interactive --no-wait
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
