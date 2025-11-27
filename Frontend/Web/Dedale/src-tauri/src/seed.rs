@@ -1,8 +1,7 @@
 use tauri::AppHandle;
 use crate::db::get_db_pool;
 use crate::db::{ObstacleType};
-// Assuming this function is accessible (defined in db.rs or similar)
-// pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> { ... }
+use sqlx::{SqlitePool, Row};
 
 
 // --- Helper Structs for Seeding Data ---
@@ -10,25 +9,26 @@ struct PointSeed { x: f64, y: f64 }
 struct CommentSeed { point_idx: usize, value: &'static str }
 struct PictureSeed { point_idx: usize, image: &'static str }
 struct ObstacleSeed { point_idx: usize, type_idx: usize, number: i32, description: Option<String> }
+struct EventSeed { name: &'static str, description: &'static str, date_debut: &'static str, date_fin: &'static str, statut: &'static str, geometry: &'static str }
 
 
-/// Seeds the database with sample data if it's currently empty.
 #[tauri::command]
-pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
+pub async fn seed_database(app: AppHandle) -> Result<(), String> {
     
     println!("🌱 Début du seeding...");
 
-    let pool = get_db_pool(&app).await?;
+    let pool: SqlitePool = get_db_pool(&app).await?;
     let query = r#"
-        SELECT
-        count(*)
+        SELECT COUNT(*) as count
         FROM point
     "#;
 
-    let (existing_points,): (i64,) = sqlx::query_as(query)
+    let row = sqlx::query(query)
         .fetch_one(&pool)
         .await
         .map_err(|e| e.to_string())?;
+    
+    let existing_points: i64 = row.get("count");
 
     if existing_points > 0 {
         println!("⚠️ Des données existent déjà, seeding annulé.");
@@ -81,6 +81,12 @@ pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
         ObstacleSeed { point_idx: 3, type_idx: 3, number: 2, description: Some("Deux panneaux de signalisation".to_string()) }, // Point 4: 2 Panneau
         ObstacleSeed { point_idx: 4, type_idx: 0, number: 5, description: Some("Cinq petits arbres".to_string()) }, // Point 5: 5 Arbre
     ];
+    
+    let event_data = [
+        EventSeed { name: "Festival de Strasbourg", description: "Un festival annuel de musique et d'arts à Strasbourg.", date_debut: "2024-07-15", date_fin: "2024-07-20", statut: "Prévu", geometry: "POLYGON((7.7400 48.5800, 7.7500 48.5800, 7.7500 48.5900, 7.7400 48.5900, 7.7400 48.5800))" },
+        EventSeed { name: "Marché de Noël", description: "Le célèbre marché de Noël de Strasbourg.", date_debut: "2024-12-24", date_fin: "2024-12-26", statut: "Prévu", geometry: "POLYGON((7.7450 48.5750, 7.7550 48.5750, 7.7550 48.5850, 7.7450 48.5850, 7.7450 48.5750))" },
+        EventSeed { name: "Marathon de la ville", description: "Course annuelle à travers la ville.", date_debut: "2024-09-10", date_fin: "2024-09-10", statut: "Prévu", geometry: "LINESTRING(7.7300 48.5700, 7.7600 48.5900)" },
+    ];      
 
     let mut point_ids: Vec<i64> = Vec::new();
     let mut type_ids: Vec<i64> = Vec::new();
@@ -162,12 +168,30 @@ pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
         .map_err(|e| format!("Failed to insert obstacle: {}", e))?;
     }
 
+     // 7. Seed event
+    println!("🎉 Insertion des événements...");
+    for e in event_data.iter() {
+        sqlx::query(
+            "INSERT INTO event (name, description, date_debut, date_fin, statut, geometry) VALUES (?, ?, ?, ?, ?, ?)"
+        )
+        .bind(e.name)
+        .bind(e.description)
+        .bind(e.date_debut)
+        .bind(e.date_fin)
+        .bind(e.statut)
+        .bind(e.geometry)
+        .execute(&pool)
+        .await
+        .map_err(|e| format!("Failed to insert event: {}", e))?;
+    }
+
     println!("✅ Seeding terminé avec succès !");
-    println!("   - {} types d'obstacles", obstacle_types.len());
-    println!("   - {} points d'intérêt", points.len());
-    println!("   - {} commentaires", comments_data.len());
-    println!("   - {} photos", pictures_data.len());
-    println!("   - {} obstacles", obstacles_data.len());
+    println!("   - {} types d'obstacles", obstacle_types.len());
+    println!("   - {} points d'intérêt", points.len());
+    println!("   - {} commentaires", comments_data.len());
+    println!("   - {} photos", pictures_data.len());
+    println!("   - {} obstacles", obstacles_data.len());
+    println!("   - {} événements", event_data.len());
 
     Ok(())
 }

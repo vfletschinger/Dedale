@@ -104,3 +104,49 @@
 }
 
 /* Keep explicit popup width intact (set elsewhere) */
+
+/* Styles pour le header fixe */
+.fixed-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+/* Ajuster le contenu principal pour compenser le header fixe */
+.main-content {
+  padding-top: 80px; /* Ajustez selon la hauteur de votre header */
+}
+
+/* Pour les navigations avec logo */
+.header-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Animation douce lors du scroll */
+.fixed-header {
+  transition: all 0.3s ease-in-out;
+}
+
+/* Variant pour header transparent qui devient opaque au scroll */
+.header-transparent {
+  background: transparent;
+  border-bottom: 1px solid transparent;
+  box-shadow: none;
+}
+
+.header-scrolled {
+  background: rgba(255, 255, 255, 0.95);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}

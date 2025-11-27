@@ -21,7 +21,10 @@ pub fn run() {
             map::get_points,
             socket::start_server,
             db::fetch_obstacle_types,
-            db::insert_obstacles
+            db::insert_obstacles,
+            db::fetch_events,
+            seed::seed_database,
+            db::insert_event
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

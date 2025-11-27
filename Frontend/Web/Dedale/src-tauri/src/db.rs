@@ -63,6 +63,22 @@ pub fn init_db() -> impl tauri::plugin::Plugin<tauri::Wry> {
             ",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 3,
+            description: "create_event_table",
+            sql: "
+                CREATE TABLE IF NOT EXISTS event (
+                    id INTEGER PRIMARY KEY,
+                    name TEXT,
+                    description TEXT,
+                    dateDebut DATE,
+                    dateFin DATE,
+                    statuts TEXT,
+                    geometry TEXT
+                );
+            ",
+            kind: MigrationKind::Up,
+        }
     ];
 
     
@@ -145,6 +161,19 @@ pub struct ObstacleInput {
     pub number: i32,
     pub obstacle_id: Option<i64>,
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Event {
+    pub id: i64,
+    pub name: String,
+    pub description: String,
+    pub date_debut: String,
+    pub date_fin: String,
+    pub statut: String,
+    pub geometry: String,
+}
+
+
 
 pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
     let app_data_dir = app.path()
@@ -458,3 +487,86 @@ pub async fn insert_point_details(
     Ok(())
 }
 
+
+#[tauri::command]
+pub async fn fetch_events(app: AppHandle) -> Result<Vec<Event>, String> {
+    println!("[DB] 🚀 Début de la récupération des événements depuis la base de données.");
+    let pool = get_db_pool(&app).await?;
+    
+    // Vérifier si la table existe
+    let table_check = sqlx::query("SELECT name FROM sqlite_master WHERE type='table' AND name='event';")
+        .fetch_optional(&pool)
+        .await
+        .map_err(|e| format!("Erreur lors de la vérification de table: {}", e))?;
+        
+    if table_check.is_none() {
+        return Err("La table 'event' n'existe pas. Veuillez redémarrer l'application pour exécuter les migrations.".to_string());
+    }
+    
+    println!("[DB] ✅ Table 'event' existe.");
+    
+    let query = r#"
+        SELECT 
+            id,
+            name,
+            description,
+            date_debut,
+            date_fin,
+            statut,
+            geometry
+        FROM event
+    "#;
+
+    let rows = sqlx::query(query)
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| {
+            println!("[DB] ❌ Erreur lors de la requête SQL: {}", e);
+            e.to_string()
+        })?;
+
+    println!("[DB] 📊 Récupéré {} événements de la base de données.", rows.len());
+
+    let mut events: Vec<Event> = Vec::new();
+    
+    for row in rows {
+        let event_id: i64 = row.get("id");
+        println!("[DB]   → Traitement de l'événement ID: {}", event_id);
+        
+        // Récupérer les géométries pour cet événement
+
+        events.push(Event {
+            id: event_id,
+            name: row.get("name"),
+            description: row.get("description"),
+            date_debut: row.get("date_debut"),
+            date_fin: row.get("date_fin"),
+            statut: row.get("statut"),
+            geometry: row.get("geometry")
+        });
+    }
+
+    println!("[DB] ✅ Récupération terminée avec succès. {} événements traités.", events.len());
+    Ok(events)
+}
+
+
+#[tauri::command]
+pub async fn insert_event(event: Event, app: AppHandle) -> Result<(), String> {
+    let pool = get_db_pool(&app).await?;
+
+    sqlx::query(
+            "INSERT INTO event (name, description, date_debut, date_fin, statut, geometry) VALUES (?, ?, ?, ?, ?, ?)"
+        )
+        .bind(&event.name)
+        .bind(&event.description)
+        .bind(&event.date_debut)
+        .bind(&event.date_fin)
+        .bind(&event.statut)
+        .bind(&event.geometry)
+        .execute(&pool)
+        .await
+        .map_err(|e| format!("Failed to insert event: {}", e))?;
+    
+    Ok(())
+}

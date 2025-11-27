@@ -5,7 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import PointDetails from "./PointDetails";
 import ReactDOM from "react-dom/client";
 
-function OfflineMapLibre() {
+function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }) {
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
   const [query, setQuery] = useState("");
@@ -15,6 +15,49 @@ function OfflineMapLibre() {
   );
   const [currentPopup, setCurrentPopup] = useState<maplibregl.Popup | null>(null);
   const pointsRef = useRef<any[]>([]);
+  const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [events, setEvents] = useState<any[]>([]);
+  const [showFilters, setShowFilters] = useState(!!selectedEventId);
+
+  // Charger tous les événements au démarrage
+  useEffect(() => {
+    const loadAllEvents = async () => {
+      try {
+        const allEvents = await invoke("fetch_events");
+        setEvents(allEvents as any[]);
+      } catch (err) {
+        console.error("Erreur lors du chargement des événements:", err);
+      }
+    };
+    loadAllEvents();
+  }, []);
+
+  // Charger l'événement sélectionné
+  useEffect(() => {
+    const loadSelectedEvent = async () => {
+      if (selectedEventId) {
+        try {
+          const allEvents = await invoke("fetch_events");
+          const event = (allEvents as any[]).find(e => e.id === selectedEventId);
+          setSelectedEvent(event);
+          setEvents(allEvents as any[]);
+          setShowFilters(true);
+        } catch (err) {
+          console.error("Erreur lors du chargement de l'événement:", err);
+        }
+      }
+    };
+    loadSelectedEvent();
+  }, [selectedEventId]);
+
+  // Fonction pour changer d'événement
+  const handleEventChange = (eventId: string) => {
+    const event = events.find(e => e.id === parseInt(eventId));
+    setSelectedEvent(event);
+    if (event) {
+      setShowFilters(true);
+    }
+  };
 
   // Initialisation de la carte
   useEffect(() => {
@@ -214,53 +257,168 @@ function OfflineMapLibre() {
   }, [query]);
 
   return (
-    <div style={{ position: "relative", height: "100vh", width: "100%" }}>
-      {/* Barre de recherche */}
-      <div
-        style={{
-          position: "absolute",
-          top: 10,
-          left: 10,
-          zIndex: 10,
-          backgroundColor: "white",
-          padding: "5px",
-          borderRadius: "4px",
-          boxShadow: "0 0 5px rgba(0,0,0,0.3)",
-          width: "300px",
-        }}
-      >
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Rechercher une adresse..."
-          style={{ padding: "5px", width: "100%" }}
-        />
-
-        {/* Liste de suggestions */}
-        {results.length > 0 && (
-          <div
-            style={{ marginTop: "5px", maxHeight: "150px", overflowY: "auto" }}
-          >
-            {results.map((r, i) => (
-              <div
-                key={i}
-                style={{
-                  padding: "5px",
-                  cursor: "pointer",
-                  borderBottom: "1px solid #ddd",
-                }}
-                onClick={() => handleSelect(r)}
+    <div className="h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
+      {/* Panneau de filtres à gauche */}
+      {showFilters && (
+        <div className="w-80 bg-white/80 backdrop-blur-md border-r border-white/20 shadow-xl overflow-y-auto">
+          <div className="p-6">
+            {/* Header du panneau */}
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                🎯 Filtres d'Événement
+              </h2>
+              <button
+                onClick={() => setShowFilters(false)}
+                className="p-2 rounded-full hover:bg-gray-100 transition-colors"
               >
-                {r.display_name}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+                ✕
+              </button>
+            </div>
 
-      {/* Conteneur de la carte */}
-      <div ref={mapContainer} style={{ height: "100%", width: "100%" }} />
+            {/* Événement sélectionné */}
+            {selectedEvent && (
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold mb-3">Événement Sélectionné</h3>
+                <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-4 border border-blue-100">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-2xl">
+                      {selectedEvent.event_type === 'Marathon' && '🏃‍♂️'}
+                      {selectedEvent.event_type === 'Cyclisme' && '🚴‍♂️'}
+                      {selectedEvent.event_type === 'Trail' && '🥾'}
+                      {!['Marathon', 'Cyclisme', 'Trail'].includes(selectedEvent.event_type) && '🏆'}
+                    </span>
+                    <h4 className="font-bold text-gray-800">{selectedEvent.name}</h4>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-2">{selectedEvent.description}</p>
+                  <div className="flex items-center gap-4 text-xs text-gray-500">
+                    <span className={`px-2 py-1 rounded-full ${
+                      selectedEvent.status === 'active' 
+                        ? 'bg-green-100 text-green-800' 
+                        : selectedEvent.status === 'planned'
+                        ? 'bg-blue-100 text-blue-800'
+                        : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {selectedEvent.status}
+                    </span>
+                    <span>📐 {selectedEvent.geometries?.length || 0} géométries</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Filtres de géométrie */}
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold mb-3">Filtres de Géométrie</h3>
+              <div className="space-y-2">
+                {['Parcours', 'Zone de départ', 'Zone d\'arrivée', 'Ravitaillement', 'Point médical', 'Zone interdite', 'Point de contrôle', 'Zone de sécurité'].map((type) => (
+                  <label key={type} className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 text-blue-600 rounded"
+                      defaultChecked
+                    />
+                    <span className="text-sm text-gray-700">{type}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="space-y-3">
+              <button className="w-full px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105">
+                Appliquer les filtres
+              </button>
+              <button className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors">
+                Réinitialiser
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Conteneur principal de la carte */}
+      <div className="flex-1 flex flex-col">
+        {/* Sélecteur d'événements */}
+        <div className="bg-gradient-to-r from-indigo-500 via-purple-600 to-blue-600 backdrop-blur-md border-b border-white/20 p-4">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-white font-semibold">🎯</span>
+              <label className="text-white font-medium">Sélectionner un événement :</label>
+            </div>
+            <select
+              value={selectedEvent?.id || ""}
+              onChange={(e) => handleEventChange(e.target.value)}
+              className="flex-1 max-w-md px-4 py-2 bg-white/90 backdrop-blur-sm border border-white/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-transparent text-gray-800 font-medium"
+            >
+              <option value="">Choisir un événement...</option>
+              {events.map((event) => (
+                <option key={event.id} value={event.id}>
+                  {event.event_type === 'Marathon' && '🏃‍♂️'} 
+                  {event.event_type === 'Cyclisme' && '🚴‍♂️'} 
+                  {event.event_type === 'Trail' && '🥾'} 
+                  {!['Marathon', 'Cyclisme', 'Trail'].includes(event.event_type) && '🏆'} 
+                  {event.name || `Événement #${event.id}`}
+                  {event.status === 'active' && ' 🟢'}
+                  {event.status === 'planned' && ' 🔵'}
+                </option>
+              ))}
+            </select>
+            {selectedEvent && (
+              <div className="flex items-center gap-2 text-white/80 text-sm">
+                <span>📐 {selectedEvent.geometries?.length || 0} géométries</span>
+                <span className={`px-2 py-1 rounded-full text-xs ${
+                  selectedEvent.status === 'active' 
+                    ? 'bg-green-400/20 text-green-100' 
+                    : selectedEvent.status === 'planned'
+                    ? 'bg-blue-400/20 text-blue-100'
+                    : 'bg-gray-400/20 text-gray-100'
+                }`}>
+                  {selectedEvent.status}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Barre de recherche */}
+        <div className="bg-white/80 backdrop-blur-md border-b border-white/20 p-4">
+          <div className="flex gap-3">
+            {!showFilters && (
+              <button
+                onClick={() => setShowFilters(true)}
+                className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all duration-300 shadow-lg"
+              >
+                🎯 Filtres
+              </button>
+            )}
+            <input
+              type="text"
+              placeholder="🔍 Rechercher un lieu..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="flex-1 px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/80 backdrop-blur-sm"
+            />
+          </div>
+
+          {/* Liste de suggestions */}
+          {results.length > 0 && (
+            <div className="mt-3 bg-white rounded-xl shadow-lg border border-gray-200 max-h-40 overflow-y-auto">
+              {results.map((r, i) => (
+                <div
+                  key={i}
+                  className="p-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
+                  onClick={() => handleSelect(r)}
+                >
+                  <div className="text-sm text-gray-800">{r.display_name}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Conteneur de la carte */}
+        <div ref={mapContainer} className="flex-1" />
+      </div>
     </div>
   );
 }
