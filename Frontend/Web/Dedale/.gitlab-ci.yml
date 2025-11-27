@@ -1,7 +1,7 @@
 image: rust:latest
 
 variables:
-  PROJECT_PATH: "Frontend/Web/Dedale/target/src-tauri"
+  PROJECT_PATH: "Frontend/Web/Dedale/src-tauri"
   CARGO_HOME: $CI_PROJECT_DIR/$PROJECT_PATH/.cargo
   DEBIAN_FRONTEND: noninteractive
 
