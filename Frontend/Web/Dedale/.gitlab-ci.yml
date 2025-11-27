@@ -58,7 +58,6 @@ check_quality:
 
   artifacts:
     when: always
-    expose_as: "Rapport Qualité"
     paths:
       - $RUST_PATH/reports/format_report.html
       - $RUST_PATH/reports/raw_diff.txt
