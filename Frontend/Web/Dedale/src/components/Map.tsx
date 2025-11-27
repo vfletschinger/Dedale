@@ -3,58 +3,61 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { invoke } from "@tauri-apps/api/core";
 import PointDetails from "./PointDetails";
-import AddPointForm from "./AddPointForm";
+import ReactDOM from "react-dom/client";
 
-// Local style constants to avoid inline clutter in JSX
-const LEFT_PANEL_STYLE: React.CSSProperties = {
-  width: 320,
-  background: "#fff",
-  padding: 8,
-  overflowY: "auto",
-  boxShadow: "2px 0 6px rgba(0,0,0,0.06)",
-  zIndex: 12,
-};
-
-
-// Create GeoJSON from points array
-function formatPointsGeoJSON(points: any[]) {
-  return {
-    type: "FeatureCollection",
-    features: points.map((p: any) => ({
-      type: "Feature",
-      geometry: {
-        type: "Point",
-        coordinates: [Number(p.x), Number(p.y)] as [number, number],
-      },
-      properties: {
-        id: p.id,
-        obstacles: p.obstacles,
-        comments: p.comments,
-        pictures: p.pictures,
-      },
-    })),
-  } as GeoJSON.FeatureCollection<GeoJSON.Point, any>;
-}
-
-function OfflineMapLibre() {
+function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }) {
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<any[]>([]);
-  const [points, setPoints] = useState<any[]>([]);
   const [currentMarker, setCurrentMarker] = useState<maplibregl.Marker | null>(
     null
   );
-  // popups replaced by drawer UI; keep ref for markers only
-  // const [currentPopup, setCurrentPopup] = useState<maplibregl.Popup | null>(null);
+  const [currentPopup, setCurrentPopup] = useState<maplibregl.Popup | null>(null);
   const pointsRef = useRef<any[]>([]);
-  const [awaitingMapClick, setAwaitingMapClick] = useState(false);
-  // Drawer state to show details or add form on the left side
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [drawerMode, setDrawerMode] = useState<"details" | "add" | null>(null);
-  const [drawerPoint, setDrawerPoint] = useState<any | null>(null);
-  const [drawerRefreshFn, setDrawerRefreshFn] = useState<(() => Promise<void>) | null>(null);
-  const [addInitialCoords, setAddInitialCoords] = useState<[number, number] | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [events, setEvents] = useState<any[]>([]);
+  const [showFilters, setShowFilters] = useState(!!selectedEventId);
+
+  // Charger tous les événements au démarrage
+  useEffect(() => {
+    const loadAllEvents = async () => {
+      try {
+        const allEvents = await invoke("fetch_events");
+        setEvents(allEvents as any[]);
+      } catch (err) {
+        console.error("Erreur lors du chargement des événements:", err);
+      }
+    };
+    loadAllEvents();
+  }, []);
+
+  // Charger l'événement sélectionné
+  useEffect(() => {
+    const loadSelectedEvent = async () => {
+      if (selectedEventId) {
+        try {
+          const allEvents = await invoke("fetch_events");
+          const event = (allEvents as any[]).find(e => e.id === selectedEventId);
+          setSelectedEvent(event);
+          setEvents(allEvents as any[]);
+          setShowFilters(true);
+        } catch (err) {
+          console.error("Erreur lors du chargement de l'événement:", err);
+        }
+      }
+    };
+    loadSelectedEvent();
+  }, [selectedEventId]);
+
+  // Fonction pour changer d'événement
+  const handleEventChange = (eventId: string) => {
+    const event = events.find(e => e.id === parseInt(eventId));
+    setSelectedEvent(event);
+    if (event) {
+      setShowFilters(true);
+    }
+  };
 
   // Initialisation de la carte
   useEffect(() => {
@@ -62,7 +65,7 @@ function OfflineMapLibre() {
 
     const mapInstance = new maplibregl.Map({
       container: mapContainer.current,
-      style: "http://localhost:8082/styles/basic-preview/style.json",
+      style: "http://localhost:8080/styles/basic-preview/style.json",
       center: [7.7635, 48.5465],
       zoom: 13,
     });
@@ -73,9 +76,23 @@ function OfflineMapLibre() {
         const points = await invoke<any[]>("get_points");
 
         pointsRef.current = points;
-        setPoints(points);
 
-        const geojson = formatPointsGeoJSON(points);
+        const geojson = {
+          type: "FeatureCollection",
+          features: points.map((p: any) => ({
+            type: "Feature",
+            geometry: {
+              type: "Point",
+              coordinates: [Number(p.x), Number(p.y)] as [number, number],
+            },
+            properties: {
+              id: p.id,
+              obstacles: p.obstacles,
+              comments: p.comments,
+              pictures: p.pictures,
+            },
+          })),
+        } as GeoJSON.FeatureCollection<GeoJSON.Point, any>;
 
         if (!mapObj.getSource("db-points")) {
           mapObj.addSource("db-points", {
@@ -101,11 +118,68 @@ function OfflineMapLibre() {
           mapObj.on("click", "db-points-layer", async (e: any) => {
             const f = e.features?.[0];
             if (!f) return;
+            const coords = (f.geometry as any).coordinates.slice();
             const pointId = f.properties?.id;
 
-            // Open details in drawer and provide refresh function
-            openDrawerForPoint(pointId, async () => {
-              await fetchAndDisplayPoints(mapObj);
+            // Remove previous popup
+            if (currentPopup) {
+              currentPopup.remove();
+              setCurrentPopup(null);
+            }
+
+            // DOM Setup
+            const container = document.createElement("div");
+            container.style.maxWidth = "600px";
+            container.style.maxHeight = "600px";
+            container.style.width = "350px";
+            container.style.height = "450px";
+            container.style.overflow = "auto";
+            container.style.padding = "8px";
+
+            const popup = new maplibregl.Popup({
+              offset: 12,
+              closeButton: false,
+              className: "custom-popup",
+            })
+              .setLngLat(coords)
+              .setDOMContent(container)
+              .addTo(mapObj);
+
+            setCurrentPopup(popup);
+            const root = ReactDOM.createRoot(container);
+
+            const handleClose = () => popup.remove();
+
+            const renderPopupUI = () => {
+              const freshPoint = pointsRef.current.find(
+                (p) => String(p.id) === String(pointId)
+              );
+
+              // If point was deleted, close the popup
+              if (!freshPoint) {
+                handleClose();
+                return;
+              }
+
+              root.render(
+                <PointDetails
+                  point={freshPoint}
+                  onClose={handleClose}
+                  onRefresh={async () => {
+                    await fetchAndDisplayPoints(mapObj);
+                    renderPopupUI();
+                  }}
+                />
+              );
+            };
+
+            // Initial render
+            renderPopupUI();
+
+            // Cleanup
+            popup.on("close", () => {
+              setTimeout(() => root.unmount(), 0);
+              setCurrentPopup(null);
             });
           });
           // --- CLICK LISTENER END ---
@@ -126,9 +200,6 @@ function OfflineMapLibre() {
       fetchAndDisplayPoints(mapInstance);
     });
 
-    // expose for later refreshes (debug helper)
-    (window as any).__fetchAndDisplayPoints = fetchAndDisplayPoints;
-
     const initialMarker = new maplibregl.Marker()
       .setLngLat([7.7635, 48.5465])
       .setPopup(new maplibregl.Popup().setText("Strasbourg !"))
@@ -139,64 +210,6 @@ function OfflineMapLibre() {
 
     return () => mapInstance.remove();
   }, []);
-
-  // When awaiting a user click to add a point, show a special cursor on the map
-  useEffect(() => {
-    if (!map) return;
-    try {
-      const canvas = map.getCanvas();
-      if (awaitingMapClick) {
-        canvas.style.cursor = "crosshair";
-      } else {
-        canvas.style.cursor = "";
-      }
-    } catch (err) {
-      // ignore
-    }
-
-    return () => {
-      try {
-        if (map) map.getCanvas().style.cursor = "";
-      } catch (e) {}
-    };
-  }, [awaitingMapClick, map]);
-
-  // Open the left drawer showing PointDetails
-  const openDrawerForPoint = (pointId: string | number, refreshFn?: () => Promise<void>) => {
-    const freshPoint = pointsRef.current.find((p) => String(p.id) === String(pointId));
-    if (!freshPoint) return;
-    setDrawerPoint(freshPoint);
-    setDrawerRefreshFn(() => refreshFn ?? null);
-    setDrawerMode("details");
-    setDrawerOpen(true);
-  };
-
-  // Ouvre un popup pour un point (utilisé par la liste à gauche)
-  const openPopupForPoint = async (point: any) => {
-    if (!map || !point) return;
-
-    const coords: [number, number] = [Number(point.x), Number(point.y)];
-
-    // recentre la carte
-    map.flyTo({ center: coords, zoom: 15 });
-
-    // open details in drawer and refresh will update points
-    openDrawerForPoint(point.id, async () => {
-      try {
-        const fresh = await invoke<any[]>("get_points");
-        pointsRef.current = fresh;
-        setPoints(fresh);
-        if (map.getSource("db-points")) {
-          const geojson = formatPointsGeoJSON(fresh);
-          (map.getSource("db-points") as maplibregl.GeoJSONSource).setData(geojson);
-        }
-      } catch (err) {
-        console.error("refresh in openPopupForPoint error", err);
-      }
-    });
-  };
-
-  // Add form is now shown in the drawer (state-driven)
 
   // Fonction pour sélectionner une suggestion
   const handleSelect = (place: any) => {
@@ -244,183 +257,167 @@ function OfflineMapLibre() {
   }, [query]);
 
   return (
-    <div style={{ display: "flex", height: "100vh", width: "100%" }}>
-      {/* Panneau gauche: liste des points */}
-      <div className="left-panel" style={LEFT_PANEL_STYLE}>
-        <div className="panel-header" style={{ marginBottom: 6 }}>
-          <h3 style={{ margin: 0 }}>Points</h3>
-          <button
-            className="add-btn"
-            onClick={() => {
-              if (!map) {
-                alert("Carte non initialisée");
-                return;
-              }
-
-              setAwaitingMapClick(true);
-              // one-time click on the map to pick coordinates
-              map.once("click", (e: any) => {
-                if (!e || !e.lngLat) {
-                  setAwaitingMapClick(false);
-                  return;
-                }
-                const lngLat = [e.lngLat.lng, e.lngLat.lat] as [number, number];
-                // open add form in drawer
-                setAddInitialCoords(lngLat);
-                setDrawerMode("add");
-                setDrawerOpen(true);
-                setAwaitingMapClick(false);
-              });
-            }}
-            aria-label="Ajouter"
-          >
-            Ajouter
-          </button>
-        </div>
-
-        {points.length === 0 && <div style={{ color: "#666" }}>Aucun point</div>}
-        <div>
-          {points.map((p: any) => (
-            <div
-              key={p.id}
-              className="list-item"
-              onClick={() => openPopupForPoint(p)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => (e.key === "Enter" ? openPopupForPoint(p) : null)}
-            >
-              <div className="title">Point #{p.id}</div>
-              <div className="meta">{p.obstacles?.length ?? 0} obstacles</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Drawer is rendered inside the map container to stay below top nav and align to the right of the map. */}
-
-      {/* Zone carte à droite */}
-      <div style={{ flex: 1, position: "relative" }}>
-      {/* Drawer: render inside the map container so it sits to the right of the map and under the navbar */}
-      {drawerOpen && (
-        <div
-          className="drawer"
-          style={{
-            position: "absolute",
-            right: 0,
-            top: 0,
-            height: "100%",
-            width: 380,
-            zIndex: 20,
-            background: "#fff",
-            boxShadow: "-2px 0 12px rgba(0,0,0,0.12)",
-            overflow: "auto",
-          }}
-        >
-          <div style={{ padding: 8 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ fontWeight: 700 }}>{drawerMode === "details" ? `Point #${drawerPoint?.id}` : "Nouveau point"}</div>
-              <button className="pp-close" onClick={() => setDrawerOpen(false)} aria-label="Fermer">✕</button>
+    <div className="h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
+      {/* Panneau de filtres à gauche */}
+      {showFilters && (
+        <div className="w-80 bg-white/80 backdrop-blur-md border-r border-white/20 shadow-xl overflow-y-auto">
+          <div className="p-6">
+            {/* Header du panneau */}
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                🎯 Filtres d'Événement
+              </h2>
+              <button
+                onClick={() => setShowFilters(false)}
+                className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+              >
+                ✕
+              </button>
             </div>
 
-            <div style={{ marginTop: 8 }}>
-              {drawerMode === "details" && drawerPoint && (
-                <PointDetails
-                  point={drawerPoint}
-                  onClose={() => setDrawerOpen(false)}
-                  onRefresh={async () => {
-                    try {
-                      if (drawerRefreshFn) await drawerRefreshFn();
-                      const fresh = await invoke<any[]>("get_points");
-                      pointsRef.current = fresh;
-                      setPoints(fresh);
-                      if (map && map.getSource("db-points")) {
-                        (map.getSource("db-points") as maplibregl.GeoJSONSource).setData(formatPointsGeoJSON(fresh));
-                      }
+            {/* Événement sélectionné */}
+            {selectedEvent && (
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold mb-3">Événement Sélectionné</h3>
+                <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-4 border border-blue-100">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-2xl">
+                      {selectedEvent.event_type === 'Marathon' && '🏃‍♂️'}
+                      {selectedEvent.event_type === 'Cyclisme' && '🚴‍♂️'}
+                      {selectedEvent.event_type === 'Trail' && '🥾'}
+                      {!['Marathon', 'Cyclisme', 'Trail'].includes(selectedEvent.event_type) && '🏆'}
+                    </span>
+                    <h4 className="font-bold text-gray-800">{selectedEvent.name}</h4>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-2">{selectedEvent.description}</p>
+                  <div className="flex items-center gap-4 text-xs text-gray-500">
+                    <span className={`px-2 py-1 rounded-full ${
+                      selectedEvent.status === 'active' 
+                        ? 'bg-green-100 text-green-800' 
+                        : selectedEvent.status === 'planned'
+                        ? 'bg-blue-100 text-blue-800'
+                        : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {selectedEvent.status}
+                    </span>
+                    <span>📐 {selectedEvent.geometries?.length || 0} géométries</span>
+                  </div>
+                </div>
+              </div>
+            )}
 
-                      // Update the drawerPoint to the refreshed version so PointDetails
-                      // receives the latest obstacles/comments/pictures without re-opening.
-                      if (fresh && drawerPoint) {
-                        const updated = fresh.find((p) => String(p.id) === String(drawerPoint.id));
-                        if (updated) {
-                          setDrawerPoint(updated);
-                        }
-                      }
-                    } catch (err) {
-                      console.error(err);
-                    }
-                  }}
-                />
-              )}
+            {/* Filtres de géométrie */}
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold mb-3">Filtres de Géométrie</h3>
+              <div className="space-y-2">
+                {['Parcours', 'Zone de départ', 'Zone d\'arrivée', 'Ravitaillement', 'Point médical', 'Zone interdite', 'Point de contrôle', 'Zone de sécurité'].map((type) => (
+                  <label key={type} className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 text-blue-600 rounded"
+                      defaultChecked
+                    />
+                    <span className="text-sm text-gray-700">{type}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
 
-              {drawerMode === "add" && addInitialCoords && (
-                <AddPointForm
-                  initialCoords={{ lng: addInitialCoords[0], lat: addInitialCoords[1] }}
-                  onClose={() => setDrawerOpen(false)}
-                  onSaved={async () => {
-                    try {
-                      const fresh = await invoke<any[]>("get_points");
-                      pointsRef.current = fresh;
-                      setPoints(fresh);
-                      if (map && map.getSource("db-points")) {
-                        (map.getSource("db-points") as maplibregl.GeoJSONSource).setData(formatPointsGeoJSON(fresh));
-                      }
-                    } catch (err) {
-                      console.error(err);
-                    }
-                    setDrawerOpen(false);
-                  }}
-                />
-              )}
+            {/* Actions */}
+            <div className="space-y-3">
+              <button className="w-full px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105">
+                Appliquer les filtres
+              </button>
+              <button className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors">
+                Réinitialiser
+              </button>
             </div>
           </div>
         </div>
       )}
-      {/* Barre de recherche */}
-      <div
-        style={{
-          position: "absolute",
-          top: 10,
-          left: 10,
-          zIndex: 10,
-          backgroundColor: "white",
-          padding: "5px",
-          borderRadius: "4px",
-          boxShadow: "0 0 5px rgba(0,0,0,0.3)",
-          width: "300px",
-        }}
-      >
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Rechercher une adresse..."
-          style={{ padding: "5px", width: "100%" }}
-        />
 
-        {/* Liste de suggestions */}
-        {results.length > 0 && (
-          <div
-            style={{ marginTop: "5px", maxHeight: "150px", overflowY: "auto" }}
-          >
-            {results.map((r, i) => (
-              <div
-                key={i}
-                style={{
-                  padding: "5px",
-                  cursor: "pointer",
-                  borderBottom: "1px solid #ddd",
-                }}
-                onClick={() => handleSelect(r)}
-              >
-                {r.display_name}
+      {/* Conteneur principal de la carte */}
+      <div className="flex-1 flex flex-col">
+        {/* Sélecteur d'événements */}
+        <div className="bg-gradient-to-r from-indigo-500 via-purple-600 to-blue-600 backdrop-blur-md border-b border-white/20 p-4">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-white font-semibold">🎯</span>
+              <label className="text-white font-medium">Sélectionner un événement :</label>
+            </div>
+            <select
+              value={selectedEvent?.id || ""}
+              onChange={(e) => handleEventChange(e.target.value)}
+              className="flex-1 max-w-md px-4 py-2 bg-white/90 backdrop-blur-sm border border-white/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-transparent text-gray-800 font-medium"
+            >
+              <option value="">Choisir un événement...</option>
+              {events.map((event) => (
+                <option key={event.id} value={event.id}>
+                  {event.event_type === 'Marathon' && '🏃‍♂️'} 
+                  {event.event_type === 'Cyclisme' && '🚴‍♂️'} 
+                  {event.event_type === 'Trail' && '🥾'} 
+                  {!['Marathon', 'Cyclisme', 'Trail'].includes(event.event_type) && '🏆'} 
+                  {event.name || `Événement #${event.id}`}
+                  {event.status === 'active' && ' 🟢'}
+                  {event.status === 'planned' && ' 🔵'}
+                </option>
+              ))}
+            </select>
+            {selectedEvent && (
+              <div className="flex items-center gap-2 text-white/80 text-sm">
+                <span>📐 {selectedEvent.geometries?.length || 0} géométries</span>
+                <span className={`px-2 py-1 rounded-full text-xs ${
+                  selectedEvent.status === 'active' 
+                    ? 'bg-green-400/20 text-green-100' 
+                    : selectedEvent.status === 'planned'
+                    ? 'bg-blue-400/20 text-blue-100'
+                    : 'bg-gray-400/20 text-gray-100'
+                }`}>
+                  {selectedEvent.status}
+                </span>
               </div>
-            ))}
+            )}
           </div>
-        )}
-      </div>
+        </div>
+
+        {/* Barre de recherche */}
+        <div className="bg-white/80 backdrop-blur-md border-b border-white/20 p-4">
+          <div className="flex gap-3">
+            {!showFilters && (
+              <button
+                onClick={() => setShowFilters(true)}
+                className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all duration-300 shadow-lg"
+              >
+                🎯 Filtres
+              </button>
+            )}
+            <input
+              type="text"
+              placeholder="🔍 Rechercher un lieu..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="flex-1 px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/80 backdrop-blur-sm"
+            />
+          </div>
+
+          {/* Liste de suggestions */}
+          {results.length > 0 && (
+            <div className="mt-3 bg-white rounded-xl shadow-lg border border-gray-200 max-h-40 overflow-y-auto">
+              {results.map((r, i) => (
+                <div
+                  key={i}
+                  className="p-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
+                  onClick={() => handleSelect(r)}
+                >
+                  <div className="text-sm text-gray-800">{r.display_name}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Conteneur de la carte */}
-        <div ref={mapContainer} style={{ height: "100%", width: "100%" }} />
+        <div ref={mapContainer} className="flex-1" />
       </div>
     </div>
   );
