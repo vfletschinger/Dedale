@@ -22,25 +22,47 @@ cache:
 check_quality:
   stage: quality
   before_script:
+    # 1. On installe Node.js
     - curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-    - apt-get install -y nodejs
-    - rustup component add clippy rustfmt
-  script:
-    - cd $PROJECT_PATH
 
-    # 1. Qualité RUST
-    - mkdir -p reports
-    - cargo fmt --all -- --check > reports/cargoFmt_repport.txt || true
+    # 2. IMPORTANT : On installe les dépendances système pour Tauri (C'est ce qui manquait !)
+    - apt-get update && apt-get install -y libgtk-3-dev libayatana-appindicator3-dev libwebkit2gtk-4.0-dev librsvg2-dev pkg-config libssl-dev curl nodejs
+
+    # 3. On installe les outils Rust
+    - rustup component add clippy rustfmt
+
+    # 4. On crée le dossier de rapport
+    - mkdir -p $RUST_PATH/reports
+
+  script:
+    # --- PARTIE 1 : RUST ---
+    - cd $RUST_PATH
+
+    # Formatage
+    - cargo fmt --all -- --check > reports/raw_diff.txt 2>&1 || true
+
+    # Génération HTML
+    - |
+      echo "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Rapport Rustfmt</title>" > reports/format_report.html
+      echo "<style>body{font-family:'Consolas',monospace;background:#1e1e1e;color:#d4d4d4;padding:20px}h1{color:#fff}.add{color:#b5cea8;bg:rgba(46,160,67,0.15)}.del{color:#ce9178;bg:rgba(248,81,73,0.15)}.line{display:block;white-space:pre}</style></head><body>" >> reports/format_report.html
+
     - cargo clippy -- -D warnings > reports/clippy_report.txt 2>&1
 
-    # 2. Qualité REACT
+    # Arrêt si formatage KO
+    # - if [ $FAIL -eq 1 ]; then exit 1; fi
+
+    # --- PARTIE 2 : REACT ---
+    - cd ..
     - npm ci
     - npm run lint
+
   artifacts:
     when: always
+    expose_as: "Rapport Qualité"
     paths:
-      - $PROJECT_PATH/reports/rustfmt_diff.txt
-      - $PROJECT_PATH/reports/clippy_report.txt
+      - $RUST_PATH/reports/format_report.html
+      - $RUST_PATH/reports/raw_diff.txt
+      - $RUST_PATH/reports/clippy_report.txt
     expire_in: 1 week
 # --- JOB 2 : BUILD ---
 build_app:
