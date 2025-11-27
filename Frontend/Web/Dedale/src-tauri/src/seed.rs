@@ -27,7 +27,7 @@ struct ObstacleSeed {
 /// Seeds the database with sample data if it's currently empty.
 #[tauri::command]
 pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
-    println!("🌱 Début du seeding...");
+    // seed started
 
     let pool = get_db_pool(&app).await?;
     let query = r#"
@@ -42,7 +42,7 @@ pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
 
     if existing_points > 0 {
-        println!("⚠️ Des données existent déjà, seeding annulé.");
+        // data already present, skip seeding
         return Ok(());
     }
 
@@ -160,7 +160,7 @@ pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
     let mut type_ids: Vec<i64> = Vec::new();
 
     // 2. Seed obstacle_type
-    println!("📦 Insertion des types d'obstacles...");
+    // inserting obstacle types
     for t in obstacle_types.iter() {
         let result = sqlx::query(
             "INSERT INTO obstacle_type (name, description, width, length) VALUES (?, ?, ?, ?)",
@@ -176,7 +176,7 @@ pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
     }
 
     // 3. Seed point
-    println!("📍 Insertion des points d'intérêt...");
+    // inserting points
     for p in points.iter() {
         let result = sqlx::query("INSERT INTO point (x, y) VALUES (?, ?)")
             .bind(p.x)
@@ -188,7 +188,7 @@ pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
     }
 
     // 4. Seed comment
-    println!("💬 Insertion des commentaires...");
+    // inserting comments
     for c in comments_data.iter() {
         let point_id = *point_ids
             .get(c.point_idx)
@@ -202,7 +202,7 @@ pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
     }
 
     // 5. Seed picture
-    println!("📸 Insertion des photos...");
+    // inserting pictures
     for i in pictures_data.iter() {
         let point_id = *point_ids
             .get(i.point_idx)
@@ -216,7 +216,7 @@ pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
     }
 
     // 6. Seed obstacle
-    println!("🚧 Insertion des obstacles...");
+    // inserting obstacles
     for o in obstacles_data.iter() {
         let point_id = *point_ids
             .get(o.point_idx)
@@ -238,12 +238,7 @@ pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
         .map_err(|e| format!("Failed to insert obstacle: {}", e))?;
     }
 
-    println!("✅ Seeding terminé avec succès !");
-    println!("   - {} types d'obstacles", obstacle_types.len());
-    println!("   - {} points d'intérêt", points.len());
-    println!("   - {} commentaires", comments_data.len());
-    println!("   - {} photos", pictures_data.len());
-    println!("   - {} obstacles", obstacles_data.len());
+    // seeding finished
 
     Ok(())
 }

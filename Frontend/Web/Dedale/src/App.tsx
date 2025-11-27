@@ -1,8 +1,12 @@
 import { useEffect, useState } from "react";
+import { listen } from '@tauri-apps/api/event';
+import { invoke } from '@tauri-apps/api/core';
+import * as path from '@tauri-apps/api/path';
 import Database from '@tauri-apps/plugin-sql';
 import Accueil from "./components/Accueil";
 import Equipes from "./components/Equipe";
 import Map from "./components/Map";
+import AdminForm from "./components/AdminForm";
 
 import logoStrasbourg from "./assets/logo_strasbourg.png";
 
@@ -10,7 +14,7 @@ import logoStrasbourg from "./assets/logo_strasbourg.png";
 // global.d.ts
 
 
-function Navigation({ page, setPage }: { page: string, setPage: (page: string) => void }) {
+function Navigation({ setPage }: { setPage: (page: string) => void }) {
 
   return (
     <nav className="bg-[#171c22]"> {/* Couleur principale 65% */}
@@ -105,12 +109,52 @@ function App() {
   const [db, setDb] = useState<Database | null>(null);
   const [page, setPage] = useState("home");
   const [error, setError] = useState("");
+  const [firstLaunch, setFirstLaunch] = useState(false);
+
+  //Check first launch
+  useEffect(() => {
+    // Écoute l'event émis par Rust
+    const unlisten = listen('first-launch', () => {
+      setFirstLaunch(true);
+    });
+    // Fallback: also query the backend directly in case the event was emitted
+    // before the frontend listener was ready.
+    (async () => {
+      try {
+        const isFirst: boolean = await invoke('is_first_launch_cmd');
+        if (isFirst) {
+          setFirstLaunch(true);
+        }
+      } catch (e) {
+        // ignore: the event listener may suffice; errors are non-fatal
+      }
+    })();
+
+    return () => {
+      unlisten.then(f => f()).catch(() => {});
+    };
+  }, []);
+
+  async function handleCreateAdmin(username: string, password: string) {
+    try {
+      await invoke('create_initial_admin_cmd', { username, password });
+      // Admin créé -> masquer le form et continuer vers l'app
+      setFirstLaunch(false);
+    } catch (e) {
+      console.error('create admin failed', e);
+      // afficher message d'erreur à l'utilisateur
+    }
+  }
 
   // Connexion BDD au démarrage
   useEffect(() => {
     const initDb = async () => {
       try {
-        const dbInstance = await Database.load("sqlite:mydatabase.db");
+        // Load DB from the app data directory to match backend
+        const appDataPath = await path.appDataDir();
+        const dbPath = await path.join(appDataPath, 'mydatabase.db');
+        // Database.load expects a connection URL like `sqlite:<path>`
+        const dbInstance = await Database.load(`sqlite:${dbPath}`);
         setDb(dbInstance);
       } catch (e: any) {
         console.error("Erreur connexion BDD:", e);
@@ -151,11 +195,19 @@ function App() {
   return (
     <div className="w-full min-h-screen bg-gray-50 font-sans">
       <header className="text-center mb-8">
-        <Navigation page={page} setPage={setPage} />
+        <Navigation setPage={setPage} />
       </header>
 
       <main className="bg-white p-6 rounded-lg shadow-md h-full">
-        {renderPage()}
+        {firstLaunch ? (
+          <div className="max-w-md mx-auto">
+            <h2 className="text-2xl font-semibold mb-4">Configuration initiale</h2>
+            <p className="mb-4 text-gray-600">Créez le compte administrateur pour continuer.</p>
+            <AdminForm onSubmit={handleCreateAdmin} />
+          </div>
+        ) : (
+          renderPage()
+        )}
       </main>
     </div>
   );
