@@ -26,7 +26,8 @@ check_quality:
     - apt-get install -y nodejs
     - rustup component add clippy rustfmt
   script:
-    - cd $PROJECT_PATH
+    - cd $PROJECT_PATH/src-tauri
+    - ls
 
     # 1. Qualité RUST
     - cargo fmt --all -- --check
