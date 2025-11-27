@@ -2,215 +2,333 @@ import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
 
 export type Obstacle = {
-    id: number;
-    name?: string | null;
-    number?: number | null;
-    description?: string | null;
-    width?: number | null;
-    length?: number | null;
+  id: number;
+  name?: string | null;
+  number?: number | null;
+  description?: string | null;
+  width?: number | null;
+  length?: number | null;
 };
 
 export type Picture = {
-    id: number;
-    image: string;
+  id: number;
+  image: string;
 };
 
 export type CommentItem = {
-    id: number;
-    value: string;
+  id: number;
+  value: string;
 };
 
 export type Point = {
-    id: number;
-    x: number;
-    y: number;
-    obstacles: Obstacle[];
-    comments: CommentItem[];
-    pictures: Picture[];
+  id: number;
+  x: number;
+  y: number;
+  obstacles: Obstacle[];
+  comments: CommentItem[];
+  pictures: Picture[];
 };
 
 export type ObstacleType = {
-    id: number;
-    name: string;
-    description: string;
-    width: number;
-    length: number;
+  id: number;
+  name: string;
+  description: string;
+  width: number;
+  length: number;
 };
 
-export default function PointDetails({ point, onClose, onRefresh }: { point: Point | null, onClose?: () => void, onRefresh?: () => void }) {
-    const [showObstaclesPopup, setShowObstaclesPopup] = useState(false);
-    const [_, setObstacleTypes] = useState<ObstacleType[]>([]);
-    const [mergedObstacles, setMergedObstacles] = useState<any[]>([]);
+// Button styles extracted to avoid recreating objects on each render
+const BTN_STYLE: React.CSSProperties = {
+  padding: "8px 12px",
+  borderRadius: 8,
+  border: "none",
+  cursor: "pointer",
+  background: "#2563eb",
+  color: "#fff",
+  fontWeight: 600,
+};
 
-    useEffect(() => {
-        if (showObstaclesPopup && point) {
-            get_types();
-        }
-    }, [showObstaclesPopup, point]);
+const BTN_DANGER_STYLE: React.CSSProperties = {
+  ...BTN_STYLE,
+  background: "#dc2626",
+};
 
-    async function get_types() {
-        try {
-            const types: ObstacleType[] = await invoke("fetch_obstacle_types");
-            setObstacleTypes(types);
+// Resolve image src helper (support data:image or base64 string)
+function resolveImageSrc(image: string) {
+  if (!image) return "";
+  if (image.startsWith("data:")) return image;
+  return `data:image/png;base64,${image}`;
+}
 
-            // Fusionner les types avec les obstacles du point
-            const merged = types.map(type => {
-                const existing = point?.obstacles.find(o => o.name === type.name);
-                return {
-                    typeId: type.id,
-                    name: type.name,
-                    description: type.description,
-                    width: type.width,
-                    length: type.length,
-                    number: existing?.number ?? 0,
-                    obstacleId: existing?.id ?? null,
-                };
-            });
-            setMergedObstacles(merged);
-        } catch (error) {
-            console.error("Failed to fetch obstacle types:", error);
-        }
+export default function PointDetails({
+  point,
+  onClose,
+  onRefresh,
+}: {
+  point: Point | null;
+  onClose?: () => void;
+  onRefresh?: () => void;
+}) {
+  const [showObstaclesPopup, setShowObstaclesPopup] = useState(false);
+  const [_, setObstacleTypes] = useState<ObstacleType[]>([]);
+  const [mergedObstacles, setMergedObstacles] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (showObstaclesPopup && point) {
+      fetchTypes();
     }
+  }, [showObstaclesPopup, point]);
 
-    function incrementObstacle(typeId: number) {
-        setMergedObstacles(prev =>
-            prev.map(o =>
-                o.typeId === typeId ? { ...o, number: o.number + 1 } : o
-            )
-        );
+  // Fetch and merge obstacle types with the point's obstacles
+  async function fetchTypes() {
+    try {
+      const types: ObstacleType[] = await invoke("fetch_obstacle_types");
+      setObstacleTypes(types);
+
+      const merged = types.map((type) => {
+        const existing = point?.obstacles.find((o) => o.name === type.name);
+        return {
+          typeId: type.id,
+          name: type.name,
+          description: type.description,
+          width: type.width,
+          length: type.length,
+          number: existing?.number ?? 0,
+          obstacleId: existing?.id ?? null,
+        };
+      });
+      setMergedObstacles(merged);
+    } catch (error) {
+      console.error("Failed to fetch obstacle types:", error);
     }
+  }
 
-    function decrementObstacle(typeId: number) {
-        setMergedObstacles(prev =>
-            prev.map(o =>
-                o.typeId === typeId ? { ...o, number: Math.max(0, o.number - 1) } : o
-            )
-        );
-    }
-
-    async function saveObstacles() {
-        try {
-            if (point) {
-                await invoke('insert_obstacles', {
-                    pointId: point.id,
-                    obstacles: mergedObstacles,
-                });
-                setShowObstaclesPopup(false);
-                if (onRefresh) {
-                    onRefresh();
-                }
-            }
-        } catch (error) {
-            console.error("Failed to save obstacles:", error);
-        }
-    }
-
-    if (!point) {
-        return (
-            <div className="point-popup" style={{ minWidth: 260 }}>
-                <div className="pp-card">Aucune donnée pour ce point.</div>
-                <div style={{ marginTop: 8 }}>
-                    <button onClick={onClose} className="button">Fermer</button>
-                </div>
-            </div>
-        );
-    }
-
-    const resolveImageSrc = (path: string) => {
-        if (!path) return "";
-        if (path.startsWith("data:")) return path;
-        // path like "/images/point1_photo1.jpg" -> serve by dev server / production frontend
-        if (path.startsWith("/")) return `${window.location.origin}${path}`;
-        return `${window.location.origin}/${path}`;
-    };
-
-    return (
-        <div className="point-popup" style={{ minWidth: 300 }}>
-            <div className="pp-header">
-                <div className="pp-title">Point #{point.id}</div>
-                <button onClick={onClose} className="pp-close" aria-label="Fermer">✕</button>
-            </div>
-
-            <div className="pp-section">
-                <div className="pp-section-title">Coordonnées</div>
-                <div className="pp-coords">{point.x.toFixed(3)}, {point.y.toFixed(3)}</div>
-            </div>
-
-            <div className="pp-section">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div className="pp-section-title">Obstacles ({point.obstacles.length})</div>
-                    <button onClick={() => setShowObstaclesPopup(true)} className="action-primary">modifier</button>
-                </div>
-
-                {showObstaclesPopup && (
-                    <div className="pp-card" style={{
-                        position: "absolute",
-                        top: 0,
-                        left: 0,
-                        zIndex: 1000,
-                        minWidth: 280,
-                        maxHeight: 400,
-                        overflowY: "auto"
-                    }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                            <strong>Modification des obstacles</strong>
-                            <button onClick={() => setShowObstaclesPopup(false)} className="pp-close">✕</button>
-                        </div>
-                        <ul style={{ margin: 0, paddingLeft: 20 }}>
-                            {mergedObstacles.map(o => (
-                                <li key={o.typeId} style={{ marginBottom: 8 }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                                        <div>
-                                            <div style={{ fontWeight: 600 }}>{o.name ?? "Type inconnu"}</div>
-                                            <div className="muted">{o.description}</div>
-                                        </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                            <button onClick={() => decrementObstacle(o.typeId)} className="action-ghost">−</button>
-                                            <div style={{ minWidth: 28, textAlign: 'center' }}>{o.number}</div>
-                                            <button onClick={() => incrementObstacle(o.typeId)} className="action-primary">+</button>
-                                        </div>
-                                    </div>
-                                </li>
-                            ))}
-                        </ul>
-                        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                            <button onClick={() => setShowObstaclesPopup(false)} className="action-ghost">Annuler</button>
-                            <button onClick={() => saveObstacles()} className="action-primary">Enregistrer</button>
-                        </div>
-                    </div>
-                )}
-
-                <ul className="pp-list">
-                    {point.obstacles.map(o => (
-                        <li key={o.id}>
-                            <div><em>{o.name ?? "Type inconnu"}</em> x {o.number ?? "-"}</div>
-                            {o.description ? <div className="muted">{o.description}</div> : null}
-                            <div className="muted">L×l: {o.length ?? "-"} × {o.width ?? "-"}</div>
-                        </li>
-                    ))}
-                </ul>
-            </div>
-
-            <div className="pp-section">
-                <div className="pp-section-title">Commentaires ({point.comments.length})</div>
-                <ul className="pp-list">
-                    {point.comments.map(c => <li key={c.id}>{c.value}</li>)}
-                </ul>
-            </div>
-
-            <div className="pp-section">
-                <div className="pp-section-title">Photos ({point.pictures.length})</div>
-                <div className="pp-photo-grid">
-                    {point.pictures.map(p => (
-                        <img
-                            key={p.id}
-                            alt={`pic-${p.id}`}
-                            src={resolveImageSrc(p.image)}
-                            className="pp-photo"
-                        />
-                    ))}
-                </div>
-            </div>
-        </div>
+  function incrementObstacle(typeId: number) {
+    setMergedObstacles((prev) =>
+      prev.map((o) =>
+        o.typeId === typeId ? { ...o, number: o.number + 1 } : o
+      )
     );
+  }
+
+  function decrementObstacle(typeId: number) {
+    setMergedObstacles((prev) =>
+      prev.map((o) =>
+        o.typeId === typeId ? { ...o, number: Math.max(0, o.number - 1) } : o
+      )
+    );
+  }
+
+  async function saveObstacles() {
+    try {
+      if (point) {
+        //Convert camelCase to snake_case for backend
+        const obstaclesSnakeCase = mergedObstacles.map((o) => ({
+          type_id: o.typeId ?? o.type_id ?? null,
+          obstacle_id: o.obstacleId ?? o.obstacle_id ?? null,
+          number: o.number ?? null,
+          width: o.width ?? null,
+          length: o.length ?? null,
+          name: o.name ?? null,
+          description: o.description ?? null,
+        }));
+
+        await invoke("insert_obstacles", {
+          pointId: point.id,
+          obstacles: obstaclesSnakeCase,
+        });
+
+        setShowObstaclesPopup(false);
+        if (onRefresh) {
+          onRefresh();
+        }
+      }
+    } catch (error) {
+      console.error("Failed to save obstacles:", error);
+    }
+  }
+
+  // Use extracted constants
+  const btnStyle = BTN_STYLE;
+  const btnDangerStyle = BTN_DANGER_STYLE;
+
+  async function handleDelete() {
+    if (!point) return;
+
+    if (!confirm(`Supprimer le point #${point.id} ?`)) return;
+
+    try {
+        await invoke("delete_point", { pointId: point.id });
+        if (onRefresh) onRefresh();
+        if (onClose) onClose();
+    } catch (error) {
+      console.error("Failed to delete point:", error);
+      alert("Erreur lors de la suppression du point.");
+    }
+  }
+
+  if (!point) {
+    return (
+      <div className="point-popup" style={{ minWidth: 260 }}>
+        <div className="pp-card">Aucune donnée pour ce point.</div>
+        <div style={{ marginTop: 8 }}>
+          <button onClick={onClose} className="button">
+            Fermer
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Use the shared resolveImageSrc helper defined above
+
+  return (
+    <div className="point-popup" style={{ minWidth: 300 }}>
+
+      <div className="pp-section">
+        <div className="pp-section-title">Coordonnées</div>
+        <div className="pp-coords">
+          {point.x.toFixed(3)}, {point.y.toFixed(3)}
+        </div>
+      </div>
+
+      <div className="pp-section">
+        <div className="pp-section-title">Obstacles ({point.obstacles.length})</div>
+
+        {showObstaclesPopup && (
+          <div
+            className="pp-card"
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              zIndex: 1000,
+              minWidth: 280,
+              maxHeight: 450,
+              overflowY: "auto",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 8,
+              }}
+            >
+              <strong>Modification des obstacles</strong>
+              <button
+                onClick={() => setShowObstaclesPopup(false)}
+                className="pp-close"
+              >
+                ✕
+              </button>
+            </div>
+            <ul style={{ margin: 0, paddingLeft: 20 }}>
+              {mergedObstacles.map((o) => (
+                <li key={o.typeId} style={{ marginBottom: 8 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 8,
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 600 }}>
+                        {o.name ?? "Type inconnu"}
+                      </div>
+                      <div className="muted">{o.description}</div>
+                    </div>
+                    <div
+                      style={{ display: "flex", alignItems: "center", gap: 6 }}
+                    >
+                      <button
+                        onClick={() => decrementObstacle(o.typeId)}
+                        className="action-ghost"
+                      >
+                        −
+                      </button>
+                      <div style={{ minWidth: 28, textAlign: "center" }}>
+                        {o.number}
+                      </div>
+                      <button
+                        onClick={() => incrementObstacle(o.typeId)}
+                        className="action-primary"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <button onClick={() => setShowObstaclesPopup(false)} style={btnStyle}>
+                Annuler
+              </button>
+              <button onClick={() => saveObstacles()} style={btnStyle}>
+                Enregistrer
+              </button>
+            </div>
+          </div>
+        )}
+
+        <ul className="pp-list">
+          {point.obstacles.map((o) => (
+            <li key={o.id}>
+              <div>
+                <em>{o.name ?? "Type inconnu"}</em> x {o.number ?? "-"}
+              </div>
+              {o.description ? (
+                <div className="muted">{o.description}</div>
+              ) : null}
+              <div className="muted">
+                L×l: {o.length ?? "-"} × {o.width ?? "-"}
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="pp-section">
+        <div className="pp-section-title">
+          Commentaires ({point.comments.length})
+        </div>
+        <ul className="pp-list">
+          {point.comments.map((c) => (
+            <li key={c.id}>{c.value}</li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="pp-section">
+        <div className="pp-section-title">Photos ({point.pictures.length})</div>
+        <div className="pp-photo-grid">
+          {point.pictures.map((p) => (
+            <img
+              key={p.id}
+              alt={`pic-${p.id}`}
+              src={resolveImageSrc(p.image)}
+              className="pp-photo"
+            />
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display: "flex", width: "100%", gap: 8, marginTop: 12, justifyContent: "space-between", alignItems: "center" }}>
+        <div>
+          <button onClick={() => setShowObstaclesPopup(true)} style={btnStyle}>
+            Modifier
+          </button>
+        </div>
+        <div>
+          <button onClick={handleDelete} style={btnDangerStyle}>
+            Supprimer
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }

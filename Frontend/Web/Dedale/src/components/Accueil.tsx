@@ -23,12 +23,9 @@ async function generate_excel() {
                 excelPathStr: excel_path_str
             }
         );
-        alert("Exportation Excel réussie dans " + excel_path_str);
-
   
     } catch (error) {
         console.error("Erreur lors de l'exportation Excel:", error);
-        alert(`Erreur d'exportation: ${error}`);
     }
 }
 
