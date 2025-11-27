@@ -1,2 +1,67 @@
-stages: 
+image: rust:latest
+
+variables:
+  CARGO_HOME: Frontend/Web/Dedale/.cargo
+  DEBIAN_FRONTEND: noninteractive
+
+stages:
   - quality
+  - build
+  - test
+
+cache:
+  key: global-cache
+  paths:
+    - .cargo/
+    - target/
+
+# --- JOB 1 : QUALITÉ DU CODE (LINT) ---
+check_quality:
+  stage: quality
+  before_script:
+    # On installe juste Node.js pour le linter JS (pas besoin des librairies graphiques ici)
+    - curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+    - apt-get install -y nodejs
+    - npm install -g yarn
+    # On ajoute les composants de formatage Rust
+    - rustup component add clippy rustfmt
+  script:
+    # 1. Vérification du formatage Rust
+    - cargo fmt --all -- --check
+
+    # 2. Vérification des bonnes pratiques Rust (Clippy)
+    - cargo clippy -- -D warnings
+
+    # 3. Vérification du code JavaScript (ESLint / Prettier)
+    - cd webdriver/webdriverio
+    - yarn install
+    - yarn lint # Assure-toi d'avoir un script "lint" dans ton package.json
+
+# --- JOB 2 : BUILD ---
+build_app:
+  stage: build
+  needs: ["check_quality"] # On ne build que si la qualité est OK
+  before_script:
+    - apt-get update && apt-get install -y libgtk-3-dev libayatana-appindicator3-dev libwebkit2gtk-4.0-dev
+  script:
+    - cargo build --release
+  artifacts:
+    paths:
+      - target/release/
+      - target/release/bundle/
+    expire_in: 1 hour
+
+# --- JOB 3 : TESTS FONCTIONNELS (WebdriverIO) ---
+test_e2e:
+  stage: test
+  needs: ["build_app"]
+  before_script:
+    - apt-get update && apt-get install -y libgtk-3-dev libayatana-appindicator3-dev libwebkit2gtk-4.0-dev webkit2gtk-driver xvfb curl
+    - curl -fsSL https://deb.nodesource.com/setup_16.x | bash -
+    - apt-get install -y nodejs
+    - npm install -g yarn
+  script:
+    - cargo install tauri-driver
+    - cd webdriver/webdriverio
+    - yarn install
+    - xvfb-run yarn test
