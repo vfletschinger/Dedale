@@ -17,6 +17,21 @@ interface EventsProps {
   onEventsLoaded?: (events: Event[]) => void;
 }
 
+const formatDate = (dateStr: string): string => {
+  if (!dateStr) return "Non définie";
+  try {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString("fr-FR", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric"
+    });
+  } catch {
+    return dateStr;
+  }
+};
+
+
 function Events({ onEventClick, onEventsLoaded }: EventsProps) {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(false);
@@ -52,9 +67,12 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
     loadEvents();
   }, []);
 
+  const createEvent = async () => {
+    invoke("insert_event", { event: formData });
+  }
+
   const handleCreateEvent = async () => {
     try {
-      // Validation des champs
       if (formData.name.trim() === "") {
         alert("Le nom de l'événement est requis !");
         return;
@@ -100,6 +118,21 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleDeleteEvent = async (eventId: number) => {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer cet événement ?")) {
+      return;
+    }
+    try {
+      console.log(" Suppression de l'événement:", eventId);
+      await invoke("delete_event", { eventId });
+      console.log("✅ Événement supprimé");
+      loadEvents();
+    } catch (err) {
+      console.error("❌ Erreur lors de la suppression:", err);
+      alert("Erreur lors de la suppression de l'événement");
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center p-8">
@@ -127,7 +160,7 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
   return (
     <div className="p-6 bg-white rounded-lg shadow-lg">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">📅 Événements</h2>
+        <h2 className="text-2xl font-bold text-gray-800"> Événements</h2>
         <button
           onClick={() => setShowCreateForm(!showCreateForm)}
           className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
@@ -260,7 +293,8 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
                     <p className="text-gray-600 mt-1">{event.description}</p>
                   )}
                   <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
-                    <span>📅 Du {event.dateDebut} au {event.dateFin}</span>
+                    <span>Sélectionné
+ Du {formatDate(event.dateDebut)} au {formatDate(event.dateFin)}</span>
                     <span className={`px-2 py-1 rounded-full text-xs ${
                       event.statut === 'active' 
                         ? 'bg-green-100 text-green-800'
@@ -272,7 +306,7 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
                     </span>
                   </div>
                 </div>
-                <div className="ml-4">
+                <div className="ml-4 flex gap-2">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -281,6 +315,15 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
                     className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
                   >
                     Voir sur la carte
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteEvent(event.id);
+                    }}
+                    className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+                  >
+                     Supprimer
                   </button>
                 </div>
               </div>
@@ -291,5 +334,4 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
     </div>
   );
 }
-
 export default Events;

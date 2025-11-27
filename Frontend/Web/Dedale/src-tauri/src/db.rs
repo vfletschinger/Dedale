@@ -74,26 +74,38 @@ pub fn init_db() -> impl tauri::plugin::Plugin<tauri::Wry> {
         },
         Migration {
             version: 3,
-            description: "create_event_table",
+            description: "create_point_event_table",
             sql: "
-                CREATE TABLE IF NOT EXISTS event (
+                CREATE TABLE point_event (
                     id INTEGER PRIMARY KEY,
-                    name TEXT,
-                    description TEXT,
-                    dateDebut DATE,
-                    dateFin DATE,
-                    statuts TEXT,
-                    geometry TEXT
+                    point_id INTEGER NOT NULL,
+                    event_id INTEGER NOT NULL,
+                    FOREIGN KEY (point_id) REFERENCES point(id) ON DELETE CASCADE,
+                    FOREIGN KEY (event_id) REFERENCES event(id) ON DELETE CASCADE,
+                    UNIQUE(point_id, event_id)
                 );
             ",
             kind: MigrationKind::Up,
         }
     ];
 
+    println!("[DB] 🔧 Initialisation du plugin SQL...");
+    println!("[DB] 📋 {} migration(s) définies", migrations.len());
+    for m in &migrations {
+        println!("[DB]   → Migration v{}: {}", m.version, m.description);
+    }
+
     // On construit et renvoie le plugin
-    Builder::default()
+    // Note: Le chemin "sqlite:mydatabase.db" est relatif au app_data_dir de Tauri
+    println!("[DB] 📂 Chemin de la base: sqlite:mydatabase.db");
+    
+    let plugin = Builder::default()
         .add_migrations("sqlite:mydatabase.db", migrations)
-        .build()
+        .build();
+    
+    println!("[DB] ✅ Plugin SQL construit (les migrations s'exécuteront au premier accès JS)");
+    
+    plugin
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -101,6 +113,8 @@ pub struct Point {
     pub id: i64,
     pub x: f64,
     pub y: f64,
+    #[serde(default)]
+    pub event_ids: Vec<i64>,
     pub obstacles: Vec<Obstacle>,
     pub comments: Vec<Comment>,
     pub pictures: Vec<Picture>,
@@ -132,7 +146,7 @@ pub struct Obstacle {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PointSimple {
-    pub id: i32, // Identifiant unique du point
+    pub id: i32, 
     pub x: f64,  // Coordonnée X (ou latitude)
     pub y: f64,  // Coordonnée Y (ou longitude)
 }
@@ -171,10 +185,13 @@ pub struct ObstacleInput {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Event {
+    #[serde(default)]
     pub id: i64,
     pub name: String,
     pub description: String,
+    #[serde(rename = "dateDebut", alias = "dateDebut")]
     pub date_debut: String,
+    #[serde(rename = "dateFin", alias = "dateFin")]
     pub date_fin: String,
     pub statut: String,
     pub geometry: String,
@@ -287,6 +304,21 @@ async fn fetch_obstacles(pool: &SqlitePool, point_id: i64) -> Result<Vec<Obstacl
     Ok(obstacles)
 }
 
+async fn fetch_event_ids(pool: &SqlitePool, point_id: i64) -> Result<Vec<i64>, String> {
+    let rows = sqlx::query("SELECT event_id FROM point_event WHERE point_id = ?")
+        .bind(point_id)
+        .fetch_all(pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let event_ids = rows
+        .into_iter()
+        .map(|row| row.get("event_id"))
+        .collect();
+
+    Ok(event_ids)
+}
+
 #[tauri::command]
 pub async fn fetch_obstacle_types(app: AppHandle) -> Result<Vec<ObstacleType>, String> {
     let pool = get_db_pool(&app).await?;
@@ -357,20 +389,37 @@ pub async fn insert_obstacles(
 
 // Récupère tous les points avec leurs obstacles
 pub async fn retrieve_data(app: &AppHandle) -> Result<Vec<Point>, String> {
-    let pool = get_db_pool(app).await?;
-    let query = r#"
-        SELECT
-        p.id,
-        p.x,
-        p.y
-    FROM point p
-    ORDER BY p.id
-    "#;
+    retrieve_data_by_event(app, None).await
+}
 
-    let base_rows = sqlx::query(query)
+// Récupère les points filtrés par event_id (None = tous les points)
+pub async fn retrieve_data_by_event(app: &AppHandle, event_id: Option<i64>) -> Result<Vec<Point>, String> {
+    let pool = get_db_pool(app).await?;
+    
+    let base_rows = if let Some(eid) = event_id {
+        println!("[DB] 🔍 Récupération des points pour l'event_id: {}", eid);
+        sqlx::query(r#"
+            SELECT DISTINCT p.id, p.x, p.y
+            FROM point p
+            INNER JOIN point_event pe ON p.id = pe.point_id
+            WHERE pe.event_id = ?
+            ORDER BY p.id
+        "#)
+        .bind(eid)
         .fetch_all(&pool)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| e.to_string())?
+    } else {
+        println!("[DB] 🔍 Récupération de tous les points");
+        sqlx::query(r#"
+            SELECT p.id, p.x, p.y
+            FROM point p
+            ORDER BY p.id
+        "#)
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| e.to_string())?
+    };
 
     let mut points: Vec<Point> = Vec::new();
 
@@ -380,17 +429,20 @@ pub async fn retrieve_data(app: &AppHandle) -> Result<Vec<Point>, String> {
         let comments = fetch_comments(&pool, id).await?;
         let pictures = fetch_pictures(&pool, id).await?;
         let obstacles = fetch_obstacles(&pool, id).await?;
+        let event_ids = fetch_event_ids(&pool, id).await?;
 
         points.push(Point {
             id: id,
             x: row.get("x"),
             y: row.get("y"),
+            event_ids,
             obstacles,
             comments,
             pictures,
         });
     }
 
+    println!("[DB] ✅ {} point(s) récupéré(s)", points.len());
     Ok(points)
 }
 
@@ -546,8 +598,6 @@ pub async fn insert_point_details(
     Ok(())
 }
 
-<<<<<<< HEAD
-=======
 #[tauri::command]
 pub async fn insert_point(
     app: tauri::AppHandle,
@@ -601,7 +651,6 @@ pub async fn delete_point(app: AppHandle, point_id: i64) -> Result<(), String> {
     Ok(())
 }
 
->>>>>>> main
 
 #[tauri::command]
 pub async fn fetch_events(app: AppHandle) -> Result<Vec<Event>, String> {
@@ -668,6 +717,8 @@ pub async fn fetch_events(app: AppHandle) -> Result<Vec<Event>, String> {
 
 #[tauri::command]
 pub async fn insert_event(event: Event, app: AppHandle) -> Result<(), String> {
+    println!("[DB] 🎉 Insertion d'un événement: {:?}", event);
+    
     let pool = get_db_pool(&app).await?;
 
     sqlx::query(
@@ -683,5 +734,68 @@ pub async fn insert_event(event: Event, app: AppHandle) -> Result<(), String> {
         .await
         .map_err(|e| format!("Failed to insert event: {}", e))?;
     
+    println!("[DB] ✅ Événement '{}' créé avec succès !", event.name);
+    
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn link_point_to_event(app: AppHandle, point_id: i64, event_id: i64) -> Result<(), String> {
+    println!("[DB] 🔗 Liaison point {} → event {}", point_id, event_id);
+    let pool = get_db_pool(&app).await?;
+
+    sqlx::query("INSERT OR IGNORE INTO point_event (point_id, event_id) VALUES (?, ?)")
+        .bind(point_id)
+        .bind(event_id)
+        .execute(&pool)
+        .await
+        .map_err(|e| format!("Failed to link point to event: {}", e))?;
+
+    println!("[DB] ✅ Point {} lié à l'événement {}", point_id, event_id);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn unlink_point_from_event(app: AppHandle, point_id: i64, event_id: i64) -> Result<(), String> {
+    println!("[DB] 🔓 Déliaison point {} ← event {}", point_id, event_id);
+    let pool = get_db_pool(&app).await?;
+
+    sqlx::query("DELETE FROM point_event WHERE point_id = ? AND event_id = ?")
+        .bind(point_id)
+        .bind(event_id)
+        .execute(&pool)
+        .await
+        .map_err(|e| format!("Failed to unlink point from event: {}", e))?;
+
+    println!("[DB] ✅ Point {} délié de l'événement {}", point_id, event_id);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_points_for_event(app: AppHandle, event_id: i64) -> Result<Vec<i64>, String> {
+    let pool = get_db_pool(&app).await?;
+
+    let rows = sqlx::query("SELECT point_id FROM point_event WHERE event_id = ?")
+        .bind(event_id)
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let point_ids: Vec<i64> = rows.into_iter().map(|row| row.get("point_id")).collect();
+    Ok(point_ids)
+}
+
+#[tauri::command]
+pub async fn delete_event(app: AppHandle, event_id: i64) -> Result<(), String> {
+    let pool = get_db_pool(&app).await?;
+
+    // Les liaisons point_event seront supprimées automatiquement grâce à ON DELETE CASCADE
+    sqlx::query("DELETE FROM event WHERE id = ?")
+        .bind(event_id)
+        .execute(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    println!("[DB] ✅ Événement {} supprimé", event_id);
     Ok(())
 }

@@ -131,7 +131,7 @@ function App() {
       )}
       
       {/* Floating stats card - fixe sur toute la page */}
-      {page === "event" && events.length > 0 && (
+      {page === "event" && (
         <div className="fixed bottom-6 right-6 z-50 bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-white/30 p-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold">
@@ -140,7 +140,7 @@ function App() {
             <div>
               <div className="text-sm font-semibold text-gray-800">Total Events</div>
               <div className="text-xs text-gray-500">
-                {events.filter((e: any) => e.status === 'active').length} actifs
+                {events.filter((e: any) => e.statut === 'active' || e.statut === 'Actif').length} actifs
               </div>
             </div>
           </div>

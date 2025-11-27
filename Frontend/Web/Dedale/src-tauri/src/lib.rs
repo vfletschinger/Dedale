@@ -25,7 +25,11 @@ pub fn run() {
             db::delete_point,
             db::insert_point,
             db::fetch_events,
-            db::insert_event
+            db::insert_event,
+            db::delete_event,
+            db::link_point_to_event,
+            db::unlink_point_from_event,
+            db::get_points_for_event
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
