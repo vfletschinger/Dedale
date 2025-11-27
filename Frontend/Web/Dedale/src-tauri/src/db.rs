@@ -410,34 +410,51 @@ pub async fn insert_point_details(
 
     // ÉTAPE 1: Insérer tous les points d'abord
     println!("[DB] 📍 Insertion des points...");
+    // We need to keep track of assigned IDs when frontend sends id==0 for new points
+    let mut assigned_ids: Vec<i64> = Vec::with_capacity(details.len());
     for detail in &details {
-        println!(
-            "[DB]   → Point ID: {}, x: {}, y: {}",
-            detail.point.id, detail.point.x, detail.point.y
-        );
-        sqlx::query(r#"INSERT OR REPLACE INTO point (id, x, y) VALUES (?, ?, ?)"#)
-            .bind(detail.point.id)
-            .bind(detail.point.x)
-            .bind(detail.point.y)
-            .execute(&mut *tx)
-            .await
-            .map_err(|e| format!("Erreur INSERT/REPLACE point ID {} : {}", detail.point.id, e))?;
+        println!("[DB]   → Point ID: {}, x: {}, y: {}", detail.point.id, detail.point.x, detail.point.y);
+        if detail.point.id == 0 {
+            // Insert without specifying id so SQLite assigns a rowid
+            sqlx::query(r#"INSERT INTO point (x, y) VALUES (?, ?)"#)
+                .bind(detail.point.x)
+                .bind(detail.point.y)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| format!("Erreur INSERT point (auto-id) : {}", e))?;
+
+            // retrieve last inserted id for this transaction
+            let row = sqlx::query("SELECT last_insert_rowid() as id")
+                .fetch_one(&mut *tx)
+                .await
+                .map_err(|e| format!("Erreur récupération last_insert_rowid: {}", e))?;
+            let new_id: i64 = row.get("id");
+            assigned_ids.push(new_id);
+            println!("[DB]     → Nouveau point id assigné: {}", new_id);
+        } else {
+            // Respect provided id
+            sqlx::query(r#"INSERT OR REPLACE INTO point (id, x, y) VALUES (?, ?, ?)"#)
+                .bind(detail.point.id)
+                .bind(detail.point.x)
+                .bind(detail.point.y)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| format!("Erreur INSERT/REPLACE point ID {} : {}", detail.point.id, e))?;
+            assigned_ids.push(detail.point.id as i64);
+        }
     }
     println!("[DB] ✓ Tous les points insérés");
 
     // ÉTAPE 2: Insérer les données liées
     println!("[DB] 💬 Insertion des commentaires...");
-    for detail in &details {
+    for (idx, detail) in details.iter().enumerate() {
+        let assigned_point_id = assigned_ids[idx];
         for comment in &detail.comment {
-            println!(
-                "[DB]   → Comment ID: {}, point_id: {}, value: {:?}",
-                comment.id,
-                comment.point_id,
-                &comment.value[..comment.value.len().min(30)]
-            );
+            let point_id_to_use = if comment.point_id == 0 { assigned_point_id as i32 } else { comment.point_id };
+            println!("[DB]   → Comment ID: {}, point_id: {}, value: {:?}", comment.id, point_id_to_use, &comment.value[..comment.value.len().min(30)]);
             sqlx::query(r#"INSERT OR REPLACE INTO comment (id, point_id, value) VALUES (?, ?, ?)"#)
                 .bind(comment.id)
-                .bind(comment.point_id)
+                .bind(point_id_to_use)
                 .bind(&comment.value)
                 .execute(&mut *tx)
                 .await
@@ -447,17 +464,14 @@ pub async fn insert_point_details(
     println!("[DB] ✓ Tous les commentaires insérés");
 
     println!("[DB] 📸 Insertion des images...");
-    for detail in &details {
+    for (idx, detail) in details.iter().enumerate() {
+        let assigned_point_id = assigned_ids[idx] as i32;
         for picture in &detail.picture {
-            println!(
-                "[DB]   → Picture ID: {}, point_id: {}, taille: {} bytes",
-                picture.id,
-                picture.point_id,
-                picture.image.len()
-            );
+            let point_id_to_use = if picture.point_id == 0 { assigned_point_id } else { picture.point_id };
+            println!("[DB]   → Picture ID: {}, point_id: {}, taille: {} bytes", picture.id, point_id_to_use, picture.image.len());
             sqlx::query(r#"INSERT OR REPLACE INTO picture (id, point_id, image) VALUES (?, ?, ?)"#)
                 .bind(picture.id)
-                .bind(picture.point_id)
+                .bind(point_id_to_use)
                 .bind(&picture.image)
                 .execute(&mut *tx)
                 .await
@@ -467,17 +481,14 @@ pub async fn insert_point_details(
     println!("[DB] ✓ Toutes les images insérées");
 
     println!("[DB] 🚧 Insertion des obstacle_types et obstacles...");
-    for detail in &details {
+    for (idx, detail) in details.iter().enumerate() {
+        let assigned_point_id = assigned_ids[idx] as i64;
         for obstacle in &detail.obstacle {
-            println!(
-                "[DB]   → Obstacle ID: {}, point_id: {}, type_id: {}, nombre: {}",
-                obstacle.id,
-                obstacle.point_id,
-                obstacle.type_id,
-                obstacle.number.unwrap_or(0)
-            );
-
-            // Si l'obstacle a des données de type (name, description, width, length),
+            let point_id_to_use = if obstacle.point_id == 0 { assigned_point_id } else { obstacle.point_id };
+            println!("[DB]   → Obstacle ID: {}, point_id: {}, type_id: {}, nombre: {}", 
+                obstacle.id, point_id_to_use, obstacle.type_id, obstacle.number.unwrap_or(0));
+            
+            // Si l'obstacle a des données de type (name, description, width, length), 
             // on l'insère dans obstacle_type
             if obstacle.name.is_some()
                 || obstacle.description.is_some()
@@ -508,17 +519,15 @@ pub async fn insert_point_details(
             }
 
             // Insérer l'obstacle lui-même
-            sqlx::query(
-                r#"INSERT OR REPLACE INTO obstacle (id, point_id, type_id, number) VALUES (?, ?, ?, ?)"#
-            )
-            .bind(obstacle.id)
-            .bind(obstacle.point_id)
-            .bind(obstacle.type_id)
-            .bind(obstacle.number)
-            .execute(&mut *tx)
-            .await
-            .map_err(|e| format!("Erreur INSERT/REPLACE obstacle ID {} (point_id: {}, type_id: {}) : {}", 
-                obstacle.id, obstacle.point_id, obstacle.type_id, e))?;
+            sqlx::query(r#"INSERT OR REPLACE INTO obstacle (id, point_id, type_id, number) VALUES (?, ?, ?, ?)"#)
+                .bind(obstacle.id)
+                .bind(point_id_to_use)
+                .bind(obstacle.type_id)
+                .bind(obstacle.number)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| format!("Erreur INSERT/REPLACE obstacle ID {} (point_id: {}, type_id: {}) : {}", 
+                    obstacle.id, point_id_to_use, obstacle.type_id, e))?;
         }
     }
     println!("[DB] ✓ Tous les obstacles et types insérés");
@@ -530,5 +539,58 @@ pub async fn insert_point_details(
 
     println!("[DB] ✅ Transaction validée avec succès !");
 
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn insert_point(
+    app: tauri::AppHandle,
+    details: Vec<PointDetail>,
+) -> Result<(), String> {
+
+    // Réutilisation de la version WebSocket existante
+    insert_point_details(&app, details).await
+}
+
+
+#[tauri::command]
+pub async fn delete_point(app: AppHandle, point_id: i64) -> Result<(), String> {
+    let pool = get_db_pool(&app).await?;
+
+    // Start a transaction and remove dependent rows first to keep DB consistent
+    let mut tx: Transaction<Sqlite> = pool
+        .begin()
+        .await
+        .map_err(|e| format!("Failed to start transaction: {}", e))?;
+
+    sqlx::query("DELETE FROM comment WHERE point_id = ?")
+        .bind(point_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| format!("Failed to delete comments: {}", e))?;
+
+    sqlx::query("DELETE FROM picture WHERE point_id = ?")
+        .bind(point_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| format!("Failed to delete pictures: {}", e))?;
+
+    sqlx::query("DELETE FROM obstacle WHERE point_id = ?")
+        .bind(point_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| format!("Failed to delete obstacles: {}", e))?;
+
+    sqlx::query("DELETE FROM point WHERE id = ?")
+        .bind(point_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| format!("Failed to delete point: {}", e))?;
+
+    tx.commit()
+        .await
+        .map_err(|e| format!("Failed to commit transaction: {}", e))?;
+
+    println!("✅ Successfully deleted point {}", point_id);
     Ok(())
 }

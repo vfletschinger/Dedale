@@ -67,15 +67,32 @@ pub async fn create_pdf(app: AppHandle) -> Result<(), String> {
                     &pic.image
                 };
 
-                let mut valid_base64 = raw_base64.to_string();
+                // Keep only valid base64 characters (A-Z a-z 0-9 + / = - _). This helps
+                // with inputs that may still contain stray characters or partial data URIs.
+                let mut valid_base64: String = raw_base64
+                    .chars()
+                    .filter(|c| c.is_ascii_alphanumeric() || *c == '+' || *c == '/' || *c == '=' || *c == '-' || *c == '_')
+                    .collect();
 
+                // Ensure padding to multiple of 4.
                 while valid_base64.len() % 4 != 0 {
                     valid_base64.push('=');
                 }
 
-                let image_bytes = general_purpose::STANDARD
-                    .decode(&valid_base64)
-                    .map_err(|e| format!("Failed to decode base64: {}", e))?;
+                // Try standard base64 first, then URL-safe. If both fail, log and skip this image
+                // instead of aborting the whole PDF generation.
+                let image_bytes = match general_purpose::STANDARD.decode(&valid_base64) {
+                    Ok(b) => Some(b),
+                    Err(e_std) => match general_purpose::URL_SAFE.decode(&valid_base64) {
+                        Ok(b2) => Some(b2),
+                        Err(e_url) => {
+                            eprintln!("Failed to decode base64 for point {} image: standard error: {}, url-safe error: {}", p.id, e_std, e_url);
+                            None
+                        }
+                    },
+                };
+
+                let image_bytes = if let Some(b) = image_bytes { b } else { continue; };
 
                 let img_dynamic = image::load_from_memory(&image_bytes)
                     .map_err(|e| format!("Failed to load image from memory: {}", e))?;
