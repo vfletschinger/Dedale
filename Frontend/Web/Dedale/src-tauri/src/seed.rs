@@ -41,7 +41,7 @@ struct PointEventSeed {
 
 #[tauri::command]
 pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
-    println!("🌱 Début du seeding...");
+    // seed started
 
     let pool: SqlitePool = get_db_pool(&app).await?;
     let query = r#"
@@ -57,7 +57,7 @@ pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
     let existing_points: i64 = row.get("count");
 
     if existing_points > 0 {
-        println!("⚠️ Des données existent déjà, seeding annulé.");
+        // data already present, skip seeding
         return Ok(());
     }
 
@@ -191,6 +191,8 @@ pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
 
     // 1. Seed obstacle_type
     println!("📦 Insertion des types d'obstacles...");
+    // 2. Seed obstacle_type
+    // inserting obstacle types
     for t in obstacle_types.iter() {
         let result = sqlx::query(
             "INSERT INTO obstacle_type (name, description, width, length) VALUES (?, ?, ?, ?)",
@@ -207,6 +209,8 @@ pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
 
     // 2. Seed point
     println!("📍 Insertion des points d'intérêt...");
+    // 3. Seed point
+    // inserting points
     for p in points.iter() {
         let result = sqlx::query("INSERT INTO point (x, y) VALUES (?, ?)")
             .bind(p.x)
@@ -219,6 +223,8 @@ pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
 
     // 3. Seed comment
     println!("💬 Insertion des commentaires...");
+    // 4. Seed comment
+    // inserting comments
     for c in comments_data.iter() {
         let point_id = *point_ids
             .get(c.point_idx)
@@ -233,6 +239,8 @@ pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
 
     // 4. Seed picture
     println!("📸 Insertion des photos...");
+    // 5. Seed picture
+    // inserting pictures
     for i in pictures_data.iter() {
         let point_id = *point_ids
             .get(i.point_idx)
@@ -247,6 +255,8 @@ pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
 
     // 5. Seed obstacle
     println!("🚧 Insertion des obstacles...");
+    // 6. Seed obstacle
+    // inserting obstacles
     for o in obstacles_data.iter() {
         let point_id = *point_ids
             .get(o.point_idx)
@@ -311,6 +321,7 @@ pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
     println!("   - {} obstacles", obstacles_data.len());
     println!("   - {} événements", event_data.len());
     println!("   - {} liaisons point-événement", point_event_data.len());
+    // seeding finished
 
     Ok(())
 }

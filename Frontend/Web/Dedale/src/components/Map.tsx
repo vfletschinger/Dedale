@@ -3,6 +3,7 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { invoke } from "@tauri-apps/api/core";
 import PointDetails from "./PointDetails";
+import AddPointForm from "./AddPointForm";
 import ReactDOM from "react-dom/client";
 
 function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }) {
@@ -15,8 +16,17 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
   );
   const [currentPopup, setCurrentPopup] = useState<maplibregl.Popup | null>(null);
   const pointsRef = useRef<any[]>([]);
+  const [points, setPoints] = useState<any[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [events, setEvents] = useState<any[]>([]);
+  const [awaitingMapClick, setAwaitingMapClick] = useState(false);
+  const awaitingMapClickRef = useRef(false);
+  const selectedEventIdRef = useRef<number | null>(null);
+
+  // Synchroniser la ref avec le state
+  useEffect(() => {
+    selectedEventIdRef.current = selectedEvent?.id ?? selectedEventId;
+  }, [selectedEvent, selectedEventId]);
 
   // Charger tous les événements au démarrage
   useEffect(() => {
@@ -73,6 +83,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
         console.log(`📍 ${points.length} point(s) récupéré(s)`);
 
         pointsRef.current = points;
+        setPoints(points);
 
         const geojson = {
           type: "FeatureCollection",
@@ -181,6 +192,101 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
           });
           // --- CLICK LISTENER END ---
 
+          // --- ADD POINT ON MAP CLICK ---
+          mapObj.on("click", (e: maplibregl.MapMouseEvent) => {
+            // Only open add form if we're in "add mode"
+            if (!awaitingMapClickRef.current) return;
+
+            // Check if we clicked on an existing point
+            const features = mapObj.queryRenderedFeatures(e.point, {
+              layers: ["db-points-layer"],
+            });
+            if (features.length > 0) return; // Don't open add form if clicking on existing point
+
+            // Reset the awaiting state
+            awaitingMapClickRef.current = false;
+            setAwaitingMapClick(false);
+
+            const { lng, lat } = e.lngLat;
+
+            // Remove previous popup
+            if (currentPopup) {
+              currentPopup.remove();
+              setCurrentPopup(null);
+            }
+
+            // DOM Setup for AddPointForm
+            const container = document.createElement("div");
+            container.style.maxWidth = "400px";
+            container.style.maxHeight = "500px";
+            container.style.width = "360px";
+            container.style.overflow = "auto";
+            container.style.padding = "8px";
+
+            const popup = new maplibregl.Popup({
+              offset: 12,
+              closeButton: true,
+              className: "custom-popup add-point-popup",
+            })
+              .setLngLat([lng, lat])
+              .setDOMContent(container)
+              .addTo(mapObj);
+
+            setCurrentPopup(popup);
+            const root = ReactDOM.createRoot(container);
+
+            const handleClose = () => popup.remove();
+            const handleSaved = async () => {
+              console.log("🔄 handleSaved appelé - rafraîchissement des points...");
+              popup.remove();
+              try {
+                const currentEventId = selectedEventIdRef.current;
+                const freshPoints = await invoke<any[]>("get_points", { eventId: currentEventId || null });
+                console.log(`📍 ${freshPoints.length} point(s) après refresh pour event ${currentEventId}`);
+                pointsRef.current = freshPoints;
+                setPoints(freshPoints);
+                
+                // Mettre à jour la source GeoJSON
+                if (mapObj.getSource("db-points")) {
+                  const geojson = {
+                    type: "FeatureCollection",
+                    features: freshPoints.map((p: any) => ({
+                      type: "Feature",
+                      geometry: {
+                        type: "Point",
+                        coordinates: [Number(p.x), Number(p.y)] as [number, number],
+                      },
+                      properties: {
+                        id: p.id,
+                        obstacles: p.obstacles,
+                        comments: p.comments,
+                        pictures: p.pictures,
+                      },
+                    })),
+                  };
+                  (mapObj.getSource("db-points") as maplibregl.GeoJSONSource).setData(geojson as any);
+                }
+              } catch (err) {
+                console.error("Erreur refresh points:", err);
+              }
+            };
+
+            root.render(
+              <AddPointForm
+                initialCoords={{ lng, lat }}
+                onClose={handleClose}
+                onSaved={handleSaved}
+                eventId={selectedEventIdRef.current}
+              />
+            );
+
+            popup.on("close", () => {
+              setTimeout(() => root.unmount(), 0);
+              setCurrentPopup(null);
+            });
+          });
+          // --- ADD POINT ON MAP CLICK END ---
+
           // Mouse cursors
           mapObj.on("mouseenter", "db-points-layer", () => (mapObj.getCanvas().style.cursor = "pointer"));
           mapObj.on("mouseleave", "db-points-layer", () => (mapObj.getCanvas().style.cursor = ""));
@@ -207,6 +313,49 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
 
     return () => mapInstance.remove();
   }, []);
+
+  // Recharger les points quand l'événement sélectionné change
+  useEffect(() => {
+    if (!map) return;
+    
+    const reloadPoints = async () => {
+      const eventId = selectedEvent?.id ?? null;
+      console.log("🔄 Changement d'événement, rechargement des points pour event_id:", eventId);
+      
+      try {
+        const freshPoints = await invoke<any[]>("get_points", { eventId: eventId });
+        console.log(`📍 ${freshPoints.length} point(s) récupéré(s) pour event ${eventId}`);
+        
+        pointsRef.current = freshPoints;
+        setPoints(freshPoints);
+        
+        // Mettre à jour la source GeoJSON
+        if (map.getSource("db-points")) {
+          const geojson = {
+            type: "FeatureCollection",
+            features: freshPoints.map((p: any) => ({
+              type: "Feature",
+              geometry: {
+                type: "Point",
+                coordinates: [Number(p.x), Number(p.y)] as [number, number],
+              },
+              properties: {
+                id: p.id,
+                obstacles: p.obstacles,
+                comments: p.comments,
+                pictures: p.pictures,
+              },
+            })),
+          };
+          (map.getSource("db-points") as maplibregl.GeoJSONSource).setData(geojson as any);
+        }
+      } catch (err) {
+        console.error("Erreur rechargement points:", err);
+      }
+    };
+    
+    reloadPoints();
+  }, [selectedEvent, map]);
 
   // Fonction pour sélectionner une suggestion
   const handleSelect = (place: any) => {
@@ -253,8 +402,78 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
     return () => clearTimeout(timeout);
   }, [query]);
 
+  // Ouvre un popup pour un point (utilisé par la liste à gauche)
+  const openPopupForPoint = async (point: any) => {
+    if (!map || !point) return;
+    const coords: [number, number] = [Number(point.x), Number(point.y)];
+    map.flyTo({ center: coords, zoom: 15 });
+  };
+
+  // Gestion du clic pour ajouter un point
+  const handleAddPointClick = () => {
+    if (!map) {
+      alert("Carte non initialisée");
+      return;
+    }
+    setAwaitingMapClick(true);
+    awaitingMapClickRef.current = true;
+  };
+
+  // Effet pour le curseur crosshair quand on attend un clic
+  useEffect(() => {
+    if (!map) return;
+    try {
+      const canvas = map.getCanvas();
+      canvas.style.cursor = awaitingMapClick ? "crosshair" : "";
+    } catch (err) {}
+    return () => {
+      try { if (map) map.getCanvas().style.cursor = ""; } catch (e) {}
+    };
+  }, [awaitingMapClick, map]);
+
   return (
     <div className="h-screen flex bg-gradient-to-br from-slate-50 to-blue-50 overflow-hidden">
+      {/* Panneau gauche: liste des points */}
+      <div className="w-72 bg-white/90 backdrop-blur-md border-r border-gray-200 shadow-lg flex flex-col z-20">
+        <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-indigo-500 to-purple-600">
+          <div className="flex items-center justify-between">
+            <h3 className="text-white font-bold text-lg">📍 Points</h3>
+            <button
+              onClick={handleAddPointClick}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                awaitingMapClick
+                  ? 'bg-yellow-400 text-yellow-900 animate-pulse'
+                  : 'bg-white/20 text-white hover:bg-white/30'
+              }`}
+            >
+              {awaitingMapClick ? '⏳ Cliquez sur la carte' : '+ Ajouter'}
+            </button>
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto p-2">
+          {points.length === 0 ? (
+            <div className="text-center text-gray-500 py-8">
+              <div className="text-4xl mb-2">📭</div>
+              <p>Aucun point</p>
+              <p className="text-xs mt-1">Cliquez sur "Ajouter" puis sur la carte</p>
+            </div>
+          ) : (
+            points.map((p: any) => (
+              <div
+                key={p.id}
+                onClick={() => openPopupForPoint(p)}
+                className="p-3 mb-2 bg-white rounded-xl border border-gray-100 hover:border-indigo-300 hover:shadow-md cursor-pointer transition-all duration-200 hover:translate-x-1"
+              >
+                <div className="font-semibold text-gray-800">Point #{p.id}</div>
+                <div className="text-xs text-gray-500 mt-1">
+                  {p.obstacles?.length || 0} obstacle(s) • {p.comments?.length || 0} commentaire(s)
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
       {/* Conteneur principal de la carte */}
       <div className="flex-1 flex flex-col">
         {/* Sélecteur d'événements */}

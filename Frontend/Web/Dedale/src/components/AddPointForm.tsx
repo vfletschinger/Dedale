@@ -5,10 +5,12 @@ export default function AddPointForm({
   initialCoords,
   onClose,
   onSaved,
+  eventId,
 }: {
   initialCoords: { lng: number; lat: number };
   onClose?: () => void;
   onSaved?: () => void;
+  eventId?: number | null;
 }) {
   const [x, setX] = useState<number>(initialCoords.lng);
   const [y, setY] = useState<number>(initialCoords.lat);
@@ -115,7 +117,13 @@ export default function AddPointForm({
         obstacles: obstaclesSnake,
       };
 
-      await invoke("insert_point", { details: [detail] });
+      console.log("📍 Envoi du point:", JSON.stringify(detail, null, 2));
+      console.log("🎯 Event ID:", eventId);
+      const insertedIds = await invoke<number[]>("insert_point", { 
+        details: [detail], 
+        eventId: eventId || null 
+      });
+      console.log("✅ Point inséré avec succès, IDs:", insertedIds);
 
       if (onSaved) onSaved();
       if (onClose) onClose();

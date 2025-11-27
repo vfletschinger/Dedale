@@ -1,4 +1,5 @@
 // On importe les dépendances nécessaires
+use bcrypt::{hash, verify, DEFAULT_COST};
 use serde::Deserialize;
 use serde::Serialize;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
@@ -60,15 +61,13 @@ pub fn init_db() -> impl tauri::plugin::Plugin<tauri::Wry> {
                     FOREIGN KEY (point_id) REFERENCES point (id),
                     FOREIGN KEY (type_id) REFERENCES obstacle_type (id)
                 );
-                CREATE TABLE event (
+
+                CREATE TABLE user (
                     id INTEGER PRIMARY KEY,
-                    name TEXT,
-                    description TEXT,
-                    date_debut DATE,
-                    date_fin DATE,
-                    statut TEXT,
-                    geometry TEXT
-                ); 
+                    username TEXT,
+                    password_hash TEXT,
+                    role TEXT
+                );
             ",
             kind: MigrationKind::Up,
         },
@@ -106,6 +105,14 @@ pub fn init_db() -> impl tauri::plugin::Plugin<tauri::Wry> {
     println!("[DB] ✅ Plugin SQL construit (les migrations s'exécuteront au premier accès JS)");
     
     plugin
+}
+
+#[derive(sqlx::FromRow, Debug, Serialize, Deserialize)]
+pub struct User {
+    pub id: i64,
+    pub username: String,
+    pub password_hash: String,
+    pub role: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -209,13 +216,12 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
         .map_err(|e| format!("Failed to create app data directory: {}", e))?;
 
     let db_path = app_data_dir.join("mydatabase.db");
+    let db_path_str = db_path
+        .to_str()
+        .ok_or_else(|| "Failed to convert DB path to string.".to_string())?
+        .to_string();
 
-    let db_url = format!(
-        "sqlite:{}",
-        db_path
-            .to_str()
-            .ok_or_else(|| "Failed to convert DB path to string.".to_string())?
-    );
+    let db_url = format!("sqlite:{}", db_path_str);
 
     let connect_options = SqliteConnectOptions::from_str(&db_url)
         .map_err(|e| format!("Failed to parse DB URL: {}", e))?
@@ -379,11 +385,6 @@ pub async fn insert_obstacles(
                 .map_err(|e| format!("Failed to insert obstacle: {}", e))?;
         }
     }
-
-    println!(
-        "✅ Successfully inserted/updated obstacles for point {}",
-        point_id
-    );
     Ok(())
 }
 
@@ -450,26 +451,17 @@ pub async fn retrieve_data_by_event(app: &AppHandle, event_id: Option<i64>) -> R
 pub async fn insert_point_details(
     app: &AppHandle,
     details: Vec<PointDetail>,
-) -> Result<(), String> {
-    println!(
-        "[DB] 🚀 Début de l'insertion de {} PointDetail(s)",
-        details.len()
-    );
-
+) -> Result<Vec<i64>, String> {
     let pool = get_db_pool(app).await?;
     let mut tx: Transaction<Sqlite> = pool
         .begin()
         .await
         .map_err(|e| format!("Erreur au démarrage de la transaction : {}", e))?;
 
-    println!("[DB] ✓ Transaction démarrée");
-
     // ÉTAPE 1: Insérer tous les points d'abord
-    println!("[DB] 📍 Insertion des points...");
     // We need to keep track of assigned IDs when frontend sends id==0 for new points
     let mut assigned_ids: Vec<i64> = Vec::with_capacity(details.len());
     for detail in &details {
-        println!("[DB]   → Point ID: {}, x: {}, y: {}", detail.point.id, detail.point.x, detail.point.y);
         if detail.point.id == 0 {
             // Insert without specifying id so SQLite assigns a rowid
             sqlx::query(r#"INSERT INTO point (x, y) VALUES (?, ?)"#)
@@ -486,7 +478,6 @@ pub async fn insert_point_details(
                 .map_err(|e| format!("Erreur récupération last_insert_rowid: {}", e))?;
             let new_id: i64 = row.get("id");
             assigned_ids.push(new_id);
-            println!("[DB]     → Nouveau point id assigné: {}", new_id);
         } else {
             // Respect provided id
             sqlx::query(r#"INSERT OR REPLACE INTO point (id, x, y) VALUES (?, ?, ?)"#)
@@ -495,19 +486,21 @@ pub async fn insert_point_details(
                 .bind(detail.point.y)
                 .execute(&mut *tx)
                 .await
-                .map_err(|e| format!("Erreur INSERT/REPLACE point ID {} : {}", detail.point.id, e))?;
+                .map_err(|e| {
+                    format!("Erreur INSERT/REPLACE point ID {} : {}", detail.point.id, e)
+                })?;
             assigned_ids.push(detail.point.id as i64);
         }
     }
-    println!("[DB] ✓ Tous les points insérés");
-
-    // ÉTAPE 2: Insérer les données liées
-    println!("[DB] 💬 Insertion des commentaires...");
+    // ÉTAPE 2: Insérer les données liées (commentaires)
     for (idx, detail) in details.iter().enumerate() {
         let assigned_point_id = assigned_ids[idx];
         for comment in &detail.comment {
-            let point_id_to_use = if comment.point_id == 0 { assigned_point_id as i32 } else { comment.point_id };
-            println!("[DB]   → Comment ID: {}, point_id: {}, value: {:?}", comment.id, point_id_to_use, &comment.value[..comment.value.len().min(30)]);
+            let point_id_to_use = if comment.point_id == 0 {
+                assigned_point_id as i32
+            } else {
+                comment.point_id
+            };
             sqlx::query(r#"INSERT OR REPLACE INTO comment (id, point_id, value) VALUES (?, ?, ?)"#)
                 .bind(comment.id)
                 .bind(point_id_to_use)
@@ -517,14 +510,15 @@ pub async fn insert_point_details(
                 .map_err(|e| format!("Erreur INSERT/REPLACE comment ID {} : {}", comment.id, e))?;
         }
     }
-    println!("[DB] ✓ Tous les commentaires insérés");
-
-    println!("[DB] 📸 Insertion des images...");
+    // images
     for (idx, detail) in details.iter().enumerate() {
         let assigned_point_id = assigned_ids[idx] as i32;
         for picture in &detail.picture {
-            let point_id_to_use = if picture.point_id == 0 { assigned_point_id } else { picture.point_id };
-            println!("[DB]   → Picture ID: {}, point_id: {}, taille: {} bytes", picture.id, point_id_to_use, picture.image.len());
+            let point_id_to_use = if picture.point_id == 0 {
+                assigned_point_id
+            } else {
+                picture.point_id
+            };
             sqlx::query(r#"INSERT OR REPLACE INTO picture (id, point_id, image) VALUES (?, ?, ?)"#)
                 .bind(picture.id)
                 .bind(point_id_to_use)
@@ -534,27 +528,23 @@ pub async fn insert_point_details(
                 .map_err(|e| format!("Erreur INSERT/REPLACE picture ID {} : {}", picture.id, e))?;
         }
     }
-    println!("[DB] ✓ Toutes les images insérées");
-
-    println!("[DB] 🚧 Insertion des obstacle_types et obstacles...");
+    // obstacles and types
     for (idx, detail) in details.iter().enumerate() {
         let assigned_point_id = assigned_ids[idx] as i64;
         for obstacle in &detail.obstacle {
-            let point_id_to_use = if obstacle.point_id == 0 { assigned_point_id } else { obstacle.point_id };
-            println!("[DB]   → Obstacle ID: {}, point_id: {}, type_id: {}, nombre: {}", 
-                obstacle.id, point_id_to_use, obstacle.type_id, obstacle.number.unwrap_or(0));
-            
-            // Si l'obstacle a des données de type (name, description, width, length), 
+            let point_id_to_use = if obstacle.point_id == 0 {
+                assigned_point_id
+            } else {
+                obstacle.point_id
+            };
+
+            // Si l'obstacle a des données de type (name, description, width, length),
             // on l'insère dans obstacle_type
             if obstacle.name.is_some()
                 || obstacle.description.is_some()
                 || obstacle.width.is_some()
                 || obstacle.length.is_some()
             {
-                println!(
-                    "[DB]     → Insertion/vérification obstacle_type ID: {}",
-                    obstacle.type_id
-                );
                 sqlx::query(
                     r#"INSERT OR IGNORE INTO obstacle_type (id, name, description, width, length) 
                        VALUES (?, ?, ?, ?, ?)"#,
@@ -573,7 +563,6 @@ pub async fn insert_point_details(
                     )
                 })?;
             }
-
             // Insérer l'obstacle lui-même
             sqlx::query(r#"INSERT OR REPLACE INTO obstacle (id, point_id, type_id, number) VALUES (?, ?, ?, ?)"#)
                 .bind(obstacle.id)
@@ -586,28 +575,48 @@ pub async fn insert_point_details(
                     obstacle.id, point_id_to_use, obstacle.type_id, e))?;
         }
     }
-    println!("[DB] ✓ Tous les obstacles et types insérés");
 
-    println!("[DB] 💾 Validation de la transaction...");
+    // Commit
     tx.commit()
         .await
         .map_err(|e| format!("Erreur à la validation (commit) de la transaction : {}", e))?;
 
-    println!("[DB] ✅ Transaction validée avec succès !");
+    // transaction committed
 
-    Ok(())
+    Ok(assigned_ids)
 }
 
 #[tauri::command]
-pub async fn insert_point(
-    app: tauri::AppHandle,
-    details: Vec<PointDetail>,
-) -> Result<(), String> {
-
-    // Réutilisation de la version WebSocket existante
-    insert_point_details(&app, details).await
+pub async fn insert_point(app: tauri::AppHandle, details: Vec<PointDetail>, event_id: Option<i64>) -> Result<Vec<i64>, String> {
+    println!("[DB] 📍 insert_point appelé avec {} point(s), event_id: {:?}", details.len(), event_id);
+    for (i, d) in details.iter().enumerate() {
+        println!("[DB]   Point {}: id={}, x={}, y={}", i, d.point.id, d.point.x, d.point.y);
+        println!("[DB]   - {} commentaire(s), {} photo(s), {} obstacle(s)", 
+            d.comment.len(), d.picture.len(), d.obstacle.len());
+    }
+    let result = insert_point_details(&app, details).await;
+    match &result {
+        Ok(ids) => {
+            println!("[DB] ✅ Point(s) inséré(s) avec succès, IDs: {:?}", ids);
+            // Lier les points à l'événement si event_id est fourni
+            if let Some(eid) = event_id {
+                let pool = get_db_pool(&app).await?;
+                for point_id in ids {
+                    println!("[DB] 🔗 Liaison automatique point {} → event {}", point_id, eid);
+                    sqlx::query("INSERT OR IGNORE INTO point_event (point_id, event_id) VALUES (?, ?)")
+                        .bind(*point_id)
+                        .bind(eid)
+                        .execute(&pool)
+                        .await
+                        .map_err(|e| format!("Failed to link point to event: {}", e))?;
+                }
+                println!("[DB] ✅ {} point(s) lié(s) à l'événement {}", ids.len(), eid);
+            }
+        },
+        Err(e) => println!("[DB] ❌ Erreur insertion: {}", e),
+    }
+    result
 }
-
 
 #[tauri::command]
 pub async fn delete_point(app: AppHandle, point_id: i64) -> Result<(), String> {
@@ -798,4 +807,132 @@ pub async fn delete_event(app: AppHandle, event_id: i64) -> Result<(), String> {
 
     println!("[DB] ✅ Événement {} supprimé", event_id);
     Ok(())
+}
+
+pub async fn is_first_launch(pool: &SqlitePool) -> sqlx::Result<bool> {
+    let (count,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM user")
+        .fetch_one(pool)
+        .await?;
+    Ok(count == 0)
+}
+
+pub async fn create_initial_admin(
+    pool: &SqlitePool,
+    username: &str,
+    password: &str,
+) -> sqlx::Result<()> {
+    let password_hash = hash(password, DEFAULT_COST).expect("Erreur hash mot de passe");
+
+    sqlx::query(
+        "
+        INSERT INTO user (username, password_hash, role)
+        VALUES (?, ?, ?)
+    ",
+    )
+    .bind(username)
+    .bind(password_hash)
+    .bind("admin")
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
+pub async fn get_user_by_username(pool: &SqlitePool, username: &str) -> sqlx::Result<Option<User>> {
+    let user = sqlx::query_as::<_, User>("SELECT * FROM user WHERE username = ?")
+        .bind(username)
+        .fetch_optional(pool)
+        .await?;
+
+    Ok(user)
+}
+
+/// Ensure the core database schema exists (idempotent).
+pub async fn ensure_schema(pool: &SqlitePool) -> Result<(), String> {
+    // CREATE TABLE IF NOT EXISTS for all required tables
+    let stmts = vec![
+        r#"CREATE TABLE IF NOT EXISTS point (
+            id INTEGER PRIMARY KEY,
+            x REAL,
+            y REAL
+        );"#,
+        r#"CREATE TABLE IF NOT EXISTS obstacle_type (
+            id INTEGER PRIMARY KEY,
+            name TEXT,
+            description TEXT,
+            width REAL,
+            length REAL
+        );"#,
+        r#"CREATE TABLE IF NOT EXISTS comment (
+            id INTEGER PRIMARY KEY,
+            point_id INTEGER,
+            value TEXT,
+            FOREIGN KEY (point_id) REFERENCES point (id)
+        );"#,
+        r#"CREATE TABLE IF NOT EXISTS picture (
+            id INTEGER PRIMARY KEY,
+            point_id INTEGER,
+            image TEXT,
+            FOREIGN KEY (point_id) REFERENCES point (id)
+        );"#,
+        r#"CREATE TABLE IF NOT EXISTS obstacle (
+            id INTEGER PRIMARY KEY,
+            point_id INTEGER,
+            type_id INTEGER,
+            number INTEGER,
+            description TEXT,
+            FOREIGN KEY (point_id) REFERENCES point (id),
+            FOREIGN KEY (type_id) REFERENCES obstacle_type (id)
+        );"#,
+        r#"CREATE TABLE IF NOT EXISTS user (
+            id INTEGER PRIMARY KEY,
+            username TEXT,
+            password_hash TEXT,
+            role TEXT
+        );"#,
+    ];
+
+    for s in stmts {
+        sqlx::query(s)
+            .execute(pool)
+            .await
+            .map_err(|e| format!("Failed to ensure schema: {}", e))?;
+    }
+
+    Ok(())
+}
+
+// --- Tauri command wrappers for frontend ---
+#[tauri::command]
+pub async fn is_first_launch_cmd(app: AppHandle) -> Result<bool, String> {
+    let pool = get_db_pool(&app).await?;
+    is_first_launch(&pool).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn create_initial_admin_cmd(
+    app: AppHandle,
+    username: String,
+    password: String,
+) -> Result<(), String> {
+    let pool = get_db_pool(&app).await?;
+    create_initial_admin(&pool, &username, &password)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn verify_credentials_cmd(
+    app: AppHandle,
+    username: String,
+    password: String,
+) -> Result<bool, String> {
+    let pool = get_db_pool(&app).await?;
+    match get_user_by_username(&pool, &username)
+        .await
+        .map_err(|e| e.to_string())?
+    {
+        Some(user) => Ok(verify(&password, &user.password_hash).unwrap_or(false)),
+        None => Ok(false),
+    }
 }

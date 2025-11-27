@@ -1,17 +1,18 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { listen } from '@tauri-apps/api/event';
+import { invoke } from '@tauri-apps/api/core';
+import * as path from '@tauri-apps/api/path';
+import Database from '@tauri-apps/plugin-sql';
 import Accueil from "./components/Accueil";
 import Equipes from "./components/Equipe";
 import Map from "./components/Map";
 import Event from "./components/Events";
-import DataTransfer from "./components/DataTransfer";
+import AdminForm from "./components/AdminForm";
+
 import logoStrasbourg from "./assets/logo_strasbourg.png";
 
 // --- Composant de Navigation ---
-// global.d.ts
-
-
-function Navigation({ page, setPage }: { page: string, setPage: (page: string) => void }) {
-
+function Navigation({ page, setPage }: { page: string; setPage: (page: string) => void }) {
   return (
     <nav className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 backdrop-blur-lg border-b border-white/10 shadow-2xl">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -29,7 +30,7 @@ function Navigation({ page, setPage }: { page: string, setPage: (page: string) =
             </div>
             <div className="hidden sm:block">
               <h1 className="text-xl font-bold bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">
-                Dédale Sports
+                Dedale Sports
               </h1>
             </div>
           </div>
@@ -37,10 +38,10 @@ function Navigation({ page, setPage }: { page: string, setPage: (page: string) =
           {/* Center - Modern Navigation Buttons */}
           <div className="flex items-center space-x-2">
             {[
-              { key: "event", label: " Événements"},
-              { key: "map", label: " Carte"},
-              { key: "equipe", label: " Équipes"},
-              { key: "transfer", label: " Données"}
+              { key: "event", label: "Evenements" },
+              { key: "map", label: "Carte" },
+              { key: "equipe", label: "Equipes" },
+              { key: "transfer", label: "Donnees" }
             ].map((item) => (
               <button
                 key={item.key}
@@ -53,7 +54,7 @@ function Navigation({ page, setPage }: { page: string, setPage: (page: string) =
                 onClick={() => setPage(item.key)}
               >
                 <span className="flex items-center space-x-2">
-                  <span className="hidden sm:inline">{item.label.split(' ')[1]}</span>
+                  <span>{item.label}</span>
                 </span>
                 {page === item.key && (
                   <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-white rounded-full"></div>
@@ -72,17 +73,66 @@ function Navigation({ page, setPage }: { page: string, setPage: (page: string) =
 }
 
 function App() {
-  const [page, setPage] = useState("equipe");
+  const [page, setPage] = useState("home");
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
   const [events, setEvents] = useState<any[]>([]);
-  
+  const [db, setDb] = useState<Database | null>(null);
+  const [error, setError] = useState("");
+  const [firstLaunch, setFirstLaunch] = useState(false);
+
   const handleEventClick = (eventId: number) => {
     setSelectedEventId(eventId);
     setPage("map");
   };
-  
+
+  // Check first launch
+  useEffect(() => {
+    const unlisten = listen('first-launch', () => {
+      setFirstLaunch(true);
+    });
+
+    (async () => {
+      try {
+        const isFirst: boolean = await invoke('is_first_launch_cmd');
+        if (isFirst) {
+          setFirstLaunch(true);
+        }
+      } catch (e) {
+        // ignore
+      }
+    })();
+
+    return () => {
+      unlisten.then(f => f()).catch(() => {});
+    };
+  }, []);
+
+  async function handleCreateAdmin(username: string, password: string) {
+    try {
+      await invoke('create_initial_admin_cmd', { username, password });
+      setFirstLaunch(false);
+    } catch (e) {
+      console.error('create admin failed', e);
+    }
+  }
+
+  // Connexion BDD au demarrage
+  useEffect(() => {
+    const initDb = async () => {
+      try {
+        const appDataPath = await path.appDataDir();
+        const dbPath = await path.join(appDataPath, 'mydatabase.db');
+        const dbInstance = await Database.load(`sqlite:${dbPath}`);
+        setDb(dbInstance);
+      } catch (e: any) {
+        console.error("Erreur connexion BDD:", e);
+        setError("Erreur de connexion BDD: " + e.message);
+      }
+    };
+    initDb();
+  }, []);
+
   const renderPage = () => {
-  
     switch (page) {
       case "equipe":
         return <Equipes />;
@@ -90,14 +140,27 @@ function App() {
         return <Map selectedEventId={selectedEventId} />;
       case "event":
         return <Event onEventClick={handleEventClick} onEventsLoaded={setEvents} />;
-      case "transfer":
-       // return <DataTransfer />;
       case "home":
         return <Accueil />;
       default:
-        return <Equipes />;
+        return <Accueil />;
     }
   };
+
+  // Si c'est le premier lancement, afficher le formulaire admin
+  if (firstLaunch) {
+    return (
+      <div className="w-full min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50 to-purple-50 font-sans flex items-center justify-center">
+        <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-8 max-w-md w-full mx-4">
+          <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-4">
+            Configuration initiale
+          </h2>
+          <p className="mb-6 text-gray-600">Creez le compte administrateur pour continuer.</p>
+          <AdminForm onSubmit={handleCreateAdmin} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50 to-purple-50 font-sans relative overflow-hidden">
@@ -111,18 +174,14 @@ function App() {
         <Navigation page={page} setPage={setPage} />
       </header>
 
-      {/* Rendu conditionnel selon la page */}
       {page === "map" ? (
-        // La carte prend toute la place disponible
         <div className="relative z-10" style={{ height: "calc(100vh - 5rem)" }}>
           <Map selectedEventId={selectedEventId} />
         </div>
       ) : (
-        // Autres pages avec le conteneur normal
         <main className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-8">
           <div className="bg-white/60 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-8 min-h-[calc(100vh-12rem)]">
             <div className="relative">
-              {/* Subtle inner glow */}
               <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-transparent to-purple-50/50 rounded-3xl -z-10"></div>
               {renderPage()}
             </div>
@@ -130,7 +189,6 @@ function App() {
         </main>
       )}
       
-      {/* Floating stats card - fixe sur toute la page */}
       {page === "event" && (
         <div className="fixed bottom-6 right-6 z-50 bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-white/30 p-4">
           <div className="flex items-center gap-3">

@@ -1,4 +1,6 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+use tauri::Emitter;
+use tauri::Manager;
 
 mod db;
 mod excel;
@@ -11,10 +13,43 @@ mod utils;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // Ensure DB plugin (migrations) is initialized before running setup code
+        .plugin(db::init_db())
+        .setup(|app| {
+            let handle = app.handle();
+            // At startup: run DB seed (idempotent) and check if this is the first launch (no users in DB).
+            tauri::async_runtime::block_on(async {
+                // Ensure schema exists (idempotent) and run seed. Keep output minimal: only show errors.
+                match db::get_db_pool(handle).await {
+                    Ok(pool) => {
+                        if let Err(e) = db::ensure_schema(&pool).await {
+                            eprintln!("[db] ensure_schema error: {}", e);
+                        }
+
+                        if let Err(e) = seed::seed_database(&handle).await {
+                            eprintln!("[seed] error during seeding: {}", e);
+                        }
+
+                        // Notify all windows that this might be a first launch.
+                        match db::is_first_launch(&pool).await {
+                            Ok(true) => {
+                                if let Some(window) = handle.get_webview_window("main") {
+                                    let _ = window.emit("first-launch", true);
+                                }
+                            }
+                            Ok(false) => {}
+                            Err(e) => eprintln!("[db] is_first_launch error: {}", e),
+                        }
+                    }
+                    Err(e) => eprintln!("[db] get_db_pool error: {}", e),
+                }
+            });
+
+            Ok(())
+        })
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_fs::init())
-        .plugin(db::init_db())
         .invoke_handler(tauri::generate_handler![
             excel::export_points_excel,
             pdf::create_pdf,
@@ -24,6 +59,9 @@ pub fn run() {
             db::insert_obstacles,
             db::delete_point,
             db::insert_point,
+            db::is_first_launch_cmd,
+            db::create_initial_admin_cmd,
+            db::verify_credentials_cmd,
             db::fetch_events,
             db::insert_event,
             db::delete_event,
