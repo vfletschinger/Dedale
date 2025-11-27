@@ -591,10 +591,6 @@ pub async fn get_user_by_username(pool: &SqlitePool, username: &str) -> sqlx::Re
     Ok(user)
 }
 
-pub async fn verify_password(user: &User, password: &str) -> bool {
-    verify(password, &user.password_hash).unwrap_or(false)
-}
-
 /// Ensure the core database schema exists (idempotent).
 pub async fn ensure_schema(pool: &SqlitePool) -> Result<(), String> {
     // CREATE TABLE IF NOT EXISTS for all required tables
