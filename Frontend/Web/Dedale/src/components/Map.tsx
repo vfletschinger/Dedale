@@ -4,7 +4,6 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { invoke } from "@tauri-apps/api/core";
 import PointDetails from "./PointDetails";
 import AddPointForm from "./AddPointForm";
-import ReactDOM from "react-dom/client";
 
 function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }) {
   const mapContainer = useRef<HTMLDivElement | null>(null);
@@ -14,9 +13,10 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
   const [currentMarker, setCurrentMarker] = useState<maplibregl.Marker | null>(
     null
   );
-  const [currentPopup, setCurrentPopup] = useState<maplibregl.Popup | null>(null);
   const pointsRef = useRef<any[]>([]);
   const [points, setPoints] = useState<any[]>([]);
+  const [selectedPoint, setSelectedPoint] = useState<any | null>(null);
+  const [addingPointCoords, setAddingPointCoords] = useState<{ lng: number; lat: number } | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [events, setEvents] = useState<any[]>([]);
   const [awaitingMapClick, setAwaitingMapClick] = useState(false);
@@ -126,69 +126,16 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
           mapObj.on("click", "db-points-layer", async (e: any) => {
             const f = e.features?.[0];
             if (!f) return;
-            const coords = (f.geometry as any).coordinates.slice();
             const pointId = f.properties?.id;
 
-            // Remove previous popup
-            if (currentPopup) {
-              currentPopup.remove();
-              setCurrentPopup(null);
+            // Trouver le point dans les données
+            const clickedPoint = pointsRef.current.find(
+              (p) => String(p.id) === String(pointId)
+            );
+
+            if (clickedPoint) {
+              setSelectedPoint(clickedPoint);
             }
-
-            // DOM Setup
-            const container = document.createElement("div");
-            container.style.maxWidth = "600px";
-            container.style.maxHeight = "600px";
-            container.style.width = "350px";
-            container.style.height = "450px";
-            container.style.overflow = "auto";
-            container.style.padding = "8px";
-
-            const popup = new maplibregl.Popup({
-              offset: 12,
-              closeButton: false,
-              className: "custom-popup",
-            })
-              .setLngLat(coords)
-              .setDOMContent(container)
-              .addTo(mapObj);
-
-            setCurrentPopup(popup);
-            const root = ReactDOM.createRoot(container);
-
-            const handleClose = () => popup.remove();
-
-            const renderPopupUI = () => {
-              const freshPoint = pointsRef.current.find(
-                (p) => String(p.id) === String(pointId)
-              );
-
-              // If point was deleted, close the popup
-              if (!freshPoint) {
-                handleClose();
-                return;
-              }
-
-              root.render(
-                <PointDetails
-                  point={freshPoint}
-                  onClose={handleClose}
-                  onRefresh={async () => {
-                    await fetchAndDisplayPoints(mapObj);
-                    renderPopupUI();
-                  }}
-                />
-              );
-            };
-
-            // Initial render
-            renderPopupUI();
-
-            // Cleanup
-            popup.on("close", () => {
-              setTimeout(() => root.unmount(), 0);
-              setCurrentPopup(null);
-            });
           });
           // --- CLICK LISTENER END ---
 
@@ -209,81 +156,9 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
 
             const { lng, lat } = e.lngLat;
 
-            // Remove previous popup
-            if (currentPopup) {
-              currentPopup.remove();
-              setCurrentPopup(null);
-            }
-
-            // DOM Setup for AddPointForm
-            const container = document.createElement("div");
-            container.style.maxWidth = "400px";
-            container.style.maxHeight = "500px";
-            container.style.width = "360px";
-            container.style.overflow = "auto";
-            container.style.padding = "8px";
-
-            const popup = new maplibregl.Popup({
-              offset: 12,
-              closeButton: true,
-              className: "custom-popup add-point-popup",
-            })
-              .setLngLat([lng, lat])
-              .setDOMContent(container)
-              .addTo(mapObj);
-
-            setCurrentPopup(popup);
-            const root = ReactDOM.createRoot(container);
-
-            const handleClose = () => popup.remove();
-            const handleSaved = async () => {
-              console.log("🔄 handleSaved appelé - rafraîchissement des points...");
-              popup.remove();
-              try {
-                const currentEventId = selectedEventIdRef.current;
-                const freshPoints = await invoke<any[]>("get_points", { eventId: currentEventId || null });
-                console.log(`📍 ${freshPoints.length} point(s) après refresh pour event ${currentEventId}`);
-                pointsRef.current = freshPoints;
-                setPoints(freshPoints);
-                
-                // Mettre à jour la source GeoJSON
-                if (mapObj.getSource("db-points")) {
-                  const geojson = {
-                    type: "FeatureCollection",
-                    features: freshPoints.map((p: any) => ({
-                      type: "Feature",
-                      geometry: {
-                        type: "Point",
-                        coordinates: [Number(p.x), Number(p.y)] as [number, number],
-                      },
-                      properties: {
-                        id: p.id,
-                        obstacles: p.obstacles,
-                        comments: p.comments,
-                        pictures: p.pictures,
-                      },
-                    })),
-                  };
-                  (mapObj.getSource("db-points") as maplibregl.GeoJSONSource).setData(geojson as any);
-                }
-              } catch (err) {
-                console.error("Erreur refresh points:", err);
-              }
-            };
-
-            root.render(
-              <AddPointForm
-                initialCoords={{ lng, lat }}
-                onClose={handleClose}
-                onSaved={handleSaved}
-                eventId={selectedEventIdRef.current}
-              />
-            );
-
-            popup.on("close", () => {
-              setTimeout(() => root.unmount(), 0);
-              setCurrentPopup(null);
-            });
+            // Fermer les détails du point si ouverts et ouvrir le formulaire d'ajout
+            setSelectedPoint(null);
+            setAddingPointCoords({ lng, lat });
           });
           // --- ADD POINT ON MAP CLICK END ---
 
@@ -402,11 +277,52 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
     return () => clearTimeout(timeout);
   }, [query]);
 
-  // Ouvre un popup pour un point (utilisé par la liste à gauche)
+  // Sélectionne un point et centre la carte dessus (utilisé par la liste à gauche)
   const openPopupForPoint = async (point: any) => {
     if (!map || !point) return;
     const coords: [number, number] = [Number(point.x), Number(point.y)];
     map.flyTo({ center: coords, zoom: 15 });
+    setSelectedPoint(point);
+  };
+
+  // Rafraîchir les points et mettre à jour le point sélectionné
+  const refreshPoints = async () => {
+    if (!map) return;
+    const currentEventId = selectedEventIdRef.current;
+    try {
+      const freshPoints = await invoke<any[]>("get_points", { eventId: currentEventId || null });
+      pointsRef.current = freshPoints;
+      setPoints(freshPoints);
+
+      // Mettre à jour le point sélectionné s'il existe encore
+      if (selectedPoint) {
+        const updatedPoint = freshPoints.find(p => p.id === selectedPoint.id);
+        setSelectedPoint(updatedPoint || null);
+      }
+
+      // Mettre à jour la source GeoJSON
+      if (map.getSource("db-points")) {
+        const geojson = {
+          type: "FeatureCollection",
+          features: freshPoints.map((p: any) => ({
+            type: "Feature",
+            geometry: {
+              type: "Point",
+              coordinates: [Number(p.x), Number(p.y)] as [number, number],
+            },
+            properties: {
+              id: p.id,
+              obstacles: p.obstacles,
+              comments: p.comments,
+              pictures: p.pictures,
+            },
+          })),
+        };
+        (map.getSource("db-points") as maplibregl.GeoJSONSource).setData(geojson as any);
+      }
+    } catch (err) {
+      console.error("Erreur refresh points:", err);
+    }
   };
 
   // Gestion du clic pour ajouter un point
@@ -432,7 +348,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
   }, [awaitingMapClick, map]);
 
   return (
-    <div className="h-screen flex bg-gradient-to-br from-slate-50 to-blue-50 overflow-hidden">
+    <div className="h-full flex bg-gradient-to-br from-slate-50 to-blue-50 overflow-hidden">
       {/* Panneau gauche: liste des points */}
       <div className="w-72 bg-white/90 backdrop-blur-md border-r border-gray-200 shadow-lg flex flex-col z-20">
         <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-indigo-500 to-purple-600">
@@ -547,8 +463,36 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
           </div>
         </div>
 
-        {/* Conteneur de la carte */}
-        <div ref={mapContainer} className="flex-1" />
+        {/* Conteneur de la carte et panneau détails */}
+        <div className="flex-1 flex overflow-hidden relative">
+          {/* Carte */}
+          <div ref={mapContainer} className="flex-1 h-full" />
+          
+          {/* Panneau droit: détails du point sélectionné OU formulaire d'ajout */}
+          {(selectedPoint || addingPointCoords) && (
+            <div className="w-96 bg-white/95 backdrop-blur-md border-l border-gray-200 shadow-lg flex flex-col overflow-hidden">
+              <div className="flex-1 overflow-y-auto">
+                {selectedPoint ? (
+                  <PointDetails
+                    point={selectedPoint}
+                    onClose={() => setSelectedPoint(null)}
+                    onRefresh={refreshPoints}
+                  />
+                ) : addingPointCoords ? (
+                  <AddPointForm
+                    initialCoords={addingPointCoords}
+                    onClose={() => setAddingPointCoords(null)}
+                    onSaved={() => {
+                      setAddingPointCoords(null);
+                      refreshPoints();
+                    }}
+                    eventId={selectedEventIdRef.current}
+                  />
+                ) : null}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
