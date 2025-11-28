@@ -71,7 +71,14 @@ pub async fn create_pdf(app: AppHandle) -> Result<(), String> {
                 // with inputs that may still contain stray characters or partial data URIs.
                 let mut valid_base64: String = raw_base64
                     .chars()
-                    .filter(|c| c.is_ascii_alphanumeric() || *c == '+' || *c == '/' || *c == '=' || *c == '-' || *c == '_')
+                    .filter(|c| {
+                        c.is_ascii_alphanumeric()
+                            || *c == '+'
+                            || *c == '/'
+                            || *c == '='
+                            || *c == '-'
+                            || *c == '_'
+                    })
                     .collect();
 
                 // Ensure padding to multiple of 4.
@@ -92,7 +99,11 @@ pub async fn create_pdf(app: AppHandle) -> Result<(), String> {
                     },
                 };
 
-                let image_bytes = if let Some(b) = image_bytes { b } else { continue; };
+                let image_bytes = if let Some(b) = image_bytes {
+                    b
+                } else {
+                    continue;
+                };
 
                 let img_dynamic = image::load_from_memory(&image_bytes)
                     .map_err(|e| format!("Failed to load image from memory: {}", e))?;
@@ -131,10 +142,6 @@ pub async fn create_pdf(app: AppHandle) -> Result<(), String> {
     if let Some(file_path) = utils::show_save_dialog(&file_name, &dir_path, "pdf".to_string()) {
         doc.render_to_file(file_path)
             .map_err(|e| format!("Failed to write PDF file: {}", e))?;
-
-        println!("PDF successfully saved.");
-    } else {
-        println!("Save cancelled by user");
     }
 
     Ok(())

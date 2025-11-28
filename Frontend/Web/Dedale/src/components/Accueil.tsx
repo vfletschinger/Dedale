@@ -1,46 +1,74 @@
-import  { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import * as path from '@tauri-apps/api/path'; 
-import QrCode from './QrCode'; 
-
-
-
-async function generate_excel() {
-    try {
-        const appDataPath = await path.appDataDir();
-
-        if (!appDataPath) throw new Error("Impossible de récupérer AppData");
-
-        const db_url = await path.join(appDataPath, 'mydatabase.db');
-        const excel_path_str = await path.join(appDataPath, 'points.xlsx');
-        
-        console.log(`Chemin de la BDD: ${db_url}`);
-        console.log(`Chemin Excel: ${excel_path_str}`);
-
-        await invoke(
-            'export_points_excel', {
-                dbUrl: db_url, 
-                excelPathStr: excel_path_str
-            }
-        );
-  
-    } catch (error) {
-        console.error("Erreur lors de l'exportation Excel:", error);
-    }
-}
-
+import * as path from '@tauri-apps/api/path';
+import QrCode from './QrCode';
 
 function Accueil() {
     const [qrCodeBase64, setQrCodeBase64] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
+    // État pour les messages de statut (Export, PDF)
+    const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+    // Fonction pour l'export Excel
+    const generate_excel = useCallback(async () => {
+        setMessage(null);
+        try {
+            const appDataPath = await path.appDataDir();
+            if (!appDataPath) throw new Error("Impossible de récupérer AppData");
+
+            // Utilisation de mockPath.join
+            const db_url = await path.join(appDataPath, 'mydatabase.db');
+            const excel_path_str = await path.join(appDataPath, 'points.xlsx');
+            
+            console.log(`Chemin de la BDD: ${db_url}`);
+            console.log(`Chemin Excel: ${excel_path_str}`);
+
+            // Utilisation de mockInvoke
+            await invoke('export_points_excel', { dbUrl: db_url, excelPathStr: excel_path_str });
+
+            setMessage({ 
+                type: 'success', 
+                text: `Exportation Excel réussie. Le fichier est simulé à : ${excel_path_str}` 
+            });
+        } catch (error) {
+            console.error("Erreur lors de l'exportation Excel:", error);
+            setMessage({ 
+                type: 'error', 
+                text: `Erreur d'exportation: ${String(error)}. Vérifiez la console.` 
+            });
+        }
+    }, []);
+
+    // Fonction pour la création de PDF
+    const createPdf = useCallback(async () => {
+        setMessage(null);
+        try {
+            // Utilisation de mockInvoke
+            await invoke("create_pdf");
+            setMessage({ 
+                type: 'success', 
+                text: "Génération PDF lancée avec succès (simulée). Vérifiez votre dossier de données." 
+            });
+        } catch (error) {
+            console.error("Erreur lors de la création du PDF:", error);
+            setMessage({ 
+                type: 'error', 
+                text: `Erreur de création PDF: ${String(error)}. Vérifiez la console.` 
+            });
+        }
+    }, []);
+
+
+    // Fonction pour le démarrage du serveur et génération du QR code
     const qr_code = useCallback(async () => {
         setIsLoading(true);
         setError(null);
         setQrCodeBase64(null);
+        setMessage(null);
 
         try {
+            // Utilisation de mockInvoke
             const base64String = await invoke<string>('start_server');
             
             setQrCodeBase64(base64String);
@@ -58,78 +86,125 @@ function Accueil() {
         return `data:image/png;base64,${base64}`;
     }
     
-    const baseBtn = "px-4 py-2 font-medium rounded-lg transition duration-200 shadow-md flex-1 mx-2";
-    const exportBtnClass = `${baseBtn} bg-green-600 text-white hover:bg-green-700 disabled:bg-gray-400`;
+    // Classes de base pour les boutons
+    const baseBtn = "w-full px-6 py-3 font-semibold rounded-xl transition duration-300 shadow-md transform hover:scale-[1.02]";
+    
+    const exportBtnClass = `${baseBtn} bg-green-500 text-white hover:bg-green-600 focus:ring-4 focus:ring-green-300`;
+    const pdfBtnClass = `${baseBtn} bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-4 focus:ring-indigo-300`;
     const connectBtnClass = qrCodeBase64 
-        ? `${baseBtn} bg-blue-500 text-white hover:bg-blue-600 disabled:bg-gray-400`
-        : `${baseBtn} bg-gray-700 text-white hover:bg-gray-800 disabled:bg-gray-400`;
+        ? `${baseBtn} bg-blue-500 text-white hover:bg-blue-600 focus:ring-4 focus:ring-blue-300`
+        : `${baseBtn} bg-gray-700 text-white hover:bg-gray-800 focus:ring-4 focus:ring-gray-400`;
+
+    // Composant de feedback pour les messages (success/error)
+    const FeedbackMessage = ({ type, text }: { type: 'success' | 'error'; text: string }) => {
+        const classes = type === 'success' 
+            ? "bg-green-100 border-green-500 text-green-700"
+            : "bg-red-100 border-red-500 text-red-700";
+        const title = type === 'success' ? "Succès" : "Erreur";
+
+        return (
+            <div className={`p-4 border-l-4 ${classes} rounded-lg shadow-inner mt-4 w-full max-w-lg mx-auto`}>
+                <p className="font-bold">{title}</p>
+                <p className="text-sm break-all">{text}</p>
+            </div>
+        );
+    };
 
     return (
-        <div className="flex flex-col items-center p-8 bg-gray-50 min-h-screen">
-            <h1 className="text-3xl font-extrabold text-[#2c3e50] mb-2">
-                Accueil Dedale
-            </h1>
-            <p className="text-lg text-gray-600 mb-8 text-center">
-                Gérez les données et connectez l'appareil mobile.
-            </p>
+        <div className="min-h-screen bg-gray-100 flex flex-col items-center p-4 sm:p-8 font-sans">
+            <div className="w-full max-w-5xl bg-white rounded-3xl shadow-2xl p-6 md:p-12">
+                <header className="text-center mb-10">
+                    <h1 className="text-4xl font-extrabold text-gray-800 tracking-tight">
+                        Dedale - Console de Gestion
+                    </h1>
+                    <p className="text-lg text-gray-500 mt-2">
+                        Gérez l'export des données et la connexion à l'application mobile.
+                    </p>
+                </header>
 
-            <div className="flex flex-row justify-center w-full max-w-lg space-x-4 mb-10">
-                <button
-                    className={exportBtnClass}
-                    onClick={generate_excel}
-                >
-                    Exporter Excel
-                </button>
-                <button
-        type="button"
-        className="px-3 py-2 rounded-md text-[#ffffff] bg-[#20272f] hover:bg-[#2ad783] transition font-medium"
-        onClick={() => createPdf()}
-      >
-        Creer un pdf
-      </button>
-                <button
-                    className={connectBtnClass}
-                    onClick={qr_code}
-                    disabled={isLoading}
-                >
-                    {qrCodeBase64 ? "Serveur Démarré" : "Connecter App Mobile"}
-                </button>
-            </div>
+                {/* Section des Messages de Statut Global */}
+                {message && <FeedbackMessage type={message.type} text={message.text} />}
 
-            <div className="flex flex-col items-center justify-center w-full min-h-[350px]">
-                {isLoading && (
-                    <div className="flex flex-col items-center justify-center p-5">
-                        <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
-                        <p className="mt-4 text-blue-700 text-lg">Démarrage du serveur et génération...</p>
-                    </div>
-                )}
 
-                {error && (
-                    <div className="p-4 bg-red-100 border border-red-400 text-red-700 rounded-md text-center">
-                        <h3 className="font-bold mb-1">Erreur Serveur</h3>
-                        <p>Erreur: {error}</p>
+                <div className="mt-8 grid lg:grid-cols-3 gap-8">
+
+                    {/* COLONNE 1: Gestion des Données (Export/PDF) */}
+                    <div className="lg:col-span-1 bg-gray-50 p-6 rounded-2xl border border-gray-200 shadow-lg h-full">
+                        <h2 className="text-2xl font-bold text-gray-700 mb-6 border-b pb-2">
+                            Gestion des Fichiers
+                        </h2>
+                        <div className="space-y-4">
+                            <button
+                                className={exportBtnClass}
+                                onClick={generate_excel}
+                                aria-label="Exporter les données au format Excel"
+                            >
+                                Exporter les Données (Excel)
+                            </button>
+                            <button
+                                className={pdfBtnClass}
+                                onClick={createPdf}
+                                aria-label="Créer un rapport PDF"
+                            >
+                                Créer un Rapport (PDF)
+                            </button>
+                        </div>
                     </div>
-                )}
-                
-                {qrCodeBase64 && !isLoading && (
-                    <div className="bg-white p-5 rounded-xl shadow-xl flex flex-col items-center">
-                        <p className="text-xl text-gray-800 mb-4 font-semibold">
-                            Scannez ce code pour vous connecter.
-                        </p>
-                        <QrCode 
-                            qrCodeUri={getQrCodeUri(qrCodeBase64)} 
-                        />
-                        <p className="mt-4 text-sm text-gray-500">
-                            Serveur WebSocket actif.
-                        </p>
+
+
+                    {/* COLONNE 2 & 3: Connexion Mobile (QR Code) */}
+                    <div className="lg:col-span-2 bg-blue-50 p-6 rounded-2xl border-2 border-dashed border-blue-200 shadow-lg flex flex-col items-center justify-center min-h-[300px]">
+                        <h2 className="text-2xl font-bold text-blue-700 mb-6 text-center">
+                            Connexion de l'Application Mobile
+                        </h2>
+                        
+                        <div className="w-full max-w-md">
+                            <button
+                                className={connectBtnClass}
+                                onClick={qr_code}
+                                disabled={isLoading}
+                                aria-label={qrCodeBase64 ? "Serveur déjà démarré" : "Démarrer le serveur et connecter l'application"}
+                            >
+                                {isLoading ? (
+                                    <span className="flex items-center justify-center">
+                                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        Démarrage du serveur...
+                                    </span>
+                                ) : (
+                                    qrCodeBase64 ? "Serveur WebSocket Actif" : "Démarrer Serveur & Connecter App Mobile"
+                                )}
+                            </button>
+                        </div>
+
+                        {/* Contenu dynamique : Erreur / QR Code */}
+                        <div className="mt-8">
+                            {error && (
+                                <div className="p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg text-center shadow-lg">
+                                    <h3 className="font-bold mb-1">Erreur Critique</h3>
+                                    <p className="text-sm">Impossible de démarrer le serveur. Erreur: <code className="text-xs break-all">{error}</code></p>
+                                </div>
+                            )}
+                            
+                            {qrCodeBase64 && !isLoading && (
+                                <div className="flex flex-col items-center">
+                                    <p className="text-lg text-gray-700 mb-4 font-medium">
+                                        Scannez ce code depuis l'application mobile.
+                                    </p>
+                                    <QrCode 
+                                        qrCodeUri={getQrCodeUri(qrCodeBase64)} 
+                                    />
+                                </div>
+                            )}
+                        </div>
                     </div>
-                )}
+                </div>
+
             </div>
         </div>
     );
-async function createPdf() {
-  await invoke("create_pdf");
-}
 }
 
 export default Accueil;
