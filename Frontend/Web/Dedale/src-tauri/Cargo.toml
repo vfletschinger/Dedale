@@ -18,13 +18,13 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+image = { version = "0.23", features = ["jpeg"] }
 sqlx = { version = "0.8.6", features = [
     "sqlite",
     "runtime-tokio-native-tls",
     "macros",
 ] }
 tauri = { version = "2.9.3", features = [] }
-genpdf = { version = "0.2.0", features = ["images"] }
 tauri-plugin-opener = "2.5.2"
 serde = { version = "^1", features = ["derive"] }
 serde_json = "^1"
@@ -35,9 +35,12 @@ tauri-plugin-fs = "2"
 rust_xlsxwriter = "0.92.2"
 dirs = "6.0.0"
 rand = "0.9.2"
-image = "0.23"
 qrcode = { version = "0.12", default-features = false, features = ["image"] }
 local-ip-address = "0.6.5"
 tungstenite = "0.28.0"
 base64 = "0.22.1"
 rfd = "0.16.0"
+typst = "0.14.0"
+typst-pdf = "0.14.0"
+typst-as-lib = "0.15.0"
+walkdir = "2"
