@@ -24,13 +24,13 @@ pub fn init_db() -> impl tauri::plugin::Plugin<tauri::Wry> {
             version: 2,
             description: "create_all_tables",
             sql: "
-                CREATE TABLE point (
+                CREATE TABLE IF NOT EXISTS point (
                     id INTEGER PRIMARY KEY ,
                     x REAL,
                     y REAL
                 );
                 
-                CREATE TABLE obstacle_type (
+                CREATE TABLE IF NOT EXISTS obstacle_type (
                     id INTEGER PRIMARY KEY,
                     name TEXT,
                     description TEXT,
@@ -38,21 +38,21 @@ pub fn init_db() -> impl tauri::plugin::Plugin<tauri::Wry> {
                     length REAL
                 );
 
-                CREATE TABLE comment (
+                CREATE TABLE IF NOT EXISTS comment (
                     id INTEGER PRIMARY KEY,
                     point_id INTEGER,
                     value TEXT,
                     FOREIGN KEY (point_id) REFERENCES point (id)
                 );
 
-                CREATE TABLE picture (
+                CREATE TABLE IF NOT EXISTS picture (
                     id INTEGER PRIMARY KEY,
                     point_id INTEGER,
                     image TEXT,
                     FOREIGN KEY (point_id) REFERENCES point (id)
                 );
 
-                CREATE TABLE obstacle (
+                CREATE TABLE IF NOT EXISTS obstacle (
                     id INTEGER PRIMARY KEY,
                     point_id INTEGER,
                     type_id INTEGER,
@@ -62,18 +62,18 @@ pub fn init_db() -> impl tauri::plugin::Plugin<tauri::Wry> {
                     FOREIGN KEY (type_id) REFERENCES obstacle_type (id)
                 );
 
-                CREATE TABLE user (
+                CREATE TABLE IF NOT EXISTS user (
                     id INTEGER PRIMARY KEY,
                     username TEXT,
                     password_hash TEXT,
                     role TEXT
                 );
-                CREATE TABLE event (
+                CREATE TABLE IF NOT EXISTS event (
                     id INTEGER PRIMARY KEY,
                     name TEXT,
                     description TEXT,
-                    dateDebut TEXT,
-                    dateFin TEXT,
+                    date_debut TEXT,
+                    date_fin TEXT,
                     statut TEXT,
                     geometry TEXT
                 );
@@ -84,7 +84,7 @@ pub fn init_db() -> impl tauri::plugin::Plugin<tauri::Wry> {
             version: 3,
             description: "create_point_event_table",
             sql: "
-                CREATE TABLE point_event (
+                CREATE TABLE IF NOT EXISTS point_event (
                     id INTEGER PRIMARY KEY,
                     point_id INTEGER NOT NULL,
                     event_id INTEGER NOT NULL,
@@ -898,6 +898,23 @@ pub async fn ensure_schema(pool: &SqlitePool) -> Result<(), String> {
             username TEXT,
             password_hash TEXT,
             role TEXT
+        );"#,
+        r#"CREATE TABLE IF NOT EXISTS event (
+            id INTEGER PRIMARY KEY,
+            name TEXT,
+            description TEXT,
+            date_debut TEXT,
+            date_fin TEXT,
+            statut TEXT,
+            geometry TEXT
+        );"#,
+        r#"CREATE TABLE IF NOT EXISTS point_event (
+            id INTEGER PRIMARY KEY,
+            point_id INTEGER NOT NULL,
+            event_id INTEGER NOT NULL,
+            FOREIGN KEY (point_id) REFERENCES point(id) ON DELETE CASCADE,
+            FOREIGN KEY (event_id) REFERENCES event(id) ON DELETE CASCADE,
+            UNIQUE(point_id, event_id)
         );"#,
     ];
 
