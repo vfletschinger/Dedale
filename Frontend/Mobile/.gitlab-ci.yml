@@ -1,6 +1,5 @@
 stages: 
   - quality
-  - build
 
 image: node:22-slim
 
@@ -18,15 +17,3 @@ lint:
     expire_in: 1 week
     when: always
   allow_failure: true
-
-build:
-  stage: build
-  before_script:
-    - apt-get update && apt-get install -y git
-    - cd Frontend/Mobile/Dedale
-    - npm install -g eas-cli
-    - npm install
-  script: 
-    - eas build --platform all --profile production --non-interactive --no-wait
-  rules:
-    - if: $CI_COMMIT_BRANCH == "main"

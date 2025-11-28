@@ -10,7 +10,7 @@ import logoStrasbourg from "./assets/logo_strasbourg.png";
 // global.d.ts
 
 
-function Navigation({ page, setPage }: { page: string, setPage: (page: string) => void }) {
+function Navigation({ setPage }: { setPage: (page: string) => void }) {
 
   return (
     <nav className="bg-[#171c22]"> {/* Couleur principale 65% */}
@@ -151,7 +151,7 @@ function App() {
   return (
     <div className="w-full min-h-screen bg-gray-50 font-sans">
       <header className="text-center mb-8">
-        <Navigation page={page} setPage={setPage} />
+        <Navigation setPage={setPage} />
       </header>
 
       <main className="bg-white p-6 rounded-lg shadow-md h-full">
