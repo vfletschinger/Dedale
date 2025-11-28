@@ -76,28 +76,22 @@ pub async fn create_pdf(app: AppHandle) -> Result<(), String> {
                     &pic.image
                 };
 
-                let mut valid_base64: String = raw_base64
-                    .chars()
-                    .filter(|c| {
-                        c.is_ascii_alphanumeric()
-                            || *c == '+'
-                            || *c == '/'
-                            || *c == '='
-                            || *c == '-'
-                            || *c == '_'
-                    })
-                    .collect();
-
-                while valid_base64.len() % 4 != 0 {
-                    valid_base64.push('=');
-                }
-
-                let image_bytes = match general_purpose::STANDARD.decode(&valid_base64) {
+                // Decode without manual padding - base64 crate handles it
+                let image_bytes = match general_purpose::STANDARD.decode(raw_base64) {
                     Ok(b) => Some(b),
-                    Err(_) => general_purpose::URL_SAFE.decode(&valid_base64).ok(),
+                    Err(_) => match general_purpose::STANDARD_NO_PAD.decode(raw_base64) {
+                        Ok(b) => Some(b),
+                        Err(_) => None,
+                    },
                 };
 
                 if let Some(bytes) = image_bytes {
+                    // Validate decoded image before writing
+                    if bytes.len() < 8 {
+                        eprintln!("Invalid image data at index {}", img_index);
+                        continue;
+                    }
+
                     let ext = if bytes.starts_with(&[0xFF, 0xD8, 0xFF]) {
                         "jpg"
                     } else if bytes.starts_with(&[0x89, 0x50, 0x4E, 0x47]) {
@@ -107,7 +101,8 @@ pub async fn create_pdf(app: AppHandle) -> Result<(), String> {
                     } else if bytes.starts_with(b"GIF8") {
                         "gif"
                     } else {
-                        "jpg"
+                        eprintln!("Unknown image format at index {}", img_index);
+                        continue;
                     };
 
                     let img_filename = format!("img_{}_{}.{}", point_index, img_index, ext);
