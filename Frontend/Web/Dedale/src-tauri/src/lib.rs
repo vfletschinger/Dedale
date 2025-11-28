@@ -26,7 +26,7 @@ pub fn run() {
                             eprintln!("[db] ensure_schema error: {}", e);
                         }
 
-                        if let Err(e) = seed::seed_database(&handle).await {
+                        if let Err(e) = seed::seed_database(&pool).await {
                             eprintln!("[seed] error during seeding: {}", e);
                         }
 
