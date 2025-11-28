@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import * as path from '@tauri-apps/api/path';
 import QrCode from './QrCode';
 
-function Accueil() {
+function Data() {
     const [qrCodeBase64, setQrCodeBase64] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
@@ -207,4 +207,4 @@ function Accueil() {
     );
 }
 
-export default Accueil;
+export default Data;

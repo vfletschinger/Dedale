@@ -68,6 +68,15 @@ pub fn init_db() -> impl tauri::plugin::Plugin<tauri::Wry> {
                     password_hash TEXT,
                     role TEXT
                 );
+                CREATE TABLE event (
+                    id INTEGER PRIMARY KEY,
+                    name TEXT,
+                    description TEXT,
+                    dateDebut TEXT,
+                    dateFin TEXT,
+                    statut TEXT,
+                    geometry TEXT
+                );
             ",
             kind: MigrationKind::Up,
         },
