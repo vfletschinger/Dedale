@@ -40,20 +40,17 @@ export default function CreateRouteScreen(_: CreateRouteProps) {
 
   return (
     <View className="container">
-      <Pressable onPress={() => navigation.goBack()} className="back-btn">
-        <View className="back-btn-gray">
-          <Text className="back-btn-gray-text">←</Text>
-        </View>
-      </Pressable>
-
-      <View className="floating-header" style={{ pointerEvents: "none" }}>
-        <View className="floating-header-content">
-          <Text className="floating-header-text">Ordonner l'itinéraire</Text>
+      <View className="header">
+        <View className="row">
+          <Pressable onPress={() => navigation.goBack()} className="mr-3">
+            <Text className="text-white text-2xl">←</Text>
+          </Pressable>
+          <Text className="header-title">Ordonner l'itinéraire</Text>
         </View>
       </View>
 
       {points && points.length > 0 ? (
-        <GestureHandlerRootView className="flex-1 pt-24 pb-24 w-3/4 self-center">
+        <GestureHandlerRootView className="flex-1 pb-24 w-3/4 self-center">
           <DragList
             data={data}
             keyExtractor={(item) => item.id.toString()}

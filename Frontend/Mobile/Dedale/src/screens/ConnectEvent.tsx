@@ -72,10 +72,7 @@ export default function ConnectEvent() {
         }
       />
 
-      <Pressable
-        className="absolute bottom-6 left-6 right-6 bg-blue-500 flex-row items-center justify-center gap-3 py-4 rounded-xl shadow-lg active:bg-blue-600"
-        onPress={() => setScanQR(true)}
-      >
+      <Pressable className="btn-bottom-action" onPress={() => setScanQR(true)}>
         <Feather name="camera" size={24} color="#fff" />
         <Text className="text-lg font-semibold text-white">
           Scanner un QR Code

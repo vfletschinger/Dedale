@@ -247,16 +247,13 @@ export default function RegisterPointScreen() {
       )}
 
       <View className="absolute bottom-5 left-5 right-5 flex-row justify-between gap-2">
-        <Pressable
-          onPress={requestLocation}
-          className="flex-1 bg-violet-500 p-4 rounded-xl items-center active:bg-violet-600"
-        >
+        <Pressable onPress={requestLocation} className="flex-1 btn-violet">
           <Text className="text-white font-bold">Obtenir ma position</Text>
         </Pressable>
 
         <Pressable
           onPress={() => setIsModalVisible(true)}
-          className="flex-1 bg-violet-500 p-4 rounded-xl items-center active:bg-violet-600"
+          className="flex-1 btn-violet"
         >
           <Text className="text-white font-bold">Ajouter un point</Text>
         </Pressable>
@@ -298,11 +295,8 @@ export default function RegisterPointScreen() {
                 </Text>
                 <View className="flex-row flex-wrap gap-2">
                   {selectedObstacles.map((obs, idx) => (
-                    <View
-                      key={idx}
-                      className="bg-blue-100 px-3 py-1.5 rounded-full"
-                    >
-                      <Text className="text-blue-800 font-medium">
+                    <View key={idx} className="obstacle-tag">
+                      <Text className="obstacle-tag-text">
                         {obs.name} ({obs.number})
                       </Text>
                     </View>
@@ -322,15 +316,12 @@ export default function RegisterPointScreen() {
                 keyExtractor={(item) => item}
                 renderItem={({ item }) => (
                   <View className="relative mr-2 my-2">
-                    <Image
-                      source={{ uri: item }}
-                      className="w-24 h-24 rounded-lg"
-                    />
+                    <Image source={{ uri: item }} className="image-thumbnail" />
                     <TouchableOpacity
                       onPress={() => removeImage(item)}
-                      className="absolute -top-1 -right-1 bg-red-500 rounded-full w-6 h-6 items-center justify-center"
+                      className="image-remove-btn"
                     >
-                      <Text className="text-white font-bold text-xs">X</Text>
+                      <Text className="image-remove-text">X</Text>
                     </TouchableOpacity>
                   </View>
                 )}
