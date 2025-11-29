@@ -1,4 +1,4 @@
-import { PointDetailType } from "../types/database";
+import { EventType } from "../types/database";
 
 /**
  * Gère la connexion et la communication avec une WebSocket.
@@ -6,8 +6,8 @@ import { PointDetailType } from "../types/database";
 class WebSocketClient {
   private uri: string;
   private ws: WebSocket | null = null;
-  private messageQueue: PointDetailType[][] = []; 
   public isConnected: boolean = false;
+  private onMessageCallback?: (events: EventType[]) => void;
 
   constructor(uri: string) {
     this.uri = uri;
@@ -17,64 +17,43 @@ class WebSocketClient {
   /**
    * Tente d'établir la connexion WebSocket.
    */
-  public connect(): Promise<boolean> {
+  public connect(onMessage?: (events: EventType[]) => void): Promise<boolean> {
+    this.onMessageCallback = onMessage;
+
     return new Promise((resolve, reject) => {
       this.ws = new WebSocket(this.uri);
-      
+
       this.ws.onopen = () => {
-        console.log('✅ WebSocket connectée avec succès.');
+        console.log("✅ WebSocket connectée avec succès.");
         this.isConnected = true;
-        this.flushQueue(); 
         resolve(true);
       };
 
       this.ws.onmessage = (e: WebSocketMessageEvent) => {
-        console.log('🔔 Message reçu:', e.data);
+        console.log("🔔 Message reçu:", e.data);
+        try {
+          const events: EventType[] = JSON.parse(e.data);
+          console.log("📦 Événements reçus:", events);
+          if (this.onMessageCallback) {
+            this.onMessageCallback(events);
+          }
+        } catch (error) {
+          console.error("❌ Erreur lors du parsing des événements:", error);
+        }
       };
 
-      this.ws.onerror = (e: WebSocketErrorEvent) => {
-        console.error('❌ Erreur WebSocket:', e.message);
+      this.ws.onerror = (e: Event) => {
+        const err = e as WebSocketErrorEvent;
+        console.error("❌ Erreur WebSocket:", err?.message ?? e);
         this.isConnected = false;
-        reject(e.message);
+        reject(err?.message ?? "WebSocket error");
       };
 
       this.ws.onclose = (e: WebSocketCloseEvent) => {
-        console.log('🚪 WebSocket fermée.', e.code, e.reason);
+        console.log("🚪 WebSocket fermée.", e.code, e.reason);
         this.isConnected = false;
       };
     });
-  }
-
-  /**
-   * Envoie un message JSON.
-   * @param data L'objet JSON (typé CommandMessage) à envoyer.
-   */
-  public send(data: PointDetailType[]): void {
-    if (!this.isConnected || this.ws?.readyState !== WebSocket.OPEN) {
-      console.log('⏳ Connexion non établie. Mise en file d\'attente du message.');
-      this.messageQueue.push(data);
-    } else {
-      try {
-        const jsonString = JSON.stringify(data);
-        this.ws.send(jsonString);
-        console.log('⬆️ Message JSON envoyé:', jsonString);
-      } catch (e) {
-        console.error('Erreur lors de l\'envoi du message:', e);
-      }
-    }
-  }
-
-  /**
-   * Envoie tous les messages en attente.
-   */
-  private flushQueue(): void {
-    while (this.messageQueue.length > 0) {
-      // Le type 'CommandMessage' est inféré ici
-      const data = this.messageQueue.shift(); 
-      if (data) {
-        this.send(data);
-      }
-    }
   }
 
   /**
