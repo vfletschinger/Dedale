@@ -9,112 +9,6 @@ use sqlx::{Row, SqlitePool};
 use std::fs;
 use std::str::FromStr;
 use tauri::{AppHandle, Manager};
-use tauri_plugin_sql::{Builder, Migration, MigrationKind};
-
-// Elle renvoie le plugin SQL entièrement configuré
-pub fn init_db() -> impl tauri::plugin::Plugin<tauri::Wry> {
-    let migrations = vec![
-        Migration {
-            version: 1,
-            description: "enable_foreign_keys",
-            sql: "PRAGMA foreign_keys = ON;",
-            kind: MigrationKind::Up,
-        },
-        Migration {
-            version: 2,
-            description: "create_all_tables",
-            sql: "
-                CREATE TABLE IF NOT EXISTS point (
-                    id INTEGER PRIMARY KEY ,
-                    x REAL,
-                    y REAL
-                );
-                
-                CREATE TABLE IF NOT EXISTS obstacle_type (
-                    id INTEGER PRIMARY KEY,
-                    name TEXT,
-                    description TEXT,
-                    width REAL,
-                    length REAL
-                );
-
-                CREATE TABLE IF NOT EXISTS comment (
-                    id INTEGER PRIMARY KEY,
-                    point_id INTEGER,
-                    value TEXT,
-                    FOREIGN KEY (point_id) REFERENCES point (id)
-                );
-
-                CREATE TABLE IF NOT EXISTS picture (
-                    id INTEGER PRIMARY KEY,
-                    point_id INTEGER,
-                    image TEXT,
-                    FOREIGN KEY (point_id) REFERENCES point (id)
-                );
-
-                CREATE TABLE IF NOT EXISTS obstacle (
-                    id INTEGER PRIMARY KEY,
-                    point_id INTEGER,
-                    type_id INTEGER,
-                    number INTEGER,
-                    description TEXT,
-                    FOREIGN KEY (point_id) REFERENCES point (id),
-                    FOREIGN KEY (type_id) REFERENCES obstacle_type (id)
-                );
-
-                CREATE TABLE IF NOT EXISTS user (
-                    id INTEGER PRIMARY KEY,
-                    username TEXT,
-                    password_hash TEXT,
-                    role TEXT
-                );
-                CREATE TABLE IF NOT EXISTS event (
-                    id INTEGER PRIMARY KEY,
-                    name TEXT,
-                    description TEXT,
-                    date_debut TEXT,
-                    date_fin TEXT,
-                    statut TEXT,
-                    geometry TEXT
-                );
-            ",
-            kind: MigrationKind::Up,
-        },
-        Migration {
-            version: 3,
-            description: "create_point_event_table",
-            sql: "
-                CREATE TABLE IF NOT EXISTS point_event (
-                    id INTEGER PRIMARY KEY,
-                    point_id INTEGER NOT NULL,
-                    event_id INTEGER NOT NULL,
-                    FOREIGN KEY (point_id) REFERENCES point(id) ON DELETE CASCADE,
-                    FOREIGN KEY (event_id) REFERENCES event(id) ON DELETE CASCADE,
-                    UNIQUE(point_id, event_id)
-                );
-            ",
-            kind: MigrationKind::Up,
-        }
-    ];
-
-    println!("[DB] 🔧 Initialisation du plugin SQL...");
-    println!("[DB] 📋 {} migration(s) définies", migrations.len());
-    for m in &migrations {
-        println!("[DB]   → Migration v{}: {}", m.version, m.description);
-    }
-
-    // On construit et renvoie le plugin
-    // Note: Le chemin "sqlite:mydatabase.db" est relatif au app_data_dir de Tauri
-    println!("[DB] 📂 Chemin de la base: sqlite:mydatabase.db");
-    
-    let plugin = Builder::default()
-        .add_migrations("sqlite:mydatabase.db", migrations)
-        .build();
-    
-    println!("[DB] ✅ Plugin SQL construit (les migrations s'exécuteront au premier accès JS)");
-    
-    plugin
-}
 
 #[derive(sqlx::FromRow, Debug, Serialize, Deserialize)]
 pub struct User {
@@ -236,10 +130,139 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
         .map_err(|e| format!("Failed to parse DB URL: {}", e))?
         .create_if_missing(true);
 
-    SqlitePoolOptions::new()
+    let pool = SqlitePoolOptions::new()
         .connect_with(connect_options)
         .await
-        .map_err(|e| format!("Failed to connect to database: {}", e))
+        .map_err(|e| format!("Failed to connect to database: {}", e))?;
+
+    // Activer les foreign keys
+    sqlx::query("PRAGMA foreign_keys = ON;")
+        .execute(&pool)
+        .await
+        .map_err(|e| format!("Failed to enable foreign keys: {}", e))?;
+
+    // Créer toutes les tables si elles n'existent pas
+    println!("[DB] 🔧 Création des tables...");
+    
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS point (
+            id INTEGER PRIMARY KEY,
+            x REAL,
+            y REAL
+        )"
+    )
+    .execute(&pool)
+    .await
+    .map_err(|e| format!("Failed to create point table: {}", e))?;
+
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS obstacle_type (
+            id INTEGER PRIMARY KEY,
+            name TEXT,
+            description TEXT,
+            width REAL,
+            length REAL
+        )"
+    )
+    .execute(&pool)
+    .await
+    .map_err(|e| format!("Failed to create obstacle_type table: {}", e))?;
+
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS comment (
+            id INTEGER PRIMARY KEY,
+            point_id INTEGER,
+            value TEXT,
+            FOREIGN KEY (point_id) REFERENCES point (id)
+        )"
+    )
+    .execute(&pool)
+    .await
+    .map_err(|e| format!("Failed to create comment table: {}", e))?;
+
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS picture (
+            id INTEGER PRIMARY KEY,
+            point_id INTEGER,
+            image TEXT,
+            FOREIGN KEY (point_id) REFERENCES point (id)
+        )"
+    )
+    .execute(&pool)
+    .await
+    .map_err(|e| format!("Failed to create picture table: {}", e))?;
+
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS obstacle (
+            id INTEGER PRIMARY KEY,
+            point_id INTEGER,
+            type_id INTEGER,
+            number INTEGER,
+            description TEXT,
+            FOREIGN KEY (point_id) REFERENCES point (id),
+            FOREIGN KEY (type_id) REFERENCES obstacle_type (id)
+        )"
+    )
+    .execute(&pool)
+    .await
+    .map_err(|e| format!("Failed to create obstacle table: {}", e))?;
+
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS user (
+            id INTEGER PRIMARY KEY,
+            username TEXT,
+            password_hash TEXT,
+            role TEXT
+        )"
+    )
+    .execute(&pool)
+    .await
+    .map_err(|e| format!("Failed to create user table: {}", e))?;
+
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS event (
+            id INTEGER PRIMARY KEY,
+            name TEXT,
+            description TEXT,
+            date_debut TEXT,
+            date_fin TEXT,
+            statut TEXT,
+            geometry TEXT
+        )"
+    )
+    .execute(&pool)
+    .await
+    .map_err(|e| format!("Failed to create event table: {}", e))?;
+
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS point_event (
+            id INTEGER PRIMARY KEY,
+            point_id INTEGER NOT NULL,
+            event_id INTEGER NOT NULL,
+            FOREIGN KEY (point_id) REFERENCES point(id) ON DELETE CASCADE,
+            FOREIGN KEY (event_id) REFERENCES event(id) ON DELETE CASCADE,
+            UNIQUE(point_id, event_id)
+        )"
+    )
+    .execute(&pool)
+    .await
+    .map_err(|e| format!("Failed to create point_event table: {}", e))?;
+
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS geometry (
+            id INTEGER PRIMARY KEY,
+            event_id INTEGER NOT NULL,
+            geom TEXT,
+            FOREIGN KEY (event_id) REFERENCES event(id) ON DELETE CASCADE
+        )"
+    )
+    .execute(&pool)
+    .await
+    .map_err(|e| format!("Failed to create geometry table: {}", e))?;
+
+    println!("[DB] ✅ Toutes les tables sont prêtes");
+
+    Ok(pool)
 }
 
 async fn fetch_comments(pool: &SqlitePool, point_id: i64) -> Result<Vec<Comment>, String> {
@@ -915,6 +938,12 @@ pub async fn ensure_schema(pool: &SqlitePool) -> Result<(), String> {
             FOREIGN KEY (point_id) REFERENCES point(id) ON DELETE CASCADE,
             FOREIGN KEY (event_id) REFERENCES event(id) ON DELETE CASCADE,
             UNIQUE(point_id, event_id)
+        );"#,
+        r#"CREATE TABLE IF NOT EXISTS geometry (
+            id INTEGER PRIMARY KEY,
+            event_id INTEGER NOT NULL,
+            geom TEXT,
+            FOREIGN KEY (event_id) REFERENCES event(id) ON DELETE CASCADE
         );"#,
     ];
 

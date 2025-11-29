@@ -13,8 +13,6 @@ mod utils;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        // Ensure DB plugin (migrations) is initialized before running setup code
-        .plugin(db::init_db())
         .setup(|app| {
             let handle = app.handle();
             // At startup: run DB seed (idempotent) and check if this is the first launch (no users in DB).

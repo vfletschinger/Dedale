@@ -39,6 +39,12 @@ struct PointEventSeed {
     event_idx: usize,
 }
 
+// Géométries liées aux événements (WKT format)
+struct GeometrySeed {
+    event_idx: usize,
+    geom: &'static str,
+}
+
 #[tauri::command]
 pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
     // seed started
@@ -200,6 +206,35 @@ pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
         PointEventSeed { point_idx: 4, event_idx: 3 }, // Parc Orangerie → Concert (multi-event!)
     ];
 
+    // Géométries WKT liées aux événements
+    let geometry_data = [
+        // Festival de Strasbourg - Zone du festival (polygone)
+        GeometrySeed { 
+            event_idx: 0, 
+            geom: "POLYGON((7.7400 48.5800, 7.7500 48.5800, 7.7500 48.5900, 7.7400 48.5900, 7.7400 48.5800))" 
+        },
+        // Marché de Noël - Zone centrale (polygone)
+        GeometrySeed { 
+            event_idx: 1, 
+            geom: "POLYGON((7.7450 48.5830, 7.7480 48.5830, 7.7480 48.5860, 7.7450 48.5860, 7.7450 48.5830))" 
+        },
+        // Marathon - Parcours (ligne)
+        GeometrySeed { 
+            event_idx: 2, 
+            geom: "LINESTRING(7.7350 48.5750, 7.7400 48.5800, 7.7500 48.5850, 7.7600 48.5900, 7.7700 48.5950)" 
+        },
+        // Concert - Point de scène
+        GeometrySeed { 
+            event_idx: 3, 
+            geom: "POINT(7.7812 48.5910)" 
+        },
+        // Festival - Zone secondaire (polygone)
+        GeometrySeed { 
+            event_idx: 0, 
+            geom: "POLYGON((7.7600 48.5820, 7.7650 48.5820, 7.7650 48.5870, 7.7600 48.5870, 7.7600 48.5820))" 
+        },
+    ];
+
     let mut point_ids: Vec<i64> = Vec::new();
     let mut type_ids: Vec<i64> = Vec::new();
     let mut event_ids: Vec<i64> = Vec::new();
@@ -328,6 +363,21 @@ pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
             .map_err(|e| format!("Failed to insert point_event: {}", e))?;
     }
 
+    // 8. Seed geometry (géométries WKT liées aux événements)
+    println!("📐 Insertion des géométries...");
+    for g in geometry_data.iter() {
+        let event_id = *event_ids
+            .get(g.event_idx)
+            .ok_or("Invalid event index for geometry")?;
+        
+        sqlx::query("INSERT INTO geometry (event_id, geom) VALUES (?, ?)")
+            .bind(event_id)
+            .bind(g.geom)
+            .execute(&pool)
+            .await
+            .map_err(|e| format!("Failed to insert geometry: {}", e))?;
+    }
+
     println!("✅ Seeding terminé avec succès !");
     println!("   - {} types d'obstacles", obstacle_types.len());
     println!("   - {} points d'intérêt", points.len());
@@ -336,6 +386,7 @@ pub async fn seed_database(app: &AppHandle) -> Result<(), String> {
     println!("   - {} obstacles", obstacles_data.len());
     println!("   - {} événements", event_data.len());
     println!("   - {} liaisons point-événement", point_event_data.len());
+    println!("   - {} géométries", geometry_data.len());
     // seeding finished
 
     Ok(())
