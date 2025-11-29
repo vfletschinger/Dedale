@@ -1,5 +1,5 @@
 import { View, Text, Pressable, FlatList } from "react-native";
-import QRCodeScanner from "../components/QrCodeSacnner";
+import QRCodeScanner from "../components/QrCodeScanner";
 import { useState, useEffect } from "react";
 import { useNavigation } from "@react-navigation/native";
 import getDatabase from "../../assets/migrations";

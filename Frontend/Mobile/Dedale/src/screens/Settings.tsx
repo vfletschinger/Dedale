@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
 } from "react-native";
 import CustomButton from "../components/CustomButton";
-import QRCodeScanner from "../components/QrCodeSacnner";
+import QRCodeScanner from "../components/QrCodeScanner";
 import Feather from "@expo/vector-icons/Feather";
 
 export default function SettingsScreen() {
