@@ -24,7 +24,16 @@ export default function ConnectEvent() {
       const eventsList = db.getAllSync<EventType>(
         "SELECT * FROM event ORDER BY dateDebut DESC"
       );
-      setEvents(eventsList);
+
+      // Trier par statut: actif -> planifié -> passé
+      const statusOrder = { actif: 1, planifié: 2, passé: 3 };
+      const sortedEvents = eventsList.sort((a, b) => {
+        const orderA = statusOrder[a.statut as keyof typeof statusOrder] || 4;
+        const orderB = statusOrder[b.statut as keyof typeof statusOrder] || 4;
+        return orderA - orderB;
+      });
+
+      setEvents(sortedEvents);
     } catch (error) {
       console.error("Erreur chargement événements:", error);
     }
@@ -62,7 +71,7 @@ export default function ConnectEvent() {
         renderItem={({ item }) => (
           <EventItem event={item} onPress={handleEventSelect} />
         )}
-        contentContainerClassName="py-4 flex-grow"
+        contentContainerClassName="py-4 pb-20 flex-grow"
         ListEmptyComponent={
           <View className="center py-16">
             <Text className="text-base text-gray-400 mt-4">

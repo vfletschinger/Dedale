@@ -4,9 +4,14 @@ import { EventType } from "../types/database";
 interface EventItemProps {
   event: EventType;
   onPress: (event: EventType) => void;
+  navArrow?: boolean;
 }
 
-export default function EventItem({ event, onPress }: EventItemProps) {
+export default function EventItem({
+  event,
+  onPress,
+  navArrow = true,
+}: EventItemProps) {
   const getEventStatus = () => {
     const now = new Date();
     const dateDebut = new Date(event.dateDebut);
@@ -61,9 +66,11 @@ export default function EventItem({ event, onPress }: EventItemProps) {
         </View>
 
         {/* Flèche navigation */}
-        <View className="bg-blue-50 rounded-full px-3 py-1">
-          <Text className="text-blue-600 text-xs font-semibold">→</Text>
-        </View>
+        {navArrow && (
+          <View className="bg-blue-50 rounded-full px-3 py-1">
+            <Text className="text-blue-600 text-xs font-semibold">→</Text>
+          </View>
+        )}
       </View>
 
       <View className="h-px bg-gray-100 mb-3" />
