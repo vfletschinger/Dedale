@@ -32,6 +32,15 @@ export async function seedDatabase(db: SQLiteDatabase) {
         description: "Festival d'été à Illkirch-Graffenstaden",
         dateDebut: "2025-07-01",
         dateFin: "2025-07-15",
+        statut: "passé",
+        geometry: null,
+      },
+      {
+        id: 3,
+        name: "Fête de la Musique 2026",
+        description: "Grande fête de la musique à Strasbourg",
+        dateDebut: "2026-06-21",
+        dateFin: "2026-06-21",
         statut: "planifié",
         geometry: null,
       },
@@ -166,48 +175,66 @@ export async function seedDatabase(db: SQLiteDatabase) {
       typeIds.push(result.lastInsertRowId);
     });
 
-    // 3. Seed points for Strasbourg event (Marché de Noël)
-    console.log("Insertion des points d'intérêt pour Strasbourg...");
-    const strasbourgPoints = [
-      { event_id: eventIds[0], x: 7.7521, y: 48.5734 }, // Centre-ville Strasbourg
-      { event_id: eventIds[0], x: 7.7475, y: 48.5708 }, // Quartier de la cathédrale
-      { event_id: eventIds[0], x: 7.7601, y: 48.5745 }, // Place Kléber
-      { event_id: eventIds[0], x: 7.755, y: 48.58 }, // Petite France
-    ];
-
-    // 4. Seed points for Illkirch event
-    console.log(
-      "Insertion des points d'intérêt pour Illkirch-Graffenstaden..."
-    );
-    const illkirchPoints = [
-      { event_id: eventIds[1], x: 7.7189, y: 48.5297 }, // Centre Illkirch
-      { event_id: eventIds[1], x: 7.7245, y: 48.532 }, // Parc de l'Ill
-      { event_id: eventIds[1], x: 7.715, y: 48.528 }, // Zone commerciale
-      { event_id: eventIds[1], x: 7.721, y: 48.5305 }, // Mairie Illkirch
-      { event_id: eventIds[1], x: 7.7175, y: 48.5265 }, // Stade municipal
+    // 3. Seed points (coordinates without event association yet)
+    console.log("Insertion des points d'intérêt...");
+    const pointsData = [
+      // Strasbourg points
+      { x: 7.7521, y: 48.5734 }, // Centre-ville Strasbourg
+      { x: 7.7475, y: 48.5708 }, // Quartier de la cathédrale
+      { x: 7.7601, y: 48.5745 }, // Place Kléber
+      { x: 7.755, y: 48.58 }, // Petite France
+      // Illkirch points
+      { x: 7.7189, y: 48.5297 }, // Centre Illkirch
+      { x: 7.7245, y: 48.532 }, // Parc de l'Ill
+      { x: 7.715, y: 48.528 }, // Zone commerciale
+      { x: 7.721, y: 48.5305 }, // Mairie Illkirch
+      { x: 7.7175, y: 48.5265 }, // Stade municipal
+      // Fête de la Musique 2026 points
+      { x: 7.75, y: 48.58 }, // Place de la République
+      { x: 7.755, y: 48.582 }, // Parc de l'Orangerie
+      { x: 7.748, y: 48.579 }, // Place Gutenberg
     ];
 
     const pointIds: number[] = [];
-
-    // Insert Strasbourg points
-    strasbourgPoints.forEach((point) => {
-      const result = db.runSync(
-        "INSERT INTO point (event_id, x, y) VALUES (?, ?, ?)",
-        [point.event_id, point.x, point.y]
-      );
+    pointsData.forEach((point) => {
+      const result = db.runSync("INSERT INTO point (x, y) VALUES (?, ?)", [
+        point.x,
+        point.y,
+      ]);
       pointIds.push(result.lastInsertRowId);
     });
 
-    // Insert Illkirch points
-    illkirchPoints.forEach((point) => {
-      const result = db.runSync(
-        "INSERT INTO point (event_id, x, y) VALUES (?, ?, ?)",
-        [point.event_id, point.x, point.y]
-      );
-      pointIds.push(result.lastInsertRowId);
+    // 4. Create point-event associations (many-to-many)
+    console.log("Création des associations points-événements...");
+    const pointEventAssociations = [
+      // Strasbourg Marché de Noël (points 0-3)
+      { point_id: pointIds[0], event_id: eventIds[0] },
+      { point_id: pointIds[1], event_id: eventIds[0] },
+      { point_id: pointIds[2], event_id: eventIds[0] },
+      { point_id: pointIds[3], event_id: eventIds[0] },
+      // Illkirch Festival (points 4-8)
+      { point_id: pointIds[4], event_id: eventIds[1] },
+      { point_id: pointIds[5], event_id: eventIds[1] },
+      { point_id: pointIds[6], event_id: eventIds[1] },
+      { point_id: pointIds[7], event_id: eventIds[1] },
+      { point_id: pointIds[8], event_id: eventIds[1] },
+      // Fête de la Musique 2026 (points 9-11)
+      { point_id: pointIds[9], event_id: eventIds[2] },
+      { point_id: pointIds[10], event_id: eventIds[2] },
+      { point_id: pointIds[11], event_id: eventIds[2] },
+      // Exemple: un point peut être associé à plusieurs événements
+      // Point 2 (Place Kléber) est aussi utilisé pour la Fête de la Musique
+      { point_id: pointIds[2], event_id: eventIds[2] },
+    ];
+
+    pointEventAssociations.forEach((assoc) => {
+      db.runSync("INSERT INTO point_event (point_id, event_id) VALUES (?, ?)", [
+        assoc.point_id,
+        assoc.event_id,
+      ]);
     });
 
-    // 5. Seed comments (for Strasbourg points)
+    // 6. Seed comments (for Strasbourg points)
     console.log("Insertion des commentaires...");
     const comments = [
       {
@@ -222,6 +249,13 @@ export async function seedDatabase(db: SQLiteDatabase) {
       { point_id: pointIds[4], value: "Scène principale du festival" },
       { point_id: pointIds[5], value: "Zone de restauration" },
       { point_id: pointIds[6], value: "Parking disponible" },
+      // Comments for Fête de la Musique 2026 points
+      {
+        point_id: pointIds[9],
+        value: "Scène principale de la Fête de la Musique",
+      },
+      { point_id: pointIds[10], value: "Concerts en plein air" },
+      { point_id: pointIds[11], value: "Podium pour groupes locaux" },
     ];
 
     comments.forEach((comment) => {
@@ -282,6 +316,10 @@ export async function seedDatabase(db: SQLiteDatabase) {
       { point_id: pointIds[6], type_id: typeIds[0], nombre: 5 },
       { point_id: pointIds[7], type_id: typeIds[4], nombre: 3 },
       { point_id: pointIds[8], type_id: typeIds[7], nombre: 4 },
+      // Fête de la Musique 2026 obstacles
+      { point_id: pointIds[9], type_id: typeIds[5], nombre: 15 },
+      { point_id: pointIds[10], type_id: typeIds[6], nombre: 12 },
+      { point_id: pointIds[11], type_id: typeIds[4], nombre: 6 },
     ];
 
     obstacles.forEach((obstacle) => {
@@ -294,8 +332,9 @@ export async function seedDatabase(db: SQLiteDatabase) {
     console.log("Seeding terminé avec succès !");
     console.log(`   - ${events.length} événements`);
     console.log(`   - ${obstacleTypes.length} types d'obstacles`);
+    console.log(`   - ${pointsData.length} points d'intérêt`);
     console.log(
-      `   - ${strasbourgPoints.length + illkirchPoints.length} points d'intérêt`
+      `   - ${pointEventAssociations.length} associations point-événement`
     );
     console.log(`   - ${comments.length} commentaires`);
     console.log(`   - ${pictures.length} photos`);
@@ -315,6 +354,7 @@ export function clearDatabase(db: SQLiteDatabase): void {
     db.execSync("DELETE FROM obstacle");
     db.execSync("DELETE FROM picture");
     db.execSync("DELETE FROM comment");
+    db.execSync("DELETE FROM point_event");
     db.execSync("DELETE FROM point");
     db.execSync("DELETE FROM obstacle_type");
 

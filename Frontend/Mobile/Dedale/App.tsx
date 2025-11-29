@@ -11,6 +11,7 @@ import InterestPointsScreen from "./src/screens/InterestPoints";
 import RegisterPointScreen from "./src/screens/RegisterPoint";
 import RouteNavigation from "./src/screens/RouteNavigation";
 import ConnectEvent from "./src/screens/ConnectEvent";
+import SettingsScreen from "./src/screens/Settings";
 
 import type { TabParamList, RootStackParamList } from "./src/types/navigation";
 import { NavigationContainer } from "@react-navigation/native";
@@ -18,6 +19,8 @@ import { useEffect, useState } from "react";
 import getDatabase from "./assets/migrations";
 import React from "react";
 import CreateRouteScreen from "./src/screens/CreateRoute";
+import { EventProvider } from "./src/context/EventContext";
+import { PointsProvider } from "./src/context/PointsContext";
 
 const Tab = createBottomTabNavigator<TabParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -37,6 +40,8 @@ function TabNavigator() {
             iconName = "map-pin";
           } else if (route.name === "RegisterPoint") {
             iconName = "plus-circle";
+          } else if (route.name === "Settings") {
+            iconName = "settings";
           } else {
             iconName = "list";
           }
@@ -48,6 +53,7 @@ function TabNavigator() {
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="InterestPoints" component={InterestPointsScreen} />
       <Tab.Screen name="RegisterPoint" component={RegisterPointScreen} />
+      <Tab.Screen name="Settings" component={SettingsScreen} />
     </Tab.Navigator>
   );
 }
@@ -59,7 +65,6 @@ export default function App() {
     async function initDatabase() {
       try {
         const db = getDatabase();
-
         // if (__DEV__) {
         //   const { resetAndSeed } = await import("./assets/migrations/seeders");
         //   resetAndSeed(db);
@@ -73,37 +78,42 @@ export default function App() {
 
     initDatabase();
   }, []);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <NavigationContainer>
-        <Stack.Navigator initialRouteName="ConnectEvent">
-          <Stack.Screen
-            name="ConnectEvent"
-            component={ConnectEvent}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="Tabs"
-            component={TabNavigator}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="PointDetails"
-            component={PointDetails}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="CreateRoute"
-            component={CreateRouteScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="RouteNavigation"
-            component={RouteNavigation}
-            options={{ headerShown: false }}
-          />
-        </Stack.Navigator>
-      </NavigationContainer>
+      <EventProvider>
+        <PointsProvider>
+          <NavigationContainer>
+            <Stack.Navigator initialRouteName="ConnectEvent">
+              <Stack.Screen
+                name="ConnectEvent"
+                component={ConnectEvent}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="Tabs"
+                component={TabNavigator}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="PointDetails"
+                component={PointDetails}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="CreateRoute"
+                component={CreateRouteScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="RouteNavigation"
+                component={RouteNavigation}
+                options={{ headerShown: false }}
+              />
+            </Stack.Navigator>
+          </NavigationContainer>
+        </PointsProvider>
+      </EventProvider>
     </GestureHandlerRootView>
   );
 }

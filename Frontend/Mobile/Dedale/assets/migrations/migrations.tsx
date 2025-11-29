@@ -37,12 +37,21 @@ export const migrations: Migration[] = [
       db.execSync(`
         CREATE TABLE IF NOT EXISTS point (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
-          event_id INTEGER NOT NULL,
           x REAL NOT NULL,
           y REAL NOT NULL,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          modified_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (event_id) REFERENCES event (id) ON DELETE CASCADE
+          modified_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+
+      db.execSync(`
+        CREATE TABLE IF NOT EXISTS point_event (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          point_id INTEGER NOT NULL,
+          event_id INTEGER NOT NULL,
+          FOREIGN KEY (point_id) REFERENCES point (id) ON DELETE CASCADE,
+          FOREIGN KEY (event_id) REFERENCES event (id) ON DELETE CASCADE,
+          UNIQUE(point_id, event_id)
         );
       `);
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { View, Text, Pressable, StyleSheet, Alert } from "react-native";
+import { View, Text, Pressable, Alert } from "react-native";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import MapView, {
   Marker,
@@ -210,17 +210,17 @@ export default function RouteNavigation() {
 
   if (!currentRegion || points.length === 0) {
     return (
-      <View style={styles.container}>
-        <Text>Chargement de la carte...</Text>
+      <View className="center">
+        <Text className="text-gray-500">Chargement de la carte...</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View className="container-white">
       <MapView
         ref={mapRef}
-        style={styles.map}
+        className="flex-1"
         provider={PROVIDER_DEFAULT}
         initialRegion={currentRegion}
         showsUserLocation={true}
@@ -254,128 +254,54 @@ export default function RouteNavigation() {
 
       {/* Recenter button - only shown when current point is not visible */}
       {!isPointVisible && (
-        <Pressable onPress={centerOnCurrentPoint} style={styles.recenterButton}>
-          <Text style={styles.recenterButtonText}>📍 Recentrer</Text>
+        <Pressable
+          onPress={centerOnCurrentPoint}
+          className="absolute top-16 right-5 bg-blue-500 py-3 px-4 rounded-3xl shadow-lg"
+        >
+          <Text className="text-white font-semibold text-sm">📍 Recentrer</Text>
         </Pressable>
       )}
 
       {/* Back button */}
       <Pressable onPress={() => navigation.goBack()} className="back-btn">
-        <Text className="back-btn-text">←</Text>
+        <View className="back-btn-gray">
+          <Text className="back-btn-gray-text">←</Text>
+        </View>
       </Pressable>
 
       {/* Navigation controls */}
-      <View style={styles.controls}>
-        <View style={styles.navigationInfo}>
-          <Text style={styles.infoText}>
+      <View className="nav-controls">
+        <View className="nav-info">
+          <Text className="nav-info-text">
             Point {currentPointIndex + 1} / {points.length}
           </Text>
-          <Text style={styles.pointName}>
+          <Text className="nav-point-name">
             Point #{points[currentPointIndex].id}
           </Text>
         </View>
 
-        <View style={styles.navigationButtons}>
+        <View className="nav-buttons">
           <Pressable
             onPress={goToPreviousPoint}
-            style={[
-              styles.navButton,
-              currentPointIndex === 0 && styles.navButtonDisabled,
-            ]}
+            className={currentPointIndex === 0 ? "nav-btn-disabled" : "nav-btn"}
             disabled={currentPointIndex === 0}
           >
-            <Text style={styles.buttonText}>← Précédent</Text>
+            <Text className="nav-btn-text">← Précédent</Text>
           </Pressable>
 
           <Pressable
             onPress={goToNextPoint}
-            style={[
-              styles.navButton,
-              currentPointIndex === points.length - 1 &&
-                styles.navButtonDisabled,
-            ]}
+            className={
+              currentPointIndex === points.length - 1
+                ? "nav-btn-disabled"
+                : "nav-btn"
+            }
             disabled={currentPointIndex === points.length - 1}
           >
-            <Text style={styles.buttonText}>Suivant →</Text>
+            <Text className="nav-btn-text">Suivant →</Text>
           </Pressable>
         </View>
       </View>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  map: {
-    flex: 1,
-  },
-  controls: {
-    position: "absolute",
-    bottom: 40,
-    left: 20,
-    right: 20,
-    backgroundColor: "white",
-    borderRadius: 16,
-    padding: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  navigationInfo: {
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  infoText: {
-    fontSize: 14,
-    color: "#6b7280",
-    marginBottom: 4,
-  },
-  pointName: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#1f2937",
-  },
-  navigationButtons: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  navButton: {
-    flex: 1,
-    backgroundColor: "#3b82f6",
-    padding: 12,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  navButtonDisabled: {
-    backgroundColor: "#d1d5db",
-  },
-  buttonText: {
-    color: "white",
-    fontWeight: "600",
-    fontSize: 14,
-  },
-  recenterButton: {
-    position: "absolute",
-    top: 60,
-    right: 20,
-    backgroundColor: "#3b82f6",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 24,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  recenterButtonText: {
-    color: "white",
-    fontWeight: "600",
-    fontSize: 14,
-  },
-});

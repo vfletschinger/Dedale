@@ -1,45 +1,75 @@
-import React, { useState, useEffect } from 'react';
-import { Text, View, StyleSheet, Button, Dimensions, Modal, ActivityIndicator } from 'react-native';
-import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
-import WebSocketClient from './WebSocketClient';
-const { width } = Dimensions.get('window');
-const SCANNER_SIZE = width * 0.7; 
-import { getDatabase } from '../../assets/migrations';
-import { CommentType, InterestPointsType, ObstacleType, PictureType, PointDetailType } from '../types/database';
+import React, { useState, useEffect } from "react";
+import {
+  Text,
+  View,
+  Button,
+  Dimensions,
+  Modal,
+  ActivityIndicator,
+  StyleSheet,
+} from "react-native";
+import {
+  CameraView,
+  useCameraPermissions,
+  BarcodeScanningResult,
+} from "expo-camera";
+import WebSocketClient from "./WebSocketClient";
+const { width } = Dimensions.get("window");
+const SCANNER_SIZE = width * 0.7;
+import { getDatabase } from "../../assets/migrations";
+import {
+  CommentType,
+  InterestPointsType,
+  ObstacleType,
+  PictureType,
+  PointDetailType,
+} from "../types/database";
 
-const QRCodeScanner = ({ setScanQR }: { setScanQR: (value: boolean) => void }) => {
+const QRCodeScanner = ({
+  setScanQR,
+}: {
+  setScanQR: (value: boolean) => void;
+}) => {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [isTransferring, setIsTransferring] = useState(false);
-  const [transferStatus, setTransferStatus] = useState('Connexion en cours...');
+  const [transferStatus, setTransferStatus] = useState("Connexion en cours...");
   const db = getDatabase();
 
   if (!permission || !permission.granted) {
-      return (
-        <View style={styles.fullContainer}>
-          {!permission ? <Text>Chargement...</Text> : (
-            <View>
-              <Text>Nous avons besoin de la caméra.</Text>
-              <Button onPress={requestPermission} title="Accorder" />
-            </View>
-          )}
-        </View>
-      );
+    return (
+      <View className="scanner-container center">
+        {!permission ? (
+          <Text className="text-white">Chargement...</Text>
+        ) : (
+          <View>
+            <Text className="text-white mb-4">
+              Nous avons besoin de la caméra.
+            </Text>
+            <Button onPress={requestPermission} title="Accorder" />
+          </View>
+        )}
+      </View>
+    );
   }
-  
+
   const fetchData = async () => {
-    const points = db.getAllSync<InterestPointsType>('SELECT id, x, y FROM point');
+    const points = db.getAllSync<InterestPointsType>(
+      "SELECT id, x, y FROM point"
+    );
     const allPointDetails: PointDetailType[] = [];
 
     for (const point of points) {
       const comments = db.getAllSync<CommentType>(
-          'SELECT id, point_id, value FROM comment WHERE point_id = ?', [point.id]
+        "SELECT id, point_id, value FROM comment WHERE point_id = ?",
+        [point.id]
       );
       const pictures = db.getAllSync<PictureType>(
-          'SELECT id, point_id, image FROM picture WHERE point_id = ?', [point.id]
+        "SELECT id, point_id, image FROM picture WHERE point_id = ?",
+        [point.id]
       );
       const obstacles = db.getAllSync<ObstacleType>(
-          `SELECT 
+        `SELECT 
             o.id, 
             o.point_id, 
             o.type_id, 
@@ -50,34 +80,42 @@ const QRCodeScanner = ({ setScanQR }: { setScanQR: (value: boolean) => void }) =
             ot.length
           FROM obstacle o
           LEFT JOIN obstacle_type ot ON o.type_id = ot.id
-          WHERE o.point_id = ?`, 
-          [point.id]
+          WHERE o.point_id = ?`,
+        [point.id]
       );
-      
-      allPointDetails.push({ point: point, comments: comments, pictures: pictures, obstacles: obstacles });
+
+      allPointDetails.push({
+        point: point,
+        comments: comments,
+        pictures: pictures,
+        obstacles: obstacles,
+      });
     }
     return allPointDetails;
-  }
-  
+  };
+
   const handleBarCodeScanned = ({ type, data }: BarcodeScanningResult) => {
     if (!scanned) {
       setScanned(true);
       setIsTransferring(true);
-      setTransferStatus('Connexion en cours...');
-      
-      const websocketUri: string = data.startsWith('ws') ? data : `ws://${data}`; 
+      setTransferStatus("Connexion en cours...");
+
+      const websocketUri: string = data.startsWith("ws")
+        ? data
+        : `ws://${data}`;
       const client = new WebSocketClient(websocketUri);
-      
-      client.connect()
+
+      client
+        .connect()
         .then(async () => {
-          setTransferStatus('Récupération des données...');
+          setTransferStatus("Récupération des données...");
           const pointsData = await fetchData();
-          
-          setTransferStatus('Envoi des données...');
-          await client.send(pointsData); 
-          
-          setTransferStatus('Transfert terminé !');
-          
+
+          setTransferStatus("Envoi des données...");
+          await client.send(pointsData);
+
+          setTransferStatus("Transfert terminé !");
+
           setTimeout(() => {
             client.close();
             setIsTransferring(false);
@@ -98,12 +136,12 @@ const QRCodeScanner = ({ setScanQR }: { setScanQR: (value: boolean) => void }) =
   };
 
   return (
-    <View style={styles.fullContainer}>
+    <View className="scanner-container">
       {!isTransferring && (
         <CameraView
-          style={StyleSheet.absoluteFillObject} 
+          style={StyleSheet.absoluteFillObject}
           barcodeScannerSettings={{
-            barcodeTypes: ['qr'],
+            barcodeTypes: ["qr"],
           }}
           onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
           facing="back"
@@ -111,118 +149,39 @@ const QRCodeScanner = ({ setScanQR }: { setScanQR: (value: boolean) => void }) =
       )}
 
       {!isTransferring && (
-        <View style={styles.overlay}>
-          <View style={styles.topAndBottomBar} />
-          <View style={styles.middleSection}>
-              <View style={styles.sideBar} />
-              <View style={styles.scanBox} />
-              <View style={styles.sideBar} />
+        <View className="full-absolute justify-center items-center">
+          <View className="flex-1 bg-black/60 w-full justify-center items-center" />
+          <View className="flex-row" style={{ height: SCANNER_SIZE }}>
+            <View className="flex-1 bg-black/60" />
+            <View
+              className="bg-transparent border-2 border-white"
+              style={{ width: SCANNER_SIZE, height: SCANNER_SIZE }}
+            />
+            <View className="flex-1 bg-black/60" />
           </View>
-          <View style={styles.topAndBottomBar}>
-              <Text style={styles.scanText}>
-                  {scanned ? 'Code scanné!' : 'Scannez le Code QR dans le carré.'}
-              </Text>
+          <View className="flex-1 bg-black/60 w-full justify-center items-center">
+            <Text className="scanner-text">
+              {scanned ? "Code scanné!" : "Scannez le Code QR dans le carré."}
+            </Text>
           </View>
         </View>
       )}
 
-      <Modal
-        visible={isTransferring}
-        transparent={true}
-        animationType="fade"
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
+      <Modal visible={isTransferring} transparent={true} animationType="fade">
+        <View className="modal-overlay bg-black/80">
+          <View className="bg-white rounded-2xl p-10 items-center min-w-[280px] shadow-lg">
             <ActivityIndicator size="large" color="#4A90E2" />
-            <Text style={styles.modalTitle}>Transfert en cours</Text>
-            <Text style={styles.modalStatus}>{transferStatus}</Text>
+            <Text className="text-xl font-bold mt-5 mb-2 text-gray-800">
+              Transfert en cours
+            </Text>
+            <Text className="text-base text-gray-600 text-center">
+              {transferStatus}
+            </Text>
           </View>
         </View>
       </Modal>
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  fullContainer: {
-    flex: 1,
-    backgroundColor: 'black',
-  },
-  
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'transparent',
-  },
-
-  middleSection: {
-    flexDirection: 'row',
-    height: SCANNER_SIZE,
-  },
-
-  topAndBottomBar: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    width: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  sideBar: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-  },
-
-  scanBox: {
-    width: SCANNER_SIZE,
-    height: SCANNER_SIZE,
-    backgroundColor: 'transparent', 
-    borderWidth: 2,
-    borderColor: 'white', 
-  },
-
-  scanText: {
-    fontSize: 16,
-    color: 'white',
-    textAlign: 'center',
-    marginBottom: 20,
-    marginTop: 10,
-  },
-
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-  },
-
-  modalContent: {
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 40,
-    alignItems: 'center',
-    minWidth: 280,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginTop: 20,
-    marginBottom: 10,
-    color: '#333',
-  },
-
-  modalStatus: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-  },
-});
 
 export default QRCodeScanner;

@@ -18,8 +18,9 @@ import {
   getUserLocation,
 } from "../services/Helper";
 import { deletePoint } from "../services/databaseAcces";
-import { get } from "react-native/Libraries/TurboModule/TurboModuleRegistry";
 import InterestPointCard from "../components/PointCard";
+import { useEvent } from "../context/EventContext";
+import { usePoints } from "../context/PointsContext";
 
 function ModalPointItem({
   item,
@@ -64,7 +65,9 @@ export default function InterestPointsScreen() {
   const [sortedList, setSortedList] = useState<InterestPointsType[]>([]);
   const [sortBy, setSortBy] = useState<"recent" | "distance">("recent");
   const db = getDatabase();
-  const [loading, setLoading] = useState(true);
+  const { selectedEventId } = useEvent();
+  const { pointsByEvent, loading: pointsLoading } = usePoints();
+
   const [location, setLocation] = useState<{
     latitude: number;
     longitude: number;
@@ -72,18 +75,13 @@ export default function InterestPointsScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
-  const fetchInterestPoint = async () => {
-    try {
-      const points = db.getAllSync<InterestPointsType>("SELECT * FROM point");
-      console.log("Points récupérés:", points);
-      setListPoint(points);
-    } catch (error) {
-      console.error("Erreur lors de la récupération:", error);
+  useEffect(() => {
+    if (selectedEventId && pointsByEvent[selectedEventId]) {
+      setListPoint(pointsByEvent[selectedEventId]);
+    } else {
       setListPoint([]);
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [selectedEventId, pointsByEvent]);
 
   const fetchLocation = async () => {
     try {
@@ -99,7 +97,6 @@ export default function InterestPointsScreen() {
 
   useFocusEffect(
     React.useCallback(() => {
-      fetchInterestPoint();
       fetchLocation();
     }, [])
   );
@@ -116,8 +113,10 @@ export default function InterestPointsScreen() {
           onPress: () => {
             const success = deletePoint(pointId, db);
             if (success) {
-              Alert.alert("Succès", "Point supprimé avec succès");
-              fetchInterestPoint();
+              Alert.alert(
+                "Succès",
+                "Point supprimé avec succès. Veuillez relancer l'application."
+              );
             } else {
               Alert.alert("Erreur", "Impossible de supprimer le point");
             }
@@ -159,7 +158,6 @@ export default function InterestPointsScreen() {
   };
 
   const openSelectionModal = () => {
-    // reset selection to empty by default (or you could persist previous)
     setSelectedIds([]);
     setModalVisible(true);
   };
@@ -177,7 +175,7 @@ export default function InterestPointsScreen() {
     navigation.navigate("CreateRoute", { points: selectedPoints });
   };
 
-  if (loading) {
+  if (pointsLoading) {
     return (
       <View className="flex-1 items-center justify-center bg-gray-50">
         <ActivityIndicator size="large" color="#3b82f6" />
@@ -224,7 +222,7 @@ export default function InterestPointsScreen() {
         </View>
       </View>
 
-      {sortedList.length === 0 && !loading ? (
+      {sortedList.length === 0 && !pointsLoading ? (
         <View className="flex-1 items-center justify-center px-8">
           <View className="bg-white rounded-full w-24 h-24 items-center justify-center mb-6 shadow-md">
             <Text className="text-5xl">📍</Text>
