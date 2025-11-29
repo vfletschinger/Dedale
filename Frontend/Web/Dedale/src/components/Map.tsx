@@ -5,6 +5,67 @@ import { invoke } from "@tauri-apps/api/core";
 import PointDetails from "./PointDetails";
 import AddPointForm from "./AddPointForm";
 
+// Type pour les géométries de la DB
+interface GeometryData {
+  id: number;
+  event_id: number;
+  geom: string;
+}
+
+// Fonction pour parser WKT et convertir en GeoJSON
+function parseWKTtoGeoJSON(wkt: string): GeoJSON.Geometry | null {
+  try {
+    const wktTrimmed = wkt.trim().toUpperCase();
+    
+    // POINT(x y)
+    if (wktTrimmed.startsWith("POINT")) {
+      const match = wkt.match(/POINT\s*\(\s*([-\d.]+)\s+([-\d.]+)\s*\)/i);
+      if (match) {
+        return {
+          type: "Point",
+          coordinates: [parseFloat(match[1]), parseFloat(match[2])]
+        };
+      }
+    }
+    
+    // LINESTRING(x1 y1, x2 y2, ...)
+    if (wktTrimmed.startsWith("LINESTRING")) {
+      const match = wkt.match(/LINESTRING\s*\(\s*(.+)\s*\)/i);
+      if (match) {
+        const coords = match[1].split(",").map(pair => {
+          const [x, y] = pair.trim().split(/\s+/);
+          return [parseFloat(x), parseFloat(y)];
+        });
+        return {
+          type: "LineString",
+          coordinates: coords
+        };
+      }
+    }
+    
+    // POLYGON((x1 y1, x2 y2, ...))
+    if (wktTrimmed.startsWith("POLYGON")) {
+      const match = wkt.match(/POLYGON\s*\(\s*\(\s*(.+)\s*\)\s*\)/i);
+      if (match) {
+        const coords = match[1].split(",").map(pair => {
+          const [x, y] = pair.trim().split(/\s+/);
+          return [parseFloat(x), parseFloat(y)];
+        });
+        return {
+          type: "Polygon",
+          coordinates: [coords]
+        };
+      }
+    }
+    
+    console.warn("WKT non reconnu:", wkt);
+    return null;
+  } catch (err) {
+    console.error("Erreur parsing WKT:", err, wkt);
+    return null;
+  }
+}
+
 function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }) {
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
@@ -22,6 +83,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
   const [awaitingMapClick, setAwaitingMapClick] = useState(false);
   const awaitingMapClickRef = useRef(false);
   const selectedEventIdRef = useRef<number | null>(null);
+  const [geometries, setGeometries] = useState<GeometryData[]>([]);
 
   // Synchroniser la ref avec le state
   useEffect(() => {
@@ -230,6 +292,114 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
     };
     
     reloadPoints();
+  }, [selectedEvent, map]);
+
+  // Charger et afficher les géométries quand l'événement sélectionné change
+  useEffect(() => {
+    if (!map) return;
+
+    const loadGeometries = async () => {
+      const eventId = selectedEvent?.id ?? null;
+      
+      // Supprimer les anciennes couches de géométries
+      if (map.getLayer("event-geometries-fill")) map.removeLayer("event-geometries-fill");
+      if (map.getLayer("event-geometries-line")) map.removeLayer("event-geometries-line");
+      if (map.getLayer("event-geometries-point")) map.removeLayer("event-geometries-point");
+      if (map.getSource("event-geometries")) map.removeSource("event-geometries");
+
+      if (!eventId) {
+        setGeometries([]);
+        return;
+      }
+
+      try {
+        console.log("📐 Chargement des géométries pour event_id:", eventId);
+        const geoms = await invoke<GeometryData[]>("fetch_geometries_for_event", { eventId });
+        console.log(`📐 ${geoms.length} géométrie(s) récupérée(s)`);
+        setGeometries(geoms);
+
+        if (geoms.length === 0) return;
+
+        // Convertir les WKT en GeoJSON features
+        const features = geoms
+          .map((g) => {
+            const geometry = parseWKTtoGeoJSON(g.geom);
+            if (!geometry) return null;
+            return {
+              type: "Feature",
+              geometry,
+              properties: {
+                id: g.id,
+                event_id: g.event_id,
+                geom_type: geometry.type,
+              },
+            } as GeoJSON.Feature;
+          })
+          .filter((f): f is GeoJSON.Feature => f !== null);
+
+        if (features.length === 0) return;
+
+        const geojson: GeoJSON.FeatureCollection = {
+          type: "FeatureCollection",
+          features,
+        };
+
+        // Ajouter la source
+        map.addSource("event-geometries", {
+          type: "geojson",
+          data: geojson,
+        });
+
+        // Ajouter la couche pour les polygones (fill)
+        map.addLayer({
+          id: "event-geometries-fill",
+          type: "fill",
+          source: "event-geometries",
+          filter: ["==", ["geometry-type"], "Polygon"],
+          paint: {
+            "fill-color": "#6366f1",
+            "fill-opacity": 0.3,
+          },
+        });
+
+        // Ajouter la couche pour les lignes (incluant les contours des polygones)
+        map.addLayer({
+          id: "event-geometries-line",
+          type: "line",
+          source: "event-geometries",
+          filter: ["any", 
+            ["==", ["geometry-type"], "LineString"],
+            ["==", ["geometry-type"], "Polygon"]
+          ],
+          paint: {
+            "line-color": "#4f46e5",
+            "line-width": 3,
+            "line-opacity": 0.8,
+          },
+        });
+
+        // Ajouter la couche pour les points
+        map.addLayer({
+          id: "event-geometries-point",
+          type: "circle",
+          source: "event-geometries",
+          filter: ["==", ["geometry-type"], "Point"],
+          paint: {
+            "circle-radius": 10,
+            "circle-color": "#8b5cf6",
+            "circle-stroke-color": "#4f46e5",
+            "circle-stroke-width": 3,
+            "circle-opacity": 0.8,
+          },
+        });
+
+        console.log("✅ Géométries affichées sur la carte");
+      } catch (err) {
+        console.error("Erreur chargement géométries:", err);
+      }
+    };
+
+    loadGeometries();
   }, [selectedEvent, map]);
 
   // Fonction pour sélectionner une suggestion

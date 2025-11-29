@@ -107,6 +107,12 @@ pub struct Event {
     pub geometry: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Geometry {
+    pub id: i64,
+    pub event_id: i64,
+    pub geom: String,
+}
 
 
 pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
@@ -824,6 +830,29 @@ pub async fn get_points_for_event(app: AppHandle, event_id: i64) -> Result<Vec<i
 
     let point_ids: Vec<i64> = rows.into_iter().map(|row| row.get("point_id")).collect();
     Ok(point_ids)
+}
+
+#[tauri::command]
+pub async fn fetch_geometries_for_event(app: AppHandle, event_id: i64) -> Result<Vec<Geometry>, String> {
+    let pool = get_db_pool(&app).await?;
+
+    let rows = sqlx::query("SELECT id, event_id, geom FROM geometry WHERE event_id = ?")
+        .bind(event_id)
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let geometries: Vec<Geometry> = rows
+        .into_iter()
+        .map(|row| Geometry {
+            id: row.get("id"),
+            event_id: row.get("event_id"),
+            geom: row.get("geom"),
+        })
+        .collect();
+
+    println!("[DB] 📐 {} géométrie(s) récupérée(s) pour l'événement {}", geometries.len(), event_id);
+    Ok(geometries)
 }
 
 #[tauri::command]
