@@ -11,6 +11,7 @@ import MapView, {
   PROVIDER_DEFAULT,
   Region,
   Polygon,
+  MapPressEvent,
 } from "react-native-maps";
 import * as Location from "expo-location";
 import { InterestPointsType } from "../types/database";
@@ -20,9 +21,21 @@ import { usePoints } from "../context/PointsContext";
 
 interface OfflineMapProps {
   initialRegion?: Region;
+  onMapPress?: (event: MapPressEvent) => void;
+  customMarker?: React.ReactNode;
+  hideDefaultMarkers?: boolean;
+  hideButtons?: boolean;
+  mapRef?: React.RefObject<MapView | null>;
 }
 
-export default function OfflineMap({ initialRegion }: OfflineMapProps) {
+export default function OfflineMap({
+  initialRegion,
+  onMapPress,
+  customMarker,
+  hideDefaultMarkers = false,
+  hideButtons = false,
+  mapRef: externalMapRef,
+}: OfflineMapProps) {
   const defaultRegion: Region = {
     latitude: 48.5734,
     longitude: 7.7521,
@@ -37,7 +50,8 @@ export default function OfflineMap({ initialRegion }: OfflineMapProps) {
     React.useState(true);
   const [listPoint, setListPoint] = React.useState<InterestPointsType[]>([]);
 
-  const mapRef = React.useRef<MapView | null>(null);
+  const internalMapRef = React.useRef<MapView | null>(null);
+  const mapRef = externalMapRef || internalMapRef;
   const { selectedEventId } = useEvent();
   const { pointsByEvent, loading: pointsLoading } = usePoints();
 
@@ -152,7 +166,11 @@ export default function OfflineMap({ initialRegion }: OfflineMapProps) {
       <MapView
         style={styles.map}
         provider={PROVIDER_DEFAULT}
-        ref={mapRef}
+        ref={(ref) => {
+          if (mapRef && "current" in mapRef) {
+            (mapRef as React.MutableRefObject<MapView | null>).current = ref;
+          }
+        }}
         initialRegion={currentRegion}
         showsUserLocation
         showsMyLocationButton={false}
@@ -163,23 +181,28 @@ export default function OfflineMap({ initialRegion }: OfflineMapProps) {
         minZoomLevel={10}
         maxZoomLevel={25}
         toolbarEnabled={false}
+        onPress={onMapPress}
       >
-        {listPoint.map((p) => (
-          <Marker
-            key={p.id}
-            coordinate={{ longitude: p.x, latitude: p.y }}
-            title={`${p.id}`}
-          />
-        ))}
+        {!hideDefaultMarkers &&
+          listPoint.map((p) => (
+            <Marker
+              key={p.id}
+              coordinate={{ longitude: p.x, latitude: p.y }}
+              title={`${p.id}`}
+            />
+          ))}
+        {customMarker}
       </MapView>
       {pointsLoading && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color="#0000ff" />
         </View>
       )}
-      <View style={styles.overlay}>
-        <CustomButton title="Center" onPress={centerOnUserLocation} />
-      </View>
+      {!hideButtons && (
+        <View style={styles.overlay}>
+          <CustomButton title="Center" onPress={centerOnUserLocation} />
+        </View>
+      )}
     </View>
   );
 }

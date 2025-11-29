@@ -12,6 +12,7 @@ import {
 import React, { useState, useRef } from "react";
 import CustomButton from "../components/CustomButton";
 import ObstacleSelector from "../components/ObstacleSelector";
+import Map from "../components/Map";
 import MapView, { Marker } from "react-native-maps";
 import * as Location from "expo-location";
 import * as ImagePicker from "expo-image-picker";
@@ -19,6 +20,7 @@ import * as FileSystem from "expo-file-system";
 import getDatabase from "../../assets/migrations";
 import * as ImageHelper from "../services/ImageHelper";
 import { useEvent } from "../context/EventContext";
+import { usePoints } from "../context/PointsContext";
 
 type SelectedObstacle = {
   type_id: number;
@@ -28,6 +30,7 @@ type SelectedObstacle = {
 
 export default function RegisterPointScreen() {
   const { selectedEventId } = useEvent();
+  const { refreshPoints } = usePoints();
   const [location, setLocation] = useState<{
     latitude: number;
     longitude: number;
@@ -212,39 +215,72 @@ export default function RegisterPointScreen() {
 
   return (
     <View className="container-white">
-      {coords ? (
-        <MapView
-          ref={(ref) => {
-            mapRef.current = ref;
-          }}
-          className="full-absolute"
-          initialRegion={{
-            latitude: coords.latitude,
-            longitude: coords.longitude,
-            latitudeDelta: 0.003,
-            longitudeDelta: 0.003,
-          }}
-          showsUserLocation={true}
-          onPress={(e) => {
-            const clickedCoords = e.nativeEvent.coordinate;
-            setLocation(clickedCoords);
-            setIsModalVisible(true);
-          }}
-        >
-          {location && (
+      <Map
+        mapRef={mapRef}
+        initialRegion={
+          coords
+            ? {
+                latitude: coords.latitude,
+                longitude: coords.longitude,
+                latitudeDelta: 0.003,
+                longitudeDelta: 0.003,
+              }
+            : undefined
+        }
+        onMapPress={(e) => {
+          const clickedCoords = e.nativeEvent.coordinate;
+          setLocation(clickedCoords);
+          setIsModalVisible(true);
+        }}
+        hideDefaultMarkers={false}
+        hideButtons={true}
+        customMarker={
+          location ? (
             <Marker
               coordinate={location}
               title="Nouveau point"
               description="Point à enregistrer"
-              pinColor="red"
-            />
-          )}
-        </MapView>
-      ) : (
-        <View className="center">
-          <Text>Chargement de la carte...</Text>
-        </View>
-      )}
+            >
+              {/* Pin personnalisé */}
+              <View style={{ alignItems: "center" }}>
+                <View
+                  style={{
+                    width: 30,
+                    height: 30,
+                    backgroundColor: "#3b82f6",
+                    borderRadius: 15,
+                    borderTopLeftRadius: 15,
+                    borderTopRightRadius: 15,
+                    borderBottomLeftRadius: 15,
+                    borderBottomRightRadius: 0,
+                    transform: [{ rotate: "45deg" }],
+                    borderWidth: 3,
+                    borderColor: "white",
+                    shadowColor: "#000",
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.3,
+                    shadowRadius: 3,
+                    elevation: 5,
+                    justifyContent: "center",
+                    alignItems: "center",
+                  }}
+                >
+                  {/* Cercle intérieur */}
+                  <View
+                    style={{
+                      width: 10,
+                      height: 10,
+                      backgroundColor: "#1d4ed8",
+                      borderRadius: 5,
+                      transform: [{ rotate: "-45deg" }],
+                    }}
+                  />
+                </View>
+              </View>
+            </Marker>
+          ) : null
+        }
+      />
 
       <View className="absolute bottom-5 left-5 right-5 flex-row justify-between gap-2">
         <Pressable onPress={requestLocation} className="flex-1 btn-violet">
@@ -340,11 +376,13 @@ export default function RegisterPointScreen() {
                     pointComment
                   );
                   if (insertedId) {
+                    await refreshPoints();
                     Alert.alert("Succès", "Point enregistré avec succès");
                     setIsModalVisible(false);
                     setPointComment("");
                     setSelectedImages([]);
                     setSelectedObstacles([]);
+                    setLocation(null);
                   }
                 } else {
                   Alert.alert("Erreur", "Aucune position à enregistrer.");
