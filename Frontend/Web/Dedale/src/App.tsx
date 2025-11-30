@@ -7,7 +7,7 @@ import Database from "@tauri-apps/plugin-sql";
 import { useNavigation } from "./hooks/useNavigation";
 import Navigation from "./components/Navigation";
 import Data from "./components/Data";
-import Equipes from "./components/Teams";
+import Teams from "./components/Teams";
 import Map from "./components/Map";
 import Event from "./components/Events";
 import AdminForm from "./components/AdminForm";
@@ -166,7 +166,7 @@ function App() {
             {/* Teams - kept mounted once visited */}
             {hasVisited("equipe") && (
               <PageWrapper isVisible={currentPage === "equipe"}>
-                <Equipes />
+                <Teams />
               </PageWrapper>
             )}
 

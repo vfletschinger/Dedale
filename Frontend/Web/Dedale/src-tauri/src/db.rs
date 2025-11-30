@@ -1,5 +1,4 @@
 // On importe les dépendances nécessaires
-use crate::seed::seed_database;
 use bcrypt::{hash, verify, DEFAULT_COST};
 use serde::Deserialize;
 use serde::Serialize;
@@ -100,13 +99,12 @@ pub fn init_db() -> impl tauri::plugin::Plugin<tauri::Wry> {
             version: 4,
             description: "create_team_person_tables",
             sql: "
-                CREATE TABLE team (
+                CREATE TABLE IF NOT EXISTS team (
                     id INTEGER PRIMARY KEY ,
-                    name TEXT,
-                    number INTEGER
+                    name TEXT
                 );
                 
-                CREATE TABLE person (
+                CREATE TABLE IF NOT EXISTS person (
                     id INTEGER PRIMARY KEY,
                     firstname TEXT,
                     lastname TEXT,
@@ -115,12 +113,28 @@ pub fn init_db() -> impl tauri::plugin::Plugin<tauri::Wry> {
                     phone_number TEXT
                 );
 
-                CREATE TABLE member (
+                CREATE TABLE IF NOT EXISTS member (
+                    id INTEGER PRIMARY KEY,
                     team_id INTEGER,
                     person_id INTEGER,
-                    PRIMARY KEY (team_id, person_id),
-                    FOREIGN KEY (team_id) REFERENCES team (id),
-                    FOREIGN KEY (person_id) REFERENCES person (id)
+                    FOREIGN KEY (team_id) REFERENCES team (id) ON DELETE CASCADE,
+                    FOREIGN KEY (person_id) REFERENCES person (id) ON DELETE CASCADE,
+                    UNIQUE(team_id, person_id)
+                );
+            ",
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 5,
+            description: "create_team_event_table",
+            sql: "
+                CREATE TABLE IF NOT EXISTS team_event (
+                    id INTEGER PRIMARY KEY,
+                    team_id INTEGER NOT NULL,
+                    event_id INTEGER NOT NULL,
+                    FOREIGN KEY (team_id) REFERENCES team(id) ON DELETE CASCADE,
+                    FOREIGN KEY (event_id) REFERENCES event(id) ON DELETE CASCADE,
+                    UNIQUE(team_id, event_id)
                 );
             ",
             kind: MigrationKind::Up,
@@ -243,6 +257,24 @@ pub struct Event {
     pub geometry: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Team {
+    #[serde(default)]
+    pub id: i64,
+    pub name: String,
+    pub number: i64,
+    #[serde(default)]
+    pub event_ids: Vec<i64>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Person {
+    pub id: i64,
+    pub firstname: String,
+    pub lastname: String,
+    pub email: String,
+}
+
 pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
     let app_data_dir = app
         .path()
@@ -268,8 +300,6 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
         .connect_with(connect_options)
         .await
         .map_err(|e| format!("Failed to connect to database: {}", e))?;
-
-    seed_database(&pool).await?;
 
     Ok(pool)
 }
@@ -730,6 +760,147 @@ pub async fn delete_point(app: AppHandle, point_id: i64) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub async fn fetch_team_members(app: AppHandle, team_id: i64) -> Result<Vec<Person>, String> {
+    let pool = get_db_pool(&app).await?;
+
+    let query = r#"
+        SELECT p.id, p.firstname, p.lastname, p.email
+        FROM person p
+        INNER JOIN member m ON p.id = m.person_id
+        WHERE m.team_id = ?
+    "#;
+
+    let rows = sqlx::query(query)
+        .bind(team_id)
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let members = rows
+        .into_iter()
+        .map(|row| Person {
+            id: row.get("id"),
+            firstname: row.get("firstname"),
+            lastname: row.get("lastname"),
+            email: row.get("email"),
+        })
+        .collect();
+
+    Ok(members)
+}
+
+#[tauri::command]
+pub async fn fetch_team_events(app: AppHandle, team_id: i64) -> Result<Vec<Event>, String> {
+    let pool = get_db_pool(&app).await?;
+
+    let query = r#"
+        SELECT e.*
+        FROM event e
+        INNER JOIN team_event te ON e.id = te.event_id
+        WHERE te.team_id = ?
+    "#;
+
+    let rows = sqlx::query(query)
+        .bind(team_id)
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let events = rows
+        .into_iter()
+        .map(|row| Event {
+            id: row.get("id"),
+            name: row.get("name"),
+            description: row.get("description"),
+            date_debut: row.get("date_debut"),
+            date_fin: row.get("date_fin"),
+            statut: row.get("statut"),
+            geometry: row.get("geometry"),
+        })
+        .collect();
+
+    Ok(events)
+}
+
+#[tauri::command]
+pub async fn fetch_teams(app: AppHandle) -> Result<Vec<Team>, String> {
+    let pool = get_db_pool(&app).await?;
+
+    let query = r#"
+        SELECT 
+            t.id,
+            t.name,
+            COUNT(DISTINCT m.person_id) as number,
+            GROUP_CONCAT(DISTINCT te.event_id) as event_ids_str
+        FROM team t
+        LEFT JOIN member m ON t.id = m.team_id
+        LEFT JOIN team_event te ON t.id = te.team_id
+        GROUP BY t.id, t.name
+    "#;
+
+    let rows = sqlx::query(query)
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let teams = rows
+        .into_iter()
+        .map(|row| {
+            let event_ids_str: Option<String> = row.get("event_ids_str");
+            let event_ids: Vec<i64> = match event_ids_str {
+                Some(s) => s
+                    .split(',')
+                    .filter_map(|id| id.parse::<i64>().ok())
+                    .collect(),
+                None => Vec::new(),
+            };
+
+            Team {
+                id: row.get("id"),
+                name: row.get("name"),
+                number: row.get("number"),
+                event_ids,
+            }
+        })
+        .collect();
+
+    Ok(teams)
+}
+
+#[tauri::command]
+pub async fn create_team(app: AppHandle, name: String) -> Result<Team, String> {
+    let pool = get_db_pool(&app).await?;
+
+    let result = sqlx::query("INSERT INTO team (name) VALUES (?)")
+        .bind(&name)
+        .execute(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let new_id = result.last_insert_rowid();
+
+    Ok(Team {
+        id: new_id,
+        name: name,
+        number: 0,
+        event_ids: Vec::new(),
+    })
+}
+
+#[tauri::command]
+pub async fn delete_team(app: AppHandle, team_id: i64) -> Result<(), String> {
+    let pool = get_db_pool(&app).await?;
+
+    sqlx::query("DELETE FROM team WHERE id = ?")
+        .bind(team_id)
+        .execute(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn fetch_events(app: AppHandle) -> Result<Vec<Event>, String> {
     println!("[DB] 🚀 Début de la récupération des événements depuis la base de données.");
     let pool = get_db_pool(&app).await?;
@@ -988,6 +1159,36 @@ pub async fn ensure_schema(pool: &SqlitePool) -> Result<(), String> {
             FOREIGN KEY (point_id) REFERENCES point(id) ON DELETE CASCADE,
             FOREIGN KEY (event_id) REFERENCES event(id) ON DELETE CASCADE,
             UNIQUE(point_id, event_id)
+        );"#,
+        r#"CREATE TABLE IF NOT EXISTS team (
+            id INTEGER PRIMARY KEY ,
+            name TEXT,
+            number INTEGER
+        );"#,
+        r#"CREATE TABLE IF NOT EXISTS person (
+            id INTEGER PRIMARY KEY,
+            firstname TEXT,
+            lastname TEXT,
+            address TEXT,
+            email TEXT,
+            phone_number TEXT
+        );"#,
+        r#"CREATE TABLE IF NOT EXISTS member (
+            id INTEGER PRIMARY KEY,
+            team_id INTEGER,
+            person_id INTEGER,
+            FOREIGN KEY (team_id) REFERENCES team (id) ON DELETE CASCADE,
+            FOREIGN KEY (person_id) REFERENCES person (id) ON DELETE CASCADE,
+            UNIQUE(team_id, person_id)
+        );"#,
+        r#"
+        CREATE TABLE IF NOT EXISTS team_event (
+            id INTEGER PRIMARY KEY,
+            team_id INTEGER NOT NULL,
+            event_id INTEGER NOT NULL,
+            FOREIGN KEY (team_id) REFERENCES team(id) ON DELETE CASCADE,
+            FOREIGN KEY (event_id) REFERENCES event(id) ON DELETE CASCADE,
+            UNIQUE(team_id, event_id)
         );"#,
     ];
 

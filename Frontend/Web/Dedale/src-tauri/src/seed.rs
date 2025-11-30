@@ -1,7 +1,5 @@
 use crate::db::ObstacleType;
-use sqlx::Row;
 use sqlx::SqlitePool;
-use tauri::AppHandle;
 
 // --- Helper Structs for Seeding Data ---
 struct PointSeed {

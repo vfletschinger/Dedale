@@ -63,11 +63,16 @@ pub fn run() {
             db::create_initial_admin_cmd,
             db::verify_credentials_cmd,
             db::fetch_events,
+            db::fetch_teams,
             db::insert_event,
             db::delete_event,
             db::link_point_to_event,
             db::unlink_point_from_event,
-            db::get_points_for_event
+            db::get_points_for_event,
+            db::fetch_team_members,
+            db::fetch_team_events,
+            db::create_team,
+            db::delete_team
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
