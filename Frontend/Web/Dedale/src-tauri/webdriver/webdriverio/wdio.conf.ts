@@ -10,7 +10,6 @@ const tauriBinary = path.resolve(
 
 // Trouver tauri-driver: d'abord via which, puis fallback sur CARGO_HOME ou PATH
 function findTauriDriver(): string {
-  // Essayer de trouver via 'which' (fonctionne dans l'image Docker)
   const whichResult = spawnSync('which', ['tauri-driver']);
   if (whichResult.status === 0) {
     return whichResult.stdout.toString().trim();

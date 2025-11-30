@@ -1,6 +1,3 @@
-# Image Docker Tauri avec toutes les dépendances pré-installées
-# https://github.com/ivangabriele/docker-tauri
-# Inclut: Rust, Node.js 22, Yarn, tauri-driver, xvfb, Tarpaulin
 image: ivangabriele/tauri:debian-bookworm-22
 
 variables:
@@ -15,19 +12,8 @@ stages:
   - test
   - release
 
-# Template de job par défaut pour éviter la répétition
-default:
-  interruptible: true
-  retry:
-    max: 1
-    when:
-      - runner_system_failure
-      - stuck_or_timeout_failure
-
-# Cache Cargo - évite de re-télécharger les crates et recompiler from scratch
-# IMPORTANT: Changer la version (v3) si vous changez d'image Docker pour invalider le cache
 .cache_cargo: &cache_cargo
-  key: "${CI_COMMIT_REF_SLUG}-cargo-v3"
+  key: "${CI_COMMIT_REF_SLUG}-cargo"
   paths:
     - .cargo/registry/
     - .cargo/git/
@@ -36,7 +22,7 @@ default:
 
 # Cache npm - évite de re-télécharger les packages Node.js
 .cache_npm: &cache_npm
-  key: "${CI_COMMIT_REF_SLUG}-npm-v3"
+  key: "${CI_COMMIT_REF_SLUG}-npm"
   paths:
     - .npm/
     - $WEB_PATH/node_modules/
@@ -48,22 +34,18 @@ check_rust_quality:
   cache:
     - <<: *cache_cargo
   before_script:
-    # rustfmt n'est pas inclus par défaut dans l'image
     - rustup component add rustfmt clippy
   script:
     - cd $PROJECT_PATH
     - mkdir -p reports
-    
-    # Vérification du formatage et linting Rust
     - cargo fmt --all -- --check 2>&1 | tee reports/cargoFmt_report.txt
     - cargo clippy --all-targets --all-features -- -D warnings 2>&1 | tee reports/clippy_report.txt
-
   artifacts:
     when: always
     paths:
       - $PROJECT_PATH/reports/
     expire_in: 1 week
-  allow_failure: true
+  allow_failure: false
 
 # Job de lint frontend 
 lint_frontend:
@@ -82,20 +64,18 @@ lint_frontend:
     paths:
       - $PROJECT_PATH/reports/
     expire_in: 1 week
-  allow_failure: true
+  allow_failure: false
 
 # --- JOB 2 : BUILD LINUX (uniquement pour les tests E2E) ---
-# Build minimal sans bundling (pas de .deb, .rpm, .AppImage)
 build_for_tests:
   stage: build
+  rules:
+    - if: $CI_COMMIT_BRANCH == "web" || $CI_COMMIT_BRANCH == "main"
   needs:
     - job: check_rust_quality
-      optional: true
     - job: lint_frontend
-      optional: true
   cache:
-    # Cache léger séparé pour le build de test (évite d'importer le gros cache Windows)
-    - key: "${CI_COMMIT_REF_SLUG}-cargo-test-v1"
+    - key: "${CI_COMMIT_REF_SLUG}-cargo-test"
       paths:
         - .cargo/registry/
         - .cargo/git/
@@ -104,47 +84,34 @@ build_for_tests:
     - <<: *cache_npm
   script:
     - cd $WEB_PATH
-    
-    # Installation des dépendances frontend
     - npm ci --prefer-offline
-    
-    # Build Linux sans bundling (--no-bundle = pas d'installateurs)
     # Génère uniquement l'exécutable pour les tests
     - npm run tauri build -- --no-bundle --verbose
     
   artifacts:
     paths:
-      # Seulement l'exécutable Linux pour les tests E2E
       - $PROJECT_PATH/target/release/dedale
     expire_in: 1 day
 
 # --- JOB 3 : TESTS WEBDRIVER (E2E) ---
-# Reproduit le workflow GitHub Actions de la doc Tauri:
-# https://tauri.app/develop/tests/webdriver/ci/
 test_e2e:
   stage: test
+  rules:
+    - if: $CI_COMMIT_BRANCH == "web" || $CI_COMMIT_BRANCH == "main"
   needs: ["build_for_tests"]
   cache:
-    # Pas besoin du cache Cargo - l'app est déjà compilée via les artifacts
-    - key: "${CI_COMMIT_REF_SLUG}-webdriver-v1"
+    - key: "${CI_COMMIT_REF_SLUG}-webdriver"
       paths:
         - $PROJECT_PATH/webdriver/webdriverio/node_modules/
       policy: pull-push
   script:
     - cd $PROJECT_PATH
-    
     # Vérifier que tauri-driver est disponible
     - which tauri-driver
-
-    # Installation des dépendances Node.js pour les tests e2e
     - cd webdriver/webdriverio
     - npm ci --prefer-offline
-    
-    # Créer les dossiers pour les artifacts
     - mkdir -p reports screenshots logs
-
     # Lancement des tests WebdriverIO avec xvfb-run (serveur d'affichage virtuel)
-    # Permet à l'application de tourner en headless sans modification du code
     - xvfb-run -a -s "-screen 0 1920x1080x24" npm run test
 
   artifacts:
@@ -154,22 +121,18 @@ test_e2e:
       - $PROJECT_PATH/webdriver/webdriverio/screenshots/
       - $PROJECT_PATH/webdriver/webdriverio/logs/
     expire_in: 1 week
+  allow_failure: false
 
 # --- JOB 4 : BUILD WINDOWS (cross-compilation depuis Linux) ---
-# Ne se lance QUE sur la branche main ET après succès des tests
-# Documentation: https://tauri.app/distribute/windows-installer/
 build_app_windows:
   stage: release
-  # rules:
-  #   # Uniquement sur main et si les tests ont réussi
-  #   - if: $CI_COMMIT_BRANCH == "main"
-  #     when: on_success
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
   needs:
     - job: test_e2e
-      artifacts: false  # Pas besoin des artifacts de test
   cache:
-    # Cache séparé pour Windows (évite les conflits avec le build Linux)
-    - key: "${CI_COMMIT_REF_SLUG}-cargo-windows-v1"
+    # Cache séparé pour Windows 
+    - key: "${CI_COMMIT_REF_SLUG}-cargo-windows"
       paths:
         - .cargo/registry/
         - .cargo/git/
@@ -185,7 +148,6 @@ build_app_windows:
     - export PATH="$CARGO_HOME/bin:$PATH"
   script:
     - cd $WEB_PATH
-    # S'assurer que cargo-xwin est dans le PATH pour tauri build
     - export PATH="$CARGO_HOME/bin:$PATH"
     - npm ci --prefer-offline
     
