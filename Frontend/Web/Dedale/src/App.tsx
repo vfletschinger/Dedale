@@ -1,162 +1,200 @@
 import { useEffect, useState } from "react";
-import Database from '@tauri-apps/plugin-sql';
-import Accueil from "./components/Accueil";
+import { listen } from "@tauri-apps/api/event";
+import { invoke } from "@tauri-apps/api/core";
+import * as path from "@tauri-apps/api/path";
+import Database from "@tauri-apps/plugin-sql";
+
+import { useNavigation } from "./hooks/useNavigation";
+import Navigation from "./components/Navigation";
+import Data from "./components/Data";
 import Equipes from "./components/Equipe";
 import Map from "./components/Map";
+import Event from "./components/Events";
+import AdminForm from "./components/AdminForm";
 
-import logoStrasbourg from "./assets/logo_strasbourg.png";
-
-// --- Composant de Navigation ---
-// global.d.ts
-
-
-function Navigation({ setPage }: { setPage: (page: string) => void }) {
+// Wrapper pour cacher une page tout en la gardant montée
+function PageWrapper({
+  isVisible,
+  isFullHeight,
+  children,
+}: {
+  isVisible: boolean;
+  isFullHeight?: boolean;
+  children: React.ReactNode;
+}) {
+  if (isFullHeight) {
+    return (
+      <div
+        className="relative z-10"
+        style={{
+          height: "calc(100vh - 5rem)",
+          visibility: isVisible ? "visible" : "hidden",
+          position: isVisible ? "relative" : "absolute",
+          width: "100%",
+          top: 0,
+          left: 0,
+        }}
+      >
+        {children}
+      </div>
+    );
+  }
 
   return (
-    <nav className="bg-[#171c22]"> {/* Couleur principale 65% */}
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-16 items-center justify-between">
-
-          {/* Left side - Logo */}
-          <div className="shrink-0">
-            <img
-              src={logoStrasbourg}
-              alt="Logo"
-              className="h-30 w-auto"
-            />
-          </div>
-
-          {/* Right side - Hamburger menu for mobile */}
-          <div className="flex sm:hidden">
-            <button
-              type="button"
-              className="inline-flex items-center justify-center p-2 rounded-md text-[#ffffff] hover:bg-[#2ad783] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2ad783]"
-              aria-controls="mobile-menu"
-              aria-expanded="false"
-            >
-              <span className="sr-only">Open main menu</span>
-              {/* Menu open icon */}
-              <svg
-                className="block h-6 w-6"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M4 6h16M4 12h16M4 18h16"
-                />
-              </svg>
-              {/* Menu close icon */}
-              <svg
-                className="hidden h-6 w-6"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-              Creer un pdf
-            </button>
-          </div>
-
-          {/* Center - Navigation Buttons */}
-          <div className="flex space-x-4">
-            <button
-              type="button"
-              className="px-3 py-2 rounded-md text-[#ffffff] bg-[#20272f] hover:bg-[#2ad783] transition font-medium"
-              onClick={() => setPage("home")}
-            >
-              Accueil
-            </button>
-
-            <button
-              type="button"
-              className="px-3 py-2 rounded-md text-[#ffffff] bg-[#20272f] hover:bg-[#2ad783] transition font-medium"
-              onClick={() => setPage("map")}
-            >
-              Map
-            </button>
-
-            <button
-              type="button"
-              className="px-3 py-2 rounded-md text-[#ffffff] bg-[#20272f] hover:bg-[#2ad783] transition font-medium"
-              onClick={() => setPage("equipe")}
-            >
-              Equipes
-            </button>
-          </div>
-        </div>
-      </div>
-    </nav>
+    <div style={{ display: isVisible ? "block" : "none" }}>
+      {children}
+    </div>
   );
 }
 
 function App() {
+  const { currentPage, navigate, goBack, canGoBack, hasVisited } = useNavigation("event");
+  const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
+  const [events, setEvents] = useState<any[]>([]);
   const [db, setDb] = useState<Database | null>(null);
-  const [page, setPage] = useState("home");
   const [error, setError] = useState("");
+  const [firstLaunch, setFirstLaunch] = useState(false);
 
-  // Connexion BDD au démarrage
+  const handleEventClick = (eventId: number) => {
+    setSelectedEventId(eventId);
+    navigate("map");
+  };
+
+  // Check first launch
+  useEffect(() => {
+    const unlisten = listen('first-launch', () => {
+      setFirstLaunch(true);
+    });
+
+    (async () => {
+      try {
+        const isFirst: boolean = await invoke('is_first_launch_cmd');
+        if (isFirst) {
+          setFirstLaunch(true);
+        }
+      } catch (e) {
+        // ignore
+      }
+    })();
+
+    return () => {
+      unlisten.then(f => f()).catch(() => { });
+    };
+  }, []);
+
+  async function handleCreateAdmin(username: string, password: string) {
+    try {
+      await invoke('create_initial_admin_cmd', { username, password });
+      setFirstLaunch(false);
+    } catch (e) {
+      console.error('create admin failed', e);
+    }
+  }
+
+  // Connexion BDD au demarrage
   useEffect(() => {
     const initDb = async () => {
       try {
-        const dbInstance = await Database.load("sqlite:mydatabase.db");
+        const appDataPath = await path.appDataDir();
+        const dbPath = await path.join(appDataPath, 'mydatabase.db');
+        const dbInstance = await Database.load(`sqlite:${dbPath}`);
         setDb(dbInstance);
       } catch (e: any) {
         console.error("Erreur connexion BDD:", e);
-        setError("Erreur de connexion BDD (simulée pour aperçu): " + e.message);
+        setError("Erreur de connexion BDD: " + e.message);
       }
     };
     initDb();
   }, []);
 
-  const renderPage = () => {
-    if (error) {
-      return <p className="text-red-600 text-center">Erreur: {error}</p>;
-    }
-    if (!db) {
-      return (
-        <div className="flex justify-center items-center h-full">
-          {/* Simple spinner de chargement Tailwind */}
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-          <p className="ml-4 text-gray-500">
-            Connexion à la base de données...
-          </p>
+  // Si c'est le premier lancement, afficher le formulaire admin
+  if (firstLaunch) {
+    return (
+      <div className="w-full min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50 to-purple-50 font-sans flex items-center justify-center">
+        <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-8 max-w-md w-full mx-4">
+          <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-4">
+            Configuration initiale
+          </h2>
+          <p className="mb-6 text-gray-600">Creez le compte administrateur pour continuer.</p>
+          <AdminForm onSubmit={handleCreateAdmin} />
         </div>
-      );
-    }
-
-    switch (page) {
-      case "home":
-        return <Accueil />;
-      case "map":
-        return <Map />;
-      case "equipe":
-        return <Equipes />;
-      default:
-        return <Accueil />;
-    }
-  };
+      </div>
+    );
+  }
 
   return (
-    <div className="w-full min-h-screen bg-gray-50 font-sans">
-      <header className="text-center mb-8">
-        <Navigation setPage={setPage} />
+    <div className="w-full min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50 to-purple-50 font-sans relative overflow-hidden">
+      {/* Background decorative elements */}
+      <div className="absolute inset-0 bg-grid-slate-100 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.6))] -z-10"></div>
+      <div className="absolute top-0 left-1/4 w-72 h-72 bg-blue-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"></div>
+      <div className="absolute top-0 right-1/4 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse animation-delay-1000"></div>
+      <div className="absolute bottom-0 left-1/3 w-72 h-72 bg-indigo-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse animation-delay-2000"></div>
+
+      <header className="relative z-10">
+        <Navigation
+          currentPage={currentPage}
+          onNavigate={navigate}
+          canGoBack={canGoBack}
+          onGoBack={goBack}
+        />
       </header>
 
-      <main className="bg-white p-6 rounded-lg shadow-md h-full">
-        {renderPage()}
+      {/* Map - full height, kept mounted once visited */}
+      {hasVisited("map") && (
+        <PageWrapper isVisible={currentPage === "map"} isFullHeight>
+          <Map selectedEventId={selectedEventId} />
+        </PageWrapper>
+      )}
+
+      {/* Other pages - wrapped in container */}
+      <main
+        className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-8"
+        style={{ display: currentPage === "map" ? "none" : "block" }}
+      >
+        <div className="bg-white/60 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-8 min-h-[calc(100vh-12rem)]">
+          <div className="relative">
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-transparent to-purple-50/50 rounded-3xl -z-10"></div>
+
+
+            {/* Events - kept mounted once visited */}
+            {hasVisited("event") && (
+              <PageWrapper isVisible={currentPage === "event"}>
+                <Event onEventClick={handleEventClick} onEventsLoaded={setEvents} />
+              </PageWrapper>
+            )}
+
+            {/* Teams - kept mounted once visited */}
+            {hasVisited("equipe") && (
+              <PageWrapper isVisible={currentPage === "equipe"}>
+                <Equipes />
+              </PageWrapper>
+            )}
+
+            {/* Data - kept mounted once visited */}
+            {hasVisited("data") && (
+              <PageWrapper isVisible={currentPage === "data"}>
+                <Data />
+              </PageWrapper>
+            )}
+          </div>
+        </div>
       </main>
+
+      {currentPage === "event" && (
+        <div className="fixed bottom-6 right-6 z-50 bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-white/30 p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold">
+              {events.length}
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-gray-800">Total Events</div>
+              <div className="text-xs text-gray-500">
+                {events.filter((e: any) => e.statut === 'active' || e.statut === 'Actif').length} actifs
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
