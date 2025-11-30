@@ -78,7 +78,7 @@ function App() {
     })();
 
     return () => {
-      unlisten.then(f => f()).catch(() => {});
+      unlisten.then(f => f()).catch(() => { });
     };
   }, []);
 
@@ -129,7 +129,7 @@ function App() {
       <div className="absolute top-0 left-1/4 w-72 h-72 bg-blue-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"></div>
       <div className="absolute top-0 right-1/4 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse animation-delay-1000"></div>
       <div className="absolute bottom-0 left-1/3 w-72 h-72 bg-indigo-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse animation-delay-2000"></div>
-      
+
       <header className="relative z-10">
         <Navigation
           currentPage={currentPage}
@@ -179,7 +179,7 @@ function App() {
           </div>
         </div>
       </main>
-      
+
       {currentPage === "event" && (
         <div className="fixed bottom-6 right-6 z-50 bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-white/30 p-4">
           <div className="flex items-center gap-3">
