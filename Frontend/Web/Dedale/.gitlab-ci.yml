@@ -181,8 +181,12 @@ build_app_windows:
     - apt-get install -y --no-install-recommends lld llvm clang
     - rustup target add x86_64-pc-windows-msvc
     - cargo install --locked cargo-xwin
+    # Ajouter le chemin de cargo-xwin au PATH
+    - export PATH="$CARGO_HOME/bin:$PATH"
   script:
     - cd $WEB_PATH
+    # S'assurer que cargo-xwin est dans le PATH pour tauri build
+    - export PATH="$CARGO_HOME/bin:$PATH"
     - npm ci --prefer-offline
     
     - npm run tauri build -- --runner cargo-xwin --target x86_64-pc-windows-msvc --verbose
