@@ -1,86 +1,61 @@
-image: rust:latest
+# Image Docker Tauri avec toutes les dépendances pré-installées
+# https://github.com/ivangabriele/docker-tauri
+# Inclut: Rust, Node.js 22, Yarn, tauri-driver, xvfb, Tarpaulin
+image: ivangabriele/tauri:debian-bookworm-22
 
 variables:
   PROJECT_PATH: "Frontend/Web/Dedale/src-tauri"
   WEB_PATH: "Frontend/Web/Dedale"
   CARGO_HOME: $CI_PROJECT_DIR/.cargo
-  DEBIAN_FRONTEND: noninteractive
-  PKG_CONFIG_PATH: /usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig
   npm_config_cache: $CI_PROJECT_DIR/.npm
-  DEPS_MARKER: /tmp/deps_installed
 
 stages:
   - quality
   - build
   - test
 
-# Cache global pour Cargo et npm pour eviter d'installer pour chaque stage
-cache:
-  key: "${CI_COMMIT_REF_SLUG}-v1"
+# Template de job par défaut pour éviter la répétition
+default:
+  interruptible: true
+  retry:
+    max: 1
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+
+# Cache Cargo - évite de re-télécharger les crates et recompiler from scratch
+# IMPORTANT: Changer la version (v3) si vous changez d'image Docker pour invalider le cache
+.cache_cargo: &cache_cargo
+  key: "${CI_COMMIT_REF_SLUG}-cargo-v3"
   paths:
-    - .cargo/
-    - .npm/
+    - .cargo/registry/
+    - .cargo/git/
     - $PROJECT_PATH/target/
-    - $PROJECT_PATH/node_modules/
-    - $PROJECT_PATH/webdriver/webdriverio/node_modules/
   policy: pull-push
 
-.install_dependencies: &install_dependencies
-  - |
-    apt-get update -qq
-    apt-get install -y --no-install-recommends \
-      curl \
-      wget \
-      libgtk-3-dev \
-      libgdk-pixbuf-xlib-2.0-dev \
-      libcairo2-dev \
-      libpango1.0-dev \
-      libatk1.0-dev \
-      libgdk-pixbuf-2.0-0 \
-      libsoup-3.0-dev \
-      libjavascriptcoregtk-4.1-dev \
-      libwebkit2gtk-4.1-dev \
-      libayatana-appindicator3-dev \
-      librsvg2-dev \
-      patchelf \
-      pkg-config \
-      xdg-utils \
-      file
-    if ! command -v node &> /dev/null; then
-      curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-      apt-get install -y nodejs
-    fi
-    rm -rf /var/lib/apt/lists/*
+# Cache npm - évite de re-télécharger les packages Node.js
+.cache_npm: &cache_npm
+  key: "${CI_COMMIT_REF_SLUG}-npm-v3"
+  paths:
+    - .npm/
+    - $WEB_PATH/node_modules/
+  policy: pull-push
 
-check_quality:
+# Job de qualité Rust 
+check_rust_quality:
   stage: quality
   cache:
-    - key: "${CI_COMMIT_REF_SLUG}-cargo-v1"
-      paths:
-        - .cargo/
-        - $PROJECT_PATH/target/
-      policy: pull-push
-    - key: "${CI_COMMIT_REF_SLUG}-npm-v1"
-      paths:
-        - .npm/
-        - $PROJECT_PATH/node_modules/
-      policy: pull-push
+    - <<: *cache_cargo
   before_script:
-    - *install_dependencies
-    - *install_dependencies
-    - rustup component add clippy rustfmt
+    # rustfmt n'est pas inclus par défaut dans l'image
+    - rustup component add rustfmt clippy
   script:
     - cd $PROJECT_PATH
-
-    # 1. Qualité RUST
     - mkdir -p reports
-    - cargo fmt --all -- --check 2>&1 | tee -a reports/cargoFmt_report.txt
-    - cargo clippy --all-targets --all-features -- -D warnings 2>&1 | tee -a reports/clippy_report.txt 
-
-    # 2. Qualité REACT/TypeScript
-    - cd $CI_PROJECT_DIR/$WEB_PATH
-    - npm ci --prefer-offline
-    - npm run lint 2>&1 | tee -a $CI_PROJECT_DIR/$PROJECT_PATH/reports/lint_report.txt
+    
+    # Vérification du formatage et linting Rust
+    - cargo fmt --all -- --check 2>&1 | tee reports/cargoFmt_report.txt
+    - cargo clippy --all-targets --all-features -- -D warnings 2>&1 | tee reports/clippy_report.txt
 
   artifacts:
     when: always
@@ -88,96 +63,87 @@ check_quality:
       - $PROJECT_PATH/reports/
     expire_in: 1 week
   allow_failure: true
+
+# Job de lint frontend 
+lint_frontend:
+  stage: quality
+  image: node:22-slim
+  cache:
+    - <<: *cache_npm
+  script:
+    - cd $WEB_PATH
+    - npm ci --prefer-offline
+    - mkdir -p $CI_PROJECT_DIR/$PROJECT_PATH/reports
+    - npm run lint 2>&1 | tee $CI_PROJECT_DIR/$PROJECT_PATH/reports/lint_report.txt
+
+  artifacts:
+    when: always
+    paths:
+      - $PROJECT_PATH/reports/
+    expire_in: 1 week
   allow_failure: true
 
 # --- JOB 2 : BUILD ---
 build_app:
   stage: build
-  needs: ["check_quality"]
+  needs: 
+    - job: check_rust_quality
+      optional: true
+    - job: lint_frontend
+      optional: true
   cache:
-    - key: "${CI_COMMIT_REF_SLUG}-cargo-v1"
-      paths:
-        - .cargo/
-        - $PROJECT_PATH/target/
-      policy: pull-push
-    - key: "${CI_COMMIT_REF_SLUG}-npm-v1"
-      paths:
-        - .npm/
-        - $PROJECT_PATH/node_modules/
-      policy: pull-push
+    - <<: *cache_cargo
+    - <<: *cache_npm
   before_script:
-    - *install_dependencies
-    - *install_dependencies
+    # xdg-open est requis pour bundler l'AppImage
+    - apt-get update -qq && apt-get install -y --no-install-recommends xdg-utils
   script:
-    - cd $PROJECT_PATH
-
-    # Vérification de l'environnement
-    - echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH"
-    - echo "=== Packages GTK/WebKit disponibles ==="
-    - pkg-config --list-all | grep -E "(gtk|gdk|webkit)" || true
-    - echo "=== Versions ==="
-    - pkg-config --modversion gtk+-3.0 || echo "gtk+-3.0 non trouvé"
-    - pkg-config --modversion gdk-3.0 || echo "gdk-3.0 non trouvé"
-    - pkg-config --modversion webkit2gtk-4.1 || echo "webkit2gtk-4.1 non trouvé"
-    - pkg-config --modversion webkit2gtk-4.0 || echo "webkit2gtk-4.0 non trouvé"
-
-    # Installation des dépendances frontend (utilise le cache)
+    - cd $WEB_PATH
+    
+    # Installation des dépendances frontend
     - npm ci --prefer-offline
-
+    
+    # Tests unitaires Rust avant le build (comme dans le GitHub Action)
+    - cd $CI_PROJECT_DIR/$PROJECT_PATH
+    - cargo test
+    
     # Build avec Tauri CLI
-    - npm run tauri build -- --verbose
-
-    # Build avec Tauri CLI
+    - cd $CI_PROJECT_DIR/$WEB_PATH
     - npm run tauri build -- --verbose
 
   artifacts:
     paths:
-      - $PROJECT_PATH/src-tauri/target/release/dedale
-      - $PROJECT_PATH/src-tauri/target/release/bundle/
+      - $PROJECT_PATH/target/release/dedale
+      - $PROJECT_PATH/target/release/bundle/
     expire_in: 1 day
 
-# --- JOB 3 : TESTS FONCTIONNELS ---
+# --- JOB 3 : TESTS WEBDRIVER (E2E) ---
+# Reproduit le workflow GitHub Actions de la doc Tauri:
+# https://tauri.app/develop/tests/webdriver/ci/
 test_e2e:
   stage: test
   needs: ["build_app"]
   cache:
-    - key: "${CI_COMMIT_REF_SLUG}-cargo-v1"
+    # Pas besoin du cache Cargo - l'app est déjà compilée via les artifacts
+    - key: "${CI_COMMIT_REF_SLUG}-webdriver-v1"
       paths:
-        - .cargo/
-        - $PROJECT_PATH/target/
-      policy: pull
-    - key: "${CI_COMMIT_REF_SLUG}-npm-v1"
-      paths:
-        - .npm/
-        - $PROJECT_PATH/node_modules/
         - $PROJECT_PATH/webdriver/webdriverio/node_modules/
       policy: pull-push
-  before_script:
-    - *install_dependencies
-    - apt-get update -qq && apt-get install -y --no-install-recommends xvfb xauth
   script:
     - cd $PROJECT_PATH
-    - |
-      if [ -f tsconfig.json ]; then
-        # Backup du tsconfig original
-        cp tsconfig.json tsconfig.json.backup
-        # Modifier pour permettre les variables non utilisées
-        sed -i 's/"noUnusedLocals": true/"noUnusedLocals": false/g' tsconfig.json
-        # Si la ligne n'existe pas, on ne fait rien (le build passera quand même)
-      fi
-
-    # Installer tauri-driver et ajouter au PATH
-    - cargo install tauri-driver --locked
-    - export PATH="$CARGO_HOME/bin:$PATH"
+    
+    # Vérifier que tauri-driver est disponible
     - which tauri-driver
-    - tauri-driver --version
 
-    # Tests E2E
+    # Installation des dépendances Node.js pour les tests e2e
     - cd webdriver/webdriverio
     - npm ci --prefer-offline
+    
+    # Créer les dossiers pour les artifacts
+    - mkdir -p reports screenshots logs
 
-    # Lancement des tests avec Xvfb (avec PATH mis à jour)
-    - export PATH="$CARGO_HOME/bin:$PATH"
+    # Lancement des tests WebdriverIO avec xvfb-run (serveur d'affichage virtuel)
+    # Permet à l'application de tourner en headless sans modification du code
     - xvfb-run -a -s "-screen 0 1920x1080x24" npm run test
 
   artifacts:
@@ -186,7 +152,5 @@ test_e2e:
       - $PROJECT_PATH/webdriver/webdriverio/reports/
       - $PROJECT_PATH/webdriver/webdriverio/screenshots/
       - $PROJECT_PATH/webdriver/webdriverio/logs/
-      - $PROJECT_PATH/webdriver/webdriverio/logs/
     expire_in: 1 week
   allow_failure: true
-

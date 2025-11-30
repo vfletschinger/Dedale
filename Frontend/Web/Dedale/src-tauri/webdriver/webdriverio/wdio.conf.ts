@@ -1,6 +1,6 @@
 import type { Options } from '@wdio/types';
 import * as path from 'path';
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, spawnSync, ChildProcess } from 'child_process';
 
 // Chemin vers le binaire Tauri buildé
 const tauriBinary = path.resolve(
@@ -8,10 +8,23 @@ const tauriBinary = path.resolve(
   '../../target/release/dedale'
 );
 
-// Trouver tauri-driver (dans $CARGO_HOME/bin ou PATH)
-const tauriDriverPath = process.env.CARGO_HOME 
-  ? path.join(process.env.CARGO_HOME, 'bin', 'tauri-driver')
-  : 'tauri-driver';
+// Trouver tauri-driver: d'abord via which, puis fallback sur CARGO_HOME ou PATH
+function findTauriDriver(): string {
+  // Essayer de trouver via 'which' (fonctionne dans l'image Docker)
+  const whichResult = spawnSync('which', ['tauri-driver']);
+  if (whichResult.status === 0) {
+    return whichResult.stdout.toString().trim();
+  }
+  
+  // Fallback: CARGO_HOME/bin ou juste 'tauri-driver'
+  if (process.env.CARGO_HOME) {
+    return path.join(process.env.CARGO_HOME, 'bin', 'tauri-driver');
+  }
+  
+  return 'tauri-driver';
+}
+
+const tauriDriverPath = findTauriDriver();
 
 let tauriDriver: ChildProcess;
 
@@ -32,7 +45,8 @@ export const config: Options.Testrunner = {
   capabilities: [
     {
       maxInstances: 1,
-      browserName: 'chrome',
+      // Pour Tauri, utiliser 'wry' (le moteur WebView de Tauri)
+      browserName: 'wry',
       'tauri:options': {
         application: tauriBinary,
       },
