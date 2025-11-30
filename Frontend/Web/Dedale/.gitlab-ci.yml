@@ -13,6 +13,7 @@ stages:
   - quality
   - build
   - test
+  - release
 
 # Template de job par défaut pour éviter la répétition
 default:
@@ -83,38 +84,38 @@ lint_frontend:
     expire_in: 1 week
   allow_failure: true
 
-# --- JOB 2 : BUILD ---
-build_app:
+# --- JOB 2 : BUILD LINUX (uniquement pour les tests E2E) ---
+# Build minimal sans bundling (pas de .deb, .rpm, .AppImage)
+build_for_tests:
   stage: build
-  needs: 
+  needs:
     - job: check_rust_quality
       optional: true
     - job: lint_frontend
       optional: true
   cache:
-    - <<: *cache_cargo
+    # Cache léger séparé pour le build de test (évite d'importer le gros cache Windows)
+    - key: "${CI_COMMIT_REF_SLUG}-cargo-test-v1"
+      paths:
+        - .cargo/registry/
+        - .cargo/git/
+        - $PROJECT_PATH/target/release/
+      policy: pull-push
     - <<: *cache_npm
-  before_script:
-    # xdg-open est requis pour bundler l'AppImage
-    - apt-get update -qq && apt-get install -y --no-install-recommends xdg-utils
   script:
     - cd $WEB_PATH
     
     # Installation des dépendances frontend
     - npm ci --prefer-offline
     
-    # Tests unitaires Rust avant le build (comme dans le GitHub Action)
-    - cd $CI_PROJECT_DIR/$PROJECT_PATH
-    - cargo test
+    # Build Linux sans bundling (--no-bundle = pas d'installateurs)
+    # Génère uniquement l'exécutable pour les tests
+    - npm run tauri build -- --no-bundle --verbose
     
-    # Build avec Tauri CLI
-    - cd $CI_PROJECT_DIR/$WEB_PATH
-    - npm run tauri build -- --verbose
-
   artifacts:
     paths:
+      # Seulement l'exécutable Linux pour les tests E2E
       - $PROJECT_PATH/target/release/dedale
-      - $PROJECT_PATH/target/release/bundle/
     expire_in: 1 day
 
 # --- JOB 3 : TESTS WEBDRIVER (E2E) ---
@@ -122,7 +123,7 @@ build_app:
 # https://tauri.app/develop/tests/webdriver/ci/
 test_e2e:
   stage: test
-  needs: ["build_app"]
+  needs: ["build_for_tests"]
   cache:
     # Pas besoin du cache Cargo - l'app est déjà compilée via les artifacts
     - key: "${CI_COMMIT_REF_SLUG}-webdriver-v1"
@@ -153,4 +154,40 @@ test_e2e:
       - $PROJECT_PATH/webdriver/webdriverio/screenshots/
       - $PROJECT_PATH/webdriver/webdriverio/logs/
     expire_in: 1 week
-  allow_failure: true
+
+# --- JOB 4 : BUILD WINDOWS (cross-compilation depuis Linux) ---
+# Ne se lance QUE sur la branche main ET après succès des tests
+# Documentation: https://tauri.app/distribute/windows-installer/
+build_app_windows:
+  stage: release
+  # rules:
+  #   # Uniquement sur main et si les tests ont réussi
+  #   - if: $CI_COMMIT_BRANCH == "main"
+  #     when: on_success
+  needs:
+    - job: test_e2e
+      artifacts: false  # Pas besoin des artifacts de test
+  cache:
+    # Cache séparé pour Windows (évite les conflits avec le build Linux)
+    - key: "${CI_COMMIT_REF_SLUG}-cargo-windows-v1"
+      paths:
+        - .cargo/registry/
+        - .cargo/git/
+        - $PROJECT_PATH/target/x86_64-pc-windows-msvc/
+      policy: pull-push
+    - <<: *cache_npm
+  before_script:
+    - apt-get update -qq && apt-get install -y --no-install-recommends nsis
+    - apt-get install -y --no-install-recommends lld llvm clang
+    - rustup target add x86_64-pc-windows-msvc
+    - cargo install --locked cargo-xwin
+  script:
+    - cd $WEB_PATH
+    - npm ci --prefer-offline
+    
+    - npm run tauri build -- --runner cargo-xwin --target x86_64-pc-windows-msvc --verbose
+    
+  artifacts:
+    paths:
+      - $PROJECT_PATH/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
+    expire_in: 1 week
