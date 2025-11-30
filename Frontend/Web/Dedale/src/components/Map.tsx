@@ -1,9 +1,32 @@
 import { useRef, useEffect, useState } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import MapboxDraw from "@mapbox/mapbox-gl-draw";
+import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
 import { invoke } from "@tauri-apps/api/core";
 import PointDetails from "./PointDetails";
 import AddPointForm from "./AddPointForm";
+
+// Fonction pour convertir GeoJSON en WKT
+function geoJSONtoWKT(geometry: GeoJSON.Geometry): string {
+  if (geometry.type === "Polygon") {
+    const coords = geometry.coordinates[0]
+      .map(([x, y]) => `${x} ${y}`)
+      .join(", ");
+    return `POLYGON((${coords}))`;
+  }
+  if (geometry.type === "LineString") {
+    const coords = geometry.coordinates
+      .map(([x, y]) => `${x} ${y}`)
+      .join(", ");
+    return `LINESTRING(${coords})`;
+  }
+  if (geometry.type === "Point") {
+    const [x, y] = geometry.coordinates;
+    return `POINT(${x} ${y})`;
+  }
+  throw new Error(`Type de géométrie non supporté: ${geometry.type}`);
+}
 
 // Type pour les géométries de la DB
 interface GeometryData {
@@ -69,6 +92,7 @@ function parseWKTtoGeoJSON(wkt: string): GeoJSON.Geometry | null {
 function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }) {
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
+  const drawRef = useRef<MapboxDraw | null>(null);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<any[]>([]);
   const [currentMarker, setCurrentMarker] = useState<maplibregl.Marker | null>(
@@ -84,6 +108,8 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
   const awaitingMapClickRef = useRef(false);
   const selectedEventIdRef = useRef<number | null>(null);
   const [geometries, setGeometries] = useState<GeometryData[]>([]);
+  const [drawingMode, setDrawingMode] = useState<"none" | "polygon" | "line">("none");
+  const [isDrawingToolsOpen, setIsDrawingToolsOpen] = useState(false);
 
   // Synchroniser la ref avec le state
   useEffect(() => {
@@ -124,6 +150,120 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
   const handleEventChange = (eventId: string) => {
     const event = events.find(e => e.id === parseInt(eventId));
     setSelectedEvent(event);
+  };
+
+  // Fonction pour rafraîchir les géométries sur la carte
+  const refreshGeometriesOnMap = (mapObj: maplibregl.Map, geoms: GeometryData[]) => {
+    // Supprimer les anciennes couches de géométries
+    if (mapObj.getLayer("event-geometries-fill")) mapObj.removeLayer("event-geometries-fill");
+    if (mapObj.getLayer("event-geometries-line")) mapObj.removeLayer("event-geometries-line");
+    if (mapObj.getLayer("event-geometries-point")) mapObj.removeLayer("event-geometries-point");
+    if (mapObj.getSource("event-geometries")) mapObj.removeSource("event-geometries");
+
+    if (geoms.length === 0) return;
+
+    // Convertir les WKT en GeoJSON features
+    const features = geoms
+      .map((g) => {
+        const geometry = parseWKTtoGeoJSON(g.geom);
+        if (!geometry) return null;
+        return {
+          type: "Feature",
+          geometry,
+          properties: {
+            id: g.id,
+            event_id: g.event_id,
+            geom_type: geometry.type,
+          },
+        } as GeoJSON.Feature;
+      })
+      .filter((f): f is GeoJSON.Feature => f !== null);
+
+    if (features.length === 0) return;
+
+    const geojson: GeoJSON.FeatureCollection = {
+      type: "FeatureCollection",
+      features,
+    };
+
+    // Ajouter la source
+    mapObj.addSource("event-geometries", {
+      type: "geojson",
+      data: geojson,
+    });
+
+    // Ajouter la couche pour les polygones (fill)
+    mapObj.addLayer({
+      id: "event-geometries-fill",
+      type: "fill",
+      source: "event-geometries",
+      filter: ["==", ["geometry-type"], "Polygon"],
+      paint: {
+        "fill-color": "#6366f1",
+        "fill-opacity": 0.3,
+      },
+    });
+
+    // Ajouter la couche pour les lignes (incluant les contours des polygones)
+    mapObj.addLayer({
+      id: "event-geometries-line",
+      type: "line",
+      source: "event-geometries",
+      filter: ["any", 
+        ["==", ["geometry-type"], "LineString"],
+        ["==", ["geometry-type"], "Polygon"]
+      ],
+      paint: {
+        "line-color": "#4f46e5",
+        "line-width": 3,
+        "line-opacity": 0.8,
+      },
+    });
+
+    // Ajouter la couche pour les points
+    mapObj.addLayer({
+      id: "event-geometries-point",
+      type: "circle",
+      source: "event-geometries",
+      filter: ["==", ["geometry-type"], "Point"],
+      paint: {
+        "circle-radius": 10,
+        "circle-color": "#8b5cf6",
+        "circle-stroke-color": "#4f46e5",
+        "circle-stroke-width": 3,
+        "circle-opacity": 0.8,
+      },
+    });
+
+    console.log("✅ Géométries affichées sur la carte:", features.length);
+  };
+
+  // Fonctions pour activer les modes de dessin
+  const startDrawPolygon = () => {
+    if (!drawRef.current) return;
+    if (!selectedEvent) {
+      alert("⚠️ Veuillez sélectionner un événement avant de dessiner.");
+      return;
+    }
+    setDrawingMode("polygon");
+    drawRef.current.changeMode("draw_polygon");
+  };
+
+  const startDrawLine = () => {
+    if (!drawRef.current) return;
+    if (!selectedEvent) {
+      alert("⚠️ Veuillez sélectionner un événement avant de dessiner.");
+      return;
+    }
+    setDrawingMode("line");
+    drawRef.current.changeMode("draw_line_string");
+  };
+
+  const cancelDrawing = () => {
+    if (!drawRef.current) return;
+    setDrawingMode("none");
+    drawRef.current.changeMode("simple_select");
+    drawRef.current.deleteAll();
   };
 
   // Initialisation de la carte
@@ -238,6 +378,110 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
 
     mapInstance.on("load", () => {
       fetchAndDisplayPoints(mapInstance, selectedEventId);
+      
+      // Initialiser MapboxDraw pour le dessin de géométries
+      const draw = new MapboxDraw({
+        displayControlsDefault: false,
+        controls: {},
+        defaultMode: "simple_select",
+        styles: [
+          // Polygones
+          {
+            id: "gl-draw-polygon-fill",
+            type: "fill",
+            filter: ["all", ["==", "$type", "Polygon"], ["!=", "mode", "static"]],
+            paint: {
+              "fill-color": "#6366f1",
+              "fill-outline-color": "#4f46e5",
+              "fill-opacity": 0.3,
+            },
+          },
+          {
+            id: "gl-draw-polygon-stroke-active",
+            type: "line",
+            filter: ["all", ["==", "$type", "Polygon"], ["!=", "mode", "static"]],
+            paint: {
+              "line-color": "#4f46e5",
+              "line-width": 3,
+            },
+          },
+          // Lignes
+          {
+            id: "gl-draw-line",
+            type: "line",
+            filter: ["all", ["==", "$type", "LineString"], ["!=", "mode", "static"]],
+            paint: {
+              "line-color": "#22c55e",
+              "line-width": 4,
+            },
+          },
+          // Points des sommets pendant le dessin
+          {
+            id: "gl-draw-polygon-and-line-vertex-active",
+            type: "circle",
+            filter: ["all", ["==", "meta", "vertex"], ["==", "$type", "Point"]],
+            paint: {
+              "circle-radius": 6,
+              "circle-color": "#fff",
+              "circle-stroke-color": "#4f46e5",
+              "circle-stroke-width": 2,
+            },
+          },
+          // Point de milieu
+          {
+            id: "gl-draw-polygon-midpoint",
+            type: "circle",
+            filter: ["all", ["==", "meta", "midpoint"], ["==", "$type", "Point"]],
+            paint: {
+              "circle-radius": 4,
+              "circle-color": "#4f46e5",
+            },
+          },
+        ],
+      });
+
+      // Ajouter le contrôle Draw à la carte (compatible MapLibre)
+      mapInstance.addControl(draw as unknown as maplibregl.IControl, "top-right");
+      drawRef.current = draw;
+
+      // Handler pour la création d'une géométrie
+      mapInstance.on("draw.create", async (e: any) => {
+        const feature = e.features[0];
+        if (!feature) return;
+
+        const eventId = selectedEventIdRef.current;
+        if (!eventId) {
+          alert("⚠️ Veuillez sélectionner un événement avant de dessiner une géométrie.");
+          draw.delete(feature.id);
+          return;
+        }
+
+        try {
+          const wkt = geoJSONtoWKT(feature.geometry);
+          console.log("📐 Création géométrie:", wkt);
+          
+          await invoke("create_geometry", {
+            eventId: eventId,
+            geom: wkt,
+          });
+          
+          console.log("✅ Géométrie sauvegardée");
+          
+          // Supprimer la feature dessinée (elle sera rechargée depuis la DB)
+          draw.delete(feature.id);
+          
+          // Recharger les géométries depuis la DB
+          const geoms = await invoke<GeometryData[]>("fetch_geometries_for_event", { eventId });
+          setGeometries(geoms);
+          
+          // Rafraîchir l'affichage des géométries sur la carte
+          refreshGeometriesOnMap(mapInstance, geoms);
+        } catch (err) {
+          console.error("Erreur sauvegarde géométrie:", err);
+          alert("Erreur lors de la sauvegarde de la géométrie");
+          draw.delete(feature.id);
+        }
+      });
     });
 
     const initialMarker = new maplibregl.Marker()
@@ -300,15 +544,10 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
 
     const loadGeometries = async () => {
       const eventId = selectedEvent?.id ?? null;
-      
-      // Supprimer les anciennes couches de géométries
-      if (map.getLayer("event-geometries-fill")) map.removeLayer("event-geometries-fill");
-      if (map.getLayer("event-geometries-line")) map.removeLayer("event-geometries-line");
-      if (map.getLayer("event-geometries-point")) map.removeLayer("event-geometries-point");
-      if (map.getSource("event-geometries")) map.removeSource("event-geometries");
 
       if (!eventId) {
         setGeometries([]);
+        refreshGeometriesOnMap(map, []);
         return;
       }
 
@@ -317,83 +556,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
         const geoms = await invoke<GeometryData[]>("fetch_geometries_for_event", { eventId });
         console.log(`📐 ${geoms.length} géométrie(s) récupérée(s)`);
         setGeometries(geoms);
-
-        if (geoms.length === 0) return;
-
-        // Convertir les WKT en GeoJSON features
-        const features = geoms
-          .map((g) => {
-            const geometry = parseWKTtoGeoJSON(g.geom);
-            if (!geometry) return null;
-            return {
-              type: "Feature",
-              geometry,
-              properties: {
-                id: g.id,
-                event_id: g.event_id,
-                geom_type: geometry.type,
-              },
-            } as GeoJSON.Feature;
-          })
-          .filter((f): f is GeoJSON.Feature => f !== null);
-
-        if (features.length === 0) return;
-
-        const geojson: GeoJSON.FeatureCollection = {
-          type: "FeatureCollection",
-          features,
-        };
-
-        // Ajouter la source
-        map.addSource("event-geometries", {
-          type: "geojson",
-          data: geojson,
-        });
-
-        // Ajouter la couche pour les polygones (fill)
-        map.addLayer({
-          id: "event-geometries-fill",
-          type: "fill",
-          source: "event-geometries",
-          filter: ["==", ["geometry-type"], "Polygon"],
-          paint: {
-            "fill-color": "#6366f1",
-            "fill-opacity": 0.3,
-          },
-        });
-
-        // Ajouter la couche pour les lignes (incluant les contours des polygones)
-        map.addLayer({
-          id: "event-geometries-line",
-          type: "line",
-          source: "event-geometries",
-          filter: ["any", 
-            ["==", ["geometry-type"], "LineString"],
-            ["==", ["geometry-type"], "Polygon"]
-          ],
-          paint: {
-            "line-color": "#4f46e5",
-            "line-width": 3,
-            "line-opacity": 0.8,
-          },
-        });
-
-        // Ajouter la couche pour les points
-        map.addLayer({
-          id: "event-geometries-point",
-          type: "circle",
-          source: "event-geometries",
-          filter: ["==", ["geometry-type"], "Point"],
-          paint: {
-            "circle-radius": 10,
-            "circle-color": "#8b5cf6",
-            "circle-stroke-color": "#4f46e5",
-            "circle-stroke-width": 3,
-            "circle-opacity": 0.8,
-          },
-        });
-
-        console.log("✅ Géométries affichées sur la carte");
+        refreshGeometriesOnMap(map, geoms);
       } catch (err) {
         console.error("Erreur chargement géométries:", err);
       }
@@ -590,7 +753,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
             </select>
             {selectedEvent && (
               <div className="flex items-center gap-2 text-white/80 text-sm">
-                <span> {selectedEvent.geometries?.length || 0} géométries</span>
+                <span>📐 {geometries.length} géométrie{geometries.length !== 1 ? 's' : ''}</span>
                 <span className={`px-2 py-1 rounded-full text-xs ${
                   selectedEvent.status === 'active' 
                     ? 'bg-green-400/20 text-green-100' 
@@ -637,6 +800,107 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
         <div className="flex-1 flex overflow-hidden relative">
           {/* Carte */}
           <div ref={mapContainer} className="flex-1 h-full" />
+          
+          {/* Barre d'outils de dessin flottante - visible uniquement si un événement est sélectionné */}
+          {selectedEvent && (
+          <div className="absolute top-4 left-4 z-10">
+            <div className="bg-white/95 backdrop-blur-md rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+              {/* Bouton toggle */}
+              <button
+                onClick={() => setIsDrawingToolsOpen(!isDrawingToolsOpen)}
+                className={`w-full px-4 py-3 flex items-center gap-2 font-medium transition-all duration-200 ${
+                  isDrawingToolsOpen 
+                    ? 'bg-indigo-500 text-white' 
+                    : 'bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <span className="text-lg">🛠️</span>
+                <span>Outils</span>
+                <span className={`ml-auto transition-transform duration-200 ${isDrawingToolsOpen ? 'rotate-180' : ''}`}>
+                  ▼
+                </span>
+              </button>
+              
+              {/* Panneau d'outils */}
+              {isDrawingToolsOpen && (
+                <div className="p-3 border-t border-gray-100 space-y-2">
+                  <p className="text-xs text-gray-500 mb-2">Dessiner une géométrie :</p>
+                  
+                  {/* Bouton Polygone */}
+                  <button
+                    onClick={startDrawPolygon}
+                    disabled={!selectedEvent}
+                    className={`w-full px-3 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all duration-200 ${
+                      drawingMode === "polygon"
+                        ? 'bg-indigo-500 text-white shadow-md'
+                        : selectedEvent
+                          ? 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
+                          : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    }`}
+                  >
+                    <span className="text-lg">⬡</span>
+                    <span>Polygone (zone)</span>
+                  </button>
+                  
+                  {/* Bouton Ligne */}
+                  <button
+                    onClick={startDrawLine}
+                    disabled={!selectedEvent}
+                    className={`w-full px-3 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all duration-200 ${
+                      drawingMode === "line"
+                        ? 'bg-green-500 text-white shadow-md'
+                        : selectedEvent
+                          ? 'bg-green-50 text-green-700 hover:bg-green-100'
+                          : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    }`}
+                  >
+                    <span className="text-lg">╱</span>
+                    <span>Ligne (chemin)</span>
+                  </button>
+                  
+                  {/* Bouton Annuler */}
+                  {drawingMode !== "none" && (
+                    <button
+                      onClick={cancelDrawing}
+                      className="w-full px-3 py-2 rounded-lg flex items-center gap-2 text-sm font-medium bg-red-50 text-red-600 hover:bg-red-100 transition-all duration-200"
+                    >
+                      <span className="text-lg">✕</span>
+                      <span>Annuler le dessin</span>
+                    </button>
+                  )}
+                  
+                  {/* Message d'aide */}
+                  {drawingMode !== "none" && (
+                    <div className="mt-2 p-2 bg-blue-50 rounded-lg text-xs text-blue-700">
+                      <p className="font-medium">💡 Instructions :</p>
+                      {drawingMode === "polygon" && (
+                        <p>Cliquez pour placer les sommets du polygone. Double-cliquez pour terminer.</p>
+                      )}
+                      {drawingMode === "line" && (
+                        <p>Cliquez pour placer les points du chemin. Double-cliquez pour terminer.</p>
+                      )}
+                    </div>
+                  )}
+                  
+                  {!selectedEvent && (
+                    <p className="text-xs text-amber-600 mt-2">
+                      ⚠️ Sélectionnez un événement pour dessiner
+                    </p>
+                  )}
+                  
+                  {/* Affichage du nombre de géométries */}
+                  {selectedEvent && geometries.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      <p className="text-xs text-gray-500">
+                        📐 {geometries.length} géométrie(s) pour cet événement
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+          )}
           
           {/* Panneau droit: détails du point sélectionné OU formulaire d'ajout */}
           {(selectedPoint || addingPointCoords) && (

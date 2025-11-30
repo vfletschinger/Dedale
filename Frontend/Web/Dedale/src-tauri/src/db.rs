@@ -856,6 +856,41 @@ pub async fn fetch_geometries_for_event(app: AppHandle, event_id: i64) -> Result
 }
 
 #[tauri::command]
+pub async fn create_geometry(app: AppHandle, event_id: i64, geom: String) -> Result<Geometry, String> {
+    let pool = get_db_pool(&app).await?;
+
+    let result = sqlx::query("INSERT INTO geometry (event_id, geom) VALUES (?, ?)")
+        .bind(event_id)
+        .bind(&geom)
+        .execute(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let id = result.last_insert_rowid();
+    println!("[DB] 📐 Géométrie créée avec id={} pour l'événement {}", id, event_id);
+
+    Ok(Geometry {
+        id,
+        event_id,
+        geom,
+    })
+}
+
+#[tauri::command]
+pub async fn delete_geometry(app: AppHandle, geometry_id: i64) -> Result<(), String> {
+    let pool = get_db_pool(&app).await?;
+
+    sqlx::query("DELETE FROM geometry WHERE id = ?")
+        .bind(geometry_id)
+        .execute(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    println!("[DB] 🗑️ Géométrie {} supprimée", geometry_id);
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn delete_event(app: AppHandle, event_id: i64) -> Result<(), String> {
     let pool = get_db_pool(&app).await?;
 
