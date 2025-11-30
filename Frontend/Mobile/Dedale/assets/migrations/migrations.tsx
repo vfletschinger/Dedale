@@ -73,24 +73,45 @@ export const migrations: Migration[] = [
 
       const tableNames = tables.map((t) => t.name);
 
-      if (tableNames.includes("interest_points")) {
+      // Renommages sécurisés : ne renommer que si la table source existe
+      // et que la table cible n'existe pas encore.
+      if (tableNames.includes("interest_points") && !tableNames.includes("point")) {
         db.execSync(`ALTER TABLE interest_points RENAME TO point;`);
       }
-      if (tableNames.includes("obstacles")) {
+      if (tableNames.includes("obstacles") && !tableNames.includes("obstacle")) {
         db.execSync(`ALTER TABLE obstacles RENAME TO obstacle;`);
       }
-      if (tableNames.includes("pictures")) {
+      if (tableNames.includes("pictures") && !tableNames.includes("picture")) {
         db.execSync(`ALTER TABLE pictures RENAME TO picture;`);
       }
-      if (tableNames.includes("comments")) {
+      if (tableNames.includes("comments") && !tableNames.includes("comment")) {
         db.execSync(`ALTER TABLE comments RENAME TO comment;`);
       }
-      if (tableNames.includes("obstacle_types")) {
+      if (tableNames.includes("obstacle_types") && !tableNames.includes("obstacle_type")) {
         db.execSync(`ALTER TABLE obstacle_types RENAME TO obstacle_type;`);
       }
 
-      // Supprimer cette ligne car la colonne s'appelle déjà 'image'
-      db.execSync(`ALTER TABLE obstacle RENAME COLUMN nombre TO number;`);
+      // Recalculer les colonnes pour les vérifications suivantes
+      const getTableColumns = (tableName: string) => {
+        try {
+          const cols = db.getAllSync<{ name: string }>(`PRAGMA table_info(${tableName})`);
+          return cols.map(c => c.name);
+        } catch (e) {
+          return [] as string[];
+        }
+      };
+
+      // Renommer la colonne 'nombre' en 'number' dans la table 'obstacle'
+      // seulement si la table existe et que la colonne source existe
+      const obstacleCols = getTableColumns('obstacle');
+      if (obstacleCols.length > 0 && obstacleCols.includes('nombre') && !obstacleCols.includes('number')) {
+        try {
+          db.execSync(`ALTER TABLE obstacle RENAME COLUMN nombre TO number;`);
+        } catch (e) {
+          // En cas d'erreur, logguer mais ne pas interrompre le processus
+          console.warn('Impossible de renommer la colonne nombre -> number:', e);
+        }
+      }
     },
   },
   {

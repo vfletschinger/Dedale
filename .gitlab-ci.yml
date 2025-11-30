@@ -1,5 +1,6 @@
 stages:
   - info
+  - trigger
 
 print_mr_link:
   stage: info
@@ -16,3 +17,22 @@ print_mr_link:
       fi
   only:
     - /^feature\/.*$/
+
+trigger_mobile:
+  stage: trigger
+  trigger:
+    include: Frontend/Mobile/.gitlab-ci.yml
+  rules:
+      - changes:
+          - Frontend/Mobile/**/*
+      - when: manual
+
+trigger_web:
+  stage: trigger
+  trigger:
+    include: Frontend/Web/Dedale/.gitlab-ci.yml
+    strategy: depend
+  rules:
+      - changes:
+        - Frontend/Web/**/*
+      - when: manual
