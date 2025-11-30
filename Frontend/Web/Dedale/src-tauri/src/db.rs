@@ -891,6 +891,35 @@ pub async fn delete_geometry(app: AppHandle, geometry_id: i64) -> Result<(), Str
 }
 
 #[tauri::command]
+pub async fn update_geometry(app: AppHandle, geometry_id: i64, geom: String) -> Result<Geometry, String> {
+    let pool = get_db_pool(&app).await?;
+
+    // Récupérer l'event_id avant la mise à jour
+    let row = sqlx::query("SELECT event_id FROM geometry WHERE id = ?")
+        .bind(geometry_id)
+        .fetch_one(&pool)
+        .await
+        .map_err(|e| format!("Géométrie non trouvée: {}", e))?;
+    
+    let event_id: i64 = row.get("event_id");
+
+    sqlx::query("UPDATE geometry SET geom = ? WHERE id = ?")
+        .bind(&geom)
+        .bind(geometry_id)
+        .execute(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    println!("[DB] ✏️ Géométrie {} mise à jour", geometry_id);
+    
+    Ok(Geometry {
+        id: geometry_id,
+        event_id,
+        geom,
+    })
+}
+
+#[tauri::command]
 pub async fn delete_event(app: AppHandle, event_id: i64) -> Result<(), String> {
     let pool = get_db_pool(&app).await?;
 

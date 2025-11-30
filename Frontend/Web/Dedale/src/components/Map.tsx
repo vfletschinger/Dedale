@@ -110,6 +110,9 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
   const [geometries, setGeometries] = useState<GeometryData[]>([]);
   const [drawingMode, setDrawingMode] = useState<"none" | "polygon" | "line">("none");
   const [isDrawingToolsOpen, setIsDrawingToolsOpen] = useState(false);
+  const [selectedGeometryId, setSelectedGeometryId] = useState<number | null>(null);
+  const [editingGeometryId, setEditingGeometryId] = useState<number | null>(null);
+  const [isGeometryListOpen, setIsGeometryListOpen] = useState(false);
 
   // Synchroniser la ref avec le state
   useEffect(() => {
@@ -264,6 +267,205 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
     setDrawingMode("none");
     drawRef.current.changeMode("simple_select");
     drawRef.current.deleteAll();
+  };
+
+  // Fonction pour obtenir le type lisible d'une géométrie WKT
+  const getGeometryTypeLabel = (wkt: string): { label: string; icon: string } => {
+    const upper = wkt.toUpperCase();
+    if (upper.startsWith("POLYGON")) return { label: "Polygone", icon: "⬡" };
+    if (upper.startsWith("LINESTRING")) return { label: "Ligne", icon: "╱" };
+    if (upper.startsWith("POINT")) return { label: "Point", icon: "●" };
+    return { label: "Inconnu", icon: "?" };
+  };
+
+  // Fonction pour surligner une géométrie sur la carte
+  const highlightGeometry = (geom: GeometryData | null) => {
+    if (!map) return;
+    
+    // Supprimer l'ancien surlignage
+    if (map.getLayer("highlight-geometry-fill")) map.removeLayer("highlight-geometry-fill");
+    if (map.getLayer("highlight-geometry-line")) map.removeLayer("highlight-geometry-line");
+    if (map.getSource("highlight-geometry")) map.removeSource("highlight-geometry");
+    
+    if (!geom) {
+      setSelectedGeometryId(null);
+      return;
+    }
+    
+    setSelectedGeometryId(geom.id);
+    
+    const geometry = parseWKTtoGeoJSON(geom.geom);
+    if (!geometry) return;
+    
+    const geojson: GeoJSON.FeatureCollection = {
+      type: "FeatureCollection",
+      features: [{
+        type: "Feature",
+        geometry,
+        properties: { id: geom.id },
+      }],
+    };
+    
+    map.addSource("highlight-geometry", {
+      type: "geojson",
+      data: geojson,
+    });
+    
+    // Style de surlignage plus visible
+    if (geometry.type === "Polygon") {
+      map.addLayer({
+        id: "highlight-geometry-fill",
+        type: "fill",
+        source: "highlight-geometry",
+        paint: {
+          "fill-color": "#fbbf24",
+          "fill-opacity": 0.5,
+        },
+      });
+    }
+    
+    map.addLayer({
+      id: "highlight-geometry-line",
+      type: "line",
+      source: "highlight-geometry",
+      paint: {
+        "line-color": "#f59e0b",
+        "line-width": 5,
+        "line-dasharray": [2, 2],
+      },
+    });
+    
+    // Centrer la carte sur la géométrie
+    let coords: number[][] = [];
+    if (geometry.type === "Polygon") {
+      coords = geometry.coordinates[0] as number[][];
+    } else if (geometry.type === "LineString") {
+      coords = geometry.coordinates as number[][];
+    } else if (geometry.type === "Point") {
+      coords = [geometry.coordinates as number[]];
+    }
+    
+    if (coords.length > 0) {
+      const bounds = coords.reduce(
+        (acc: maplibregl.LngLatBounds, coord: number[]) => {
+          return acc.extend(coord as [number, number]);
+        },
+        new maplibregl.LngLatBounds(coords[0] as [number, number], coords[0] as [number, number])
+      );
+      map.fitBounds(bounds, { padding: 100, maxZoom: 17 });
+    }
+  };
+
+  // Fonction pour supprimer une géométrie
+  const handleDeleteGeometry = async (geometryId: number) => {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer cette géométrie ?")) return;
+    
+    try {
+      await invoke("delete_geometry", { geometryId });
+      console.log("✅ Géométrie supprimée:", geometryId);
+      
+      // Rafraîchir la liste
+      const eventId = selectedEvent?.id;
+      if (eventId) {
+        const geoms = await invoke<GeometryData[]>("fetch_geometries_for_event", { eventId });
+        setGeometries(geoms);
+        if (map) refreshGeometriesOnMap(map, geoms);
+      }
+      
+      // Désélectionner si c'était la géométrie sélectionnée
+      if (selectedGeometryId === geometryId) {
+        highlightGeometry(null);
+      }
+    } catch (err) {
+      console.error("Erreur suppression géométrie:", err);
+      alert("Erreur lors de la suppression");
+    }
+  };
+
+  // Fonction pour démarrer l'édition d'une géométrie
+  const startEditGeometry = (geom: GeometryData) => {
+    if (!drawRef.current || !map) return;
+    
+    setEditingGeometryId(geom.id);
+    highlightGeometry(null); // Supprimer le surlignage
+    
+    // Convertir WKT en GeoJSON et l'ajouter au Draw
+    const geometry = parseWKTtoGeoJSON(geom.geom);
+    if (!geometry) return;
+    
+    const feature: GeoJSON.Feature = {
+      type: "Feature",
+      id: `edit-${geom.id}`,
+      geometry,
+      properties: { originalId: geom.id },
+    };
+    
+    // Supprimer toutes les features du Draw et ajouter celle-ci
+    drawRef.current.deleteAll();
+    drawRef.current.add(feature as any);
+    drawRef.current.changeMode("direct_select", { featureId: `edit-${geom.id}` });
+    
+    // Masquer la géométrie originale
+    if (map.getLayer("event-geometries-fill")) {
+      map.setFilter("event-geometries-fill", ["!=", ["get", "id"], geom.id]);
+    }
+    if (map.getLayer("event-geometries-line")) {
+      map.setFilter("event-geometries-line", ["all",
+        ["any", ["==", ["geometry-type"], "LineString"], ["==", ["geometry-type"], "Polygon"]],
+        ["!=", ["get", "id"], geom.id]
+      ]);
+    }
+  };
+
+  // Fonction pour sauvegarder les modifications d'une géométrie
+  const saveEditGeometry = async () => {
+    if (!drawRef.current || !editingGeometryId) return;
+    
+    const features = drawRef.current.getAll();
+    if (features.features.length === 0) {
+      alert("Aucune géométrie à sauvegarder");
+      return;
+    }
+    
+    const feature = features.features[0];
+    try {
+      const wkt = geoJSONtoWKT(feature.geometry as GeoJSON.Geometry);
+      await invoke("update_geometry", { geometryId: editingGeometryId, geom: wkt });
+      console.log("✅ Géométrie mise à jour:", editingGeometryId);
+      
+      // Rafraîchir
+      const eventId = selectedEvent?.id;
+      if (eventId && map) {
+        const geoms = await invoke<GeometryData[]>("fetch_geometries_for_event", { eventId });
+        setGeometries(geoms);
+        refreshGeometriesOnMap(map, geoms);
+      }
+      
+      cancelEditGeometry();
+    } catch (err) {
+      console.error("Erreur mise à jour géométrie:", err);
+      alert("Erreur lors de la mise à jour");
+    }
+  };
+
+  // Fonction pour annuler l'édition
+  const cancelEditGeometry = () => {
+    if (!drawRef.current || !map) return;
+    
+    drawRef.current.deleteAll();
+    drawRef.current.changeMode("simple_select");
+    setEditingGeometryId(null);
+    
+    // Restaurer les filtres des couches
+    if (map.getLayer("event-geometries-fill")) {
+      map.setFilter("event-geometries-fill", ["==", ["geometry-type"], "Polygon"]);
+    }
+    if (map.getLayer("event-geometries-line")) {
+      map.setFilter("event-geometries-line", ["any", 
+        ["==", ["geometry-type"], "LineString"],
+        ["==", ["geometry-type"], "Polygon"]
+      ]);
+    }
   };
 
   // Initialisation de la carte
@@ -888,12 +1090,85 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
                     </p>
                   )}
                   
-                  {/* Affichage du nombre de géométries */}
+                  {/* Affichage du nombre de géométries et liste */}
                   {selectedEvent && geometries.length > 0 && (
                     <div className="mt-3 pt-3 border-t border-gray-100">
-                      <p className="text-xs text-gray-500">
-                        📐 {geometries.length} géométrie(s) pour cet événement
-                      </p>
+                      <button
+                        onClick={() => setIsGeometryListOpen(!isGeometryListOpen)}
+                        className="w-full flex items-center justify-between text-xs text-gray-600 hover:text-gray-800"
+                      >
+                        <span>📐 {geometries.length} géométrie(s)</span>
+                        <span className={`transition-transform ${isGeometryListOpen ? 'rotate-180' : ''}`}>▼</span>
+                      </button>
+                      
+                      {isGeometryListOpen && (
+                        <div className="mt-2 max-h-48 overflow-y-auto space-y-1">
+                          {geometries.map((geom) => {
+                            const { label, icon } = getGeometryTypeLabel(geom.geom);
+                            const isSelected = selectedGeometryId === geom.id;
+                            const isEditing = editingGeometryId === geom.id;
+                            
+                            return (
+                              <div
+                                key={geom.id}
+                                className={`p-2 rounded-lg text-xs transition-all ${
+                                  isEditing 
+                                    ? 'bg-amber-100 border border-amber-300'
+                                    : isSelected 
+                                      ? 'bg-indigo-100 border border-indigo-300' 
+                                      : 'bg-gray-50 hover:bg-gray-100 border border-transparent'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <button
+                                    onClick={() => highlightGeometry(isSelected ? null : geom)}
+                                    className="flex items-center gap-1 text-left flex-1"
+                                  >
+                                    <span>{icon}</span>
+                                    <span className="font-medium">{label} #{geom.id}</span>
+                                  </button>
+                                  
+                                  {!editingGeometryId && (
+                                    <div className="flex gap-1">
+                                      <button
+                                        onClick={() => startEditGeometry(geom)}
+                                        className="p-1 rounded hover:bg-blue-100 text-blue-600"
+                                        title="Modifier"
+                                      >
+                                        ✏️
+                                      </button>
+                                      <button
+                                        onClick={() => handleDeleteGeometry(geom.id)}
+                                        className="p-1 rounded hover:bg-red-100 text-red-600"
+                                        title="Supprimer"
+                                      >
+                                        🗑️
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                                
+                                {isEditing && (
+                                  <div className="mt-2 flex gap-1">
+                                    <button
+                                      onClick={saveEditGeometry}
+                                      className="flex-1 px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600"
+                                    >
+                                      ✓ Sauvegarder
+                                    </button>
+                                    <button
+                                      onClick={cancelEditGeometry}
+                                      className="flex-1 px-2 py-1 bg-gray-400 text-white rounded text-xs hover:bg-gray-500"
+                                    >
+                                      ✕ Annuler
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
