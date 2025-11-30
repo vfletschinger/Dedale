@@ -1,4 +1,4 @@
-import { EventType } from "../types/database";
+import { EventWithGeometries } from "../types/database";
 
 /**
  * Gère la connexion et la communication avec une WebSocket.
@@ -7,7 +7,7 @@ class WebSocketClient {
   private uri: string;
   private ws: WebSocket | null = null;
   public isConnected: boolean = false;
-  private onMessageCallback?: (events: EventType[]) => void;
+  private onMessageCallback?: (events: EventWithGeometries[]) => void;
 
   constructor(uri: string) {
     this.uri = uri;
@@ -17,7 +17,9 @@ class WebSocketClient {
   /**
    * Tente d'établir la connexion WebSocket.
    */
-  public connect(onMessage?: (events: EventType[]) => void): Promise<boolean> {
+  public connect(
+    onMessage?: (events: EventWithGeometries[]) => void
+  ): Promise<boolean> {
     this.onMessageCallback = onMessage;
 
     return new Promise((resolve, reject) => {
@@ -32,7 +34,7 @@ class WebSocketClient {
       this.ws.onmessage = (e: WebSocketMessageEvent) => {
         console.log("🔔 Message reçu:", e.data);
         try {
-          const events: EventType[] = JSON.parse(e.data);
+          const events: EventWithGeometries[] = JSON.parse(e.data);
           console.log("📦 Événements reçus:", events);
           if (this.onMessageCallback) {
             this.onMessageCallback(events);

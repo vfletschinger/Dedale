@@ -17,7 +17,7 @@ import WebSocketClient from "./WebSocketClient";
 const { width } = Dimensions.get("window");
 const SCANNER_SIZE = width * 0.7;
 import { getDatabase } from "../../assets/migrations";
-import { EventType } from "../types/database";
+import { EventType, EventWithGeometries } from "../types/database";
 
 const QRCodeScanner = ({
   setScanQR,
@@ -47,20 +47,19 @@ const QRCodeScanner = ({
     );
   }
 
-  const insertEvents = (events: EventType[]) => {
+  const insertEvents = (events: EventWithGeometries[]) => {
     try {
       let insertedCount = 0;
       let updatedCount = 0;
+      let geometriesCount = 0;
 
       for (const event of events) {
-        // Check if event already exists
         const existing = db.getFirstSync<EventType>(
           "SELECT id FROM event WHERE id = ?",
           [event.id]
         );
 
         if (existing) {
-          // Update existing event
           db.runSync(
             "UPDATE event SET name = ?, description = ?, dateDebut = ?, dateFin = ?, statut = ?, geometry = ? WHERE id = ?",
             [
@@ -75,7 +74,6 @@ const QRCodeScanner = ({
           );
           updatedCount++;
         } else {
-          // Insert new event
           db.runSync(
             "INSERT INTO event (id, name, description, dateDebut, dateFin, statut, geometry) VALUES (?, ?, ?, ?, ?, ?, ?)",
             [
@@ -90,13 +88,25 @@ const QRCodeScanner = ({
           );
           insertedCount++;
         }
+
+        if (event.geometries && event.geometries.length > 0) {
+          db.runSync("DELETE FROM geometry WHERE event_id = ?", [event.id]);
+
+          for (const geom of event.geometries) {
+            db.runSync("INSERT INTO geometry (event_id, wkt) VALUES (?, ?)", [
+              event.id,
+              geom.wkt,
+            ]);
+            geometriesCount++;
+          }
+        }
       }
 
       console.log(
-        `✅ ${insertedCount} événement(s) inséré(s), ${updatedCount} mis à jour`
+        `✅ ${insertedCount} événement(s) inséré(s), ${updatedCount} mis à jour, ${geometriesCount} géométrie(s) synchronisée(s)`
       );
       setTransferStatus(
-        `${insertedCount} événement(s) ajouté(s), ${updatedCount} mis à jour`
+        `${insertedCount} événement(s) ajouté(s), ${updatedCount} mis à jour, ${geometriesCount} géométrie(s)`
       );
     } catch (error) {
       console.error("❌ Erreur lors de l'insertion des événements:", error);
@@ -116,7 +126,7 @@ const QRCodeScanner = ({
       const client = new WebSocketClient(websocketUri);
 
       client
-        .connect((events: EventType[]) => {
+        .connect((events: EventWithGeometries[]) => {
           setTransferStatus("Réception des événements...");
           try {
             insertEvents(events);

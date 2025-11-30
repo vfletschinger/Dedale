@@ -11,13 +11,15 @@ import MapView, {
   PROVIDER_DEFAULT,
   Region,
   Polygon,
+  Polyline,
   MapPressEvent,
 } from "react-native-maps";
 import * as Location from "expo-location";
-import { InterestPointsType } from "../types/database";
+import { InterestPointsType, GeometryType } from "../types/database";
 import CustomButton from "./CustomButton";
 import { useEvent } from "../context/EventContext";
 import { usePoints } from "../context/PointsContext";
+import { useGeometries } from "../context/GeometriesContext";
 
 interface OfflineMapProps {
   initialRegion?: Region;
@@ -36,6 +38,18 @@ export default function OfflineMap({
   hideButtons = false,
   mapRef: externalMapRef,
 }: OfflineMapProps) {
+  const colors = [
+    "#FF0000", // Rouge
+    "#0000FF", // Bleu
+    "#00FF00", // Vert
+    "#FF00FF", // Magenta
+    "#FFA500", // Orange
+    "#800080", // Violet
+    "#00FFFF", // Cyan
+    "#FFD700", // Or
+    "#FF1493", // Rose foncé
+  ];
+
   const defaultRegion: Region = {
     latitude: 48.5734,
     longitude: 7.7521,
@@ -49,11 +63,13 @@ export default function OfflineMap({
   const [initialLocationLoading, setInitialLocationLoading] =
     React.useState(true);
   const [listPoint, setListPoint] = React.useState<InterestPointsType[]>([]);
+  const [listGeometry, setListGeometry] = React.useState<GeometryType[]>([]);
 
   const internalMapRef = React.useRef<MapView | null>(null);
   const mapRef = externalMapRef || internalMapRef;
   const { selectedEventId } = useEvent();
   const { pointsByEvent, loading: pointsLoading } = usePoints();
+  const { geometriesByEvent, loading: geometriesLoading } = useGeometries();
 
   React.useEffect(() => {
     if (selectedEventId && pointsByEvent[selectedEventId]) {
@@ -76,6 +92,14 @@ export default function OfflineMap({
       setListPoint([]);
     }
   }, [selectedEventId, pointsByEvent]);
+
+  React.useEffect(() => {
+    if (selectedEventId && geometriesByEvent[selectedEventId]) {
+      setListGeometry(geometriesByEvent[selectedEventId]);
+    } else {
+      setListGeometry([]);
+    }
+  }, [selectedEventId, geometriesByEvent]);
 
   React.useEffect(() => {
     const initialize = async () => {
@@ -135,6 +159,45 @@ export default function OfflineMap({
     initialize();
   }, []);
 
+  const parseWKT = (wkt: string) => {
+    const trimmed = wkt.trim();
+
+    if (trimmed.startsWith("POLYGON")) {
+      const coordsMatch = trimmed.match(/\(\((.+?)\)\)/);
+      if (!coordsMatch) return null;
+
+      const coords = coordsMatch[1].split(",").map((pair) => {
+        const [lng, lat] = pair.trim().split(" ").map(Number);
+        return { latitude: lat, longitude: lng };
+      });
+      return { type: "polygon", coordinates: coords };
+    }
+
+    if (trimmed.startsWith("LINESTRING")) {
+      const coordsMatch = trimmed.match(/\((.+?)\)/);
+      if (!coordsMatch) return null;
+
+      const coords = coordsMatch[1].split(",").map((pair) => {
+        const [lng, lat] = pair.trim().split(" ").map(Number);
+        return { latitude: lat, longitude: lng };
+      });
+      return { type: "linestring", coordinates: coords };
+    }
+
+    if (trimmed.startsWith("POINT")) {
+      const coordsMatch = trimmed.match(/\((.+?)\)/);
+      if (!coordsMatch) return null;
+
+      const [lng, lat] = coordsMatch[1].trim().split(" ").map(Number);
+      return {
+        type: "point",
+        coordinates: [{ latitude: lat, longitude: lng }],
+      };
+    }
+
+    return null;
+  };
+
   const centerOnUserLocation = () => {
     if (mapRef.current && currentRegion) {
       mapRef.current.animateToRegion(
@@ -178,8 +241,8 @@ export default function OfflineMap({
         rotateEnabled
         pitchEnabled={true}
         mapType="standard"
-        minZoomLevel={10}
-        maxZoomLevel={25}
+        minZoomLevel={0}
+        maxZoomLevel={20}
         toolbarEnabled={false}
         onPress={onMapPress}
       >
@@ -191,9 +254,56 @@ export default function OfflineMap({
               title={`${p.id}`}
             />
           ))}
+        {listGeometry.map((geom, index) => {
+          const parsed = parseWKT(geom.wkt);
+          if (!parsed) return null;
+
+          const color = colors[index % colors.length];
+
+          if (parsed.type === "polygon") {
+            const fillColor = color
+              .replace("#", "")
+              .match(/.{2}/g)
+              ?.map((hex) => parseInt(hex, 16))
+              .join(", ");
+
+            return (
+              <Polygon
+                key={`geom-${geom.id}`}
+                coordinates={parsed.coordinates}
+                strokeColor={color}
+                strokeWidth={2}
+                fillColor={`rgba(${fillColor}, 0.3)`}
+              />
+            );
+          }
+
+          if (parsed.type === "linestring") {
+            return (
+              <Polyline
+                key={`geom-${geom.id}`}
+                coordinates={parsed.coordinates}
+                strokeColor={color}
+                strokeWidth={3}
+              />
+            );
+          }
+
+          if (parsed.type === "point") {
+            return (
+              <Marker
+                key={`geom-${geom.id}`}
+                coordinate={parsed.coordinates[0]}
+                pinColor="green"
+              />
+            );
+          }
+
+          return null;
+        })}
         {customMarker}
       </MapView>
-      {pointsLoading && (
+      {(pointsLoading || geometriesLoading) && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color="#0000ff" />
         </View>
