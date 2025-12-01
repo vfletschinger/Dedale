@@ -5,7 +5,6 @@ use std::fmt::Write;
 use std::fs;
 use std::path::Path;
 use tauri::AppHandle;
-use typst_as_lib::conversions::IntoFonts;
 use typst_as_lib::TypstEngine;
 use typst_pdf::PdfOptions;
 
@@ -76,40 +75,43 @@ pub async fn create_pdf(app: AppHandle) -> Result<(), String> {
                     &pic.image
                 };
 
-                // Decode without manual padding - base64 crate handles it
-                let image_bytes = match general_purpose::STANDARD.decode(raw_base64) {
+                let clean_base64 = raw_base64.replace(['\n', '\r', ' '], "");
+
+                let image_bytes = match general_purpose::STANDARD.decode(&clean_base64) {
                     Ok(b) => Some(b),
-                    Err(_) => match general_purpose::STANDARD_NO_PAD.decode(raw_base64) {
+                    Err(_) => match general_purpose::STANDARD_NO_PAD.decode(&clean_base64) {
                         Ok(b) => Some(b),
-                        Err(_) => None,
+                        Err(e) => {
+                            eprintln!(
+                                "❌ Failed to decode Base64 for img {}_{}: {}",
+                                point_index, img_index, e
+                            );
+                            None
+                        }
                     },
                 };
 
                 if let Some(bytes) = image_bytes {
-                    // Validate decoded image before writing
-                    if bytes.len() < 8 {
-                        eprintln!("Invalid image data at index {}", img_index);
-                        continue;
-                    }
+                    match image::load_from_memory(&bytes) {
+                        Ok(dynamic_image) => {
+                            let img_filename = format!("img_{}_{}.png", point_index, img_index);
+                            let img_path = temp_dir.join(&img_filename);
 
-                    let ext = if bytes.starts_with(&[0xFF, 0xD8, 0xFF]) {
-                        "jpg"
-                    } else if bytes.starts_with(&[0x89, 0x50, 0x4E, 0x47]) {
-                        "png"
-                    } else if bytes.starts_with(b"RIFF") {
-                        "webp"
-                    } else if bytes.starts_with(b"GIF8") {
-                        "gif"
-                    } else {
-                        eprintln!("Unknown image format at index {}", img_index);
-                        continue;
-                    };
-
-                    let img_filename = format!("img_{}_{}.{}", point_index, img_index, ext);
-                    let img_path = temp_dir.join(&img_filename);
-
-                    if let Ok(_) = fs::write(&img_path, bytes) {
-                        writeln!(typst_src, "  image(\"{}\", width: 100%),", img_filename).unwrap();
+                            if let Err(e) =
+                                dynamic_image.save_with_format(&img_path, image::ImageFormat::Png)
+                            {
+                                eprintln!("❌ Failed to save image to disk: {}", e);
+                            } else {
+                                writeln!(typst_src, "  image(\"{}\", width: 100%),", img_filename)
+                                    .unwrap();
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!(
+                                "❌ Image crate failed to load bytes (corrupt image?): {}",
+                                e
+                            );
+                        }
                     }
                 }
             }

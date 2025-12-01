@@ -12,8 +12,8 @@ const navItems: { key: PageKey; label: string }[] = [
   { key: "event", label: "Événements" },
   { key: "map", label: "Carte" },
   { key: "team", label: "Équipes" },
+  { key: "person", label: "Personnes" },
   { key: "data", label: "Données" },
-  { key: "person", label: "Personne" },
 ];
 
 export default function Navigation({

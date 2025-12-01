@@ -175,7 +175,23 @@ function Teams({ onTeamClick }: any) {
             onDelete={() => {
               setViewingPerson(null);
             }}
-            onUpdate={() => { }}
+            onUpdate={(updatedPerson) => {
+              setViewingPerson(updatedPerson);
+
+              if (selectedTeamData && selectedTeamData.data) {
+                const updatedMembers = selectedTeamData.data.members.map((m) =>
+                  m.id === updatedPerson.id ? updatedPerson : m
+                );
+
+                setSelectedTeamData({
+                  ...selectedTeamData,
+                  data: {
+                    ...selectedTeamData.data,
+                    members: updatedMembers,
+                  },
+                });
+              }
+            }}
             onTeamClick={(team) => {
               setViewingPerson(null);
               setSelectedTeamData({
@@ -214,7 +230,7 @@ function Teams({ onTeamClick }: any) {
 
           <button
             onClick={() => setIsEventMenuOpen(!isEventMenuOpen)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-left flex justify-between items-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+            className="cursor-pointer w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-left flex justify-between items-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
           >
             <span className="truncate">
               {filterEventId === 'all' ? "Tous" :
@@ -341,7 +357,7 @@ function Teams({ onTeamClick }: any) {
 
         <button
           onClick={() => setIsCreateModalOpen(true)}
-          className="absolute bottom-8 right-8 w-10 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg hover:shadow-xl hover:scale-110 active:scale-95 transition-all duration-200 flex items-center justify-center z-10 group"
+          className="absolute bottom-8 right-8 w-10 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg hover:shadow-xl hover:scale-110 cursor-pointer active:scale-95 transition-all duration-200 flex items-center justify-center z-10 group"
           title="Créer une nouvelle équipe"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 transition-transform group-hover:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">

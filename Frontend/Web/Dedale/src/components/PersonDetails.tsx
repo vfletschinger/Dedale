@@ -79,12 +79,12 @@ export default function PersonDetails({ person, onClose, onDelete, onUpdate, onT
         setIsSaving(true);
         try {
             await invoke("update_person", {
-                id: editData.id,
-                firstname: editData.firstname,
-                lastname: editData.lastname,
-                email: editData.email,
-                address: editData.address,
-                phoneNumber: editData.phone_number
+                id: editData.id || "",
+                firstname: editData.firstname || "",
+                lastname: editData.lastname || "",
+                email: editData.email || "",
+                address: editData.address || "",
+                phoneNumber: editData.phone_number || ""
             });
 
             onUpdate(editData);
