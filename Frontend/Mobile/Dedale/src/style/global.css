@@ -2,27 +2,581 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Define a reusable Tailwind component for RN */
+/* ============================================
+   DEDALE - Unified NativeWind Styles
+   ============================================ */
+
 @layer components {
+  /* ============================================
+     LAYOUT & CONTAINERS
+     ============================================ */
   .container {
-    @apply flex-1 items-center justify-center bg-white;
+    @apply flex-1 bg-gray-50;
   }
-  .btn {
-    @apply mt-4 px-4 py-2 bg-blue-500 rounded;
+
+  .container-white {
+    @apply flex-1 bg-white;
   }
-  .btn-text {
-    @apply text-white font-bold;
+
+  .container-centered {
+    @apply flex-1 items-center justify-center bg-gray-50;
   }
+
+  .center {
+    @apply flex-1 justify-center items-center;
+  }
+
+  .screen-padding {
+    @apply p-4;
+  }
+
+  /* ============================================
+     HEADERS
+     ============================================ */
+  .header {
+    @apply bg-blue-500 pt-4 pb-4 px-4 shadow-sm;
+  }
+
+  .header-title {
+    @apply text-white text-2xl font-bold;
+  }
+
+  .header-title-lg {
+    @apply text-white text-3xl font-bold;
+  }
+
+  .header-subtitle {
+    @apply text-blue-100 text-base;
+  }
+
+  .header-row {
+    @apply flex-row items-center justify-between;
+  }
+
+  /* ============================================
+     BACK BUTTON
+     ============================================ */
   .back-btn {
-    @apply absolute top-12 left-4 px-3 py-2 bg-gray-300 rounded-full;
+    @apply absolute top-12 left-4 z-50;
   }
+
+  .back-btn-circle {
+    @apply bg-white/20 w-10 h-10 rounded-full items-center justify-center;
+  }
+
   .back-btn-text {
+    @apply text-white text-2xl font-bold;
+  }
+
+  .back-btn-gray {
+    @apply bg-gray-300 px-3 py-2 rounded-full;
+  }
+
+  .back-btn-gray-text {
     @apply text-gray-500 text-lg;
   }
+
+  /* ============================================
+     BUTTONS
+     ============================================ */
+  .btn {
+    @apply py-3 px-6 rounded-lg;
+  }
+
+  .btn-primary {
+    @apply bg-blue-500 py-3 px-6 rounded-lg active:bg-blue-600;
+  }
+
+  .btn-secondary {
+    @apply bg-gray-300 py-3 px-6 rounded-lg active:bg-gray-400;
+  }
+
+  .btn-danger {
+    @apply bg-red-500 py-3 px-6 rounded-lg active:bg-red-600;
+  }
+
+  .btn-text {
+    @apply text-white text-center font-semibold text-base;
+  }
+
+  .btn-text-dark {
+    @apply text-gray-800 text-center font-semibold text-base;
+  }
+
+  .btn-rounded {
+    @apply bg-blue-500 rounded-full p-4 shadow-lg active:bg-blue-600;
+  }
+
+  .btn-icon {
+    @apply w-10 h-10 rounded-full items-center justify-center;
+  }
+
+  .btn-icon-danger {
+    @apply bg-red-500/70 w-10 h-10 rounded-full items-center justify-center;
+  }
+
+  .btn-small {
+    @apply px-3 py-1 rounded-lg;
+  }
+
+  .btn-fab {
+    @apply absolute bottom-6 left-1/2 -translate-x-1/2 bg-blue-500 rounded-full p-4 shadow-lg active:bg-blue-600;
+  }
+
+  /* ============================================
+     CARDS
+     ============================================ */
+  .card {
+    @apply bg-white rounded-2xl p-5 mb-4 shadow-md;
+  }
+
+  .card-pressable {
+    @apply bg-white rounded-2xl p-5 mb-4 shadow-md active:shadow-lg;
+  }
+
+  .card-section {
+    @apply bg-gray-100 p-4 rounded-lg mb-4;
+  }
+
+  .card-divider {
+    @apply h-px bg-gray-100 mb-3;
+  }
+
+  /* ============================================
+     MODALS
+     ============================================ */
+  .modal-overlay {
+    @apply flex-1 justify-center items-center bg-black/50 p-4;
+  }
+
+  .modal-container {
+    @apply bg-white rounded-3xl p-6 w-full max-w-lg max-h-[85%];
+  }
+
+  .modal-title {
+    @apply text-2xl font-bold mb-4 text-center;
+  }
+
+  .modal-actions {
+    @apply flex-row gap-3;
+  }
+
+  .modal-bottom {
+    @apply flex-1 justify-end bg-black/40;
+  }
+
+  .modal-bottom-content {
+    @apply bg-white p-5 rounded-t-2xl;
+  }
+
+  /* ============================================
+     INPUTS
+     ============================================ */
+  .input {
+    @apply border border-gray-300 rounded-lg p-3;
+  }
+
+  .input-multiline {
+    @apply border border-gray-300 rounded-lg p-3 min-h-[60px];
+  }
+
+  .input-label {
+    @apply text-sm font-semibold mb-2 text-gray-700;
+  }
+
+  /* ============================================
+     BADGES & TAGS
+     ============================================ */
+  .badge {
+    @apply rounded-full px-3 py-1;
+  }
+
+  .badge-blue {
+    @apply bg-blue-500 rounded-full w-10 h-10 items-center justify-center;
+  }
+
+  .badge-blue-lg {
+    @apply bg-blue-500 rounded-full w-12 h-12 items-center justify-center;
+  }
+
+  .badge-text {
+    @apply text-white font-bold text-base;
+  }
+
+  .tag {
+    @apply bg-blue-100 px-3 py-2 rounded-full flex-row items-center;
+  }
+
+  .tag-text {
+    @apply text-blue-800 font-medium;
+  }
+
+  .status-badge {
+    @apply rounded-full px-3 py-1 self-start;
+  }
+
+  .nav-arrow {
+    @apply bg-blue-50 rounded-full px-3 py-1;
+  }
+
+  .nav-arrow-text {
+    @apply text-blue-600 text-xs font-semibold;
+  }
+
+  /* ============================================
+     TOGGLE / SEGMENTED CONTROL
+     ============================================ */
+  .toggle-container {
+    @apply flex-row mt-4 bg-blue-400/50 rounded-full p-1;
+  }
+
+  .toggle-item {
+    @apply flex-1 py-2 rounded-full;
+  }
+
+  .toggle-item-active {
+    @apply flex-1 py-2 rounded-full bg-white;
+  }
+
+  .toggle-text {
+    @apply text-center font-semibold text-white;
+  }
+
+  .toggle-text-active {
+    @apply text-center font-semibold text-blue-600;
+  }
+
+  /* ============================================
+     LIST ITEMS
+     ============================================ */
+  .list-item {
+    @apply flex-row items-center justify-between p-3 rounded-lg mb-2 bg-white;
+  }
+
+  .list-item-selected {
+    @apply flex-row items-center justify-between p-3 rounded-lg mb-2 bg-blue-50;
+  }
+
+  /* ============================================
+     EMPTY STATE
+     ============================================ */
+  .empty-state {
+    @apply flex-1 items-center justify-center px-8;
+  }
+
+  .empty-icon {
+    @apply bg-white rounded-full w-24 h-24 items-center justify-center mb-6 shadow-md;
+  }
+
+  .empty-title {
+    @apply text-gray-800 text-xl font-bold mb-2 text-center;
+  }
+
+  .empty-text {
+    @apply text-gray-500 text-base text-center leading-6;
+  }
+
+  /* ============================================
+     MAP STYLES
+     ============================================ */
   .map {
     @apply w-full h-full;
   }
-  .center {
-    @apply flex-1 justify-center items-center;
+
+  .map-overlay {
+    @apply absolute right-4 bottom-4 z-50;
+  }
+
+  .map-loading-overlay {
+    @apply absolute inset-0 bg-white/70 justify-center items-center;
+  }
+
+  /* ============================================
+     FLOATING HEADER
+     ============================================ */
+  .floating-header {
+    @apply absolute top-12 left-0 right-0 items-center z-50;
+  }
+
+  .floating-header-content {
+    @apply bg-white/95 px-6 py-3 rounded-3xl shadow-lg;
+  }
+
+  .floating-header-text {
+    @apply text-lg font-bold text-blue-500;
+  }
+
+  /* ============================================
+     NAVIGATION CONTROLS
+     ============================================ */
+  .nav-controls {
+    @apply absolute bottom-10 left-5 right-5 bg-white rounded-2xl p-4 shadow-lg;
+  }
+
+  .nav-info {
+    @apply items-center mb-3;
+  }
+
+  .nav-info-text {
+    @apply text-sm text-gray-500 mb-1;
+  }
+
+  .nav-point-name {
+    @apply text-lg font-bold text-gray-800;
+  }
+
+  .nav-buttons {
+    @apply flex-row justify-between gap-3;
+  }
+
+  .nav-btn {
+    @apply flex-1 bg-blue-500 p-3 rounded-lg items-center;
+  }
+
+  .nav-btn-disabled {
+    @apply flex-1 bg-gray-300 p-3 rounded-lg items-center;
+  }
+
+  .nav-btn-text {
+    @apply text-white font-semibold text-sm;
+  }
+
+  /* ============================================
+     KNOB / DRAG HANDLE
+     ============================================ */
+  .knob {
+    @apply mr-3 p-2 flex-row gap-1;
+  }
+
+  .knob-dot {
+    @apply w-1 h-1 bg-gray-400 rounded-full;
+  }
+
+  /* ============================================
+     SCANNER STYLES
+     ============================================ */
+  .scanner-container {
+    @apply flex-1 bg-black;
+  }
+
+  .scanner-text {
+    @apply text-base text-white text-center mb-5 mt-2;
+  }
+
+  /* ============================================
+     COORDINATES DISPLAY
+     ============================================ */
+  .coord-box-lat {
+    @apply bg-blue-50 border border-blue-200 rounded-lg px-3 py-2;
+  }
+
+  .coord-box-lon {
+    @apply bg-green-50 border border-green-200 rounded-lg px-3 py-2;
+  }
+
+  .coord-label-lat {
+    @apply text-blue-600 text-xs font-medium mb-0.5;
+  }
+
+  .coord-label-lon {
+    @apply text-green-600 text-xs font-medium mb-0.5;
+  }
+
+  .coord-value {
+    @apply text-gray-800 text-sm font-mono font-semibold;
+  }
+
+  /* ============================================
+     ACTION BUTTONS (Edit/Delete)
+     ============================================ */
+  .action-btn-edit {
+    @apply bg-blue-100 px-3 py-1 rounded;
+  }
+
+  .action-btn-edit-text {
+    @apply text-blue-600 text-xs;
+  }
+
+  .action-btn-delete {
+    @apply bg-red-100 px-3 py-1 rounded;
+  }
+
+  .action-btn-delete-text {
+    @apply text-red-600 text-xs;
+  }
+
+  .delete-btn-circle {
+    @apply bg-red-500 w-12 h-12 rounded-full items-center justify-center shadow-sm active:bg-red-600;
+  }
+
+  /* ============================================
+     TYPOGRAPHY
+     ============================================ */
+  .text-title {
+    @apply text-3xl font-bold text-gray-800;
+  }
+
+  .text-subtitle {
+    @apply text-lg font-semibold text-gray-800;
+  }
+
+  .text-body {
+    @apply text-base text-gray-700;
+  }
+
+  .text-caption {
+    @apply text-sm text-gray-500;
+  }
+
+  .text-small {
+    @apply text-xs text-gray-400;
+  }
+
+  .text-section-title {
+    @apply text-lg font-semibold;
+  }
+
+  /* ============================================
+     UTILITY CLASSES
+     ============================================ */
+  .full-absolute {
+    @apply absolute inset-0;
+  }
+
+  .shadow-card {
+    @apply shadow-md;
+  }
+
+  .shadow-elevated {
+    @apply shadow-lg;
+  }
+
+  .section-spacing {
+    @apply mb-4;
+  }
+
+  .row {
+    @apply flex-row items-center;
+  }
+
+  .row-between {
+    @apply flex-row items-center justify-between;
+  }
+
+  .row-gap {
+    @apply flex-row gap-2;
+  }
+
+  /* ============================================
+     SETTINGS / SYNC SCREEN
+     ============================================ */
+  .settings-icon {
+    @apply text-blue-500;
+  }
+
+  .settings-title {
+    @apply text-2xl font-bold text-blue-900 mt-5 mb-2 text-center;
+  }
+
+  .settings-description {
+    @apply text-base text-gray-600 text-center mb-8 leading-6;
+  }
+
+  /* ============================================
+     BUTTON VARIANTS
+     ============================================ */
+  .btn-violet {
+    @apply bg-violet-500 p-4 rounded-xl items-center active:bg-violet-600;
+  }
+
+  .btn-bottom-action {
+    @apply absolute bottom-6 left-6 right-6 bg-blue-500 flex-row items-center justify-center gap-3 py-4 rounded-xl shadow-lg active:bg-blue-600;
+  }
+
+  .btn-add-point {
+    @apply mt-8 bg-blue-500 px-8 py-4 rounded-full shadow-md active:bg-blue-600;
+  }
+
+  /* ============================================
+     MODAL SELECTION ITEM
+     ============================================ */
+  .modal-select-item {
+    @apply flex-row items-center justify-between p-3 rounded-lg mb-2 bg-white;
+  }
+
+  .modal-select-item-active {
+    @apply flex-row items-center justify-between p-3 rounded-lg mb-2 bg-blue-50;
+  }
+
+  .modal-checkbox {
+    @apply w-8 h-8 rounded-full items-center justify-center border border-gray-300;
+  }
+
+  .modal-btn-cancel {
+    @apply flex-1 mr-2 bg-gray-200 rounded-full p-3 items-center;
+  }
+
+  .modal-btn-confirm {
+    @apply flex-1 ml-2 bg-blue-500 rounded-full p-3 items-center;
+  }
+
+  /* ============================================
+     POINT DETAILS SECTION
+     ============================================ */
+  .section-box {
+    @apply bg-gray-100 p-4 rounded-lg mb-4;
+  }
+
+  .section-header {
+    @apply flex-row justify-between items-center mb-2;
+  }
+
+  .section-item {
+    @apply bg-white p-3 rounded-lg mb-2;
+  }
+
+  .btn-add-small {
+    @apply bg-blue-500 px-3 py-1 rounded-lg;
+  }
+
+  .btn-add-small-text {
+    @apply text-white text-xs font-semibold;
+  }
+
+  /* ============================================
+     OBSTACLE TAG
+     ============================================ */
+  .obstacle-tag {
+    @apply bg-blue-100 px-3 py-1.5 rounded-full;
+  }
+
+  .obstacle-tag-text {
+    @apply text-blue-800 font-medium;
+  }
+
+  /* ============================================
+     IMAGE THUMBNAIL
+     ============================================ */
+  .image-thumbnail {
+    @apply w-24 h-24 rounded-lg;
+  }
+
+  .image-remove-btn {
+    @apply absolute -top-1 -right-1 bg-red-500 rounded-full w-6 h-6 items-center justify-center;
+  }
+
+  .image-remove-text {
+    @apply text-white font-bold text-xs;
+  }
+
+  /* ============================================
+     MAP COORDINATE INFO
+     ============================================ */
+  .map-coord-overlay {
+    @apply absolute top-4 left-4 right-4 bg-white/95 p-3 rounded-lg shadow-lg;
+  }
+
+  .coord-text {
+    @apply font-mono text-sm;
   }
 }
