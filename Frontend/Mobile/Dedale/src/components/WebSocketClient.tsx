@@ -1,4 +1,4 @@
-import { EventType } from "../types/database";
+import { EventWithGeometries } from "../types/database";
 
 export interface WebSocketResponse {
   code: 1 | 2 | 3;
@@ -12,7 +12,7 @@ class WebSocketClient {
   private uri: string;
   private ws: WebSocket | null = null;
   public isConnected: boolean = false;
-  private onMessageCallback?: (events: EventType[]) => void;
+  private onMessageCallback?: (events: EventWithGeometries[]) => void;
   private onResponseCallback?: (response: WebSocketResponse) => void;
 
   constructor(uri: string) {
@@ -23,7 +23,9 @@ class WebSocketClient {
   /**
    * Tente d'établir la connexion WebSocket.
    */
-  public connect(onMessage?: (events: EventType[]) => void): Promise<boolean> {
+  public connect(
+    onMessage?: (events: EventWithGeometries[]) => void
+  ): Promise<boolean> {
     this.onMessageCallback = onMessage;
 
     return new Promise((resolve, reject) => {
@@ -39,7 +41,7 @@ class WebSocketClient {
         console.log("🔔 Message reçu:", e.data);
         try {
           const data = JSON.parse(e.data);
-          
+
           // Check if it's a response with code (from desktop)
           if (data.code !== undefined) {
             const response: WebSocketResponse = data;
@@ -49,7 +51,7 @@ class WebSocketClient {
             }
           } else {
             // It's events data (from desktop initial sync)
-            const events: EventType[] = data;
+            const events: EventWithGeometries[] = data;
             console.log("📦 Événements reçus:", events);
             if (this.onMessageCallback) {
               this.onMessageCallback(events);
@@ -89,7 +91,9 @@ class WebSocketClient {
       console.log("📤 Envoi du message:", message);
       this.ws.send(message);
     } else {
-      console.error("❌ WebSocket non connectée, impossible d'envoyer le message");
+      console.error(
+        "❌ WebSocket non connectée, impossible d'envoyer le message"
+      );
     }
   }
 

@@ -27,6 +27,17 @@ export type EventType = {
   geometry: string | null;
 };
 
+export type GeometryType = {
+  id: number;
+  event_id: number;
+  wkt: string;
+  created_at?: string;
+};
+
+export type EventWithGeometries = EventType & {
+  geometries?: Array<Omit<GeometryType, "id" | "event_id" | "created_at">>;
+};
+
 export type ObstacleType = {
   id: number;
   point_id: number;

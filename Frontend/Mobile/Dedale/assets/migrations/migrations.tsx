@@ -56,6 +56,10 @@ export const migrations: Migration[] = [
       `);
 
       db.execSync(`
+        CREATE INDEX IF NOT EXISTS idx_point_event_event_id ON point_event(event_id);
+      `);
+
+      db.execSync(`
         CREATE TABLE IF NOT EXISTS comment (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           point_id INTEGER NOT NULL,
@@ -89,6 +93,20 @@ export const migrations: Migration[] = [
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           date DATETIME DEFAULT CURRENT_TIMESTAMP
         );
+      `);
+
+      db.execSync(`
+        CREATE TABLE IF NOT EXISTS geometry (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          event_id INTEGER NOT NULL,
+          wkt TEXT NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (event_id) REFERENCES event (id) ON DELETE CASCADE
+        );
+      `);
+
+      db.execSync(`
+        CREATE INDEX IF NOT EXISTS idx_geometry_event_id ON geometry(event_id);
       `);
     },
   },

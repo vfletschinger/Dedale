@@ -324,6 +324,58 @@ export async function seedDatabase(db: SQLiteDatabase) {
       ]);
     });
 
+    // 5. Seed geometries for events (only for events with points, not starting with "!")
+    console.log("Insertion des géométries...");
+    const geometries = [
+      // Marché de Noël 2025 (event_id: eventIds[0]) - Grande zone englobant tout le centre de Strasbourg
+      {
+        event_id: eventIds[0],
+        wkt: "POLYGON((7.765 48.5775, 7.7641 48.5818, 7.7615 48.5855, 7.7576 48.5882, 7.7529 48.5895, 7.7479 48.5895, 7.7432 48.5882, 7.7393 48.5855, 7.7367 48.5818, 7.7358 48.5775, 7.7367 48.5732, 7.7393 48.5695, 7.7432 48.5668, 7.7479 48.5655, 7.7529 48.5655, 7.7576 48.5668, 7.7615 48.5695, 7.7641 48.5732, 7.765 48.5775))",
+      },
+      // Marché de Noël 2025 - Zone de la cathédrale
+      {
+        event_id: eventIds[0],
+        wkt: "POLYGON((7.746 48.5805, 7.7505 48.5805, 7.7505 48.583, 7.746 48.583, 7.746 48.5805))",
+      },
+      // Marché de Noël 2025 - Zone Place Kléber
+      {
+        event_id: eventIds[0],
+        wkt: "POLYGON((7.7435 48.5835, 7.7485 48.5835, 7.7485 48.586, 7.7435 48.586, 7.7435 48.5835))",
+      },
+      // Marché de Noël 2025 - Zone Petite France
+      {
+        event_id: eventIds[0],
+        wkt: "POLYGON((7.7375 48.579, 7.7425 48.579, 7.74 48.582, 7.7375 48.579))",
+      },
+      // Marché de Noël 2025 - Parcours à travers Strasbourg
+      {
+        event_id: eventIds[0],
+        wkt: "LINESTRING(7.7405 48.5795, 7.7445 48.5815, 7.7475 48.5830, 7.7510 48.5845, 7.7545 48.5855, 7.7580 48.5840, 7.7605 48.5820, 7.7590 48.5785, 7.7565 48.5760, 7.7530 48.5745, 7.7495 48.5735, 7.7460 48.5750, 7.7430 48.5770)",
+      },
+      // Festival d'été Illkirch 2025 (event_id: eventIds[1]) - Zone du festival
+      {
+        event_id: eventIds[1],
+        wkt: "POLYGON((7.715 48.528, 7.7245 48.532, 7.721 48.5305, 7.7175 48.5265, 7.715 48.528))",
+      },
+      // Fête de la Musique 2026 (event_id: eventIds[2]) - Zone des concerts
+      {
+        event_id: eventIds[2],
+        wkt: "POLYGON((7.748 48.579, 7.755 48.582, 7.75 48.58, 7.748 48.579))",
+      },
+      // Fête de la Musique 2026 - Parcours des animations
+      {
+        event_id: eventIds[2],
+        wkt: "LINESTRING(7.748 48.579, 7.75 48.58, 7.755 48.582)",
+      },
+    ];
+
+    geometries.forEach((geom) => {
+      db.runSync("INSERT INTO geometry (event_id, wkt) VALUES (?, ?)", [
+        geom.event_id,
+        geom.wkt,
+      ]);
+    });
+
     // 6. Seed comments (for Strasbourg points)
     console.log("Insertion des commentaires...");
     const comments = [
@@ -426,6 +478,7 @@ export async function seedDatabase(db: SQLiteDatabase) {
     console.log(
       `   - ${pointEventAssociations.length} associations point-événement`
     );
+    console.log(`   - ${geometries.length} géométries`);
     console.log(`   - ${comments.length} commentaires`);
     console.log(`   - ${pictures.length} photos`);
     console.log(`   - ${obstacles.length} obstacles`);
@@ -454,6 +507,7 @@ export function clearDatabase(db: SQLiteDatabase): void {
     );
 
     if (eventTableExists) {
+      db.execSync("DELETE FROM geometry");
       db.execSync("DELETE FROM session");
       db.execSync("DELETE FROM event");
     }

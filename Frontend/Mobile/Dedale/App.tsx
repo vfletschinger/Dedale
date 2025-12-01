@@ -22,6 +22,7 @@ import CreateRouteScreen from "./src/screens/CreateRoute";
 import { EventProvider } from "./src/context/EventContext";
 import { PointsProvider } from "./src/context/PointsContext";
 import { WebSocketProvider } from "./src/context/WebSocketContext";
+import { GeometriesProvider } from "./src/context/GeometriesContext";
 
 const Tab = createBottomTabNavigator<TabParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -85,35 +86,37 @@ export default function App() {
       <WebSocketProvider>
         <EventProvider>
           <PointsProvider>
-            <NavigationContainer>
-              <Stack.Navigator initialRouteName="ConnectEvent">
-                <Stack.Screen
-                  name="ConnectEvent"
-                  component={ConnectEvent}
-                  options={{ headerShown: false }}
-                />
-                <Stack.Screen
-                  name="Tabs"
-                  component={TabNavigator}
-                  options={{ headerShown: false }}
-                />
-                <Stack.Screen
-                  name="PointDetails"
-                  component={PointDetails}
-                  options={{ headerShown: false }}
-                />
-                <Stack.Screen
-                  name="CreateRoute"
-                  component={CreateRouteScreen}
-                  options={{ headerShown: false }}
-                />
-                <Stack.Screen
-                  name="RouteNavigation"
-                  component={RouteNavigation}
-                  options={{ headerShown: false }}
-                />
-              </Stack.Navigator>
-            </NavigationContainer>
+            <GeometriesProvider>
+              <NavigationContainer>
+                <Stack.Navigator initialRouteName="ConnectEvent">
+                  <Stack.Screen
+                    name="ConnectEvent"
+                    component={ConnectEvent}
+                    options={{ headerShown: false }}
+                  />
+                  <Stack.Screen
+                    name="Tabs"
+                    component={TabNavigator}
+                    options={{ headerShown: false }}
+                  />
+                  <Stack.Screen
+                    name="PointDetails"
+                    component={PointDetails}
+                    options={{ headerShown: false }}
+                  />
+                  <Stack.Screen
+                    name="CreateRoute"
+                    component={CreateRouteScreen}
+                    options={{ headerShown: false }}
+                  />
+                  <Stack.Screen
+                    name="RouteNavigation"
+                    component={RouteNavigation}
+                    options={{ headerShown: false }}
+                  />
+                </Stack.Navigator>
+              </NavigationContainer>
+            </GeometriesProvider>
           </PointsProvider>
         </EventProvider>
       </WebSocketProvider>
