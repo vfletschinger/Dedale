@@ -272,6 +272,16 @@ pub struct Person {
     pub id: i64,
     pub firstname: String,
     pub lastname: String,
+    pub address: String,
+    pub email: String,
+    pub phone_number: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Member {
+    pub id: i64,
+    pub firstname: String,
+    pub lastname: String,
     pub email: String,
 }
 
@@ -760,7 +770,7 @@ pub async fn delete_point(app: AppHandle, point_id: i64) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn fetch_team_members(app: AppHandle, team_id: i64) -> Result<Vec<Person>, String> {
+pub async fn fetch_team_members(app: AppHandle, team_id: i64) -> Result<Vec<Member>, String> {
     let pool = get_db_pool(&app).await?;
 
     let query = r#"
@@ -778,7 +788,7 @@ pub async fn fetch_team_members(app: AppHandle, team_id: i64) -> Result<Vec<Pers
 
     let members = rows
         .into_iter()
-        .map(|row| Person {
+        .map(|row| Member {
             id: row.get("id"),
             firstname: row.get("firstname"),
             lastname: row.get("lastname"),
@@ -898,6 +908,199 @@ pub async fn delete_team(app: AppHandle, team_id: i64) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
 
     Ok(())
+}
+
+#[tauri::command]
+pub async fn update_team(app: AppHandle, id: i64, name: String) -> Result<(), String> {
+    let pool = get_db_pool(&app).await?;
+
+    sqlx::query("UPDATE team SET name = ? WHERE id = ?")
+        .bind(name)
+        .bind(id)
+        .execute(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn add_team_event(app: AppHandle, team_id: i64, event_id: i64) -> Result<(), String> {
+    let pool = get_db_pool(&app).await?;
+    sqlx::query("INSERT OR IGNORE INTO team_event (team_id, event_id) VALUES (?, ?)")
+        .bind(team_id)
+        .bind(event_id)
+        .execute(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn remove_team_event(app: AppHandle, team_id: i64, event_id: i64) -> Result<(), String> {
+    let pool = get_db_pool(&app).await?;
+    sqlx::query("DELETE FROM team_event WHERE team_id = ? AND event_id = ?")
+        .bind(team_id)
+        .bind(event_id)
+        .execute(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn fetch_people(app: AppHandle) -> Result<Vec<Person>, String> {
+    let pool = get_db_pool(&app).await?;
+
+    let rows = sqlx::query("SELECT id, firstname, lastname, address, email, phone_number FROM person ORDER BY lastname, firstname")
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let people = rows
+        .into_iter()
+        .map(|row| Person {
+            id: row.get("id"),
+            firstname: row.get("firstname"),
+            lastname: row.get("lastname"),
+            address: row.get("address"),
+            email: row.get("email"),
+            phone_number: row.get("phone_number"),
+        })
+        .collect();
+
+    Ok(people)
+}
+
+#[tauri::command]
+pub async fn create_person(
+    app: AppHandle,
+    firstname: String,
+    lastname: String,
+    email: String,
+    address: String,
+    phone_number: String,
+) -> Result<Person, String> {
+    let pool = get_db_pool(&app).await?;
+
+    let result = sqlx::query(
+        "INSERT INTO person (firstname, lastname, email, address, phone_number) VALUES (?, ?, ?, ?, ?)"
+    )
+    .bind(&firstname)
+    .bind(&lastname)
+    .bind(&email)
+    .bind(&address)
+    .bind(&phone_number)
+    .execute(&pool)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let new_id = result.last_insert_rowid();
+
+    Ok(Person {
+        id: new_id,
+        firstname,
+        lastname,
+        email,
+        address,
+        phone_number: phone_number,
+    })
+}
+
+#[tauri::command]
+pub async fn delete_person(app: AppHandle, person_id: i64) -> Result<(), String> {
+    let pool = get_db_pool(&app).await?;
+
+    // Grâce au ON DELETE CASCADE dans 'member', ça supprimera aussi le lien avec l'équipe
+    sqlx::query("DELETE FROM person WHERE id = ?")
+        .bind(person_id)
+        .execute(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn update_person(
+    app: AppHandle,
+    id: i64,
+    firstname: String,
+    lastname: String,
+    email: String,
+    address: String,
+    phone_number: String,
+) -> Result<(), String> {
+    let pool = get_db_pool(&app).await?;
+
+    sqlx::query(
+        "UPDATE person SET firstname=?, lastname=?, email=?, address=?, phone_number=? WHERE id=?",
+    )
+    .bind(firstname)
+    .bind(lastname)
+    .bind(email)
+    .bind(address)
+    .bind(phone_number)
+    .bind(id)
+    .execute(&pool)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn add_member(app: AppHandle, team_id: i64, person_id: i64) -> Result<(), String> {
+    let pool = get_db_pool(&app).await?;
+    sqlx::query("INSERT OR IGNORE INTO member (team_id, person_id) VALUES (?, ?)")
+        .bind(team_id)
+        .bind(person_id)
+        .execute(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn remove_member(app: AppHandle, team_id: i64, person_id: i64) -> Result<(), String> {
+    let pool = get_db_pool(&app).await?;
+    sqlx::query("DELETE FROM member WHERE team_id = ? AND person_id = ?")
+        .bind(team_id)
+        .bind(person_id)
+        .execute(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn fetch_person_teams(app: AppHandle, person_id: i64) -> Result<Vec<Team>, String> {
+    let pool = get_db_pool(&app).await?;
+    let query = r#"
+        SELECT t.id, t.name, 
+               (SELECT COUNT(*) FROM member m2 WHERE m2.team_id = t.id) as number
+        FROM team t
+        INNER JOIN member m ON t.id = m.team_id
+        WHERE m.person_id = ?
+    "#;
+
+    let rows = sqlx::query(query)
+        .bind(person_id)
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let teams = rows
+        .into_iter()
+        .map(|row| Team {
+            id: row.get("id"),
+            name: row.get("name"),
+            number: row.get("number"),
+            event_ids: Vec::new(),
+        })
+        .collect();
+
+    Ok(teams)
 }
 
 #[tauri::command]

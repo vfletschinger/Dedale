@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
+import { emit } from "@tauri-apps/api/event";
 
 export interface TeamDetailData {
     members: Person[];
@@ -11,6 +12,8 @@ export interface Person {
     firstname: string;
     lastname: string;
     email: string;
+    address: string;
+    phone_number: string;
 }
 
 export interface Event {
@@ -22,17 +25,134 @@ export interface Event {
 interface TeamDetailsProps {
     teamId: number;
     teamName: string;
-    data: TeamDetailData;
+    data?: TeamDetailData;
     onClose: () => void;
     onDelete: (teamId: number) => void;
+    onMemberClick: (person: Person) => void;
 }
 
-export default function TeamDetails({ teamId, teamName, data, onClose, onDelete }: TeamDetailsProps) {
+export default function TeamDetails({ teamId, teamName, data, onClose, onDelete, onMemberClick }: TeamDetailsProps) {
     const [activeTab, setActiveTab] = useState<'members' | 'events'>('members');
     const [showConfirm, setShowConfirm] = useState(false);
+
+    // --- ÉTATS ÉDITION ---
+    const [isEditing, setIsEditing] = useState(false);
+    const [editedName, setEditedName] = useState(teamName);
+    const [isSaving, setIsSaving] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
 
-    const handleDelete = async () => {
+    // --- ÉTATS LOCAUX ---
+    const [currentMembers, setCurrentMembers] = useState<Person[]>(data?.members || []);
+    const [currentEvents, setCurrentEvents] = useState<Event[]>(data?.events || []);
+
+    useEffect(() => {
+        if (data) {
+            setCurrentMembers(data.members);
+            setCurrentEvents(data.events);
+            return;
+        }
+
+        const loadData = async () => {
+            try {
+                const [m, e] = await Promise.all([
+                    invoke<Person[]>("fetch_team_members", { teamId }),
+                    invoke<Event[]>("fetch_team_events", { teamId }),
+                ]);
+                setCurrentMembers(m);
+                setCurrentEvents(e);
+            } catch (err) { console.error(err); }
+        };
+        loadData();
+    }, [teamId, data]);
+
+
+    // ========================
+    // LOGIQUE MEMBRES
+    // ========================
+    const [isAddingMember, setIsAddingMember] = useState(false);
+    const [availablePeople, setAvailablePeople] = useState<Person[]>([]);
+    const [selectedPersonId, setSelectedPersonId] = useState<string>("");
+
+    const handleRemoveMember = async (personId: number) => {
+        try {
+            await invoke("remove_member", { teamId, personId });
+            setCurrentMembers(currentMembers.filter(m => m.id !== personId));
+            await emit("team-update");
+        } catch (e) { console.error(e); }
+    };
+
+    const startAddingMember = async () => {
+        setIsAddingMember(true);
+        try {
+            const allPeople = await invoke<Person[]>("fetch_people");
+            const existingIds = new Set(currentMembers.map(m => m.id));
+            setAvailablePeople(allPeople.filter(p => !existingIds.has(p.id)));
+        } catch (e) { console.error(e); }
+    };
+
+    const confirmAddMember = async () => {
+        if (!selectedPersonId) return;
+        const pid = parseInt(selectedPersonId);
+        try {
+            await invoke("add_member", { teamId, personId: pid });
+            const personToAdd = availablePeople.find(p => p.id === pid);
+            if (personToAdd) setCurrentMembers([...currentMembers, personToAdd]);
+            setIsAddingMember(false);
+            setSelectedPersonId("");
+            await emit("team-update");
+        } catch (e) { console.error(e); }
+    };
+
+
+    // ========================
+    // LOGIQUE ÉVÉNEMENTS
+    // ========================
+    const [isAddingEvent, setIsAddingEvent] = useState(false);
+    const [availableEvents, setAvailableEvents] = useState<Event[]>([]);
+    const [selectedEventId, setSelectedEventId] = useState<string>("");
+
+    const handleRemoveEvent = async (eventId: number) => {
+        try {
+            await invoke("remove_team_event", { teamId, eventId });
+            setCurrentEvents(currentEvents.filter(e => e.id !== eventId));
+            await emit("team-update"); // Met à jour les petits points verts sur la carte
+        } catch (e) { console.error(e); }
+    };
+
+    const startAddingEvent = async () => {
+        setIsAddingEvent(true);
+        try {
+            // On utilise fetch_events (qui renvoie des objets un peu différents, attention au mapping si besoin)
+            // Ici on suppose que fetch_events renvoie un tableau compatible ou on mappe
+            const allEvents = await invoke<any[]>("fetch_events");
+            const existingIds = new Set(currentEvents.map(e => e.id));
+
+            // On filtre et on adapte le type si nécessaire
+            const filtered = allEvents
+                .filter((e: any) => !existingIds.has(e.id))
+                .map((e: any) => ({ id: e.id, name: e.name, statut: e.statut }));
+
+            setAvailableEvents(filtered);
+        } catch (e) { console.error(e); }
+    };
+
+    const confirmAddEvent = async () => {
+        if (!selectedEventId) return;
+        const eid = parseInt(selectedEventId);
+        try {
+            await invoke("add_team_event", { teamId, eventId: eid });
+            const eventToAdd = availableEvents.find(e => e.id === eid);
+            if (eventToAdd) setCurrentEvents([...currentEvents, eventToAdd]);
+            setIsAddingEvent(false);
+            setSelectedEventId("");
+            await emit("team-update"); // Met à jour les petits points verts
+        } catch (e) { console.error(e); }
+    };
+
+    // ========================
+    // LOGIQUE SUPPRESSION EQUIPE
+    // ========================
+    const handleDeleteTeam = async () => {
         setIsDeleting(true);
         try {
             await invoke("delete_team", { teamId });
@@ -44,103 +164,205 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete 
         }
     };
 
+    const handleSaveName = async () => {
+        if (!editedName.trim()) return;
+        setIsSaving(true);
+        try {
+            await invoke("update_team", { id: teamId, name: editedName });
+            setIsEditing(false);
+            await emit("team-update");
+        } catch (e) {
+            console.error(e);
+            alert("Erreur lors de la modification");
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     return (
         <div className="bg-white w-full max-w-md h-[500px] rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 relative">
 
-            {/*OVERLAY DE CONFIRMATION*/}
+            {/* OVERLAY CONFIRMATION */}
             {showConfirm && (
                 <div className="absolute inset-0 z-50 bg-white/95 backdrop-blur-sm flex flex-col items-center justify-center p-6 animate-in fade-in duration-200">
                     <div className="bg-red-50 p-4 rounded-full mb-4">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                     </div>
-                    <h3 className="text-lg font-bold text-gray-800 mb-2 text-center">Supprimer l'équipe ?</h3>
-                    <p className="text-sm text-gray-500 text-center mb-6">
-                        Vous êtes sur le point de supprimer définitivement <b>{teamName}</b>. Cette action est irréversible.
-                    </p>
-                    <div className="flex gap-3 w-full">
-                        <button
-                            onClick={() => setShowConfirm(false)}
-                            className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors font-medium text-sm"
-                            disabled={isDeleting}
-                        >
-                            Annuler
-                        </button>
-                        <button
-                            onClick={handleDelete}
-                            disabled={isDeleting}
-                            className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-medium text-sm flex justify-center items-center gap-2"
-                        >
-                            {isDeleting ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> : "Confirmer"}
-                        </button>
+                    <h3 className="text-lg font-bold text-gray-800 mb-2">Supprimer l'équipe ?</h3>
+                    <div className="flex gap-3 w-full mt-4">
+                        <button onClick={() => setShowConfirm(false)} className="flex-1 px-4 py-2 bg-gray-100 rounded-lg text-gray-700">Annuler</button>
+                        <button onClick={handleDeleteTeam} disabled={isDeleting} className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg">{isDeleting ? "..." : "Confirmer"}</button>
                     </div>
                 </div>
             )}
 
             {/* HEADER */}
-            <div className="bg-gray-50 border-b border-gray-100 p-4 flex justify-between items-center flex-shrink-0">
-                <div>
-                    <h2 className="text-lg font-bold text-gray-800">{teamName}</h2>
+            <div className="bg-gray-50 border-b border-gray-100 p-4 flex justify-between items-center flex-shrink-0 relative">
+                <div className="flex-1 mr-4">
+                    {isEditing ? (
+                        <input
+                            type="text"
+                            value={editedName}
+                            onChange={(e) => setEditedName(e.target.value)}
+                            className="w-full text-lg font-bold text-gray-800 bg-white border border-blue-300 rounded px-2 py-1 outline-none focus:ring-2 focus:ring-blue-200"
+                            autoFocus
+                        />
+                    ) : (
+                        <h2 className="text-lg font-bold text-gray-800 truncate">{editedName}</h2>
+                    )}
                     <p className="text-xs text-gray-500">Détails de l'équipe</p>
                 </div>
-                <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors">✕</button>
+
+                <div className="flex items-center gap-2">
+                    {/* Bouton Edit (Crayon) */}
+                    {!isEditing && (
+                        <button
+                            onClick={() => setIsEditing(true)}
+                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Modifier le nom"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                            </svg>
+                        </button>
+                    )}
+                    <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-200 text-gray-400">✕</button>
+                </div>
             </div>
 
             {/* ONGLETS */}
             <div className="flex border-b border-gray-100 flex-shrink-0">
-                <button onClick={() => setActiveTab('members')} className={`flex-1 py-3 text-sm font-medium transition-colors ${activeTab === 'members' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-gray-500 hover:text-gray-700'}`}>
-                    👥 Membres ({data.members.length})
+                <button onClick={() => isEditing ? "" : setActiveTab('members')} className={`flex-1 py-3 text-sm font-medium transition-colors ${activeTab === 'members' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-gray-500 hover:text-gray-700'}`}>
+                    👥 Membres ({currentMembers.length})
                 </button>
-                <button onClick={() => setActiveTab('events')} className={`flex-1 py-3 text-sm font-medium transition-colors ${activeTab === 'events' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-gray-500 hover:text-gray-700'}`}>
-                    📅 Événements ({data.events.length})
+                <button onClick={() => isEditing ? "" : setActiveTab('events')} className={`flex-1 py-3 text-sm font-medium transition-colors ${activeTab === 'events' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-gray-500 hover:text-gray-700'}`}>
+                    📅 Événements ({currentEvents.length})
                 </button>
             </div>
 
             {/* CONTENU */}
             <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+
+                {/* --- ONGLET MEMBRES --- */}
                 {activeTab === 'members' && (
                     <div className="space-y-3">
-                        {data.members.length === 0 ? <p className="text-gray-400 text-center text-sm py-10">Aucun membre.</p> :
-                            data.members.map((member) => (
-                                <div key={member.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg transition-colors border border-transparent hover:border-gray-100">
-                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center text-blue-700 font-bold text-xs shadow-sm">{member.firstname[0]}{member.lastname[0]}</div>
-                                    <div className="overflow-hidden"><p className="text-sm font-medium text-gray-800 truncate">{member.firstname} {member.lastname}</p><p className="text-xs text-gray-500 truncate">{member.email}</p></div>
-                                </div>
-                            ))
-                        }
-                    </div>
-                )}
-                {activeTab === 'events' && (
-                    <div className="space-y-3">
-                        {data.events.length === 0 ? <div className="text-center py-10"><p className="text-gray-400 text-sm">Aucun événement assigné.</p></div> :
-                            data.events.map((event) => (
-                                <div key={event.id} className="group p-3 border border-gray-100 rounded-lg hover:shadow-sm hover:border-blue-200 transition-all bg-white">
-                                    <div className="flex justify-between items-start mb-1">
-                                        <p className="text-sm font-semibold text-gray-800 group-hover:text-blue-700 transition-colors">{event.name}</p>
-                                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${event.statut === 'Actif' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>{event.statut || 'Planifié'}</span>
+                        {currentMembers.map((member) => (
+                            <div key={member.id} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg transition-colors border border-transparent hover:border-blue-300 cursor-pointer group" onClick={() => {
+                                isEditing ? "" : onMemberClick(member);
+                            }}>
+                                <div className="flex items-center gap-3 overflow-hidden">
+                                    <div className="w-8 h-8 rounded-full bg-blue-100 flex-shrink-0 flex items-center justify-center text-blue-700 font-bold text-xs">
+                                        {member.firstname[0]}{member.lastname[0]}
+                                    </div>
+                                    <div className="overflow-hidden">
+                                        <p className="text-sm font-medium text-gray-800 truncate">{member.firstname} {member.lastname}</p>
+                                        <p className="text-xs text-gray-500 truncate">{member.email}</p>
                                     </div>
                                 </div>
-                            ))
-                        }
+                                <button
+                                    onClick={(e) => {
+                                        isEditing ? "" : e.stopPropagation();
+                                        isEditing ? "" : handleRemoveMember(member.id);
+                                    }}
+                                    className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 p-1"
+                                >                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                            </div>
+                        ))}
+
+                        {/* AJOUT MEMBRE */}
+                        {isEditing ? "" : isAddingMember ? (
+                            <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                                <p className="text-xs font-bold text-blue-800 mb-2">Ajouter un membre</p>
+                                <div className="flex gap-2">
+                                    <select value={selectedPersonId} onChange={(e) => setSelectedPersonId(e.target.value)} className="flex-1 text-sm border border-blue-200 rounded px-2 py-1 outline-none">
+                                        <option value="">Choisir...</option>
+                                        {availablePeople.map(p => <option key={p.id} value={p.id}>{p.firstname} {p.lastname}</option>)}
+                                    </select>
+                                    <button onClick={confirmAddMember} disabled={!selectedPersonId} className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">OK</button>
+                                    <button onClick={() => setIsAddingMember(false)} className="text-gray-500 px-2">✕</button>
+                                </div>
+                            </div>
+                        ) : (
+                            <button onClick={startAddingMember} className="w-full py-2 mt-2 border border-dashed border-gray-300 rounded-lg text-gray-500 text-xs hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all flex items-center justify-center gap-1">
+                                <span>+</span> Ajouter un membre
+                            </button>
+                        )}
+                        {currentMembers.length === 0 && !isAddingMember && <p className="text-gray-400 text-center text-sm py-4">Aucun membre.</p>}
+                    </div>
+                )}
+
+                {/* --- ONGLET ÉVÉNEMENTS (MODIFIÉ) --- */}
+                {activeTab === 'events' && (
+                    <div className="space-y-3">
+                        {currentEvents.map((event) => (
+                            <div key={event.id} onClick={() => {
+                                isEditing ? "" : onClose();
+                                isEditing ? "" : emit("navigate-to-map", { eventId: event.id });
+                            }} className="flex justify-between items-center group p-3 border border-gray-100 rounded-lg hover:shadow-sm hover:border-blue-200 transition-all bg-white">
+                                <div className="overflow-hidden">
+                                    <div className="flex items-center gap-2">
+                                        <p className="text-sm font-semibold text-gray-800 truncate">{event.name}</p>
+                                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${event.statut === 'Actif' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>{event.statut || 'Planifié'}</span>
+                                    </div>
+                                </div>
+                                {/* Bouton supprimer */}
+                                <button onClick={() => isEditing ? "" : handleRemoveEvent(event.id)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 p-1 ml-2 flex-shrink-0">
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                            </div>
+                        ))}
+
+                        {/* AJOUT ÉVÉNEMENT */}
+                        {isEditing ? "" : isAddingEvent ? (
+                            <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100 animate-in fade-in slide-in-from-top-2">
+                                <p className="text-xs font-bold text-blue-800 mb-2">Lier à un événement</p>
+                                <div className="flex gap-2">
+                                    <select
+                                        value={selectedEventId}
+                                        onChange={(e) => setSelectedEventId(e.target.value)}
+                                        className="flex-1 text-sm border border-blue-200 rounded px-2 py-1 outline-none"
+                                        autoFocus
+                                    >
+                                        <option value="">Choisir un événement...</option>
+                                        {availableEvents.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                                    </select>
+                                    <button onClick={confirmAddEvent} disabled={!selectedEventId} className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">OK</button>
+                                    <button onClick={() => setIsAddingEvent(false)} className="text-gray-500 px-2">✕</button>
+                                </div>
+                            </div>
+                        ) : (
+                            <button
+                                onClick={() => { isEditing ? "" : startAddingEvent() }}
+                                className="w-full py-2 mt-2 border border-dashed border-gray-300 rounded-lg text-gray-500 text-xs hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all flex items-center justify-center gap-1"
+                            >
+                                <span>+</span> Lier à un événement
+                            </button>
+                        )}
+
+                        {currentEvents.length === 0 && !isAddingEvent && <div className="text-center py-10"><p className="text-gray-400 text-sm">Aucun événement assigné.</p></div>}
                     </div>
                 )}
             </div>
 
             {/* FOOTER */}
             <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-between items-center flex-shrink-0">
-                <button
-                    onClick={() => setShowConfirm(true)}
-                    className="p-2 text-red-500 hover:bg-red-50 hover:text-red-700 rounded-lg transition-colors"
-                    title="Supprimer l'équipe"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                </button>
-                <button onClick={onClose} className="px-4 py-2 bg-white border border-gray-300 rounded text-xs font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 shadow-sm transition-all">
-                    Fermer
-                </button>
+                {isEditing ? (
+                    <div className="flex gap-2 w-full">
+                        <button onClick={() => { setIsEditing(false); setEditedName(teamName); }} className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded text-sm text-gray-700 hover:bg-gray-50">Annuler</button>
+                        <button onClick={handleSaveName} disabled={isSaving} className="flex-1 px-3 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700 flex items-center justify-center gap-2">
+                            {isSaving && <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>}
+                            Enregistrer
+                        </button>
+                    </div>
+                ) : (
+                    <>
+                        <button onClick={() => setShowConfirm(true)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+                        <button onClick={onClose} className="px-4 py-2 bg-white border border-gray-300 rounded text-xs font-medium text-gray-700 hover:bg-gray-100">Fermer</button>
+                    </>
+                )}
             </div>
         </div>
     );

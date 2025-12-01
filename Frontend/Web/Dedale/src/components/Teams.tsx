@@ -2,6 +2,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import TeamDetails, { TeamDetailData, Person, Event } from "./TeamDetails";
 import CreateTeam from "./CreateTeam";
+import { listen } from "@tauri-apps/api/event";
+import MultiRangeSlider from "./MultiRangeSlider";
+import PersonDetails from "./PersonDetails";
 
 interface Team {
   id: number;
@@ -17,7 +20,7 @@ interface SimpleEvent {
 
 interface SelectedTeamState {
   info: Team;
-  data: TeamDetailData;
+  data: TeamDetailData | undefined;
 }
 
 function Teams({ onTeamClick }: any) {
@@ -27,7 +30,7 @@ function Teams({ onTeamClick }: any) {
 
   const [filterName, setFilterName] = useState("");
   const [filterMinMembers, setFilterMinMembers] = useState<number>(0);
-  const [filterMaxMembers, setFilterMaxMembers] = useState<number>(20);
+  const [filterMaxMembers, setFilterMaxMembers] = useState<number>(10);
   const [filterEventId, setFilterEventId] = useState<number | 'all' | 'none'>('all');
 
   const [detailsCache, setDetailsCache] = useState<Record<number, TeamDetailData>>({});
@@ -35,9 +38,13 @@ function Teams({ onTeamClick }: any) {
   const [loadingTeamId, setLoadingTeamId] = useState<number | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEventMenuOpen, setIsEventMenuOpen] = useState(false);
+  const [viewingPerson, setViewingPerson] = useState<Person | null>(null);
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (showSpinner = true) => {
+    if (showSpinner) {
+      setLoading(true);
+    }
+
     try {
       const [teamsData, eventsData] = await Promise.all([
         invoke<Team[]>("fetch_teams"),
@@ -45,10 +52,43 @@ function Teams({ onTeamClick }: any) {
       ]);
       setTeams(teamsData);
       setAvailableEvents(eventsData.map((e: any) => ({ id: e.id, name: e.name })));
-    } catch (e) { console.error(e) } finally { setLoading(false) }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      if (showSpinner) {
+        setLoading(false);
+      }
+    }
   };
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    const unlisten = listen('team-update', () => {
+      console.log("♻️ Mise à jour silencieuse...");
+
+      loadData(false);
+
+      setDetailsCache({});
+    });
+
+    const unlistenNav = listen<any>('navigate-to-team', (event) => {
+      const teamToOpen = event.payload;
+      const teamObj: Team = {
+        id: teamToOpen.id,
+        name: teamToOpen.name,
+        number: 0,
+        event_ids: []
+      };
+      handleOpenTeam(teamObj);
+    });
+
+    loadData();
+
+    return () => {
+      unlisten.then(f => f());
+      unlistenNav.then(f => f());
+    };
+  }, []);
+
 
   const filteredTeams = useMemo(() => {
     return teams.filter(team => {
@@ -58,7 +98,7 @@ function Teams({ onTeamClick }: any) {
       if (filterEventId === 'none') matchEvent = team.event_ids.length === 0;
       else if (filterEventId !== 'all') matchEvent = team.event_ids.includes(filterEventId as number);
 
-      const SLIDER_MAX = 20;
+      const SLIDER_MAX = 10;
       const effectiveMax = filterMaxMembers === SLIDER_MAX ? Infinity : filterMaxMembers;
       const matchMembers = team.number >= filterMinMembers && team.number <= effectiveMax;
 
@@ -121,8 +161,34 @@ function Teams({ onTeamClick }: any) {
             data={selectedTeamData.data}
             onClose={() => setSelectedTeamData(null)}
             onDelete={handleTeamDeleted}
+            onMemberClick={(person) => setViewingPerson(person)}
           />
           <div className="absolute inset-0 -z-10" onClick={() => setSelectedTeamData(null)}></div>
+        </div>
+      )}
+      {/* 2. MODALE PERSONNE (Niveau 2 - Par dessus l'équipe) */}
+      {viewingPerson && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-md p-4 animate-in fade-in zoom-in-95 duration-200">
+          <PersonDetails
+            person={viewingPerson}
+            onClose={() => setViewingPerson(null)}
+            onDelete={() => {
+              setViewingPerson(null);
+            }}
+            onUpdate={() => { }}
+            onTeamClick={(team) => {
+              setViewingPerson(null);
+              setSelectedTeamData({
+                info: {
+                  id: team.id,
+                  name: team.name,
+                  number: 0,
+                  event_ids: []
+                }, data: detailsCache[team.id] || undefined
+              });
+            }}
+          />
+          <div className="absolute inset-0 -z-10" onClick={() => setViewingPerson(null)}></div>
         </div>
       )}
 
@@ -196,14 +262,14 @@ function Teams({ onTeamClick }: any) {
           <div className="flex justify-between items-end mb-4">
             <label className="text-xs font-semibold text-gray-500 uppercase">Membres</label>
             <div className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
-              {filterMinMembers} - {filterMaxMembers === 20 ? "20+" : filterMaxMembers}
+              {filterMinMembers} - {filterMaxMembers === 10 ? "10+" : filterMaxMembers}
             </div>
           </div>
 
           <div className="px-1">
             <MultiRangeSlider
               min={0}
-              max={20}
+              max={10}
               onChange={(min, max) => {
                 setFilterMinMembers(min);
                 setFilterMaxMembers(max);
@@ -213,7 +279,7 @@ function Teams({ onTeamClick }: any) {
 
           <div className="flex justify-between text-[10px] text-gray-400 mt-2 px-0.5">
             <span>0</span>
-            <span>20+</span>
+            <span>10+</span>
           </div>
         </div>
 
@@ -221,13 +287,13 @@ function Teams({ onTeamClick }: any) {
         <div className="mt-auto pt-4 text-xs text-gray-400 text-center border-t border-gray-100">
           <p className="mb-2"><b>{filteredTeams.length}</b> / {teams.length} équipes</p>
 
-          {(filterName || filterEventId !== 'all' || filterMinMembers > 0 || filterMaxMembers < 20) && (
+          {(filterName || filterEventId !== 'all' || filterMinMembers > 0 || filterMaxMembers < 10) && (
             <button
               onClick={() => {
                 setFilterName("");
                 setFilterEventId('all');
                 setFilterMinMembers(0);
-                setFilterMaxMembers(20);
+                setFilterMaxMembers(10);
               }}
               className="text-blue-500 hover:text-blue-700 hover:underline font-medium transition-colors"
             >
@@ -266,14 +332,6 @@ function Teams({ onTeamClick }: any) {
                     )}
                     <div><h3 className="font-semibold text-gray-800">{team.name}</h3></div>
                     <p className="text-xs text-gray-500 mt-4">👤 {team.number} membre{team.number > 1 ? "s" : ""}</p>
-
-                    {team.event_ids.length > 0 && (
-                      <div className="absolute bottom-3 right-3 flex gap-1">
-                        {team.event_ids.slice(0, 3).map(eid => (
-                          <div key={eid} className="w-2 h-2 rounded-full bg-green-400"></div>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 ))
               )}
@@ -283,7 +341,7 @@ function Teams({ onTeamClick }: any) {
 
         <button
           onClick={() => setIsCreateModalOpen(true)}
-          className="absolute bottom-8 right-8 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg hover:shadow-xl hover:scale-110 active:scale-95 transition-all duration-200 flex items-center justify-center z-10 group"
+          className="absolute bottom-8 right-8 w-10 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg hover:shadow-xl hover:scale-110 active:scale-95 transition-all duration-200 flex items-center justify-center z-10 group"
           title="Créer une nouvelle équipe"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 transition-transform group-hover:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -297,92 +355,3 @@ function Teams({ onTeamClick }: any) {
 }
 
 export default Teams;
-
-interface MultiRangeSliderProps {
-  min: number;
-  max: number;
-  onChange: (min: number, max: number) => void;
-}
-
-const MultiRangeSlider = ({ min, max, onChange }: MultiRangeSliderProps) => {
-  const [minVal, setMinVal] = useState(min);
-  const [maxVal, setMaxVal] = useState(max);
-  const minValRef = useRef(min);
-  const maxValRef = useRef(max);
-  const range = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    setMinVal(min);
-    minValRef.current = min;
-    setMaxVal(max);
-    maxValRef.current = max;
-  }, [min, max]);
-
-  const getPercent = useCallback(
-    (value: number) => Math.round(((value - 0) / (20 - 0)) * 100),
-    []
-  );
-
-  useEffect(() => {
-    const minPercent = getPercent(minVal);
-    const maxPercent = getPercent(maxValRef.current);
-
-    if (range.current) {
-      range.current.style.left = `${minPercent}%`;
-      range.current.style.width = `${maxPercent - minPercent}%`;
-    }
-  }, [minVal, getPercent]);
-
-  useEffect(() => {
-    const minPercent = getPercent(minValRef.current);
-    const maxPercent = getPercent(maxVal);
-
-    if (range.current) {
-      range.current.style.width = `${maxPercent - minPercent}%`;
-    }
-  }, [maxVal, getPercent]);
-
-  useEffect(() => {
-    onChange(minVal, maxVal);
-  }, [minVal, maxVal]);
-
-  return (
-    <div className="relative w-full h-5">
-
-      {/* --- INPUT MIN --- */}
-      <input
-        type="range"
-        min={0}
-        max={20}
-        value={minVal}
-        onChange={(event) => {
-          const value = Math.min(Number(event.target.value), maxVal - 1);
-          setMinVal(value);
-          minValRef.current = value;
-        }}
-        className="thumb pointer-events-none absolute h-0 w-full outline-none z-[3] top-1/2 -translate-y-1/2 left-0"
-        style={{ zIndex: minVal > 20 - 10 ? "5" : "3" }}
-      />
-
-      {/* --- INPUT MAX --- */}
-      <input
-        type="range"
-        min={0}
-        max={20}
-        value={maxVal}
-        onChange={(event) => {
-          const value = Math.max(Number(event.target.value), minVal + 1);
-          setMaxVal(value);
-          maxValRef.current = value;
-        }}
-        className="thumb pointer-events-none absolute h-0 w-full outline-none z-[4] top-1/2 -translate-y-1/2 left-0"
-      />
-
-      {/* --- BARRES VISUELLES --- */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-18px)] h-1.5 z-[1]">
-        <div className="absolute top-0 left-0 h-full w-full rounded bg-gray-200"></div>
-        <div ref={range} className="absolute top-0 h-full rounded bg-blue-500 z-[2]"></div>
-      </div>
-    </div>
-  );
-};

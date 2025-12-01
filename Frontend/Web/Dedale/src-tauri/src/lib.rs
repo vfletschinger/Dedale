@@ -72,7 +72,17 @@ pub fn run() {
             db::fetch_team_members,
             db::fetch_team_events,
             db::create_team,
-            db::delete_team
+            db::delete_team,
+            db::fetch_people,
+            db::create_person,
+            db::delete_person,
+            db::add_member,
+            db::remove_member,
+            db::fetch_person_teams,
+            db::add_team_event,
+            db::remove_team_event,
+            db::update_person,
+            db::update_team
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
