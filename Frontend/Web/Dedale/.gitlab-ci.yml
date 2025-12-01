@@ -1,0 +1,159 @@
+image: ivangabriele/tauri:debian-bookworm-22
+
+variables:
+  PROJECT_PATH: "Frontend/Web/Dedale/src-tauri"
+  WEB_PATH: "Frontend/Web/Dedale"
+  CARGO_HOME: $CI_PROJECT_DIR/.cargo
+  npm_config_cache: $CI_PROJECT_DIR/.npm
+
+stages:
+  - quality
+  - build
+  - test
+  - release
+
+.cache_cargo: &cache_cargo
+  key: "${CI_COMMIT_REF_SLUG}-cargo"
+  paths:
+    - .cargo/registry/
+    - .cargo/git/
+    - $PROJECT_PATH/target/
+  policy: pull-push
+
+# Cache npm - évite de re-télécharger les packages Node.js
+.cache_npm: &cache_npm
+  key: "${CI_COMMIT_REF_SLUG}-npm"
+  paths:
+    - .npm/
+    - $WEB_PATH/node_modules/
+  policy: pull-push
+
+# Job de qualité Rust 
+check_rust_quality:
+  stage: quality
+  cache:
+    - <<: *cache_cargo
+  before_script:
+    - rustup component add rustfmt clippy
+  script:
+    - cd $PROJECT_PATH
+    - mkdir -p reports
+    - cargo fmt --all -- --check 2>&1 | tee reports/cargoFmt_report.txt
+    - cargo clippy --all-targets --all-features -- -D warnings 2>&1 | tee reports/clippy_report.txt
+  artifacts:
+    when: always
+    paths:
+      - $PROJECT_PATH/reports/
+    expire_in: 1 week
+  allow_failure: false
+
+# Job de lint frontend 
+lint_frontend:
+  stage: quality
+  image: node:22-slim
+  cache:
+    - <<: *cache_npm
+  script:
+    - cd $WEB_PATH
+    - npm ci --prefer-offline
+    - mkdir -p $CI_PROJECT_DIR/$PROJECT_PATH/reports
+    - npm run lint 2>&1 | tee $CI_PROJECT_DIR/$PROJECT_PATH/reports/lint_report.txt
+
+  artifacts:
+    when: always
+    paths:
+      - $PROJECT_PATH/reports/
+    expire_in: 1 week
+  allow_failure: false
+
+# --- JOB 2 : BUILD LINUX (uniquement pour les tests E2E) ---
+build_for_tests:
+  stage: build
+  rules:
+    - if: $CI_COMMIT_BRANCH == "web" || $CI_COMMIT_BRANCH == "main"
+  needs:
+    - job: check_rust_quality
+    - job: lint_frontend
+  cache:
+    - key: "${CI_COMMIT_REF_SLUG}-cargo-test"
+      paths:
+        - .cargo/registry/
+        - .cargo/git/
+        - $PROJECT_PATH/target/release/
+      policy: pull-push
+    - <<: *cache_npm
+  script:
+    - cd $WEB_PATH
+    - npm ci --prefer-offline
+    # Génère uniquement l'exécutable pour les tests
+    - npm run tauri build -- --no-bundle --verbose
+    
+  artifacts:
+    paths:
+      - $PROJECT_PATH/target/release/dedale
+    expire_in: 1 day
+
+# --- JOB 3 : TESTS WEBDRIVER (E2E) ---
+test_e2e:
+  stage: test
+  rules:
+    - if: $CI_COMMIT_BRANCH == "web" || $CI_COMMIT_BRANCH == "main"
+  needs: ["build_for_tests"]
+  cache:
+    - key: "${CI_COMMIT_REF_SLUG}-webdriver"
+      paths:
+        - $PROJECT_PATH/webdriver/webdriverio/node_modules/
+      policy: pull-push
+  script:
+    - cd $PROJECT_PATH
+    # Vérifier que tauri-driver est disponible
+    - which tauri-driver
+    - cd webdriver/webdriverio
+    - npm ci --prefer-offline
+    - mkdir -p reports screenshots logs
+    # Lancement des tests WebdriverIO avec xvfb-run (serveur d'affichage virtuel)
+    - xvfb-run -a -s "-screen 0 1920x1080x24" npm run test
+
+  artifacts:
+    when: always
+    paths:
+      - $PROJECT_PATH/webdriver/webdriverio/reports/
+      - $PROJECT_PATH/webdriver/webdriverio/screenshots/
+      - $PROJECT_PATH/webdriver/webdriverio/logs/
+    expire_in: 1 week
+  allow_failure: false
+
+# --- JOB 4 : BUILD WINDOWS (cross-compilation depuis Linux) ---
+build_app_windows:
+  stage: release
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  needs:
+    - job: test_e2e
+  cache:
+    # Cache séparé pour Windows 
+    - key: "${CI_COMMIT_REF_SLUG}-cargo-windows"
+      paths:
+        - .cargo/registry/
+        - .cargo/git/
+        - $PROJECT_PATH/target/x86_64-pc-windows-msvc/
+      policy: pull-push
+    - <<: *cache_npm
+  before_script:
+    - apt-get update -qq && apt-get install -y --no-install-recommends nsis
+    - apt-get install -y --no-install-recommends lld llvm clang
+    - rustup target add x86_64-pc-windows-msvc
+    - cargo install --locked cargo-xwin
+    # Ajouter le chemin de cargo-xwin au PATH
+    - export PATH="$CARGO_HOME/bin:$PATH"
+  script:
+    - cd $WEB_PATH
+    - export PATH="$CARGO_HOME/bin:$PATH"
+    - npm ci --prefer-offline
+    
+    - npm run tauri build -- --runner cargo-xwin --target x86_64-pc-windows-msvc --verbose
+    
+  artifacts:
+    paths:
+      - $PROJECT_PATH/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
+    expire_in: 1 week
