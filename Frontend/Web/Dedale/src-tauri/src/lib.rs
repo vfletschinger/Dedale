@@ -13,8 +13,6 @@ mod utils;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        // Ensure DB plugin (migrations) is initialized before running setup code
-        .plugin(db::init_db())
         .setup(|app| {
             let handle = app.handle();
             // At startup: run DB seed (idempotent) and check if this is the first launch (no users in DB).
@@ -82,7 +80,11 @@ pub fn run() {
             db::add_team_event,
             db::remove_team_event,
             db::update_person,
-            db::update_team
+            db::update_team,
+            db::fetch_geometries_for_event,
+            db::create_geometry,
+            db::delete_geometry,
+            db::update_geometry
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

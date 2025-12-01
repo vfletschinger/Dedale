@@ -21,7 +21,7 @@ export default function CreatePerson({ onClose, onPersonCreated }: CreatePersonP
         lastname: "",
         email: "",
         address: "",
-        phone: ""
+        phoneNumber: ""
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -34,15 +34,10 @@ export default function CreatePerson({ onClose, onPersonCreated }: CreatePersonP
         }
 
         setLoading(true);
-        try {
-            const newPerson = await invoke<Person>("create_person", { ...formData });
-            onPersonCreated(newPerson);
-            onClose();
-        } catch (err: any) {
-            setError(err?.message || "Erreur inconnue");
-        } finally {
-            setLoading(false);
-        }
+        const newPerson = await invoke<Person>("create_person", { ...formData });
+        onPersonCreated(newPerson);
+        onClose();
+        setLoading(false);
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -77,7 +72,7 @@ export default function CreatePerson({ onClose, onPersonCreated }: CreatePersonP
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-xs font-medium text-gray-700 mb-1">Téléphone</label>
-                            <input name="phone" value={formData.phone} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                            <input name="phone" value={formData.phoneNumber} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
                         </div>
                         <div>
                             <label className="block text-xs font-medium text-gray-700 mb-1">Adresse</label>
