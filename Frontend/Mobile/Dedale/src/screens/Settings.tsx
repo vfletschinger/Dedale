@@ -6,20 +6,24 @@ import {
   TouchableOpacity,
   Pressable,
   FlatList,
+  Alert,
 } from "react-native";
 import CustomButton from "../components/CustomButton";
 import QRCodeScanner from "../components/QrCodeScanner";
 import Feather from "@expo/vector-icons/Feather";
 import { useEvent } from "../context/EventContext";
+import { useWebSocket } from "../context/WebSocketContext";
 import { useNavigation } from "@react-navigation/native";
 import getDatabase from "../../assets/migrations";
 import { EventType } from "../types/database";
 import EventItem from "../components/EventItem";
+import { WebSocketResponse } from "../components/WebSocketClient";
 
 export default function SettingsScreen() {
   const [scanQR, setScanQR] = useState(false);
   const [isEventListExpanded, setIsEventListExpanded] = useState(false);
   const { selectedEventId, setSelectedEventId } = useEvent();
+  const { isConnected, sendEvent } = useWebSocket();
   const [events, setEvents] = useState<EventType[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<EventType | null>(null);
   const db = getDatabase();
@@ -50,6 +54,72 @@ export default function SettingsScreen() {
   const handleEventChange = (event: EventType) => {
     setSelectedEventId(event.id);
     setSelectedEvent(event);
+  };
+
+  const deleteEventLocally = (eventId: number) => {
+    try {
+      // Delete only the many-to-many relationship (point_event)
+      db.runSync("DELETE FROM point_event WHERE event_id = ?", [eventId]);
+      
+      // Delete the event itself
+      db.runSync("DELETE FROM event WHERE id = ?", [eventId]);
+      
+      console.log(`✅ Événement ${eventId} supprimé localement`);
+      
+      // Reload events list
+      loadEvents();
+      
+      // Clear selection if the deleted event was selected
+      if (selectedEventId === eventId) {
+        setSelectedEventId(null);
+        setSelectedEvent(null);
+      }
+    } catch (error) {
+      console.error("❌ Erreur lors de la suppression de l'événement:", error);
+      Alert.alert("Erreur", "Impossible de supprimer l'événement localement");
+    }
+  };
+
+  const handleExportEvent = () => {
+    if (selectedEvent && isConnected) {
+      console.log("📤 Événement exporté vers l'application de bureau:", selectedEvent);
+      
+      sendEvent(selectedEvent, (response: WebSocketResponse) => {
+        switch (response.code) {
+          case 1:
+            // Desktop refuses the import
+            Alert.alert(
+              "Import refusé",
+              response.message || "Le serveur a refusé l'import de l'événement",
+              [{ text: "OK" }]
+            );
+            break;
+            
+          case 2:
+            // Desktop accepts but fails to import
+            Alert.alert(
+              "Échec de l'import",
+              response.message || "Le serveur a accepté mais n'a pas pu importer l'événement",
+              [{ text: "OK" }]
+            );
+            break;
+            
+          case 3:
+            // Desktop accepts and successfully imports
+            Alert.alert(
+              "Export réussi",
+              response.message || "L'événement a été exporté avec succès. Il sera supprimé de votre appareil.",
+              [
+                {
+                  text: "OK",
+                  onPress: () => deleteEventLocally(selectedEvent.id),
+                }
+              ]
+            );
+            break;
+        }
+      });
+    }
   };
 
   return (
@@ -147,13 +217,29 @@ export default function SettingsScreen() {
             <Text className="text-lg font-bold text-gray-800 mt-3 mb-2 text-center">
               Data Synchronization
             </Text>
-            <Text className="text-sm text-gray-600 text-center mb-6">
-              Scan QR code to sync data
-            </Text>
-            <CustomButton
-              onPress={() => setScanQR(true)}
-              title="Scan QR Code"
-            />
+            
+            {!isConnected ? (
+              <>
+                <Text className="text-sm text-gray-600 text-center mb-6">
+                  Scan QR code to connect desktop application
+                </Text>
+                <CustomButton
+                  onPress={() => setScanQR(true)}
+                  title="Scan QR Code"
+                />
+              </>
+            ) : (
+              <>
+                <Text className="text-sm text-green-600 text-center mb-6">
+                  ✓ Connecté à l'application de bureau
+                </Text>
+                <CustomButton
+                  onPress={handleExportEvent}
+                  title="Exporter l'événement vers l'application de bureau"
+                  disabled={!selectedEvent}
+                />
+              </>
+            )}
           </View>
         </View>
       )}

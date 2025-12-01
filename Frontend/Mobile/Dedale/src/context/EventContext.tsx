@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, ReactNode } from "react";
 
 interface EventContextType {
   selectedEventId: number | null;
-  setSelectedEventId: (id: number) => void;
+  setSelectedEventId: (id: number | null) => void;
 }
 
 const EventContext = createContext<EventContextType | undefined>(undefined);
