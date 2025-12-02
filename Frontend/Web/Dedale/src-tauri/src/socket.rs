@@ -1,26 +1,237 @@
-use crate::db::insert_point_details;
-use crate::db::PointDetail;
+use crate::db::{get_db_pool, insert_point_details, Event, PointDetail};
 use base64::{engine::general_purpose, Engine as _};
 use image::Luma;
 use local_ip_address::local_ip;
 use qrcode::QrCode;
 use rand::Rng;
+use serde::Serialize;
+use sqlx::Row;
 use std::io::Cursor;
 use std::net::SocketAddr;
+use std::sync::Arc;
 use std::thread;
 use tauri::AppHandle;
 use tungstenite::accept;
 use tungstenite::Message;
+
+/// Structure pour les données envoyées au mobile
+#[derive(Debug, Serialize)]
+struct TransferData {
+    events: Vec<Event>,
+    points: Vec<TransferPoint>,
+}
+
+#[derive(Debug, Serialize)]
+struct TransferPoint {
+    id: i64,
+    x: f64,
+    y: f64,
+    event_ids: Vec<i64>,
+    obstacles: Vec<TransferObstacle>,
+    comments: Vec<TransferComment>,
+    pictures: Vec<TransferPicture>,
+}
+
+#[derive(Debug, Serialize)]
+struct TransferObstacle {
+    id: i64,
+    type_id: i64,
+    type_name: String,
+    number: i32,
+}
+
+#[derive(Debug, Serialize)]
+struct TransferComment {
+    id: i64,
+    content: String,
+}
+
+#[derive(Debug, Serialize)]
+struct TransferPicture {
+    id: i64,
+    data: String, // Base64 encoded
+}
 
 fn random_port() -> u16 {
     let mut rng = rand::rng();
     rng.random_range(1025..65535)
 }
 
+/// Récupère les events et les points associés pour le transfert
+async fn fetch_transfer_data(app: &AppHandle, event_ids: &[i64]) -> Result<TransferData, String> {
+    let pool = get_db_pool(app).await?;
+
+    // Récupérer les events sélectionnés
+    let event_ids_placeholder = event_ids
+        .iter()
+        .map(|_| "?")
+        .collect::<Vec<_>>()
+        .join(",");
+
+    let events_query = format!(
+        "SELECT id, name, description, date_debut, date_fin, statut, geometry FROM event WHERE id IN ({})",
+        event_ids_placeholder
+    );
+
+    let mut query = sqlx::query(&events_query);
+    for id in event_ids {
+        query = query.bind(id);
+    }
+
+    let event_rows = query
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| format!("Erreur récupération events: {}", e))?;
+
+    let events: Vec<Event> = event_rows
+        .iter()
+        .map(|row| Event {
+            id: row.get("id"),
+            name: row.get("name"),
+            description: row.get("description"),
+            date_debut: row.get("date_debut"),
+            date_fin: row.get("date_fin"),
+            statut: row.get("statut"),
+            geometry: row.get("geometry"),
+        })
+        .collect();
+
+    println!("📋 {} event(s) récupéré(s)", events.len());
+
+    // Récupérer les points liés aux events sélectionnés
+    let points_query = format!(
+        r#"
+        SELECT DISTINCT p.id, p.x, p.y
+        FROM point p
+        INNER JOIN point_event pe ON p.id = pe.point_id
+        WHERE pe.event_id IN ({})
+        ORDER BY p.id
+        "#,
+        event_ids_placeholder
+    );
+
+    let mut query = sqlx::query(&points_query);
+    for id in event_ids {
+        query = query.bind(id);
+    }
+
+    let point_rows = query
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| format!("Erreur récupération points: {}", e))?;
+
+    let mut points: Vec<TransferPoint> = Vec::new();
+
+    for row in point_rows {
+        let point_id: i64 = row.get("id");
+
+        // Récupérer les event_ids pour ce point
+        let event_ids_rows = sqlx::query("SELECT event_id FROM point_event WHERE point_id = ?")
+            .bind(point_id)
+            .fetch_all(&pool)
+            .await
+            .map_err(|e| format!("Erreur récupération event_ids: {}", e))?;
+
+        let point_event_ids: Vec<i64> = event_ids_rows.iter().map(|r| r.get("event_id")).collect();
+
+        // Récupérer les obstacles
+        let obstacle_rows = sqlx::query(
+            r#"
+            SELECT po.id, po.type_id, ot.name as type_name, po.number
+            FROM point_obstacle po
+            JOIN obstacle_type ot ON po.type_id = ot.id
+            WHERE po.point_id = ?
+            "#,
+        )
+        .bind(point_id)
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| format!("Erreur récupération obstacles: {}", e))?;
+
+        let obstacles: Vec<TransferObstacle> = obstacle_rows
+            .iter()
+            .map(|r| TransferObstacle {
+                id: r.get("id"),
+                type_id: r.get("type_id"),
+                type_name: r.get("type_name"),
+                number: r.get("number"),
+            })
+            .collect();
+
+        // Récupérer les commentaires
+        let comment_rows = sqlx::query("SELECT id, content FROM comment WHERE point_id = ?")
+            .bind(point_id)
+            .fetch_all(&pool)
+            .await
+            .map_err(|e| format!("Erreur récupération commentaires: {}", e))?;
+
+        let comments: Vec<TransferComment> = comment_rows
+            .iter()
+            .map(|r| TransferComment {
+                id: r.get("id"),
+                content: r.get("content"),
+            })
+            .collect();
+
+        // Récupérer les images (en base64)
+        let picture_rows = sqlx::query("SELECT id, data FROM picture WHERE point_id = ?")
+            .bind(point_id)
+            .fetch_all(&pool)
+            .await
+            .map_err(|e| format!("Erreur récupération pictures: {}", e))?;
+
+        let pictures: Vec<TransferPicture> = picture_rows
+            .iter()
+            .map(|r| {
+                let data: Vec<u8> = r.get("data");
+                TransferPicture {
+                    id: r.get("id"),
+                    data: general_purpose::STANDARD.encode(&data),
+                }
+            })
+            .collect();
+
+        points.push(TransferPoint {
+            id: point_id,
+            x: row.get("x"),
+            y: row.get("y"),
+            event_ids: point_event_ids,
+            obstacles,
+            comments,
+            pictures,
+        });
+    }
+
+    println!("📍 {} point(s) récupéré(s)", points.len());
+
+    Ok(TransferData { events, points })
+}
+
 async fn handle_websocket(
     app: &AppHandle,
     mut websocket: tungstenite::WebSocket<std::net::TcpStream>,
+    event_ids: Arc<Vec<i64>>,
 ) -> Result<(), String> {
+    // Envoyer les données dès la connexion
+    println!("📤 Envoi des données au client mobile...");
+    
+    let transfer_data = fetch_transfer_data(app, &event_ids).await?;
+    let json_data = serde_json::to_string(&transfer_data)
+        .map_err(|e| format!("Erreur sérialisation JSON: {}", e))?;
+
+    println!("📦 Taille des données: {} octets", json_data.len());
+
+    websocket
+        .write(Message::Text(json_data.into()))
+        .map_err(|e| format!("Erreur envoi données: {}", e))?;
+
+    websocket
+        .flush()
+        .map_err(|e| format!("Erreur flush: {}", e))?;
+
+    println!("✅ Données envoyées avec succès !");
+
+    // Continuer à écouter les messages du client
     loop {
         match websocket.read() {
             Ok(msg) => {
@@ -136,7 +347,9 @@ async fn handle_websocket(
 }
 
 #[tauri::command]
-pub fn start_server(app: AppHandle) -> Result<String, String> {
+pub fn start_server(app: AppHandle, event_ids: Vec<i64>) -> Result<String, String> {
+    println!("🚀 Démarrage du serveur WebSocket pour {} événement(s)", event_ids.len());
+    
     let ip = local_ip().map_err(|e| e.to_string())?;
     let port = random_port();
     let socket = SocketAddr::new(ip, port);
@@ -158,6 +371,7 @@ pub fn start_server(app: AppHandle) -> Result<String, String> {
     let base64_data = general_purpose::STANDARD.encode(&buffer);
 
     let app_for_thread = app.clone();
+    let event_ids_arc = Arc::new(event_ids);
 
     thread::spawn(move || {
         let listener =
@@ -171,11 +385,12 @@ pub fn start_server(app: AppHandle) -> Result<String, String> {
                         Ok(ws) => {
                             println!("Client WebSocket connecté");
                             let app_clone = app_for_thread.clone();
+                            let event_ids_clone = Arc::clone(&event_ids_arc);
                             thread::spawn(move || {
                                 // Create a Tokio runtime to run the async function
                                 let rt = tokio::runtime::Runtime::new().unwrap();
                                 rt.block_on(async {
-                                    if let Err(e) = handle_websocket(&app_clone, ws).await {
+                                    if let Err(e) = handle_websocket(&app_clone, ws, event_ids_clone).await {
                                         eprintln!("Erreur WebSocket: {}", e);
                                     }
                                 });
