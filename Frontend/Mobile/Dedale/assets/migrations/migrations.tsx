@@ -13,7 +13,7 @@ export const migrations: Migration[] = [
     name: "Initial schema",
     up: (db: SQLiteDatabase) => {
       db.execSync(`
-        CREATE TABLE IF NOT EXISTS obstacle_types (
+        CREATE TABLE IF NOT EXISTS obstacle_type (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           name VARCHAR(25) NOT NULL,
           description TEXT,
@@ -23,106 +23,90 @@ export const migrations: Migration[] = [
       `);
 
       db.execSync(`
-        CREATE TABLE IF NOT EXISTS interest_points (
+        CREATE TABLE IF NOT EXISTS event (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT,
+          description TEXT,
+          dateDebut DATE,
+          dateFin DATE,
+          statut TEXT,
+          geometry TEXT
+        );
+      `);
+
+      db.execSync(`
+        CREATE TABLE IF NOT EXISTS point (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           x REAL NOT NULL,
           y REAL NOT NULL,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           modified_at DATETIME DEFAULT CURRENT_TIMESTAMP
-
         );
       `);
 
       db.execSync(`
-        CREATE TABLE IF NOT EXISTS comments (
+        CREATE TABLE IF NOT EXISTS point_event (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          point_id INTEGER NOT NULL,
+          event_id INTEGER NOT NULL,
+          FOREIGN KEY (point_id) REFERENCES point (id) ON DELETE CASCADE,
+          FOREIGN KEY (event_id) REFERENCES event (id) ON DELETE CASCADE,
+          UNIQUE(point_id, event_id)
+        );
+      `);
+
+      db.execSync(`
+        CREATE INDEX IF NOT EXISTS idx_point_event_event_id ON point_event(event_id);
+      `);
+
+      db.execSync(`
+        CREATE TABLE IF NOT EXISTS comment (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           point_id INTEGER NOT NULL,
           value TEXT,
-          FOREIGN KEY (point_id) REFERENCES interest_points (id) ON DELETE CASCADE
+          FOREIGN KEY (point_id) REFERENCES point (id) ON DELETE CASCADE
         );
       `);
 
       db.execSync(`
-        CREATE TABLE IF NOT EXISTS pictures (
+        CREATE TABLE IF NOT EXISTS picture (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           point_id INTEGER NOT NULL,
           image TEXT NOT NULL,
-          FOREIGN KEY (point_id) REFERENCES interest_points (id) ON DELETE CASCADE
+          FOREIGN KEY (point_id) REFERENCES point (id) ON DELETE CASCADE
         );
       `);
 
       db.execSync(`
-        CREATE TABLE IF NOT EXISTS obstacles (
+        CREATE TABLE IF NOT EXISTS obstacle (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           point_id INTEGER NOT NULL,
           type_id INTEGER NOT NULL,
-          nombre INTEGER DEFAULT 1,
-          FOREIGN KEY (point_id) REFERENCES interest_points (id) ON DELETE CASCADE,
-          FOREIGN KEY (type_id) REFERENCES obstacle_types (id)
+          number INTEGER DEFAULT 1,
+          FOREIGN KEY (point_id) REFERENCES point (id) ON DELETE CASCADE,
+          FOREIGN KEY (type_id) REFERENCES obstacle_type (id)
         );
       `);
-    },
-  },
-  {
-    version: 2,
-    name: "change column name",
-    up: (db: SQLiteDatabase) => {
-      const tables = db.getAllSync<{ name: string }>(
-        "SELECT name FROM sqlite_master WHERE type='table'"
-      );
 
-      const tableNames = tables.map((t) => t.name);
-
-      // Renommages sécurisés : ne renommer que si la table source existe
-      // et que la table cible n'existe pas encore.
-      if (tableNames.includes("interest_points") && !tableNames.includes("point")) {
-        db.execSync(`ALTER TABLE interest_points RENAME TO point;`);
-      }
-      if (tableNames.includes("obstacles") && !tableNames.includes("obstacle")) {
-        db.execSync(`ALTER TABLE obstacles RENAME TO obstacle;`);
-      }
-      if (tableNames.includes("pictures") && !tableNames.includes("picture")) {
-        db.execSync(`ALTER TABLE pictures RENAME TO picture;`);
-      }
-      if (tableNames.includes("comments") && !tableNames.includes("comment")) {
-        db.execSync(`ALTER TABLE comments RENAME TO comment;`);
-      }
-      if (tableNames.includes("obstacle_types") && !tableNames.includes("obstacle_type")) {
-        db.execSync(`ALTER TABLE obstacle_types RENAME TO obstacle_type;`);
-      }
-
-      // Recalculer les colonnes pour les vérifications suivantes
-      const getTableColumns = (tableName: string) => {
-        try {
-          const cols = db.getAllSync<{ name: string }>(`PRAGMA table_info(${tableName})`);
-          return cols.map(c => c.name);
-        } catch (e) {
-          return [] as string[];
-        }
-      };
-
-      // Renommer la colonne 'nombre' en 'number' dans la table 'obstacle'
-      // seulement si la table existe et que la colonne source existe
-      const obstacleCols = getTableColumns('obstacle');
-      if (obstacleCols.length > 0 && obstacleCols.includes('nombre') && !obstacleCols.includes('number')) {
-        try {
-          db.execSync(`ALTER TABLE obstacle RENAME COLUMN nombre TO number;`);
-        } catch (e) {
-          // En cas d'erreur, logguer mais ne pas interrompre le processus
-          console.warn('Impossible de renommer la colonne nombre -> number:', e);
-        }
-      }
-    },
-  },
-  {
-    version: 3,
-    name: "add time stam",
-    up: (db: SQLiteDatabase) => {
       db.execSync(`
         CREATE TABLE IF NOT EXISTS session (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           date DATETIME DEFAULT CURRENT_TIMESTAMP
         );
+      `);
+
+      db.execSync(`
+        CREATE TABLE IF NOT EXISTS geometry (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          event_id INTEGER NOT NULL,
+          wkt TEXT NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (event_id) REFERENCES event (id) ON DELETE CASCADE
+        );
+      `);
+
+      db.execSync(`
+        CREATE INDEX IF NOT EXISTS idx_geometry_event_id ON geometry(event_id);
       `);
     },
   },

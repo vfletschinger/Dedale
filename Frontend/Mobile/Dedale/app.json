@@ -12,10 +12,7 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "plugins": [
-      "expo-sqlite",
-      "expo-barcode-scanner"
-    ],
+    "plugins": ["expo-sqlite"],
     "ios": {
       "bundleIdentifier": "com.t5crs.dedale",
       "infoPlist": {
@@ -49,9 +46,8 @@
     },
     "extra": {
       "eas": {
-        "projectId": "acc13400-d2ce-4fac-aebf-8b64ef3aad51"
+        "projectId": "3e1a8d04-3073-4e55-9721-c6edd46db4e5"
       }
-    },
-    "owner": "acouotn"
+    }
   }
 }

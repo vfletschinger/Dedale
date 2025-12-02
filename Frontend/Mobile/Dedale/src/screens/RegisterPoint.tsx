@@ -4,7 +4,6 @@ import {
   Alert,
   Modal,
   TextInput,
-  StyleSheet,
   Image,
   Pressable,
   FlatList,
@@ -13,12 +12,15 @@ import {
 import React, { useState, useRef } from "react";
 import CustomButton from "../components/CustomButton";
 import ObstacleSelector from "../components/ObstacleSelector";
+import Map from "../components/Map";
 import MapView, { Marker } from "react-native-maps";
 import * as Location from "expo-location";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
 import getDatabase from "../../assets/migrations";
 import * as ImageHelper from "../services/ImageHelper";
+import { useEvent } from "../context/EventContext";
+import { usePoints } from "../context/PointsContext";
 
 type SelectedObstacle = {
   type_id: number;
@@ -27,6 +29,8 @@ type SelectedObstacle = {
 };
 
 export default function RegisterPointScreen() {
+  const { selectedEventId } = useEvent();
+  const { refreshPoints } = usePoints();
   const [location, setLocation] = useState<{
     latitude: number;
     longitude: number;
@@ -134,6 +138,14 @@ export default function RegisterPointScreen() {
         );
       }
 
+      // Associate point with current event via junction table
+      if (selectedEventId) {
+        db.runSync(
+          "INSERT INTO point_event (point_id, event_id) VALUES (?, ?)",
+          [insertedPointId, selectedEventId]
+        );
+      }
+
       // Sauvegarder les images
       if (selectedImages.length > 0) {
         for (const imageUri of selectedImages) {
@@ -202,54 +214,84 @@ export default function RegisterPointScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      {coords ? (
-        <MapView
-          ref={(ref) => {
-            mapRef.current = ref;
-          }}
-          style={styles.map}
-          initialRegion={{
-            latitude: coords.latitude,
-            longitude: coords.longitude,
-            latitudeDelta: 0.003,
-            longitudeDelta: 0.003,
-          }}
-          showsUserLocation={true}
-          onPress={(e) => {
-            const clickedCoords = e.nativeEvent.coordinate;
-            setLocation(clickedCoords);
-            setIsModalVisible(true);
-          }}
-        >
-          {location && (
+    <View className="container-white">
+      <Map
+        mapRef={mapRef}
+        initialRegion={
+          coords
+            ? {
+                latitude: coords.latitude,
+                longitude: coords.longitude,
+                latitudeDelta: 0.003,
+                longitudeDelta: 0.003,
+              }
+            : undefined
+        }
+        onMapPress={(e) => {
+          const clickedCoords = e.nativeEvent.coordinate;
+          setLocation(clickedCoords);
+          setIsModalVisible(true);
+        }}
+        hideDefaultMarkers={false}
+        hideButtons={true}
+        customMarker={
+          location ? (
             <Marker
               coordinate={location}
               title="Nouveau point"
               description="Point à enregistrer"
-              pinColor="red"
-            />
-          )}
-        </MapView>
-      ) : (
-        <View style={styles.map}>
-          <Text>Chargement de la carte...</Text>
-        </View>
-      )}
+            >
+              {/* Pin personnalisé */}
+              <View style={{ alignItems: "center" }}>
+                <View
+                  style={{
+                    width: 30,
+                    height: 30,
+                    backgroundColor: "#3b82f6",
+                    borderRadius: 15,
+                    borderTopLeftRadius: 15,
+                    borderTopRightRadius: 15,
+                    borderBottomLeftRadius: 15,
+                    borderBottomRightRadius: 0,
+                    transform: [{ rotate: "45deg" }],
+                    borderWidth: 3,
+                    borderColor: "white",
+                    shadowColor: "#000",
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.3,
+                    shadowRadius: 3,
+                    elevation: 5,
+                    justifyContent: "center",
+                    alignItems: "center",
+                  }}
+                >
+                  {/* Cercle intérieur */}
+                  <View
+                    style={{
+                      width: 10,
+                      height: 10,
+                      backgroundColor: "#1d4ed8",
+                      borderRadius: 5,
+                      transform: [{ rotate: "-45deg" }],
+                    }}
+                  />
+                </View>
+              </View>
+            </Marker>
+          ) : null
+        }
+      />
 
-      <View style={styles.buttonContainer}>
-        <Pressable
-          onPress={requestLocation}
-          style={[styles.button, { backgroundColor: "#8B5CF6" }]}
-        >
-          <Text style={styles.buttonText}>Obtenir ma position</Text>
+      <View className="absolute bottom-5 left-5 right-5 flex-row justify-between gap-2">
+        <Pressable onPress={requestLocation} className="flex-1 btn-violet">
+          <Text className="text-white font-bold">Obtenir ma position</Text>
         </Pressable>
 
         <Pressable
           onPress={() => setIsModalVisible(true)}
-          style={[styles.button, { backgroundColor: "#8B5CF6" }]}
+          className="flex-1 btn-violet"
         >
-          <Text style={styles.buttonText}>Ajouter un point</Text>
+          <Text className="text-white font-bold">Ajouter un point</Text>
         </Pressable>
       </View>
 
@@ -260,13 +302,15 @@ export default function RegisterPointScreen() {
         animationType="slide"
         onRequestClose={() => setIsModalVisible(false)}
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Ajouter un point d'intérêt</Text>
+        <View className="modal-bottom">
+          <View className="modal-bottom-content max-h-[80%]">
+            <Text className="text-lg font-semibold mb-3">
+              Ajouter un point d'intérêt
+            </Text>
 
             {/* Commentaire */}
             <TextInput
-              style={[styles.input, { marginBottom: 10 }]}
+              className="input-multiline mb-3"
               placeholder="Entrez le commentaire du point"
               value={pointComment}
               onChangeText={setPointComment}
@@ -281,24 +325,14 @@ export default function RegisterPointScreen() {
 
             {/* Affichage des obstacles sélectionnés */}
             {selectedObstacles.length > 0 && (
-              <View style={{ marginVertical: 10 }}>
-                <Text style={{ fontWeight: "600", marginBottom: 5 }}>
+              <View className="my-2">
+                <Text className="font-semibold mb-1">
                   Obstacles sélectionnés :
                 </Text>
-                <View
-                  style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}
-                >
+                <View className="flex-row flex-wrap gap-2">
                   {selectedObstacles.map((obs, idx) => (
-                    <View
-                      key={idx}
-                      style={{
-                        backgroundColor: "#DBEAFE",
-                        paddingHorizontal: 12,
-                        paddingVertical: 6,
-                        borderRadius: 20,
-                      }}
-                    >
-                      <Text style={{ color: "#1E40AF", fontWeight: "500" }}>
+                    <View key={idx} className="obstacle-tag">
+                      <Text className="obstacle-tag-text">
                         {obs.name} ({obs.number})
                       </Text>
                     </View>
@@ -317,23 +351,17 @@ export default function RegisterPointScreen() {
                 data={selectedImages}
                 keyExtractor={(item) => item}
                 renderItem={({ item }) => (
-                  <View
-                    style={{
-                      position: "relative",
-                      marginRight: 10,
-                      marginVertical: 8,
-                    }}
-                  >
-                    <Image source={{ uri: item }} style={styles.thumbnail} />
+                  <View className="relative mr-2 my-2">
+                    <Image source={{ uri: item }} className="image-thumbnail" />
                     <TouchableOpacity
                       onPress={() => removeImage(item)}
-                      style={styles.removeButton}
+                      className="image-remove-btn"
                     >
-                      <Text style={styles.removeButtonText}>X</Text>
+                      <Text className="image-remove-text">X</Text>
                     </TouchableOpacity>
                   </View>
                 )}
-                style={{ marginVertical: 8 }}
+                className="my-2"
               />
             ) : null}
 
@@ -348,11 +376,13 @@ export default function RegisterPointScreen() {
                     pointComment
                   );
                   if (insertedId) {
+                    await refreshPoints();
                     Alert.alert("Succès", "Point enregistré avec succès");
                     setIsModalVisible(false);
                     setPointComment("");
                     setSelectedImages([]);
                     setSelectedObstacles([]);
+                    setLocation(null);
                   }
                 } else {
                   Alert.alert("Erreur", "Aucune position à enregistrer.");
@@ -384,81 +414,3 @@ export default function RegisterPointScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: "rgba(0,0,0,0.5)",
-  },
-  modalContent: {
-    backgroundColor: "#fff",
-    padding: 20,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-    maxHeight: "80%",
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginBottom: 12,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 12,
-    minHeight: 60,
-  },
-  map: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  buttonContainer: {
-    position: "absolute",
-    bottom: 20,
-    left: 20,
-    right: 20,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  button: {
-    flex: 1,
-    padding: 15,
-    borderRadius: 12,
-    alignItems: "center",
-  },
-  buttonText: {
-    color: "white",
-    fontWeight: "bold",
-  },
-  thumbnail: {
-    width: 100,
-    height: 100,
-    borderRadius: 8,
-  },
-  removeButton: {
-    position: "absolute",
-    top: -5,
-    right: -5,
-    backgroundColor: "red",
-    borderRadius: 12,
-    width: 24,
-    height: 24,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  removeButtonText: {
-    color: "white",
-    fontWeight: "bold",
-    fontSize: 12,
-  },
-});
