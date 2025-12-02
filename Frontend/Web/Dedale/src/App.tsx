@@ -7,10 +7,11 @@ import Database from "@tauri-apps/plugin-sql";
 import { useNavigation } from "./hooks/useNavigation";
 import Navigation from "./components/Navigation";
 import Data from "./components/Data";
-import Equipes from "./components/Equipe";
+import Teams from "./components/Teams";
 import Map from "./components/Map";
 import Event from "./components/Events";
 import AdminForm from "./components/AdminForm";
+import Persons from "./components/Persons";
 
 // Wrapper pour cacher une page tout en la gardant montée
 function PageWrapper({
@@ -79,6 +80,31 @@ function App() {
 
     return () => {
       unlisten.then(f => f()).catch(() => { });
+    };
+  }, []);
+
+  useEffect(() => {
+    // Si on demande d'aller voir une équipe
+    const unlistenTeam = listen('navigate-to-team', () => {
+      navigate("team");
+    });
+
+    // Si on demande d'aller voir une personne
+    const unlistenPerson = listen('navigate-to-person', () => {
+      navigate("person");
+    });
+
+    // Si on demande d'aller voir un event
+    const unlistenMap = listen<any>('navigate-to-map', (event) => {
+      const targetEventId = event.payload.eventId;
+      setSelectedEventId(targetEventId);
+      navigate("map");
+    });
+
+    return () => {
+      unlistenTeam.then(f => f());
+      unlistenPerson.then(f => f());
+      unlistenMap.then(f => f());
     };
   }, []);
 
@@ -164,9 +190,16 @@ function App() {
             )}
 
             {/* Teams - kept mounted once visited */}
-            {hasVisited("equipe") && (
-              <PageWrapper isVisible={currentPage === "equipe"}>
-                <Equipes />
+            {hasVisited("team") && (
+              <PageWrapper isVisible={currentPage === "team"}>
+                <Teams />
+              </PageWrapper>
+            )}
+
+            {/* Persons - kept mounted once visited */}
+            {hasVisited("person") && (
+              <PageWrapper isVisible={currentPage === "person"}>
+                <Persons />
               </PageWrapper>
             )}
 

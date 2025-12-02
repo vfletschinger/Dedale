@@ -24,7 +24,7 @@ pub fn run() {
                             eprintln!("[db] ensure_schema error: {}", e);
                         }
 
-                        if let Err(e) = seed::seed_database(&handle).await {
+                        if let Err(e) = seed::seed_database(&pool).await {
                             eprintln!("[seed] error during seeding: {}", e);
                         }
 
@@ -61,11 +61,26 @@ pub fn run() {
             db::create_initial_admin_cmd,
             db::verify_credentials_cmd,
             db::fetch_events,
+            db::fetch_teams,
             db::insert_event,
             db::delete_event,
             db::link_point_to_event,
             db::unlink_point_from_event,
             db::get_points_for_event,
+            db::fetch_team_members,
+            db::fetch_team_events,
+            db::create_team,
+            db::delete_team,
+            db::fetch_people,
+            db::create_person,
+            db::delete_person,
+            db::add_member,
+            db::remove_member,
+            db::fetch_person_teams,
+            db::add_team_event,
+            db::remove_team_event,
+            db::update_person,
+            db::update_team,
             db::fetch_geometries_for_event,
             db::create_geometry,
             db::delete_geometry,
