@@ -24,6 +24,8 @@ export type Point = {
   id: number;
   x: number;
   y: number;
+  pose?: string | null;
+  depose?: string | null;
   obstacles: Obstacle[];
   comments: CommentItem[];
   pictures: Picture[];
@@ -54,9 +56,19 @@ export default function PointDetails({
   onRefresh?: () => void;
 }) {
   const [showObstaclesPopup, setShowObstaclesPopup] = useState(false);
+  const [showDatesPopup, setShowDatesPopup] = useState(false);
   const [_, setObstacleTypes] = useState<ObstacleType[]>([]);
   const [mergedObstacles, setMergedObstacles] = useState<any[]>([]);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [editPose, setEditPose] = useState<string>("");
+  const [editDepose, setEditDepose] = useState<string>("");
+
+  useEffect(() => {
+    if (showDatesPopup && point) {
+      setEditPose(point.pose || "");
+      setEditDepose(point.depose || "");
+    }
+  }, [showDatesPopup, point]);
 
   useEffect(() => {
     if (showObstaclesPopup && point) {
@@ -148,6 +160,53 @@ export default function PointDetails({
     }
   }
 
+  async function saveDates() {
+    // Validation : dépose ne peut pas être antérieure à pose
+    if (editPose && editDepose) {
+      const poseDate = new Date(editPose);
+      const deposeDate = new Date(editDepose);
+      if (deposeDate < poseDate) {
+        alert("⚠️ La date de dépose ne peut pas être antérieure à la date de pose.");
+        return;
+      }
+    }
+    
+    try {
+      if (point) {
+        await invoke("update_point_dates", {
+          pointId: point.id,
+          pose: editPose || null,
+          depose: editDepose || null,
+        });
+
+        setShowDatesPopup(false);
+        if (onRefresh) {
+          onRefresh();
+        }
+      }
+    } catch (error) {
+      console.error("Failed to save dates:", error);
+      alert("Erreur lors de la sauvegarde des dates.");
+    }
+  }
+
+  // Helper pour formater les dates pour l'affichage
+  function formatDateTime(dateStr: string | null | undefined): string {
+    if (!dateStr) return "Non défini";
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleString("fr-FR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return dateStr;
+    }
+  }
+
   if (!point) {
     return (
       <div className="p-6 text-center">
@@ -185,6 +244,36 @@ export default function PointDetails({
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* Dates Pose/Dépose Section */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-4 py-3 bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">🕐</span>
+              <span className="font-semibold text-gray-800">Dates Pose / Dépose</span>
+            </div>
+            <button
+              onClick={() => setShowDatesPopup(true)}
+              className="px-3 py-1.5 bg-purple-500 hover:bg-purple-600 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              Modifier
+            </button>
+          </div>
+          <div className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-500">Pose :</span>
+              <span className={`text-sm font-medium ${point.pose ? 'text-gray-800' : 'text-gray-400 italic'}`}>
+                {formatDateTime(point.pose)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-500">Dépose :</span>
+              <span className={`text-sm font-medium ${point.depose ? 'text-gray-800' : 'text-gray-400 italic'}`}>
+                {formatDateTime(point.depose)}
+              </span>
+            </div>
+          </div>
+        </div>
+
         {/* Obstacles Section */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-4 py-3 bg-gradient-to-r from-orange-50 to-amber-50 border-b border-orange-100 flex items-center justify-between">
@@ -358,6 +447,67 @@ export default function PointDetails({
               <button
                 onClick={() => saveObstacles()}
                 className="flex-1 px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-semibold rounded-xl transition-all"
+              >
+                Enregistrer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Modification Dates Pose/Dépose */}
+      {showDatesPopup && (
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden">
+            <div className="p-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white flex items-center justify-between">
+              <h3 className="font-bold text-lg">Modifier les dates</h3>
+              <button
+                onClick={() => setShowDatesPopup(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date et heure de pose</label>
+                <input
+                  type="datetime-local"
+                  value={editPose}
+                  onChange={(e) => setEditPose(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-gray-50 transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date et heure de dépose</label>
+                <input
+                  type="datetime-local"
+                  value={editDepose}
+                  onChange={(e) => setEditDepose(e.target.value)}
+                  min={editPose || undefined}
+                  className={`w-full px-3 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-gray-50 transition-all ${
+                    editPose && editDepose && new Date(editDepose) < new Date(editPose)
+                      ? 'border-red-400 bg-red-50'
+                      : 'border-gray-200'
+                  }`}
+                />
+                {editPose && editDepose && new Date(editDepose) < new Date(editPose) && (
+                  <p className="text-red-500 text-xs mt-1">⚠️ La dépose doit être après la pose</p>
+                )}
+              </div>
+            </div>
+            
+            <div className="p-4 border-t border-gray-100 flex gap-3">
+              <button
+                onClick={() => setShowDatesPopup(false)}
+                className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => saveDates()}
+                className="flex-1 px-4 py-3 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold rounded-xl transition-all"
               >
                 Enregistrer
               </button>

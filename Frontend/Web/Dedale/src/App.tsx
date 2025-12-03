@@ -29,11 +29,8 @@ function PageWrapper({
         className="relative z-10"
         style={{
           height: "calc(100vh - 5rem)",
-          visibility: isVisible ? "visible" : "hidden",
-          position: isVisible ? "relative" : "absolute",
+          display: isVisible ? "block" : "none",
           width: "100%",
-          top: 0,
-          left: 0,
         }}
       >
         {children}

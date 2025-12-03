@@ -24,7 +24,7 @@ export default function Navigation({
 }: NavigationProps) {
   return (
     <nav className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 backdrop-blur-lg border-b border-white/10 shadow-2xl">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex h-20 items-center justify-between">
           {/* Left side - Logo + Back button */}
           <div className="flex items-center space-x-3">

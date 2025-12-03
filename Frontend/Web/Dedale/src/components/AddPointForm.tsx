@@ -18,6 +18,8 @@ export default function AddPointForm({
   const [mergedObstacles, setMergedObstacles] = useState<any[]>([]);
   const [pictures, setPictures] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [pose, setPose] = useState<string>("");
+  const [depose, setDepose] = useState<string>("");
 
   useEffect(() => {
     // initially fetch obstacle types to let user add obstacles
@@ -83,6 +85,16 @@ export default function AddPointForm({
   }
 
   async function handleSave() {
+    // Validation : dépose ne peut pas être antérieure à pose
+    if (pose && depose) {
+      const poseDate = new Date(pose);
+      const deposeDate = new Date(depose);
+      if (deposeDate < poseDate) {
+        alert("⚠️ La date de dépose ne peut pas être antérieure à la date de pose.");
+        return;
+      }
+    }
+    
     setSaving(true);
     try {
       // Prepare obstacles in backend-friendly shape (snake_case -> full Obstacle shape expected by insert_point_details)
@@ -111,6 +123,8 @@ export default function AddPointForm({
           id: 0,
           x: Number(x),
           y: Number(y),
+          pose: pose || null,
+          depose: depose || null,
         },
         comments: comments,
         pictures: picturesPayload,
@@ -185,6 +199,42 @@ export default function AddPointForm({
                   className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-gray-50 transition-all"
                 />
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Dates Pose/Dépose Section */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-4 py-3 bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple-100 flex items-center gap-2">
+            <span className="text-xl">🕐</span>
+            <span className="font-semibold text-gray-800">Dates Pose / Dépose</span>
+          </div>
+          <div className="p-4 space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Date et heure de pose</label>
+              <input
+                type="datetime-local"
+                value={pose}
+                onChange={(e) => setPose(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-gray-50 transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Date et heure de dépose</label>
+              <input
+                type="datetime-local"
+                value={depose}
+                onChange={(e) => setDepose(e.target.value)}
+                min={pose || undefined}
+                className={`w-full px-3 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-gray-50 transition-all ${
+                  pose && depose && new Date(depose) < new Date(pose)
+                    ? 'border-red-400 bg-red-50'
+                    : 'border-gray-200'
+                }`}
+              />
+              {pose && depose && new Date(depose) < new Date(pose) && (
+                <p className="text-red-500 text-xs mt-1">⚠️ La dépose doit être après la pose</p>
+              )}
             </div>
           </div>
         </div>
