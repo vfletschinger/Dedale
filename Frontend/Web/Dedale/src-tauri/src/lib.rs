@@ -53,6 +53,7 @@ pub fn run() {
             pdf::create_pdf,
             map::get_points,
             socket::start_server,
+            socket::send_event_to_mobile,
             db::fetch_obstacle_types,
             db::insert_obstacles,
             db::delete_point,

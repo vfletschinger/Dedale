@@ -121,32 +121,31 @@ const QRCodeScanner = ({
           setTransferStatus("Réception des événements...");
           try {
             insertEvents(events);
-            setTransferStatus("Synchronisation réussie !");
+            setTransferStatus(`Événement(s) synchronisé(s) ! En attente...`);
 
             // Rafraîchir la liste des événements dans le contexte
             refreshEvents();
 
             // Save the WebSocket client in context and mark as connected
+            // Ne pas fermer le modal - rester en attente d'autres événements
             setWsClient(client);
             setIsConnected(true);
-
-            setTimeout(() => {
-              setIsTransferring(false);
-              setScanned(false);
-              setScanQR(false);
-            }, 2000);
           } catch (error) {
             setTransferStatus(`Erreur: ${error}`);
-            setTimeout(() => {
-              client.close();
-              setIsTransferring(false);
-              setScanned(false);
-              setScanQR(false);
-            }, 3000);
           }
         })
         .then(() => {
-          setTransferStatus("En attente des événements...");
+          setTransferStatus("Connecté ! En attente des événements...");
+          // Sauvegarder le client immédiatement après connexion
+          setWsClient(client);
+          setIsConnected(true);
+          
+          // Fermer le modal de transfert après connexion réussie
+          setTimeout(() => {
+            setIsTransferring(false);
+            setScanned(false);
+            setScanQR(false);
+          }, 1500);
         })
         .catch((error: string) => {
           setTransferStatus(`Erreur de connexion: ${error}`);

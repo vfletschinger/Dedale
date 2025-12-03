@@ -131,14 +131,19 @@ function Data() {
         }
     }, []);
 
-    // Envoyer un événement spécifique au mobile (marquage visuel uniquement)
+    // Envoyer un événement spécifique au mobile
     const sendEventToMobile = useCallback(async (eventId: number) => {
         setSendingEventId(eventId);
-        // Simuler un délai d'envoi (le vrai envoi se fait quand le mobile demande get_events)
-        await new Promise(resolve => setTimeout(resolve, 500));
-        setSentEventIds(prev => new Set([...prev, eventId]));
-        setSendingEventId(null);
-        setMessage({ type: 'success', text: `Événement ${eventId} marqué pour transfert !` });
+        try {
+            await invoke('send_event_to_mobile', { eventId });
+            setSentEventIds(prev => new Set([...prev, eventId]));
+            setMessage({ type: 'success', text: `Événement ${eventId} envoyé au mobile !` });
+        } catch (err) {
+            console.error('Erreur envoi événement:', err);
+            setMessage({ type: 'error', text: `Erreur: ${String(err)}` });
+        } finally {
+            setSendingEventId(null);
+        }
     }, []);
 
     const terminateTransfer = useCallback(async () => {

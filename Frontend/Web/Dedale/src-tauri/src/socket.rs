@@ -8,14 +8,19 @@ use serde::{Deserialize, Serialize};
 use sqlx::Row;
 use std::io::Cursor;
 use std::net::SocketAddr;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::thread;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tungstenite::accept;
 use tungstenite::Message;
+use std::sync::mpsc::{channel, Sender, Receiver};
+use once_cell::sync::Lazy;
+
+/// Canal global pour envoyer des événements au thread WebSocket
+static EVENT_SENDER: Lazy<Mutex<Option<Sender<TransferEvent>>>> = Lazy::new(|| Mutex::new(None));
 
 /// Structure pour un event envoyé au mobile (avec noms camelCase pour compatibilité)
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct TransferEvent {
     id: i64,
@@ -111,6 +116,7 @@ async fn handle_websocket(
     app: &AppHandle,
     mut websocket: tungstenite::WebSocket<std::net::TcpStream>,
     event_ids: Arc<Vec<i64>>,
+    event_receiver: Receiver<TransferEvent>,
 ) -> Result<(), String> {
     println!("📱 Client mobile connecté, en attente d'actions...");
     
@@ -118,6 +124,9 @@ async fn handle_websocket(
     app.emit("mobile-connected", ()).unwrap_or_else(|e| {
         eprintln!("⚠️ Erreur émission événement mobile-connected: {}", e);
     });
+    
+    // Passer le socket en mode non-bloquant pour pouvoir vérifier le canal
+    websocket.get_ref().set_nonblocking(true).map_err(|e| format!("Erreur set_nonblocking: {}", e))?;
     
     // Envoyer un message de bienvenue avec le nombre d'events disponibles
     let welcome = serde_json::json!({
@@ -130,8 +139,32 @@ async fn handle_websocket(
         .map_err(|e| format!("Erreur envoi welcome: {}", e))?;
     websocket.flush().map_err(|e| format!("Erreur flush: {}", e))?;
 
-    // Boucle principale - attendre les actions du client
+    // Boucle principale - attendre les actions du client ou les événements du frontend
     loop {
+        // Vérifier s'il y a un événement à envoyer depuis le frontend
+        if let Ok(event) = event_receiver.try_recv() {
+            println!("📤 Envoi de l'événement {} au mobile...", event.id);
+            let response = serde_json::json!({
+                "type": "event",
+                "data": event
+            });
+            let json_data = serde_json::to_string(&response)
+                .map_err(|e| format!("Erreur sérialisation JSON: {}", e))?;
+            
+            websocket
+                .write(Message::Text(json_data.into()))
+                .map_err(|e| format!("Erreur envoi événement: {}", e))?;
+            websocket.flush().map_err(|e| format!("Erreur flush: {}", e))?;
+            
+            println!("✅ Événement {} envoyé avec succès !", event.id);
+            
+            // Émettre un événement pour confirmer l'envoi au frontend
+            app.emit("event-sent", event.id).unwrap_or_else(|e| {
+                eprintln!("⚠️ Erreur émission événement event-sent: {}", e);
+            });
+        }
+        
+        // Vérifier s'il y a un message du client
         match websocket.read() {
             Ok(msg) => {
                 println!("Reçu : {}", msg);
@@ -272,8 +305,17 @@ async fn handle_websocket(
                     }
                 }
             }
+            Err(tungstenite::Error::Io(ref e)) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                // Pas de message disponible, c'est normal en mode non-bloquant
+                // Attendre un peu avant de réessayer
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
             Err(e) => {
                 eprintln!("Client déconnecté : {}", e);
+                // Nettoyer le sender global
+                if let Ok(mut sender) = EVENT_SENDER.lock() {
+                    *sender = None;
+                }
                 return Ok(());
             }
         }
@@ -318,16 +360,30 @@ pub fn start_server(app: AppHandle, event_ids: Vec<i64>) -> Result<String, Strin
                     match accept(stream) {
                         Ok(ws) => {
                             println!("Client WebSocket connecté");
+                            
+                            // Créer le canal pour cet client
+                            let (sender, receiver) = channel::<TransferEvent>();
+                            
+                            // Stocker le sender globalement
+                            if let Ok(mut global_sender) = EVENT_SENDER.lock() {
+                                *global_sender = Some(sender);
+                            }
+                            
                             let app_clone = app_for_thread.clone();
                             let event_ids_clone = Arc::clone(&event_ids_arc);
                             thread::spawn(move || {
                                 // Create a Tokio runtime to run the async function
                                 let rt = tokio::runtime::Runtime::new().unwrap();
                                 rt.block_on(async {
-                                    if let Err(e) = handle_websocket(&app_clone, ws, event_ids_clone).await {
+                                    if let Err(e) = handle_websocket(&app_clone, ws, event_ids_clone, receiver).await {
                                         eprintln!("Erreur WebSocket: {}", e);
                                     }
                                 });
+                                
+                                // Nettoyer le sender global quand la connexion se termine
+                                if let Ok(mut global_sender) = EVENT_SENDER.lock() {
+                                    *global_sender = None;
+                                }
                             });
                         }
                         Err(e) => eprintln!("Erreur accept WebSocket : {}", e),
@@ -339,4 +395,43 @@ pub fn start_server(app: AppHandle, event_ids: Vec<i64>) -> Result<String, Strin
     });
 
     Ok(base64_data)
+}
+
+/// Envoyer un événement individuel au mobile connecté
+#[tauri::command]
+pub async fn send_event_to_mobile(app: AppHandle, event_id: i64) -> Result<(), String> {
+    println!("📤 Demande d'envoi de l'événement {} au mobile", event_id);
+    
+    // Récupérer l'événement depuis la base de données
+    let pool = get_db_pool(&app).await?;
+    
+    let row = sqlx::query(
+        "SELECT id, name, description, date_debut, date_fin, statut, geometry FROM event WHERE id = ?"
+    )
+    .bind(event_id)
+    .fetch_optional(&pool)
+    .await
+    .map_err(|e| format!("Erreur récupération event: {}", e))?
+    .ok_or_else(|| format!("Event {} non trouvé", event_id))?;
+    
+    let event = TransferEvent {
+        id: row.get("id"),
+        name: row.get("name"),
+        description: row.get("description"),
+        date_debut: row.get("date_debut"),
+        date_fin: row.get("date_fin"),
+        statut: row.get("statut"),
+        geometry: row.get("geometry"),
+    };
+    
+    // Envoyer via le canal global
+    let sender = EVENT_SENDER.lock()
+        .map_err(|e| format!("Erreur lock: {}", e))?
+        .clone()
+        .ok_or_else(|| "Aucun mobile connecté".to_string())?;
+    
+    sender.send(event)
+        .map_err(|e| format!("Erreur envoi via canal: {}", e))?;
+    
+    Ok(())
 }
