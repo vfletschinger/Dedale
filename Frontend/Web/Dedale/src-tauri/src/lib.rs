@@ -84,7 +84,8 @@ pub fn run() {
             db::fetch_geometries_for_event,
             db::create_geometry,
             db::delete_geometry,
-            db::update_geometry
+            db::update_geometry,
+            db::update_point_dates
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
