@@ -3,12 +3,71 @@ import { invoke } from '@tauri-apps/api/core';
 import * as path from '@tauri-apps/api/path';
 import QrCode from './QrCode';
 
+type Event = {
+    id: number;
+    name: string;
+    description: string;
+    dateDebut: string;
+    dateFin: string;
+    statut: string;
+};
+
 function Data() {
     const [qrCodeBase64, setQrCodeBase64] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     // État pour les messages de statut (Export, PDF)
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    
+    // États pour la sélection d'événements
+    const [showEventSelector, setShowEventSelector] = useState(false);
+    const [events, setEvents] = useState<Event[]>([]);
+    const [selectedEventIds, setSelectedEventIds] = useState<Set<number>>(new Set());
+    const [loadingEvents, setLoadingEvents] = useState(false);
+
+    // Charger les événements
+    const loadEvents = useCallback(async () => {
+        setLoadingEvents(true);
+        try {
+            const eventsData = await invoke<Event[]>("fetch_events");
+            setEvents(eventsData);
+            // Sélectionner tous les événements par défaut
+            setSelectedEventIds(new Set(eventsData.map(e => e.id)));
+        } catch (err) {
+            console.error("Erreur lors du chargement des événements:", err);
+            setError(String(err));
+        } finally {
+            setLoadingEvents(false);
+        }
+    }, []);
+
+    // Ouvrir le sélecteur d'événements
+    const openEventSelector = useCallback(async () => {
+        await loadEvents();
+        setShowEventSelector(true);
+    }, [loadEvents]);
+
+    // Toggle la sélection d'un événement
+    const toggleEventSelection = (eventId: number) => {
+        setSelectedEventIds(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(eventId)) {
+                newSet.delete(eventId);
+            } else {
+                newSet.add(eventId);
+            }
+            return newSet;
+        });
+    };
+
+    // Sélectionner/Désélectionner tous
+    const toggleSelectAll = () => {
+        if (selectedEventIds.size === events.length) {
+            setSelectedEventIds(new Set());
+        } else {
+            setSelectedEventIds(new Set(events.map(e => e.id)));
+        }
+    };
 
     // Fonction pour l'export Excel
     const generate_excel = useCallback(async () => {
@@ -62,24 +121,44 @@ function Data() {
 
     // Fonction pour le démarrage du serveur et génération du QR code
     const qr_code = useCallback(async () => {
+        // D'abord ouvrir le sélecteur d'événements
+        await openEventSelector();
+    }, [openEventSelector]);
+
+    // Confirmer et démarrer le transfert avec les événements sélectionnés
+    const confirmAndStartTransfer = useCallback(async () => {
+        if (selectedEventIds.size === 0) {
+            setMessage({ type: 'error', text: 'Veuillez sélectionner au moins un événement.' });
+            return;
+        }
+
+        setShowEventSelector(false);
         setIsLoading(true);
         setError(null);
         setQrCodeBase64(null);
         setMessage(null);
 
         try {
-            // Utilisation de mockInvoke
-            const base64String = await invoke<string>('start_server');
+            // Passer les IDs des événements sélectionnés au serveur
+            const eventIdsArray = Array.from(selectedEventIds);
+            console.log("📤 Transfert des événements:", eventIdsArray);
+            
+            const base64String = await invoke<string>('start_server', { 
+                eventIds: eventIdsArray 
+            });
             
             setQrCodeBase64(base64String);
-            
+            setMessage({ 
+                type: 'success', 
+                text: `Serveur démarré avec ${eventIdsArray.length} événement(s) sélectionné(s).` 
+            });
         } catch (err) {
             console.error('Erreur au démarrage du serveur:', err);
             setError(String(err));
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [selectedEventIds]);
 
     const getQrCodeUri = (base64: string | null): string => {
         if (!base64) return '';
@@ -174,7 +253,7 @@ function Data() {
                                         Démarrage du serveur...
                                     </span>
                                 ) : (
-                                    qrCodeBase64 ? "Serveur WebSocket Actif" : "Démarrer Serveur & Connecter App Mobile"
+                                    qrCodeBase64 ? "Serveur WebSocket Actif" : "Transférer vers l'App Mobile"
                                 )}
                             </button>
                         </div>
@@ -203,6 +282,133 @@ function Data() {
                 </div>
 
             </div>
+
+            {/* Modal de sélection des événements */}
+            {showEventSelector && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden">
+                        {/* Header */}
+                        <div className="p-5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h3 className="text-xl font-bold">📤 Sélection des événements</h3>
+                                    <p className="text-white/80 text-sm mt-1">
+                                        Choisissez les événements à transférer
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => setShowEventSelector(false)}
+                                    className="w-8 h-8 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Liste des événements */}
+                        <div className="flex-1 overflow-y-auto p-4">
+                            {loadingEvents ? (
+                                <div className="flex items-center justify-center py-8">
+                                    <svg className="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    <span className="ml-3 text-gray-600">Chargement des événements...</span>
+                                </div>
+                            ) : events.length === 0 ? (
+                                <div className="text-center py-8 text-gray-500">
+                                    <div className="text-4xl mb-2">📭</div>
+                                    <p>Aucun événement disponible</p>
+                                </div>
+                            ) : (
+                                <>
+                                    {/* Sélectionner tout */}
+                                    <div className="mb-4 pb-3 border-b border-gray-200">
+                                        <label className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedEventIds.size === events.length}
+                                                onChange={toggleSelectAll}
+                                                className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+                                            />
+                                            <span className="font-semibold text-gray-700">
+                                                {selectedEventIds.size === events.length ? "Tout désélectionner" : "Tout sélectionner"}
+                                            </span>
+                                            <span className="ml-auto text-sm text-gray-500">
+                                                {selectedEventIds.size}/{events.length} sélectionné(s)
+                                            </span>
+                                        </label>
+                                    </div>
+
+                                    {/* Liste */}
+                                    <div className="space-y-2">
+                                        {events.map((event) => (
+                                            <label
+                                                key={event.id}
+                                                className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                                                    selectedEventIds.has(event.id)
+                                                        ? 'bg-blue-50 border-blue-300 shadow-sm'
+                                                        : 'bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                                                }`}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedEventIds.has(event.id)}
+                                                    onChange={() => toggleEventSelection(event.id)}
+                                                    className="w-5 h-5 mt-0.5 text-blue-600 rounded focus:ring-blue-500"
+                                                />
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="font-semibold text-gray-800 truncate">
+                                                        {event.name}
+                                                    </div>
+                                                    <div className="text-sm text-gray-500 truncate">
+                                                        {event.description}
+                                                    </div>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                                                            event.statut === 'Actif' 
+                                                                ? 'bg-green-100 text-green-700'
+                                                                : event.statut === 'Prévu'
+                                                                ? 'bg-blue-100 text-blue-700'
+                                                                : 'bg-gray-100 text-gray-700'
+                                                        }`}>
+                                                            {event.statut}
+                                                        </span>
+                                                        <span className="text-xs text-gray-400">
+                                                            {event.dateDebut} → {event.dateFin}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-4 border-t border-gray-200 bg-gray-50 flex gap-3">
+                            <button
+                                onClick={() => setShowEventSelector(false)}
+                                className="flex-1 px-4 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-xl transition-colors"
+                            >
+                                Annuler
+                            </button>
+                            <button
+                                onClick={confirmAndStartTransfer}
+                                disabled={selectedEventIds.size === 0}
+                                className={`flex-1 px-4 py-3 font-semibold rounded-xl transition-all ${
+                                    selectedEventIds.size === 0
+                                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                        : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-md hover:shadow-lg'
+                                }`}
+                            >
+                                Transférer ({selectedEventIds.size})
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

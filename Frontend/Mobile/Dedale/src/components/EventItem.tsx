@@ -1,10 +1,18 @@
 import { View, Text, Pressable } from "react-native";
 import { EventType } from "../types/database";
+import { EventWithStatus } from "../context/EventContext";
 
 interface EventItemProps {
-  event: EventType;
-  onPress: (event: EventType) => void;
+  event: EventType | EventWithStatus;
+  onPress: (event: EventType | EventWithStatus) => void;
   navArrow?: boolean;
+}
+
+// Type guard pour vérifier si c'est un EventWithStatus
+function hasCalculatedStatus(
+  event: EventType | EventWithStatus
+): event is EventWithStatus {
+  return "calculatedStatus" in event;
 }
 
 export default function EventItem({
@@ -13,6 +21,33 @@ export default function EventItem({
   navArrow = true,
 }: EventItemProps) {
   const getEventStatus = () => {
+    // Utiliser le statut calculé s'il existe, sinon le calculer
+    if (hasCalculatedStatus(event)) {
+      const statusLabel = event.calculatedStatus;
+      switch (statusLabel) {
+        case "planifié":
+          return {
+            label: "planifié",
+            color: "bg-blue-100",
+            textColor: "text-blue-700",
+          };
+        case "passé":
+          return {
+            label: "passé",
+            color: "bg-gray-100",
+            textColor: "text-gray-600",
+          };
+        case "actif":
+        default:
+          return {
+            label: "actif",
+            color: "bg-green-100",
+            textColor: "text-green-700",
+          };
+      }
+    }
+
+    // Fallback: calculer le statut si pas présent
     const now = new Date();
     const dateDebut = new Date(event.dateDebut);
     const dateFin = new Date(event.dateFin);

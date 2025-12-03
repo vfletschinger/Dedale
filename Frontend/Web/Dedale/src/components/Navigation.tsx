@@ -11,7 +11,8 @@ interface NavigationProps {
 const navItems: { key: PageKey; label: string }[] = [
   { key: "event", label: "Événements" },
   { key: "map", label: "Carte" },
-  { key: "equipe", label: "Équipes" },
+  { key: "team", label: "Équipes" },
+  { key: "person", label: "Personnes" },
   { key: "data", label: "Données" },
 ];
 
@@ -23,7 +24,7 @@ export default function Navigation({
 }: NavigationProps) {
   return (
     <nav className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 backdrop-blur-lg border-b border-white/10 shadow-2xl">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex h-20 items-center justify-between">
           {/* Left side - Logo + Back button */}
           <div className="flex items-center space-x-3">
@@ -71,11 +72,10 @@ export default function Navigation({
               <button
                 key={item.key}
                 type="button"
-                className={`group relative px-4 py-2 rounded-2xl font-medium transition-all duration-300 transform hover:scale-105 ${
-                  currentPage === item.key
-                    ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg shadow-blue-500/30 ring-2 ring-white/20"
-                    : "text-white/80 hover:text-white bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/10 hover:border-white/30"
-                }`}
+                className={`group relative px-4 py-2 rounded-2xl font-medium transition-all duration-300 transform hover:scale-105 ${currentPage === item.key
+                  ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg shadow-blue-500/30 ring-2 ring-white/20"
+                  : "text-white/80 hover:text-white bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/10 hover:border-white/30"
+                  }`}
                 onClick={() => onNavigate(item.key)}
               >
                 <span className="flex items-center space-x-2">

@@ -1,40 +1,161 @@
-use crate::db::insert_point_details;
-use crate::db::PointDetail;
+use crate::db::{get_db_pool, insert_point_details, Event, PointDetail};
 use base64::{engine::general_purpose, Engine as _};
 use image::Luma;
 use local_ip_address::local_ip;
 use qrcode::QrCode;
 use rand::Rng;
+use serde::{Deserialize, Serialize};
+use sqlx::Row;
 use std::io::Cursor;
 use std::net::SocketAddr;
+use std::sync::Arc;
 use std::thread;
 use tauri::AppHandle;
 use tungstenite::accept;
 use tungstenite::Message;
+
+/// Structure pour un event envoyé au mobile (avec noms camelCase pour compatibilité)
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct TransferEvent {
+    id: i64,
+    name: String,
+    description: String,
+    date_debut: String,
+    date_fin: String,
+    statut: String,
+    geometry: Option<String>,
+}
+
+/// Structure pour un accusé de réception d'event du mobile
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct EventAck {
+    id: i64,
+    name: String,
+    #[serde(default)]
+    description: Option<String>,
+    #[serde(default)]
+    date_debut: Option<String>,
+    #[serde(default)]
+    date_fin: Option<String>,
+    #[serde(default)]
+    statut: Option<String>,
+    #[serde(default)]
+    geometry: Option<String>,
+}
+
+/// Réponse envoyée au mobile
+#[derive(Debug, Serialize)]
+struct AckResponse {
+    code: i32,
+    message: String,
+}
 
 fn random_port() -> u16 {
     let mut rng = rand::rng();
     rng.random_range(1025..65535)
 }
 
+/// Récupère les events sélectionnés pour le transfert
+async fn fetch_events_for_transfer(app: &AppHandle, event_ids: &[i64]) -> Result<Vec<TransferEvent>, String> {
+    let pool = get_db_pool(app).await?;
+
+    // Récupérer les events sélectionnés
+    let event_ids_placeholder = event_ids
+        .iter()
+        .map(|_| "?")
+        .collect::<Vec<_>>()
+        .join(",");
+
+    let events_query = format!(
+        "SELECT id, name, description, date_debut, date_fin, statut, geometry FROM event WHERE id IN ({})",
+        event_ids_placeholder
+    );
+
+    let mut query = sqlx::query(&events_query);
+    for id in event_ids {
+        query = query.bind(id);
+    }
+
+    let event_rows = query
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| format!("Erreur récupération events: {}", e))?;
+
+    let events: Vec<TransferEvent> = event_rows
+        .iter()
+        .map(|row| TransferEvent {
+            id: row.get("id"),
+            name: row.get("name"),
+            description: row.get("description"),
+            date_debut: row.get("date_debut"),
+            date_fin: row.get("date_fin"),
+            statut: row.get("statut"),
+            geometry: row.get("geometry"),
+        })
+        .collect();
+
+    println!("📋 {} event(s) récupéré(s) pour le transfert", events.len());
+
+    Ok(events)
+}
+
 async fn handle_websocket(
     app: &AppHandle,
     mut websocket: tungstenite::WebSocket<std::net::TcpStream>,
+    event_ids: Arc<Vec<i64>>,
 ) -> Result<(), String> {
+    // Envoyer les events dès la connexion
+    println!("📤 Envoi des événements au client mobile...");
+    
+    let events = fetch_events_for_transfer(app, &event_ids).await?;
+    let json_data = serde_json::to_string(&events)
+        .map_err(|e| format!("Erreur sérialisation JSON: {}", e))?;
+
+    println!("📦 Taille des données: {} octets ({} event(s))", json_data.len(), events.len());
+
+    websocket
+        .write(Message::Text(json_data.into()))
+        .map_err(|e| format!("Erreur envoi données: {}", e))?;
+
+    websocket
+        .flush()
+        .map_err(|e| format!("Erreur flush: {}", e))?;
+
+    println!("✅ Événements envoyés avec succès !");
+
+    // Continuer à écouter les messages du client
     loop {
         match websocket.read() {
             Ok(msg) => {
                 println!("Reçu : {}", msg);
-                // insert de donnée
-                let mut should_echo = true;
+                
                 if let Message::Text(text) = msg.clone() {
+                    // Essayer d'abord de parser comme un accusé de réception d'event (objet unique)
+                    if let Ok(event_ack) = serde_json::from_str::<EventAck>(&text) {
+                        println!("✅ Accusé de réception reçu pour l'event: {} (id: {})", event_ack.name, event_ack.id);
+                        
+                        // Envoyer une confirmation
+                        let response = AckResponse {
+                            code: 3,
+                            message: format!("Event {} reçu avec succès", event_ack.id),
+                        };
+                        let response_json = serde_json::to_string(&response).unwrap_or_default();
+                        if let Err(e) = websocket.write(Message::Text(response_json.into())) {
+                            eprintln!("⚠️ Erreur envoi accusé: {}", e);
+                        }
+                        let _ = websocket.flush();
+                        continue;
+                    }
+                    
+                    // Sinon, essayer de parser comme un tableau de PointDetail
                     match serde_json::from_str::<Vec<PointDetail>>(&text) {
                         Ok(point_details_vec) => {
                             println!(
                                 "🔄 Désérialisation réussie. Nombre de points reçus : {}",
                                 point_details_vec.len()
                             );
-                            should_echo = false; // Ne pas renvoyer le message original
 
                             println!("🚀 Début de l'insertion en base de données...");
                             match insert_point_details(&app, point_details_vec).await {
@@ -92,38 +213,9 @@ async fn handle_websocket(
                             }
                         }
                         Err(e) => {
-                            eprintln!("Erreur de désérialisation JSON : {}", e);
-                            should_echo = false; // Ne pas renvoyer le message original
-                                                 // Envoyer un message d'erreur de désérialisation
-                            let error_msg = Message::Text(format!("erreur_json: {}", e).into());
-                            match websocket.write(error_msg) {
-                                Ok(_) => {
-                                    println!("📤 Message d'erreur JSON envoyé avec succès !");
-                                    if let Err(e) = websocket.flush() {
-                                        eprintln!(
-                                            "⚠️ Erreur flush WebSocket (erreur JSON) : {}",
-                                            e
-                                        );
-                                    }
-                                }
-                                Err(e) => {
-                                    eprintln!("Erreur envoi message d'erreur JSON : {}", e);
-                                    return Err(format!(
-                                        "Erreur envoi message d'erreur JSON : {}",
-                                        e
-                                    ));
-                                }
-                            }
-                            std::thread::sleep(std::time::Duration::from_millis(100));
+                            // Message non reconnu (ni event, ni points)
+                            println!("⚠️ Message non reconnu, ignoré: {}", e);
                         }
-                    }
-                }
-
-                // Ne renvoyer le message original que si ce n'est pas des données JSON à traiter
-                if should_echo {
-                    if let Err(e) = websocket.write(msg) {
-                        eprintln!("Erreur écriture message : {}", e);
-                        return Err(format!("Erreur d'écriture WebSocket : {}", e));
                     }
                 }
             }
@@ -136,7 +228,9 @@ async fn handle_websocket(
 }
 
 #[tauri::command]
-pub fn start_server(app: AppHandle) -> Result<String, String> {
+pub fn start_server(app: AppHandle, event_ids: Vec<i64>) -> Result<String, String> {
+    println!("🚀 Démarrage du serveur WebSocket pour {} événement(s)", event_ids.len());
+    
     let ip = local_ip().map_err(|e| e.to_string())?;
     let port = random_port();
     let socket = SocketAddr::new(ip, port);
@@ -158,6 +252,7 @@ pub fn start_server(app: AppHandle) -> Result<String, String> {
     let base64_data = general_purpose::STANDARD.encode(&buffer);
 
     let app_for_thread = app.clone();
+    let event_ids_arc = Arc::new(event_ids);
 
     thread::spawn(move || {
         let listener =
@@ -171,11 +266,12 @@ pub fn start_server(app: AppHandle) -> Result<String, String> {
                         Ok(ws) => {
                             println!("Client WebSocket connecté");
                             let app_clone = app_for_thread.clone();
+                            let event_ids_clone = Arc::clone(&event_ids_arc);
                             thread::spawn(move || {
                                 // Create a Tokio runtime to run the async function
                                 let rt = tokio::runtime::Runtime::new().unwrap();
                                 rt.block_on(async {
-                                    if let Err(e) = handle_websocket(&app_clone, ws).await {
+                                    if let Err(e) = handle_websocket(&app_clone, ws, event_ids_clone).await {
                                         eprintln!("Erreur WebSocket: {}", e);
                                     }
                                 });

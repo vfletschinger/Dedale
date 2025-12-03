@@ -4,12 +4,14 @@
 .maplibregl-popup.custom-popup .maplibregl-popup-content {
   width: 350px !important;
   max-width: none !important;
-  padding: 0 !important; /* on gère le padding dans le container React */
-  box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+  padding: 0 !important;
+  /* on gère le padding dans le container React */
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
 }
 
 .maplibregl-popup.custom-popup .maplibregl-popup-tip {
-  display: none; /* optionnel : masque la flèche si inutile */
+  display: none;
+  /* optionnel : masque la flèche si inutile */
 }
 
 /* au cas où le bouton existe encore */
@@ -20,7 +22,8 @@
 /* Styles du contenu PointDetails */
 .maplibregl-popup.custom-popup .point-popup {
   font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
-  color: #0f172a; /* slate-900 */
+  color: #0f172a;
+  /* slate-900 */
   background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
   border-radius: 8px;
   padding: 12px 14px;
@@ -32,27 +35,33 @@
   align-items: center;
   gap: 12px;
 }
+
 .point-popup .pp-title {
   font-weight: 700;
   font-size: 16px;
-  color: #0b63d6; /* app blue */
+  color: #0b63d6;
+  /* app blue */
 }
+
 .point-popup .pp-close {
   background: transparent;
   border: none;
   font-size: 16px;
   cursor: pointer;
-  color: #475569; /* slate-500 */
+  color: #475569;
+  /* slate-500 */
 }
 
 .point-popup .pp-section {
   margin-top: 10px;
 }
+
 .point-popup .pp-section .pp-section-title {
   font-weight: 600;
   margin-bottom: 6px;
   color: #0941a4;
 }
+
 .point-popup .pp-coords {
   font-size: 13px;
   color: #334155;
@@ -62,6 +71,7 @@
   margin: 6px 0 0 0;
   padding-left: 16px;
 }
+
 .point-popup .pp-list li {
   margin-bottom: 8px;
   line-height: 1.25;
@@ -73,6 +83,7 @@
   flex-wrap: wrap;
   margin-top: 6px;
 }
+
 .point-popup .pp-photo {
   width: 100px;
   height: 72px;
@@ -90,7 +101,7 @@
   background: #ffffff;
   border-radius: 8px;
   padding: 8px;
-  box-shadow: 0 2px 8px rgba(15,23,42,0.04);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
 }
 
 .point-popup a.button {
@@ -112,13 +123,16 @@
   align-items: center;
   gap: 8px;
 }
+
 .left-panel .panel-header h3 {
   margin: 0;
   font-size: 16px;
   color: #0b63d6;
 }
+
 .left-panel .add-btn {
-  background: #16a34a; /* green-600 */
+  background: #16a34a;
+  /* green-600 */
   color: #fff;
   border: none;
   padding: 6px 10px;
@@ -126,14 +140,16 @@
   cursor: pointer;
   font-weight: 600;
 }
+
 .left-panel .add-btn:hover {
   filter: brightness(0.95);
 }
+
 .left-panel .list-item {
   padding: 8px;
   border-radius: 8px;
   background: #ffffff;
-  box-shadow: 0 2px 8px rgba(15,23,42,0.04);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
   margin-bottom: 8px;
   display: flex;
   justify-content: space-between;
@@ -141,15 +157,18 @@
   cursor: pointer;
   transition: transform 120ms ease, box-shadow 120ms ease;
 }
+
 .left-panel .list-item:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(2,6,23,0.08);
+  box-shadow: 0 8px 20px rgba(2, 6, 23, 0.08);
 }
+
 .left-panel .list-item .title {
   font-weight: 600;
   font-size: 13px;
   color: #0f172a;
 }
+
 .left-panel .list-item .meta {
   font-size: 12px;
   color: #64748b;
@@ -158,7 +177,8 @@
 /* Generic button styles used across popups/drawer */
 .button {
   display: inline-block;
-  background: #2563eb; /* matches BTN_STYLE in PointDetails */
+  background: #2563eb;
+  /* matches BTN_STYLE in PointDetails */
   color: #fff;
   padding: 8px 12px;
   border-radius: 8px;
@@ -166,6 +186,7 @@
   cursor: pointer;
   font-weight: 600;
 }
+
 .button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -180,6 +201,7 @@
   border-radius: 6px;
   cursor: pointer;
 }
+
 .action-ghost {
   background: transparent;
   color: #0f172a;
@@ -191,7 +213,8 @@
 
 /* Upload box */
 .upload-box {
-  border: 1px dashed #cbd5e1; /* slate-300 */
+  border: 1px dashed #cbd5e1;
+  /* slate-300 */
   border-radius: 8px;
   padding: 10px;
   text-align: center;
@@ -200,15 +223,18 @@
   width: 100%;
   cursor: pointer;
 }
+
 .upload-box input[type="file"] {
   display: none;
 }
+
 .upload-preview {
   display: flex;
   gap: 8px;
   margin-top: 8px;
   flex-wrap: wrap;
 }
+
 .upload-preview img {
   width: 100px;
   height: 72px;
@@ -224,4 +250,34 @@
   font-size: 16px;
   cursor: pointer;
   color: #475569;
+}
+
+/* Teams filter Slider */
+.thumb::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  pointer-events: auto;
+  height: 18px;
+  width: 18px;
+  border-radius: 50%;
+  background-color: #2563eb;
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  margin-top: 0;
+
+  position: relative;
+  z-index: 50;
+}
+
+.thumb::-moz-range-thumb {
+  -webkit-appearance: none;
+  pointer-events: auto;
+  height: 18px;
+  width: 18px;
+  border-radius: 50%;
+  background-color: #2563eb;
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  border: none;
 }
