@@ -4,52 +4,58 @@ use image::Luma;
 use local_ip_address::local_ip;
 use qrcode::QrCode;
 use rand::Rng;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sqlx::Row;
 use std::io::Cursor;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::thread;
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter};
 use tungstenite::accept;
 use tungstenite::Message;
 
-/// Structure pour les données envoyées au mobile
+/// Structure pour un event envoyé au mobile (avec noms camelCase pour compatibilité)
 #[derive(Debug, Serialize)]
-struct TransferData {
-    events: Vec<Event>,
-    points: Vec<TransferPoint>,
+#[serde(rename_all = "camelCase")]
+struct TransferEvent {
+    id: i64,
+    name: String,
+    description: String,
+    date_debut: String,
+    date_fin: String,
+    statut: String,
+    geometry: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
-struct TransferPoint {
+/// Structure pour un accusé de réception d'event du mobile
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct EventAck {
     id: i64,
-    x: f64,
-    y: f64,
-    event_ids: Vec<i64>,
-    obstacles: Vec<TransferObstacle>,
-    comments: Vec<TransferComment>,
-    pictures: Vec<TransferPicture>,
+    name: String,
+    #[serde(default)]
+    description: Option<String>,
+    #[serde(default)]
+    date_debut: Option<String>,
+    #[serde(default)]
+    date_fin: Option<String>,
+    #[serde(default)]
+    statut: Option<String>,
+    #[serde(default)]
+    geometry: Option<String>,
 }
 
+/// Réponse envoyée au mobile
 #[derive(Debug, Serialize)]
-struct TransferObstacle {
-    id: i64,
-    type_id: i64,
-    type_name: String,
-    number: i32,
+struct AckResponse {
+    code: i32,
+    message: String,
 }
 
-#[derive(Debug, Serialize)]
-struct TransferComment {
-    id: i64,
-    content: String,
-}
-
-#[derive(Debug, Serialize)]
-struct TransferPicture {
-    id: i64,
-    data: String, // Base64 encoded
+/// Action demandée par le mobile
+#[derive(Debug, Deserialize)]
+struct ClientAction {
+    action: String,
 }
 
 fn random_port() -> u16 {
@@ -57,8 +63,8 @@ fn random_port() -> u16 {
     rng.random_range(1025..65535)
 }
 
-/// Récupère les events et les points associés pour le transfert
-async fn fetch_transfer_data(app: &AppHandle, event_ids: &[i64]) -> Result<TransferData, String> {
+/// Récupère les events sélectionnés pour le transfert
+async fn fetch_events_for_transfer(app: &AppHandle, event_ids: &[i64]) -> Result<Vec<TransferEvent>, String> {
     let pool = get_db_pool(app).await?;
 
     // Récupérer les events sélectionnés
@@ -83,9 +89,9 @@ async fn fetch_transfer_data(app: &AppHandle, event_ids: &[i64]) -> Result<Trans
         .await
         .map_err(|e| format!("Erreur récupération events: {}", e))?;
 
-    let events: Vec<Event> = event_rows
+    let events: Vec<TransferEvent> = event_rows
         .iter()
-        .map(|row| Event {
+        .map(|row| TransferEvent {
             id: row.get("id"),
             name: row.get("name"),
             description: row.get("description"),
@@ -96,115 +102,9 @@ async fn fetch_transfer_data(app: &AppHandle, event_ids: &[i64]) -> Result<Trans
         })
         .collect();
 
-    println!("📋 {} event(s) récupéré(s)", events.len());
+    println!("📋 {} event(s) récupéré(s) pour le transfert", events.len());
 
-    // Récupérer les points liés aux events sélectionnés
-    let points_query = format!(
-        r#"
-        SELECT DISTINCT p.id, p.x, p.y
-        FROM point p
-        INNER JOIN point_event pe ON p.id = pe.point_id
-        WHERE pe.event_id IN ({})
-        ORDER BY p.id
-        "#,
-        event_ids_placeholder
-    );
-
-    let mut query = sqlx::query(&points_query);
-    for id in event_ids {
-        query = query.bind(id);
-    }
-
-    let point_rows = query
-        .fetch_all(&pool)
-        .await
-        .map_err(|e| format!("Erreur récupération points: {}", e))?;
-
-    let mut points: Vec<TransferPoint> = Vec::new();
-
-    for row in point_rows {
-        let point_id: i64 = row.get("id");
-
-        // Récupérer les event_ids pour ce point
-        let event_ids_rows = sqlx::query("SELECT event_id FROM point_event WHERE point_id = ?")
-            .bind(point_id)
-            .fetch_all(&pool)
-            .await
-            .map_err(|e| format!("Erreur récupération event_ids: {}", e))?;
-
-        let point_event_ids: Vec<i64> = event_ids_rows.iter().map(|r| r.get("event_id")).collect();
-
-        // Récupérer les obstacles
-        let obstacle_rows = sqlx::query(
-            r#"
-            SELECT po.id, po.type_id, ot.name as type_name, po.number
-            FROM point_obstacle po
-            JOIN obstacle_type ot ON po.type_id = ot.id
-            WHERE po.point_id = ?
-            "#,
-        )
-        .bind(point_id)
-        .fetch_all(&pool)
-        .await
-        .map_err(|e| format!("Erreur récupération obstacles: {}", e))?;
-
-        let obstacles: Vec<TransferObstacle> = obstacle_rows
-            .iter()
-            .map(|r| TransferObstacle {
-                id: r.get("id"),
-                type_id: r.get("type_id"),
-                type_name: r.get("type_name"),
-                number: r.get("number"),
-            })
-            .collect();
-
-        // Récupérer les commentaires
-        let comment_rows = sqlx::query("SELECT id, content FROM comment WHERE point_id = ?")
-            .bind(point_id)
-            .fetch_all(&pool)
-            .await
-            .map_err(|e| format!("Erreur récupération commentaires: {}", e))?;
-
-        let comments: Vec<TransferComment> = comment_rows
-            .iter()
-            .map(|r| TransferComment {
-                id: r.get("id"),
-                content: r.get("content"),
-            })
-            .collect();
-
-        // Récupérer les images (en base64)
-        let picture_rows = sqlx::query("SELECT id, data FROM picture WHERE point_id = ?")
-            .bind(point_id)
-            .fetch_all(&pool)
-            .await
-            .map_err(|e| format!("Erreur récupération pictures: {}", e))?;
-
-        let pictures: Vec<TransferPicture> = picture_rows
-            .iter()
-            .map(|r| {
-                let data: Vec<u8> = r.get("data");
-                TransferPicture {
-                    id: r.get("id"),
-                    data: general_purpose::STANDARD.encode(&data),
-                }
-            })
-            .collect();
-
-        points.push(TransferPoint {
-            id: point_id,
-            x: row.get("x"),
-            y: row.get("y"),
-            event_ids: point_event_ids,
-            obstacles,
-            comments,
-            pictures,
-        });
-    }
-
-    println!("📍 {} point(s) récupéré(s)", points.len());
-
-    Ok(TransferData { events, points })
+    Ok(events)
 }
 
 async fn handle_websocket(
@@ -212,40 +112,103 @@ async fn handle_websocket(
     mut websocket: tungstenite::WebSocket<std::net::TcpStream>,
     event_ids: Arc<Vec<i64>>,
 ) -> Result<(), String> {
-    // Envoyer les données dès la connexion
-    println!("📤 Envoi des données au client mobile...");
+    println!("📱 Client mobile connecté, en attente d'actions...");
     
-    let transfer_data = fetch_transfer_data(app, &event_ids).await?;
-    let json_data = serde_json::to_string(&transfer_data)
-        .map_err(|e| format!("Erreur sérialisation JSON: {}", e))?;
-
-    println!("📦 Taille des données: {} octets", json_data.len());
-
+    // Émettre un événement Tauri pour notifier le frontend
+    app.emit("mobile-connected", ()).unwrap_or_else(|e| {
+        eprintln!("⚠️ Erreur émission événement mobile-connected: {}", e);
+    });
+    
+    // Envoyer un message de bienvenue avec le nombre d'events disponibles
+    let welcome = serde_json::json!({
+        "type": "connected",
+        "eventCount": event_ids.len(),
+        "message": format!("{} événement(s) disponible(s)", event_ids.len())
+    });
     websocket
-        .write(Message::Text(json_data.into()))
-        .map_err(|e| format!("Erreur envoi données: {}", e))?;
+        .write(Message::Text(welcome.to_string().into()))
+        .map_err(|e| format!("Erreur envoi welcome: {}", e))?;
+    websocket.flush().map_err(|e| format!("Erreur flush: {}", e))?;
 
-    websocket
-        .flush()
-        .map_err(|e| format!("Erreur flush: {}", e))?;
-
-    println!("✅ Données envoyées avec succès !");
-
-    // Continuer à écouter les messages du client
+    // Boucle principale - attendre les actions du client
     loop {
         match websocket.read() {
             Ok(msg) => {
                 println!("Reçu : {}", msg);
-                // insert de donnée
-                let mut should_echo = true;
+                
                 if let Message::Text(text) = msg.clone() {
+                    // Essayer de parser comme une action du client
+                    if let Ok(client_action) = serde_json::from_str::<ClientAction>(&text) {
+                        match client_action.action.as_str() {
+                            "get_events" => {
+                                // Le mobile demande les events
+                                println!("📤 Le mobile demande les événements...");
+                                
+                                let events = fetch_events_for_transfer(app, &event_ids).await?;
+                                let response = serde_json::json!({
+                                    "type": "events",
+                                    "data": events
+                                });
+                                let json_data = serde_json::to_string(&response)
+                                    .map_err(|e| format!("Erreur sérialisation JSON: {}", e))?;
+
+                                println!("📦 Envoi de {} event(s)", events.len());
+
+                                websocket
+                                    .write(Message::Text(json_data.into()))
+                                    .map_err(|e| format!("Erreur envoi données: {}", e))?;
+                                websocket.flush().map_err(|e| format!("Erreur flush: {}", e))?;
+
+                                println!("✅ Événements envoyés avec succès !");
+                                continue;
+                            }
+                            "terminate" => {
+                                // Le mobile demande la fermeture
+                                println!("🔚 Le mobile demande la fermeture de la connexion");
+                                
+                                let response = serde_json::json!({
+                                    "type": "goodbye",
+                                    "message": "Connexion terminée"
+                                });
+                                let _ = websocket.write(Message::Text(response.to_string().into()));
+                                let _ = websocket.flush();
+                                
+                                // Fermer proprement
+                                let _ = websocket.close(None);
+                                println!("👋 Connexion fermée proprement");
+                                return Ok(());
+                            }
+                            _ => {
+                                println!("⚠️ Action inconnue: {}", client_action.action);
+                            }
+                        }
+                        continue;
+                    }
+                    
+                    // Essayer de parser comme un accusé de réception d'event (objet unique)
+                    if let Ok(event_ack) = serde_json::from_str::<EventAck>(&text) {
+                        println!("✅ Accusé de réception reçu pour l'event: {} (id: {})", event_ack.name, event_ack.id);
+                        
+                        // Envoyer une confirmation
+                        let response = AckResponse {
+                            code: 3,
+                            message: format!("Event {} reçu avec succès", event_ack.id),
+                        };
+                        let response_json = serde_json::to_string(&response).unwrap_or_default();
+                        if let Err(e) = websocket.write(Message::Text(response_json.into())) {
+                            eprintln!("⚠️ Erreur envoi accusé: {}", e);
+                        }
+                        let _ = websocket.flush();
+                        continue;
+                    }
+                    
+                    // Sinon, essayer de parser comme un tableau de PointDetail
                     match serde_json::from_str::<Vec<PointDetail>>(&text) {
                         Ok(point_details_vec) => {
                             println!(
                                 "🔄 Désérialisation réussie. Nombre de points reçus : {}",
                                 point_details_vec.len()
                             );
-                            should_echo = false; // Ne pas renvoyer le message original
 
                             println!("🚀 Début de l'insertion en base de données...");
                             match insert_point_details(&app, point_details_vec).await {
@@ -303,38 +266,9 @@ async fn handle_websocket(
                             }
                         }
                         Err(e) => {
-                            eprintln!("Erreur de désérialisation JSON : {}", e);
-                            should_echo = false; // Ne pas renvoyer le message original
-                                                 // Envoyer un message d'erreur de désérialisation
-                            let error_msg = Message::Text(format!("erreur_json: {}", e).into());
-                            match websocket.write(error_msg) {
-                                Ok(_) => {
-                                    println!("📤 Message d'erreur JSON envoyé avec succès !");
-                                    if let Err(e) = websocket.flush() {
-                                        eprintln!(
-                                            "⚠️ Erreur flush WebSocket (erreur JSON) : {}",
-                                            e
-                                        );
-                                    }
-                                }
-                                Err(e) => {
-                                    eprintln!("Erreur envoi message d'erreur JSON : {}", e);
-                                    return Err(format!(
-                                        "Erreur envoi message d'erreur JSON : {}",
-                                        e
-                                    ));
-                                }
-                            }
-                            std::thread::sleep(std::time::Duration::from_millis(100));
+                            // Message non reconnu (ni event, ni points)
+                            println!("⚠️ Message non reconnu, ignoré: {}", e);
                         }
-                    }
-                }
-
-                // Ne renvoyer le message original que si ce n'est pas des données JSON à traiter
-                if should_echo {
-                    if let Err(e) = websocket.write(msg) {
-                        eprintln!("Erreur écriture message : {}", e);
-                        return Err(format!("Erreur d'écriture WebSocket : {}", e));
                     }
                 }
             }
