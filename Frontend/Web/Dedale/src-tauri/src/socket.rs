@@ -10,7 +10,7 @@ use std::io::Cursor;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::thread;
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter};
 use tungstenite::accept;
 use tungstenite::Message;
 
@@ -50,6 +50,12 @@ struct EventAck {
 struct AckResponse {
     code: i32,
     message: String,
+}
+
+/// Action demandée par le mobile
+#[derive(Debug, Deserialize)]
+struct ClientAction {
+    action: String,
 }
 
 fn random_port() -> u16 {
@@ -106,33 +112,80 @@ async fn handle_websocket(
     mut websocket: tungstenite::WebSocket<std::net::TcpStream>,
     event_ids: Arc<Vec<i64>>,
 ) -> Result<(), String> {
-    // Envoyer les events dès la connexion
-    println!("📤 Envoi des événements au client mobile...");
+    println!("📱 Client mobile connecté, en attente d'actions...");
     
-    let events = fetch_events_for_transfer(app, &event_ids).await?;
-    let json_data = serde_json::to_string(&events)
-        .map_err(|e| format!("Erreur sérialisation JSON: {}", e))?;
-
-    println!("📦 Taille des données: {} octets ({} event(s))", json_data.len(), events.len());
-
+    // Émettre un événement Tauri pour notifier le frontend
+    app.emit("mobile-connected", ()).unwrap_or_else(|e| {
+        eprintln!("⚠️ Erreur émission événement mobile-connected: {}", e);
+    });
+    
+    // Envoyer un message de bienvenue avec le nombre d'events disponibles
+    let welcome = serde_json::json!({
+        "type": "connected",
+        "eventCount": event_ids.len(),
+        "message": format!("{} événement(s) disponible(s)", event_ids.len())
+    });
     websocket
-        .write(Message::Text(json_data.into()))
-        .map_err(|e| format!("Erreur envoi données: {}", e))?;
+        .write(Message::Text(welcome.to_string().into()))
+        .map_err(|e| format!("Erreur envoi welcome: {}", e))?;
+    websocket.flush().map_err(|e| format!("Erreur flush: {}", e))?;
 
-    websocket
-        .flush()
-        .map_err(|e| format!("Erreur flush: {}", e))?;
-
-    println!("✅ Événements envoyés avec succès !");
-
-    // Continuer à écouter les messages du client
+    // Boucle principale - attendre les actions du client
     loop {
         match websocket.read() {
             Ok(msg) => {
                 println!("Reçu : {}", msg);
                 
                 if let Message::Text(text) = msg.clone() {
-                    // Essayer d'abord de parser comme un accusé de réception d'event (objet unique)
+                    // Essayer de parser comme une action du client
+                    if let Ok(client_action) = serde_json::from_str::<ClientAction>(&text) {
+                        match client_action.action.as_str() {
+                            "get_events" => {
+                                // Le mobile demande les events
+                                println!("📤 Le mobile demande les événements...");
+                                
+                                let events = fetch_events_for_transfer(app, &event_ids).await?;
+                                let response = serde_json::json!({
+                                    "type": "events",
+                                    "data": events
+                                });
+                                let json_data = serde_json::to_string(&response)
+                                    .map_err(|e| format!("Erreur sérialisation JSON: {}", e))?;
+
+                                println!("📦 Envoi de {} event(s)", events.len());
+
+                                websocket
+                                    .write(Message::Text(json_data.into()))
+                                    .map_err(|e| format!("Erreur envoi données: {}", e))?;
+                                websocket.flush().map_err(|e| format!("Erreur flush: {}", e))?;
+
+                                println!("✅ Événements envoyés avec succès !");
+                                continue;
+                            }
+                            "terminate" => {
+                                // Le mobile demande la fermeture
+                                println!("🔚 Le mobile demande la fermeture de la connexion");
+                                
+                                let response = serde_json::json!({
+                                    "type": "goodbye",
+                                    "message": "Connexion terminée"
+                                });
+                                let _ = websocket.write(Message::Text(response.to_string().into()));
+                                let _ = websocket.flush();
+                                
+                                // Fermer proprement
+                                let _ = websocket.close(None);
+                                println!("👋 Connexion fermée proprement");
+                                return Ok(());
+                            }
+                            _ => {
+                                println!("⚠️ Action inconnue: {}", client_action.action);
+                            }
+                        }
+                        continue;
+                    }
+                    
+                    // Essayer de parser comme un accusé de réception d'event (objet unique)
                     if let Ok(event_ack) = serde_json::from_str::<EventAck>(&text) {
                         println!("✅ Accusé de réception reçu pour l'event: {} (id: {})", event_ack.name, event_ack.id);
                         
