@@ -14,42 +14,17 @@ use tauri::AppHandle;
 use tungstenite::accept;
 use tungstenite::Message;
 
-/// Structure pour les données envoyées au mobile
+/// Structure pour un event envoyé au mobile (avec noms camelCase pour compatibilité)
 #[derive(Debug, Serialize)]
-struct TransferData {
-    events: Vec<Event>,
-    points: Vec<TransferPoint>,
-}
-
-#[derive(Debug, Serialize)]
-struct TransferPoint {
+#[serde(rename_all = "camelCase")]
+struct TransferEvent {
     id: i64,
-    x: f64,
-    y: f64,
-    event_ids: Vec<i64>,
-    obstacles: Vec<TransferObstacle>,
-    comments: Vec<TransferComment>,
-    pictures: Vec<TransferPicture>,
-}
-
-#[derive(Debug, Serialize)]
-struct TransferObstacle {
-    id: i64,
-    type_id: i64,
-    type_name: String,
-    number: i32,
-}
-
-#[derive(Debug, Serialize)]
-struct TransferComment {
-    id: i64,
-    content: String,
-}
-
-#[derive(Debug, Serialize)]
-struct TransferPicture {
-    id: i64,
-    data: String, // Base64 encoded
+    name: String,
+    description: String,
+    date_debut: String,
+    date_fin: String,
+    statut: String,
+    geometry: Option<String>,
 }
 
 fn random_port() -> u16 {
@@ -57,8 +32,8 @@ fn random_port() -> u16 {
     rng.random_range(1025..65535)
 }
 
-/// Récupère les events et les points associés pour le transfert
-async fn fetch_transfer_data(app: &AppHandle, event_ids: &[i64]) -> Result<TransferData, String> {
+/// Récupère les events sélectionnés pour le transfert
+async fn fetch_events_for_transfer(app: &AppHandle, event_ids: &[i64]) -> Result<Vec<TransferEvent>, String> {
     let pool = get_db_pool(app).await?;
 
     // Récupérer les events sélectionnés
@@ -83,9 +58,9 @@ async fn fetch_transfer_data(app: &AppHandle, event_ids: &[i64]) -> Result<Trans
         .await
         .map_err(|e| format!("Erreur récupération events: {}", e))?;
 
-    let events: Vec<Event> = event_rows
+    let events: Vec<TransferEvent> = event_rows
         .iter()
-        .map(|row| Event {
+        .map(|row| TransferEvent {
             id: row.get("id"),
             name: row.get("name"),
             description: row.get("description"),
@@ -96,115 +71,9 @@ async fn fetch_transfer_data(app: &AppHandle, event_ids: &[i64]) -> Result<Trans
         })
         .collect();
 
-    println!("📋 {} event(s) récupéré(s)", events.len());
+    println!("📋 {} event(s) récupéré(s) pour le transfert", events.len());
 
-    // Récupérer les points liés aux events sélectionnés
-    let points_query = format!(
-        r#"
-        SELECT DISTINCT p.id, p.x, p.y
-        FROM point p
-        INNER JOIN point_event pe ON p.id = pe.point_id
-        WHERE pe.event_id IN ({})
-        ORDER BY p.id
-        "#,
-        event_ids_placeholder
-    );
-
-    let mut query = sqlx::query(&points_query);
-    for id in event_ids {
-        query = query.bind(id);
-    }
-
-    let point_rows = query
-        .fetch_all(&pool)
-        .await
-        .map_err(|e| format!("Erreur récupération points: {}", e))?;
-
-    let mut points: Vec<TransferPoint> = Vec::new();
-
-    for row in point_rows {
-        let point_id: i64 = row.get("id");
-
-        // Récupérer les event_ids pour ce point
-        let event_ids_rows = sqlx::query("SELECT event_id FROM point_event WHERE point_id = ?")
-            .bind(point_id)
-            .fetch_all(&pool)
-            .await
-            .map_err(|e| format!("Erreur récupération event_ids: {}", e))?;
-
-        let point_event_ids: Vec<i64> = event_ids_rows.iter().map(|r| r.get("event_id")).collect();
-
-        // Récupérer les obstacles
-        let obstacle_rows = sqlx::query(
-            r#"
-            SELECT po.id, po.type_id, ot.name as type_name, po.number
-            FROM point_obstacle po
-            JOIN obstacle_type ot ON po.type_id = ot.id
-            WHERE po.point_id = ?
-            "#,
-        )
-        .bind(point_id)
-        .fetch_all(&pool)
-        .await
-        .map_err(|e| format!("Erreur récupération obstacles: {}", e))?;
-
-        let obstacles: Vec<TransferObstacle> = obstacle_rows
-            .iter()
-            .map(|r| TransferObstacle {
-                id: r.get("id"),
-                type_id: r.get("type_id"),
-                type_name: r.get("type_name"),
-                number: r.get("number"),
-            })
-            .collect();
-
-        // Récupérer les commentaires
-        let comment_rows = sqlx::query("SELECT id, content FROM comment WHERE point_id = ?")
-            .bind(point_id)
-            .fetch_all(&pool)
-            .await
-            .map_err(|e| format!("Erreur récupération commentaires: {}", e))?;
-
-        let comments: Vec<TransferComment> = comment_rows
-            .iter()
-            .map(|r| TransferComment {
-                id: r.get("id"),
-                content: r.get("content"),
-            })
-            .collect();
-
-        // Récupérer les images (en base64)
-        let picture_rows = sqlx::query("SELECT id, data FROM picture WHERE point_id = ?")
-            .bind(point_id)
-            .fetch_all(&pool)
-            .await
-            .map_err(|e| format!("Erreur récupération pictures: {}", e))?;
-
-        let pictures: Vec<TransferPicture> = picture_rows
-            .iter()
-            .map(|r| {
-                let data: Vec<u8> = r.get("data");
-                TransferPicture {
-                    id: r.get("id"),
-                    data: general_purpose::STANDARD.encode(&data),
-                }
-            })
-            .collect();
-
-        points.push(TransferPoint {
-            id: point_id,
-            x: row.get("x"),
-            y: row.get("y"),
-            event_ids: point_event_ids,
-            obstacles,
-            comments,
-            pictures,
-        });
-    }
-
-    println!("📍 {} point(s) récupéré(s)", points.len());
-
-    Ok(TransferData { events, points })
+    Ok(events)
 }
 
 async fn handle_websocket(
@@ -212,14 +81,14 @@ async fn handle_websocket(
     mut websocket: tungstenite::WebSocket<std::net::TcpStream>,
     event_ids: Arc<Vec<i64>>,
 ) -> Result<(), String> {
-    // Envoyer les données dès la connexion
-    println!("📤 Envoi des données au client mobile...");
+    // Envoyer les events dès la connexion
+    println!("📤 Envoi des événements au client mobile...");
     
-    let transfer_data = fetch_transfer_data(app, &event_ids).await?;
-    let json_data = serde_json::to_string(&transfer_data)
+    let events = fetch_events_for_transfer(app, &event_ids).await?;
+    let json_data = serde_json::to_string(&events)
         .map_err(|e| format!("Erreur sérialisation JSON: {}", e))?;
 
-    println!("📦 Taille des données: {} octets", json_data.len());
+    println!("📦 Taille des données: {} octets ({} event(s))", json_data.len(), events.len());
 
     websocket
         .write(Message::Text(json_data.into()))
@@ -229,7 +98,7 @@ async fn handle_websocket(
         .flush()
         .map_err(|e| format!("Erreur flush: {}", e))?;
 
-    println!("✅ Données envoyées avec succès !");
+    println!("✅ Événements envoyés avec succès !");
 
     // Continuer à écouter les messages du client
     loop {

@@ -1,4 +1,4 @@
-import { EventWithGeometries, PointDetailType } from "../types/database";
+import { EventType, PointDetailType } from "../types/database";
 
 export interface WebSocketResponse {
   code: 1 | 2 | 3;
@@ -17,7 +17,7 @@ class WebSocketClient {
   private onErrorCallback?: (error: string) => void;
   private onLoadingChangeCallback?: (isLoading: boolean) => void;
   private finishedSuccessfully: boolean = false;
-  private onMessageCallback?: (events: EventWithGeometries[]) => void;
+  private onMessageCallback?: (events: EventType[]) => void;
   private onResponseCallback?: (response: WebSocketResponse) => void;
 
   constructor(uri: string) {
@@ -52,7 +52,7 @@ class WebSocketClient {
    * Tente d'établir la connexion WebSocket.
    */
   public connect(
-    onMessage?: (events: EventWithGeometries[]) => void
+    onMessage?: (events: EventType[]) => void
   ): Promise<boolean> {
     this.onMessageCallback = onMessage;
 
@@ -110,10 +110,10 @@ class WebSocketClient {
             if (this.onResponseCallback) {
               this.onResponseCallback(response);
             }
-          } else {
+          } else if (Array.isArray(data)) {
             // It's events data (from desktop initial sync)
-            const events: EventWithGeometries[] = data;
-            console.log("📦 Événements reçus:", events);
+            const events: EventType[] = data;
+            console.log("📦 Événements reçus:", events.length);
             if (this.onMessageCallback) {
               this.onMessageCallback(events);
             }

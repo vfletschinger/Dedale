@@ -18,7 +18,7 @@ const { width } = Dimensions.get("window");
 const SCANNER_SIZE = width * 0.7;
 import { getDatabase } from "../../assets/migrations";
 import { useWebSocket } from "../context/WebSocketContext";
-import { EventType, EventWithGeometries } from "../types/database";
+import { EventType } from "../types/database";
 
 const QRCodeScanner = ({
   setScanQR,
@@ -49,11 +49,10 @@ const QRCodeScanner = ({
     );
   }
 
-  const insertEvents = (events: EventWithGeometries[]) => {
+  const insertEvents = (events: EventType[]) => {
     try {
       let insertedCount = 0;
       let updatedCount = 0;
-      let geometriesCount = 0;
 
       for (const event of events) {
         const existing = db.getFirstSync<EventType>(
@@ -90,25 +89,13 @@ const QRCodeScanner = ({
           );
           insertedCount++;
         }
-
-        if (event.geometries && event.geometries.length > 0) {
-          db.runSync("DELETE FROM geometry WHERE event_id = ?", [event.id]);
-
-          for (const geom of event.geometries) {
-            db.runSync("INSERT INTO geometry (event_id, wkt) VALUES (?, ?)", [
-              event.id,
-              geom.wkt,
-            ]);
-            geometriesCount++;
-          }
-        }
       }
 
       console.log(
-        `✅ ${insertedCount} événement(s) inséré(s), ${updatedCount} mis à jour, ${geometriesCount} géométrie(s) synchronisée(s)`
+        `✅ ${insertedCount} événement(s) inséré(s), ${updatedCount} mis à jour`
       );
       setTransferStatus(
-        `${insertedCount} événement(s) ajouté(s), ${updatedCount} mis à jour, ${geometriesCount} géométrie(s)`
+        `${insertedCount} événement(s) ajouté(s), ${updatedCount} mis à jour`
       );
     } catch (error) {
       console.error("❌ Erreur lors de l'insertion des événements:", error);
@@ -128,7 +115,7 @@ const QRCodeScanner = ({
       const client = new WebSocketClient(websocketUri);
 
       client
-        .connect((events: EventWithGeometries[]) => {
+        .connect((events: EventType[]) => {
           setTransferStatus("Réception des événements...");
           try {
             insertEvents(events);
