@@ -4,7 +4,7 @@ use image::Luma;
 use local_ip_address::local_ip;
 use qrcode::QrCode;
 use rand::Rng;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sqlx::Row;
 use std::io::Cursor;
 use std::net::SocketAddr;
@@ -25,6 +25,31 @@ struct TransferEvent {
     date_fin: String,
     statut: String,
     geometry: Option<String>,
+}
+
+/// Structure pour un accusé de réception d'event du mobile
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct EventAck {
+    id: i64,
+    name: String,
+    #[serde(default)]
+    description: Option<String>,
+    #[serde(default)]
+    date_debut: Option<String>,
+    #[serde(default)]
+    date_fin: Option<String>,
+    #[serde(default)]
+    statut: Option<String>,
+    #[serde(default)]
+    geometry: Option<String>,
+}
+
+/// Réponse envoyée au mobile
+#[derive(Debug, Serialize)]
+struct AckResponse {
+    code: i32,
+    message: String,
 }
 
 fn random_port() -> u16 {
@@ -105,16 +130,32 @@ async fn handle_websocket(
         match websocket.read() {
             Ok(msg) => {
                 println!("Reçu : {}", msg);
-                // insert de donnée
-                let mut should_echo = true;
+                
                 if let Message::Text(text) = msg.clone() {
+                    // Essayer d'abord de parser comme un accusé de réception d'event (objet unique)
+                    if let Ok(event_ack) = serde_json::from_str::<EventAck>(&text) {
+                        println!("✅ Accusé de réception reçu pour l'event: {} (id: {})", event_ack.name, event_ack.id);
+                        
+                        // Envoyer une confirmation
+                        let response = AckResponse {
+                            code: 3,
+                            message: format!("Event {} reçu avec succès", event_ack.id),
+                        };
+                        let response_json = serde_json::to_string(&response).unwrap_or_default();
+                        if let Err(e) = websocket.write(Message::Text(response_json.into())) {
+                            eprintln!("⚠️ Erreur envoi accusé: {}", e);
+                        }
+                        let _ = websocket.flush();
+                        continue;
+                    }
+                    
+                    // Sinon, essayer de parser comme un tableau de PointDetail
                     match serde_json::from_str::<Vec<PointDetail>>(&text) {
                         Ok(point_details_vec) => {
                             println!(
                                 "🔄 Désérialisation réussie. Nombre de points reçus : {}",
                                 point_details_vec.len()
                             );
-                            should_echo = false; // Ne pas renvoyer le message original
 
                             println!("🚀 Début de l'insertion en base de données...");
                             match insert_point_details(&app, point_details_vec).await {
@@ -172,38 +213,9 @@ async fn handle_websocket(
                             }
                         }
                         Err(e) => {
-                            eprintln!("Erreur de désérialisation JSON : {}", e);
-                            should_echo = false; // Ne pas renvoyer le message original
-                                                 // Envoyer un message d'erreur de désérialisation
-                            let error_msg = Message::Text(format!("erreur_json: {}", e).into());
-                            match websocket.write(error_msg) {
-                                Ok(_) => {
-                                    println!("📤 Message d'erreur JSON envoyé avec succès !");
-                                    if let Err(e) = websocket.flush() {
-                                        eprintln!(
-                                            "⚠️ Erreur flush WebSocket (erreur JSON) : {}",
-                                            e
-                                        );
-                                    }
-                                }
-                                Err(e) => {
-                                    eprintln!("Erreur envoi message d'erreur JSON : {}", e);
-                                    return Err(format!(
-                                        "Erreur envoi message d'erreur JSON : {}",
-                                        e
-                                    ));
-                                }
-                            }
-                            std::thread::sleep(std::time::Duration::from_millis(100));
+                            // Message non reconnu (ni event, ni points)
+                            println!("⚠️ Message non reconnu, ignoré: {}", e);
                         }
-                    }
-                }
-
-                // Ne renvoyer le message original que si ce n'est pas des données JSON à traiter
-                if should_echo {
-                    if let Err(e) = websocket.write(msg) {
-                        eprintln!("Erreur écriture message : {}", e);
-                        return Err(format!("Erreur d'écriture WebSocket : {}", e));
                     }
                 }
             }
