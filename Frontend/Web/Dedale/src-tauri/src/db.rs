@@ -24,6 +24,10 @@ pub struct Point {
     pub x: f64,
     pub y: f64,
     #[serde(default)]
+    pub pose: Option<String>,
+    #[serde(default)]
+    pub depose: Option<String>,
+    #[serde(default)]
     pub event_ids: Vec<i64>,
     pub obstacles: Vec<Obstacle>,
     pub comments: Vec<Comment>,
@@ -59,6 +63,10 @@ pub struct PointSimple {
     pub id: i32,
     pub x: f64, // Coordonnée X (ou latitude)
     pub y: f64, // Coordonnée Y (ou longitude)
+    #[serde(default)]
+    pub pose: Option<String>,
+    #[serde(default)]
+    pub depose: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -181,12 +189,22 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
         "CREATE TABLE IF NOT EXISTS point (
             id INTEGER PRIMARY KEY,
             x REAL,
-            y REAL
+            y REAL,
+            pose TEXT,
+            depose TEXT
         )",
     )
     .execute(&pool)
     .await
     .map_err(|e| format!("Failed to create point table: {}", e))?;
+
+    // Migration: ajouter les colonnes pose et depose si elles n'existent pas
+    let _ = sqlx::query("ALTER TABLE point ADD COLUMN pose TEXT")
+        .execute(&pool)
+        .await;
+    let _ = sqlx::query("ALTER TABLE point ADD COLUMN depose TEXT")
+        .execute(&pool)
+        .await;
 
     sqlx::query(
         "CREATE TABLE IF NOT EXISTS obstacle_type (
@@ -518,7 +536,7 @@ pub async fn retrieve_data_by_event(
         println!("[DB] 🔍 Récupération des points pour l'event_id: {}", eid);
         sqlx::query(
             r#"
-            SELECT DISTINCT p.id, p.x, p.y
+            SELECT DISTINCT p.id, p.x, p.y, p.pose, p.depose
             FROM point p
             INNER JOIN point_event pe ON p.id = pe.point_id
             WHERE pe.event_id = ?
@@ -533,7 +551,7 @@ pub async fn retrieve_data_by_event(
         println!("[DB] 🔍 Récupération de tous les points");
         sqlx::query(
             r#"
-            SELECT p.id, p.x, p.y
+            SELECT p.id, p.x, p.y, p.pose, p.depose
             FROM point p
             ORDER BY p.id
         "#,
@@ -557,6 +575,8 @@ pub async fn retrieve_data_by_event(
             id: id,
             x: row.get("x"),
             y: row.get("y"),
+            pose: row.get("pose"),
+            depose: row.get("depose"),
             event_ids,
             obstacles,
             comments,
@@ -585,9 +605,11 @@ pub async fn insert_point_details(
     for detail in &details {
         if detail.point.id == 0 {
             // Insert without specifying id so SQLite assigns a rowid
-            sqlx::query(r#"INSERT INTO point (x, y) VALUES (?, ?)"#)
+            sqlx::query(r#"INSERT INTO point (x, y, pose, depose) VALUES (?, ?, ?, ?)"#)
                 .bind(detail.point.x)
                 .bind(detail.point.y)
+                .bind(&detail.point.pose)
+                .bind(&detail.point.depose)
                 .execute(&mut *tx)
                 .await
                 .map_err(|e| format!("Erreur INSERT point (auto-id) : {}", e))?;
@@ -601,10 +623,12 @@ pub async fn insert_point_details(
             assigned_ids.push(new_id);
         } else {
             // Respect provided id
-            sqlx::query(r#"INSERT OR REPLACE INTO point (id, x, y) VALUES (?, ?, ?)"#)
+            sqlx::query(r#"INSERT OR REPLACE INTO point (id, x, y, pose, depose) VALUES (?, ?, ?, ?, ?)"#)
                 .bind(detail.point.id)
                 .bind(detail.point.x)
                 .bind(detail.point.y)
+                .bind(&detail.point.pose)
+                .bind(&detail.point.depose)
                 .execute(&mut *tx)
                 .await
                 .map_err(|e| {
@@ -761,6 +785,27 @@ pub async fn insert_point(
         Err(e) => println!("[DB] ❌ Erreur insertion: {}", e),
     }
     result
+}
+
+#[tauri::command]
+pub async fn update_point_dates(
+    app: AppHandle,
+    point_id: i64,
+    pose: Option<String>,
+    depose: Option<String>,
+) -> Result<(), String> {
+    let pool = get_db_pool(&app).await?;
+    
+    sqlx::query("UPDATE point SET pose = ?, depose = ? WHERE id = ?")
+        .bind(&pose)
+        .bind(&depose)
+        .bind(point_id)
+        .execute(&pool)
+        .await
+        .map_err(|e| format!("Failed to update point dates: {}", e))?;
+    
+    println!("[DB] ✅ Dates du point {} mises à jour: pose={:?}, depose={:?}", point_id, pose, depose);
+    Ok(())
 }
 
 #[tauri::command]
@@ -1447,7 +1492,9 @@ pub async fn ensure_schema(pool: &SqlitePool) -> Result<(), String> {
         r#"CREATE TABLE IF NOT EXISTS point (
             id INTEGER PRIMARY KEY,
             x REAL,
-            y REAL
+            y REAL,
+            pose TEXT,
+            depose TEXT
         );"#,
         r#"CREATE TABLE IF NOT EXISTS obstacle_type (
             id INTEGER PRIMARY KEY,
