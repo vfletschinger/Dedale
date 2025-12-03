@@ -1,12 +1,18 @@
 import React, { createContext, useContext, useState, ReactNode } from "react";
-import WebSocketClient, { WebSocketResponse } from "../components/WebSocketClient";
+import WebSocketClient, {
+  WebSocketResponse,
+} from "../components/WebSocketClient";
 
 interface WebSocketContextType {
   wsClient: WebSocketClient | null;
   isConnected: boolean;
   setWsClient: (client: WebSocketClient | null) => void;
   setIsConnected: (connected: boolean) => void;
-  sendEvent: (event: any, onResponse: (response: WebSocketResponse) => void) => void;
+  sendEvent: (
+    event: any,
+    onResponse: (response: WebSocketResponse) => void,
+    onError?: (error: string) => void
+  ) => boolean;
 }
 
 const WebSocketContext = createContext<WebSocketContextType | undefined>(
@@ -17,10 +23,28 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   const [wsClient, setWsClient] = useState<WebSocketClient | null>(null);
   const [isConnected, setIsConnected] = useState(false);
 
-  const sendEvent = (event: any, onResponse: (response: WebSocketResponse) => void) => {
-    if (wsClient && isConnected) {
+  const sendEvent = (
+    event: any,
+    onResponse: (response: WebSocketResponse) => void,
+    onError?: (error: string) => void
+  ): boolean => {
+    if (!wsClient) {
+      onError?.("Client WebSocket non initialisé");
+      return false;
+    }
+    if (!isConnected) {
+      onError?.("Non connecté au serveur");
+      return false;
+    }
+    try {
       wsClient.setOnResponse(onResponse);
       wsClient.send(JSON.stringify(event));
+      return true;
+    } catch (error) {
+      onError?.(
+        error instanceof Error ? error.message : "Erreur lors de l'envoi"
+      );
+      return false;
     }
   };
 

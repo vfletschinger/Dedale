@@ -18,6 +18,7 @@ const { width } = Dimensions.get("window");
 const SCANNER_SIZE = width * 0.7;
 import { getDatabase } from "../../assets/migrations";
 import { useWebSocket } from "../context/WebSocketContext";
+import { useEvent } from "../context/EventContext";
 import { EventType } from "../types/database";
 
 const QRCodeScanner = ({
@@ -26,6 +27,7 @@ const QRCodeScanner = ({
   setScanQR: (value: boolean) => void;
 }) => {
   const { setWsClient, setIsConnected } = useWebSocket();
+  const { refreshEvents } = useEvent();
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [isTransferring, setIsTransferring] = useState(false);
@@ -120,6 +122,9 @@ const QRCodeScanner = ({
           try {
             insertEvents(events);
             setTransferStatus("Synchronisation réussie !");
+
+            // Rafraîchir la liste des événements dans le contexte
+            refreshEvents();
 
             // Save the WebSocket client in context and mark as connected
             setWsClient(client);
