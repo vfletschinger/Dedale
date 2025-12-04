@@ -40,7 +40,7 @@ import CoordinatesDisplay from "../components/CoordinatesDisplay";
 import EditModal from "../components/EditModal";
 import ObstacleSelector from "../components/ObstacleSelector";
 
-type RouteParams = { pointId: number };
+type RouteParams = { pointId: string };
 
 type SelectedObstacle = {
   type_id: number;

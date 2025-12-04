@@ -103,6 +103,42 @@ class WebSocketClient {
         try {
           const data = JSON.parse(e.data);
 
+          // Check if it's a message with type (new protocol)
+          if (data.type !== undefined) {
+            switch (data.type) {
+              case "connected":
+                // Serveur confirme la connexion, ne plus demander automatiquement les events
+                console.log("🔗 Connecté au serveur, en attente d'événements...");
+                break;
+              case "events":
+                // Serveur envoie tous les events (batch)
+                if (data.data && Array.isArray(data.data)) {
+                  const events: EventType[] = data.data;
+                  console.log("📦 Événements reçus (batch):", events.length);
+                  if (this.onMessageCallback) {
+                    this.onMessageCallback(events);
+                  }
+                }
+                break;
+              case "event":
+                // Serveur envoie un seul event (envoi individuel)
+                if (data.data) {
+                  const event: EventType = data.data;
+                  console.log("📦 Événement individuel reçu:", event.id, event.name);
+                  if (this.onMessageCallback) {
+                    this.onMessageCallback([event]);
+                  }
+                }
+                break;
+              case "goodbye":
+                console.log("👋 Serveur a fermé la connexion");
+                break;
+              default:
+                console.log("🤔 Type de message inconnu:", data.type);
+            }
+            return;
+          }
+
           // Check if it's a response with code (from desktop)
           if (data.code !== undefined) {
             const response: WebSocketResponse = data;
@@ -110,16 +146,27 @@ class WebSocketClient {
             if (this.onResponseCallback) {
               this.onResponseCallback(response);
             }
+          } else if (data.event !== undefined && data.points !== undefined) {
+            // Format d'export: { event: {...}, points: [...] }
+            const event: EventType = data.event;
+            const points: PointDetailType[] = data.points;
+            console.log("📦 Événement avec points reçu:", event.name, "- Points:", points.length);
+            if (this.onMessageCallback) {
+              this.onMessageCallback([event]);
+            }
+            // TODO: Stocker les points si nécessaire
           } else if (Array.isArray(data)) {
-            // It's events data (from desktop initial sync)
+            // It's events data (legacy format - direct array)
             const events: EventType[] = data;
-            console.log("📦 Événements reçus:", events.length);
+            console.log("📦 Événements reçus (format legacy):", events.length);
             if (this.onMessageCallback) {
               this.onMessageCallback(events);
             }
+          } else {
+            console.log("⚠️ Format de message non reconnu:", JSON.stringify(data).substring(0, 100));
           }
         } catch (error) {
-          console.log("🤔 Message non reconnu:", e.data);
+          console.log("🤔 Message non-JSON reçu:", e.data);
           if (this.isLoading) {
             console.log(
               "📝 Message reçu pendant le chargement, possiblement un écho"

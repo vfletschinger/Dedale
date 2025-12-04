@@ -1,5 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import * as path from '@tauri-apps/api/path';
 import QrCode from './QrCode';
 
@@ -12,6 +13,8 @@ type Event = {
     statut: string;
 };
 
+type TransferPhase = 'idle' | 'qr_displayed' | 'connected';
+
 function Data() {
     const [qrCodeBase64, setQrCodeBase64] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -20,54 +23,26 @@ function Data() {
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     
     // États pour la sélection d'événements
-    const [showEventSelector, setShowEventSelector] = useState(false);
     const [events, setEvents] = useState<Event[]>([]);
     const [selectedEventIds, setSelectedEventIds] = useState<Set<number>>(new Set());
-    const [loadingEvents, setLoadingEvents] = useState(false);
+    
+    // États pour le transfert
+    const [transferPhase, setTransferPhase] = useState<TransferPhase>('idle');
+    const [sentEventIds, setSentEventIds] = useState<Set<number>>(new Set());
+    const [sendingEventId, setSendingEventId] = useState<number | null>(null);
 
-    // Charger les événements
-    const loadEvents = useCallback(async () => {
-        setLoadingEvents(true);
-        try {
-            const eventsData = await invoke<Event[]>("fetch_events");
-            setEvents(eventsData);
-            // Sélectionner tous les événements par défaut
-            setSelectedEventIds(new Set(eventsData.map(e => e.id)));
-        } catch (err) {
-            console.error("Erreur lors du chargement des événements:", err);
-            setError(String(err));
-        } finally {
-            setLoadingEvents(false);
-        }
-    }, []);
-
-    // Ouvrir le sélecteur d'événements
-    const openEventSelector = useCallback(async () => {
-        await loadEvents();
-        setShowEventSelector(true);
-    }, [loadEvents]);
-
-    // Toggle la sélection d'un événement
-    const toggleEventSelection = (eventId: number) => {
-        setSelectedEventIds(prev => {
-            const newSet = new Set(prev);
-            if (newSet.has(eventId)) {
-                newSet.delete(eventId);
-            } else {
-                newSet.add(eventId);
-            }
-            return newSet;
+    // Écouter l'événement de connexion mobile
+    useEffect(() => {
+        const unlisten = listen('mobile-connected', () => {
+            console.log('📱 Mobile connecté !');
+            setTransferPhase('connected');
+            setMessage({ type: 'success', text: 'Mobile connecté !' });
         });
-    };
 
-    // Sélectionner/Désélectionner tous
-    const toggleSelectAll = () => {
-        if (selectedEventIds.size === events.length) {
-            setSelectedEventIds(new Set());
-        } else {
-            setSelectedEventIds(new Set(events.map(e => e.id)));
-        }
-    };
+        return () => {
+            unlisten.then(fn => fn());
+        };
+    }, []);
 
     // Fonction pour l'export Excel
     const generate_excel = useCallback(async () => {
@@ -121,44 +96,62 @@ function Data() {
 
     // Fonction pour le démarrage du serveur et génération du QR code
     const qr_code = useCallback(async () => {
-        // D'abord ouvrir le sélecteur d'événements
-        await openEventSelector();
-    }, [openEventSelector]);
-
-    // Confirmer et démarrer le transfert avec les événements sélectionnés
-    const confirmAndStartTransfer = useCallback(async () => {
-        if (selectedEventIds.size === 0) {
-            setMessage({ type: 'error', text: 'Veuillez sélectionner au moins un événement.' });
-            return;
-        }
-
-        setShowEventSelector(false);
+        // Charger les events et démarrer directement
         setIsLoading(true);
         setError(null);
         setQrCodeBase64(null);
         setMessage(null);
 
         try {
-            // Passer les IDs des événements sélectionnés au serveur
-            const eventIdsArray = Array.from(selectedEventIds);
-            console.log("📤 Transfert des événements:", eventIdsArray);
+            // Charger tous les événements
+            const eventsData = await invoke<Event[]>("fetch_events");
+            setEvents(eventsData);
+            const allEventIds = eventsData.map(e => e.id);
+            setSelectedEventIds(new Set(allEventIds));
+
+            // Démarrer le serveur avec tous les événements
+            console.log("📤 Transfert des événements:", allEventIds);
             
             const base64String = await invoke<string>('start_server', { 
-                eventIds: eventIdsArray 
+                eventIds: allEventIds 
             });
             
             setQrCodeBase64(base64String);
+            setTransferPhase('qr_displayed');
+            setSentEventIds(new Set());
             setMessage({ 
                 type: 'success', 
-                text: `Serveur démarré avec ${eventIdsArray.length} événement(s) sélectionné(s).` 
+                text: `Serveur démarré avec ${allEventIds.length} événement(s).` 
             });
         } catch (err) {
-            console.error('Erreur au démarrage du serveur:', err);
+            console.error('Erreur:', err);
             setError(String(err));
         } finally {
             setIsLoading(false);
         }
-    }, [selectedEventIds]);
+    }, []);
+
+    // Envoyer un événement spécifique au mobile
+    const sendEventToMobile = useCallback(async (eventId: number) => {
+        setSendingEventId(eventId);
+        try {
+            await invoke('send_event_to_mobile', { eventId });
+            setSentEventIds(prev => new Set([...prev, eventId]));
+            setMessage({ type: 'success', text: `Événement ${eventId} envoyé au mobile !` });
+        } catch (err) {
+            console.error('Erreur envoi événement:', err);
+            setMessage({ type: 'error', text: `Erreur: ${String(err)}` });
+        } finally {
+            setSendingEventId(null);
+        }
+    }, []);
+
+    const terminateTransfer = useCallback(async () => {
+        setQrCodeBase64(null);
+        setTransferPhase('idle');
+        setSentEventIds(new Set());
+        setMessage({ type: 'success', text: 'Transfert terminé.' });
+    }, []);
 
     const getQrCodeUri = (base64: string | null): string => {
         if (!base64) return '';
@@ -232,183 +225,139 @@ function Data() {
 
 
                     {/* COLONNE 2 & 3: Connexion Mobile (QR Code) */}
-                    <div className="lg:col-span-2 bg-blue-50 p-6 rounded-2xl border-2 border-dashed border-blue-200 shadow-lg flex flex-col items-center justify-center min-h-[300px]">
+                    <div className="lg:col-span-2 bg-blue-50 p-6 rounded-2xl border-2 border-dashed border-blue-200 shadow-lg flex flex-col min-h-[300px]">
                         <h2 className="text-2xl font-bold text-blue-700 mb-6 text-center">
                             Connexion de l'Application Mobile
                         </h2>
                         
-                        <div className="w-full max-w-md">
-                            <button
-                                className={connectBtnClass}
-                                onClick={qr_code}
-                                disabled={isLoading}
-                                aria-label={qrCodeBase64 ? "Serveur déjà démarré" : "Démarrer le serveur et connecter l'application"}
-                            >
-                                {isLoading ? (
-                                    <span className="flex items-center justify-center">
-                                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                        </svg>
-                                        Démarrage du serveur...
-                                    </span>
-                                ) : (
-                                    qrCodeBase64 ? "Serveur WebSocket Actif" : "Transférer vers l'App Mobile"
-                                )}
-                            </button>
-                        </div>
-
-                        {/* Contenu dynamique : Erreur / QR Code */}
-                        <div className="mt-8">
-                            {error && (
-                                <div className="p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg text-center shadow-lg">
-                                    <h3 className="font-bold mb-1">Erreur Critique</h3>
-                                    <p className="text-sm">Impossible de démarrer le serveur. Erreur: <code className="text-xs break-all">{error}</code></p>
+                        {/* Phase initiale: bouton pour démarrer */}
+                        {transferPhase === 'idle' && (
+                            <div className="flex-1 flex flex-col items-center justify-center">
+                                <div className="w-full max-w-md">
+                                    <button
+                                        className={connectBtnClass}
+                                        onClick={qr_code}
+                                        disabled={isLoading}
+                                        aria-label="Démarrer le serveur et connecter l'application"
+                                    >
+                                        {isLoading ? (
+                                            <span className="flex items-center justify-center">
+                                                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                </svg>
+                                                Démarrage du serveur...
+                                            </span>
+                                        ) : (
+                                            "Transférer vers l'App Mobile"
+                                        )}
+                                    </button>
                                 </div>
-                            )}
-                            
-                            {qrCodeBase64 && !isLoading && (
+                            </div>
+                        )}
+
+                        {/* Phase QR affiché: uniquement le QR code en attente de connexion */}
+                        {transferPhase === 'qr_displayed' && qrCodeBase64 && (
+                            <div className="flex-1 flex flex-col items-center justify-center">
                                 <div className="flex flex-col items-center">
                                     <p className="text-lg text-gray-700 mb-4 font-medium">
-                                        Scannez ce code depuis l'application mobile.
+                                        Scannez ce code depuis l'application mobile
                                     </p>
-                                    <QrCode 
-                                        qrCodeUri={getQrCodeUri(qrCodeBase64)} 
-                                    />
+                                    <QrCode qrCodeUri={getQrCodeUri(qrCodeBase64)} />
+                                    <p className="text-sm text-gray-500 mt-4 animate-pulse">
+                                        En attente de connexion...
+                                    </p>
                                 </div>
-                            )}
-                        </div>
+                                
+                                {/* Bouton Annuler */}
+                                <div className="mt-6">
+                                    <button
+                                        onClick={terminateTransfer}
+                                        className="px-6 py-2 bg-gray-400 hover:bg-gray-500 text-white font-medium rounded-lg transition-colors"
+                                    >
+                                        Annuler
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Phase connecté: liste des events avec boutons Envoyer */}
+                        {transferPhase === 'connected' && (
+                            <div className="flex-1 flex flex-col">
+                                {/* Header connexion */}
+                                <div className="flex items-center justify-center gap-2 mb-4 p-3 bg-green-100 rounded-lg">
+                                    <span className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
+                                    <span className="text-green-700 font-medium">Mobile connecté</span>
+                                </div>
+
+                                {/* Liste des événements à envoyer */}
+                                <div className="flex-1 bg-white rounded-xl p-4 border border-gray-200 overflow-y-auto max-h-64">
+                                    <h3 className="font-semibold text-gray-700 mb-3">
+                                        Événements à transférer ({selectedEventIds.size})
+                                    </h3>
+                                    <div className="space-y-2">
+                                        {events.filter(e => selectedEventIds.has(e.id)).map((event) => (
+                                            <div 
+                                                key={event.id}
+                                                className={`flex items-center justify-between p-3 rounded-lg border ${
+                                                    sentEventIds.has(event.id) 
+                                                        ? 'bg-green-50 border-green-300' 
+                                                        : 'bg-gray-50 border-gray-200'
+                                                }`}
+                                            >
+                                                <div className="flex-1 min-w-0 mr-3">
+                                                    <div className="font-medium text-gray-800 truncate">
+                                                        {event.name}
+                                                    </div>
+                                                    <div className="text-xs text-gray-500 truncate">
+                                                        {event.description}
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={() => sendEventToMobile(event.id)}
+                                                    disabled={sendingEventId === event.id || sentEventIds.has(event.id)}
+                                                    className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                                                        sentEventIds.has(event.id)
+                                                            ? 'bg-green-500 text-white cursor-default'
+                                                            : sendingEventId === event.id
+                                                            ? 'bg-blue-300 text-white cursor-wait'
+                                                            : 'bg-blue-500 hover:bg-blue-600 text-white'
+                                                    }`}
+                                                >
+                                                    {sentEventIds.has(event.id) 
+                                                        ? '✓ Envoyé' 
+                                                        : sendingEventId === event.id 
+                                                        ? 'Envoi...' 
+                                                        : 'Envoyer'}
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Bouton Terminer */}
+                                <div className="mt-4">
+                                    <button
+                                        onClick={terminateTransfer}
+                                        className="w-full px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl transition-colors shadow-md"
+                                    >
+                                        Terminer le transfert
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Erreur */}
+                        {error && (
+                            <div className="mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg text-center shadow-lg">
+                                <h3 className="font-bold mb-1">Erreur Critique</h3>
+                                <p className="text-sm">Impossible de démarrer le serveur. Erreur: <code className="text-xs break-all">{error}</code></p>
+                            </div>
+                        )}
                     </div>
                 </div>
 
             </div>
-
-            {/* Modal de sélection des événements */}
-            {showEventSelector && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden">
-                        {/* Header */}
-                        <div className="p-5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <h3 className="text-xl font-bold">📤 Sélection des événements</h3>
-                                    <p className="text-white/80 text-sm mt-1">
-                                        Choisissez les événements à transférer
-                                    </p>
-                                </div>
-                                <button
-                                    onClick={() => setShowEventSelector(false)}
-                                    className="w-8 h-8 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors"
-                                >
-                                    ✕
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Liste des événements */}
-                        <div className="flex-1 overflow-y-auto p-4">
-                            {loadingEvents ? (
-                                <div className="flex items-center justify-center py-8">
-                                    <svg className="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
-                                    <span className="ml-3 text-gray-600">Chargement des événements...</span>
-                                </div>
-                            ) : events.length === 0 ? (
-                                <div className="text-center py-8 text-gray-500">
-                                    <div className="text-4xl mb-2">📭</div>
-                                    <p>Aucun événement disponible</p>
-                                </div>
-                            ) : (
-                                <>
-                                    {/* Sélectionner tout */}
-                                    <div className="mb-4 pb-3 border-b border-gray-200">
-                                        <label className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors">
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedEventIds.size === events.length}
-                                                onChange={toggleSelectAll}
-                                                className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
-                                            />
-                                            <span className="font-semibold text-gray-700">
-                                                {selectedEventIds.size === events.length ? "Tout désélectionner" : "Tout sélectionner"}
-                                            </span>
-                                            <span className="ml-auto text-sm text-gray-500">
-                                                {selectedEventIds.size}/{events.length} sélectionné(s)
-                                            </span>
-                                        </label>
-                                    </div>
-
-                                    {/* Liste */}
-                                    <div className="space-y-2">
-                                        {events.map((event) => (
-                                            <label
-                                                key={event.id}
-                                                className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
-                                                    selectedEventIds.has(event.id)
-                                                        ? 'bg-blue-50 border-blue-300 shadow-sm'
-                                                        : 'bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                                                }`}
-                                            >
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedEventIds.has(event.id)}
-                                                    onChange={() => toggleEventSelection(event.id)}
-                                                    className="w-5 h-5 mt-0.5 text-blue-600 rounded focus:ring-blue-500"
-                                                />
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="font-semibold text-gray-800 truncate">
-                                                        {event.name}
-                                                    </div>
-                                                    <div className="text-sm text-gray-500 truncate">
-                                                        {event.description}
-                                                    </div>
-                                                    <div className="flex items-center gap-2 mt-1">
-                                                        <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-                                                            event.statut === 'Actif' 
-                                                                ? 'bg-green-100 text-green-700'
-                                                                : event.statut === 'Prévu'
-                                                                ? 'bg-blue-100 text-blue-700'
-                                                                : 'bg-gray-100 text-gray-700'
-                                                        }`}>
-                                                            {event.statut}
-                                                        </span>
-                                                        <span className="text-xs text-gray-400">
-                                                            {event.dateDebut} → {event.dateFin}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </label>
-                                        ))}
-                                    </div>
-                                </>
-                            )}
-                        </div>
-
-                        {/* Footer */}
-                        <div className="p-4 border-t border-gray-200 bg-gray-50 flex gap-3">
-                            <button
-                                onClick={() => setShowEventSelector(false)}
-                                className="flex-1 px-4 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-xl transition-colors"
-                            >
-                                Annuler
-                            </button>
-                            <button
-                                onClick={confirmAndStartTransfer}
-                                disabled={selectedEventIds.size === 0}
-                                className={`flex-1 px-4 py-3 font-semibold rounded-xl transition-all ${
-                                    selectedEventIds.size === 0
-                                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                        : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-md hover:shadow-lg'
-                                }`}
-                            >
-                                Transférer ({selectedEventIds.size})
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

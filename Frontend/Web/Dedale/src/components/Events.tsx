@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { useState, useEffect } from "react";
 
 // Types
@@ -45,6 +46,12 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
     statut: "planned",
     geometry: ""
   });
+  
+  // État pour le QR code de réception
+  const [receiveQrCode, setReceiveQrCode] = useState<string | null>(null);
+  const [receivingEventId, setReceivingEventId] = useState<number | null>(null);
+  const [receiveStatus, setReceiveStatus] = useState<string>("En attente...");
+  const [pointsReceived, setPointsReceived] = useState<number>(0);
 
   const loadEvents = async () => {
     setLoading(true);
@@ -307,6 +314,15 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
+                      handleReceiveFromMobile(event.id);
+                    }}
+                    className="px-3 py-1 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
+                  >
+                   Import
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
                       onEventClick?.(event.id);
                     }}
                     className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
@@ -328,6 +344,46 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
           ))
         )}
       </div>
+
+      {/* Modal QR Code pour réception */}
+      {receiveQrCode && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl">
+            <h3 className="text-xl font-bold text-center mb-4">
+              📱 Recevoir depuis le mobile
+            </h3>
+            <p className="text-gray-600 text-center mb-4">
+              Scannez ce QR code avec l'application mobile pour envoyer les points de l'événement.
+            </p>
+            
+            <div className="flex justify-center mb-4">
+              <img 
+                src={`data:image/png;base64,${receiveQrCode}`} 
+                alt="QR Code" 
+                className="w-48 h-48"
+              />
+            </div>
+            
+            <div className="text-center mb-4">
+              <p className="text-sm text-gray-500">{receiveStatus}</p>
+              {pointsReceived > 0 && (
+                <p className="text-green-600 font-semibold mt-2">
+                  ✅ {pointsReceived} point(s) reçu(s)
+                </p>
+              )}
+            </div>
+            
+            <div className="flex justify-center">
+              <button
+                onClick={closeReceiveModal}
+                className="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
