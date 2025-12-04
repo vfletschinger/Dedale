@@ -7,6 +7,9 @@ import { invoke } from "@tauri-apps/api/core";
 import PointDetails from "./PointDetails";
 import AddPointForm from "./AddPointForm";
 
+// Date initiale pour le calcul de la timeline (stable pour éviter les re-renders)
+const INITIAL_NOW = Date.now();
+
 // Fonction pour convertir GeoJSON en WKT
 function geoJSONtoWKT(geometry: GeoJSON.Geometry): string {
   if (geometry.type === "Polygon") {
@@ -33,6 +36,44 @@ interface GeometryData {
   id: number;
   event_id: number;
   geom: string;
+}
+
+// Type pour les obstacles
+interface Obstacle {
+  id?: number;
+  name?: string;
+  number?: number;
+  description?: string;
+  width?: number;
+  length?: number;
+}
+
+// Type pour les points de la carte
+interface MapPoint {
+  id: number;
+  x: number;
+  y: number;
+  pose?: string | null;
+  depose?: string | null;
+  obstacles?: Obstacle[];
+  comments?: { id: number; value: string }[];
+  pictures?: { id: number; image: string }[];
+}
+
+// Type pour les événements
+interface MapEvent {
+  id: number;
+  name?: string;
+  event_type?: string;
+  status?: string;
+  statut?: string;
+}
+
+// Type pour les résultats de recherche Nominatim
+interface SearchResult {
+  lon: string;
+  lat: string;
+  display_name: string;
 }
 
 // Fonction pour parser WKT et convertir en GeoJSON
@@ -105,31 +146,13 @@ function formatDateShort(dateStr: string | null | undefined): string {
   }
 }
 
-// Helper pour formater une date complète
-function formatDateFull(dateStr: string | null | undefined): string {
-  if (!dateStr) return "Non défini";
-  try {
-    const date = new Date(dateStr);
-    return date.toLocaleString("fr-FR", {
-      weekday: "short",
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return dateStr;
-  }
-}
-
 // Composant Frise Chronologique personnalisée
 function TimelinePanel({ 
   points, 
   onPointClick 
 }: { 
-  points: any[]; 
-  onPointClick: (point: any) => void;
+  points: MapPoint[]; 
+  onPointClick: (point: MapPoint) => void;
 }) {
   const [obstacleFilter, setObstacleFilter] = useState<string>("all");
   const containerRef = useRef<HTMLDivElement>(null);
@@ -139,9 +162,9 @@ function TimelinePanel({
     const types = new Set<string>();
     points.forEach(p => {
       if (p.obstacles && Array.isArray(p.obstacles)) {
-        p.obstacles.forEach((obs: any) => {
+        p.obstacles.forEach((obs: Obstacle) => {
           // Les obstacles sont des objets avec une propriété 'name'
-          const obsName = typeof obs === 'string' ? obs : obs?.name;
+          const obsName = obs?.name;
           if (obsName) types.add(obsName);
         });
       }
@@ -150,10 +173,10 @@ function TimelinePanel({
   }, [points]);
 
   // Helper pour vérifier si un point contient un type d'obstacle
-  const pointHasObstacle = (point: any, obstacleName: string) => {
+  const pointHasObstacle = (point: MapPoint, obstacleName: string) => {
     if (!point.obstacles || !Array.isArray(point.obstacles)) return false;
-    return point.obstacles.some((obs: any) => {
-      const obsName = typeof obs === 'string' ? obs : obs?.name;
+    return point.obstacles.some((obs: Obstacle) => {
+      const obsName = obs?.name;
       return obsName === obstacleName;
     });
   };
@@ -171,19 +194,18 @@ function TimelinePanel({
       );
     }
     // Trier par date de pose (la plus proche en premier)
-    return filtered.sort((a, b) => new Date(a.pose).getTime() - new Date(b.pose).getTime());
+    return filtered.sort((a, b) => new Date(a.pose!).getTime() - new Date(b.pose!).getTime());
   }, [points, obstacleFilter]);
 
   // Calculer les bornes de temps
   const timeRange = useMemo(() => {
     if (filteredPoints.length === 0) {
-      const now = Date.now();
-      return { min: now - 12 * 60 * 60 * 1000, max: now + 12 * 60 * 60 * 1000 };
+      return { min: INITIAL_NOW - 12 * 60 * 60 * 1000, max: INITIAL_NOW + 12 * 60 * 60 * 1000 };
     }
     
     const times = filteredPoints.flatMap(p => [
-      new Date(p.pose).getTime(),
-      new Date(p.depose).getTime()
+      new Date(p.pose!).getTime(),
+      new Date(p.depose!).getTime()
     ]);
     const min = Math.min(...times);
     const max = Math.max(...times);
@@ -213,6 +235,17 @@ function TimelinePanel({
   // Nombre total de points avec dates
   const totalPointsWithDates = points.filter(p => p.pose && p.depose).length;
 
+  // Générer les marqueurs de temps - doit être avant tout return conditionnel
+  const timeMarkers = useMemo(() => {
+    const markers: number[] = [];
+    const range = timeRange.max - timeRange.min;
+    const step = range / 6; // 6 marqueurs
+    for (let i = 0; i <= 6; i++) {
+      markers.push(timeRange.min + step * i);
+    }
+    return markers;
+  }, [timeRange]);
+
   if (totalPointsWithDates === 0) {
     return (
       <div className="flex items-center justify-center h-full text-gray-500">
@@ -224,17 +257,6 @@ function TimelinePanel({
       </div>
     );
   }
-
-  // Générer les marqueurs de temps
-  const timeMarkers = useMemo(() => {
-    const markers = [];
-    const range = timeRange.max - timeRange.min;
-    const step = range / 6; // 6 marqueurs
-    for (let i = 0; i <= 6; i++) {
-      markers.push(timeRange.min + step * i);
-    }
-    return markers;
-  }, [timeRange]);
 
   return (
     <div className="h-full flex flex-col">
@@ -291,7 +313,7 @@ function TimelinePanel({
       ) : (
         <div className="flex-1 flex flex-col overflow-hidden" ref={containerRef}>
           {/* En-tête avec les marqueurs de temps */}
-          <div className="shrink-0 flex border-b border-gray-200 bg-gradient-to-r from-indigo-500 to-purple-600">
+          <div className="shrink-0 flex border-b border-gray-200 bg-linear-to-r from-indigo-500 to-purple-600">
             <div className="w-24 shrink-0 px-2 py-1 text-xs font-semibold text-white border-r border-white/20">
               Points
             </div>
@@ -313,8 +335,8 @@ function TimelinePanel({
           {/* Corps de la timeline avec scroll */}
           <div className="flex-1 overflow-y-auto">
             {filteredPoints.map((point, index) => {
-              const startPos = getPosition(new Date(point.pose).getTime());
-              const endPos = getPosition(new Date(point.depose).getTime());
+              const startPos = getPosition(new Date(point.pose!).getTime());
+              const endPos = getPosition(new Date(point.depose!).getTime());
               const width = Math.max(endPos - startPos, 2);
 
               return (
@@ -349,7 +371,7 @@ function TimelinePanel({
                         background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
                         minWidth: '20px'
                       }}
-                      title={`Point #${point.id}\nPose: ${formatTime(new Date(point.pose).getTime())}\nDépose: ${formatTime(new Date(point.depose).getTime())}`}
+                      title={`Point #${point.id}\nPose: ${formatTime(new Date(point.pose!).getTime())}\nDépose: ${formatTime(new Date(point.depose!).getTime())}`}
                     >
                       <div className="h-full flex items-center justify-center px-1 overflow-hidden">
                         <span className="text-[10px] text-white font-medium truncate">
@@ -373,16 +395,16 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
   const [map, setMap] = useState<maplibregl.Map | null>(null);
   const drawRef = useRef<MapboxDraw | null>(null);
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<any[]>([]);
+  const [results, setResults] = useState<SearchResult[]>([]);
   const [currentMarker, setCurrentMarker] = useState<maplibregl.Marker | null>(
     null
   );
-  const pointsRef = useRef<any[]>([]);
-  const [points, setPoints] = useState<any[]>([]);
-  const [selectedPoint, setSelectedPoint] = useState<any | null>(null);
+  const pointsRef = useRef<MapPoint[]>([]);
+  const [points, setPoints] = useState<MapPoint[]>([]);
+  const [selectedPoint, setSelectedPoint] = useState<MapPoint | null>(null);
   const [addingPointCoords, setAddingPointCoords] = useState<{ lng: number; lat: number } | null>(null);
-  const [selectedEvent, setSelectedEvent] = useState<any>(null);
-  const [events, setEvents] = useState<any[]>([]);
+  const [selectedEvent, setSelectedEvent] = useState<MapEvent | null>(null);
+  const [events, setEvents] = useState<MapEvent[]>([]);
   const [awaitingMapClick, setAwaitingMapClick] = useState(false);
   const awaitingMapClickRef = useRef(false);
   const selectedEventIdRef = useRef<number | null>(null);
@@ -403,8 +425,8 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
   useEffect(() => {
     const loadAllEvents = async () => {
       try {
-        const allEvents = await invoke("fetch_events");
-        setEvents(allEvents as any[]);
+        const allEvents = await invoke<MapEvent[]>("fetch_events");
+        setEvents(allEvents);
       } catch (err) {
         console.error("Erreur lors du chargement des événements:", err);
       }
@@ -417,10 +439,10 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
     const loadSelectedEvent = async () => {
       if (selectedEventId) {
         try {
-          const allEvents = await invoke("fetch_events");
-          const event = (allEvents as any[]).find(e => e.id === selectedEventId);
-          setSelectedEvent(event);
-          setEvents(allEvents as any[]);
+          const allEvents = await invoke<MapEvent[]>("fetch_events");
+          const event = allEvents.find(e => e.id === selectedEventId);
+          setSelectedEvent(event ?? null);
+          setEvents(allEvents);
         } catch (err) {
           console.error("Erreur lors du chargement de l'événement:", err);
         }
@@ -432,7 +454,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
   // Fonction pour changer d'événement
   const handleEventChange = (eventId: string) => {
     const event = events.find(e => e.id === parseInt(eventId));
-    setSelectedEvent(event);
+    setSelectedEvent(event ?? null);
   };
 
   // Fonction pour rafraîchir les géométries sur la carte
@@ -682,6 +704,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
 
     // Supprimer toutes les features du Draw et ajouter celle-ci
     drawRef.current.deleteAll();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     drawRef.current.add(feature as any);
     drawRef.current.changeMode("direct_select", { featureId: `edit-${geom.id}` });
 
@@ -763,15 +786,15 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
     const fetchAndDisplayPoints = async (mapObj: maplibregl.Map, eventId?: number | null) => {
       try {
         console.log("🔄 Chargement des points pour event_id:", eventId);
-        const points = await invoke<any[]>("get_points", { eventId: eventId || null });
+        const points = await invoke<MapPoint[]>("get_points", { eventId: eventId || null });
         console.log(`📍 ${points.length} point(s) récupéré(s)`);
 
         pointsRef.current = points;
         setPoints(points);
 
-        const geojson = {
+        const geojson: GeoJSON.FeatureCollection<GeoJSON.Point> = {
           type: "FeatureCollection",
-          features: points.map((p: any) => ({
+          features: points.map((p: MapPoint) => ({
             type: "Feature",
             geometry: {
               type: "Point",
@@ -784,7 +807,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
               pictures: p.pictures,
             },
           })),
-        } as GeoJSON.FeatureCollection<GeoJSON.Point, any>;
+        };
 
         if (!mapObj.getSource("db-points")) {
           mapObj.addSource("db-points", {
@@ -807,7 +830,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
           });
 
           // --- CLICK LISTENER START ---
-          mapObj.on("click", "db-points-layer", async (e: any) => {
+          mapObj.on("click", "db-points-layer", async (e: maplibregl.MapLayerMouseEvent) => {
             const f = e.features?.[0];
             if (!f) return;
             const pointId = f.properties?.id;
@@ -927,6 +950,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
       drawRef.current = draw;
 
       // Handler pour la création d'une géométrie
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       mapInstance.on("draw.create", async (e: any) => {
         const feature = e.features[0];
         if (!feature) return;
@@ -975,6 +999,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
     setMap(mapInstance);
 
     return () => mapInstance.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Recharger les points quand l'événement sélectionné change
@@ -986,7 +1011,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
       console.log("🔄 Changement d'événement, rechargement des points pour event_id:", eventId);
 
       try {
-        const freshPoints = await invoke<any[]>("get_points", { eventId: eventId });
+        const freshPoints = await invoke<MapPoint[]>("get_points", { eventId: eventId });
         console.log(`📍 ${freshPoints.length} point(s) récupéré(s) pour event ${eventId}`);
 
         pointsRef.current = freshPoints;
@@ -994,9 +1019,9 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
 
         // Mettre à jour la source GeoJSON
         if (map.getSource("db-points")) {
-          const geojson = {
+          const geojson: GeoJSON.FeatureCollection<GeoJSON.Point> = {
             type: "FeatureCollection",
-            features: freshPoints.map((p: any) => ({
+            features: freshPoints.map((p: MapPoint) => ({
               type: "Feature",
               geometry: {
                 type: "Point",
@@ -1010,6 +1035,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
               },
             })),
           };
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (map.getSource("db-points") as maplibregl.GeoJSONSource).setData(geojson as any);
         }
       } catch (err) {
@@ -1048,7 +1074,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
   }, [selectedEvent, map]);
 
   // Fonction pour sélectionner une suggestion
-  const handleSelect = (place: any) => {
+  const handleSelect = (place: SearchResult) => {
     if (!map) return;
 
     const { lon, lat, display_name } = place;
@@ -1093,7 +1119,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
   }, [query]);
 
   // Sélectionne un point et centre la carte dessus (utilisé par la liste à gauche)
-  const openPopupForPoint = async (point: any) => {
+  const openPopupForPoint = async (point: MapPoint) => {
     if (!map || !point) return;
     const coords: [number, number] = [Number(point.x), Number(point.y)];
     map.flyTo({ center: coords, zoom: 15 });
@@ -1105,7 +1131,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
     if (!map) return;
     const currentEventId = selectedEventIdRef.current;
     try {
-      const freshPoints = await invoke<any[]>("get_points", { eventId: currentEventId || null });
+      const freshPoints = await invoke<MapPoint[]>("get_points", { eventId: currentEventId || null });
       pointsRef.current = freshPoints;
       setPoints(freshPoints);
 
@@ -1117,9 +1143,9 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
 
       // Mettre à jour la source GeoJSON
       if (map.getSource("db-points")) {
-        const geojson = {
+        const geojson: GeoJSON.FeatureCollection<GeoJSON.Point> = {
           type: "FeatureCollection",
-          features: freshPoints.map((p: any) => ({
+          features: freshPoints.map((p: MapPoint) => ({
             type: "Feature",
             geometry: {
               type: "Point",
@@ -1133,6 +1159,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
             },
           })),
         };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (map.getSource("db-points") as maplibregl.GeoJSONSource).setData(geojson as any);
       }
     } catch (err) {
@@ -1156,20 +1183,20 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
     try {
       const canvas = map.getCanvas();
       canvas.style.cursor = awaitingMapClick ? "crosshair" : "";
-    } catch (err) { }
+    } catch { /* ignore */ }
     return () => {
-      try { if (map) map.getCanvas().style.cursor = ""; } catch (e) { }
+      try { if (map) map.getCanvas().style.cursor = ""; } catch { /* ignore */ }
     };
   }, [awaitingMapClick, map]);
 
   return (
-    <div className="h-full flex flex-col bg-gradient-to-br from-slate-50 to-blue-50 overflow-hidden">
+    <div className="h-full flex flex-col bg-linear-to-br from-slate-50 to-blue-50 overflow-hidden">
       {/* Conteneur principal: sidebar + carte */}
       <div className="flex-1 flex overflow-hidden">
         {/* Panneau gauche: liste des points (visible seulement en mode points) */}
         {viewMode === "points" && (
           <div className="w-72 bg-white/90 backdrop-blur-md border-r border-gray-200 shadow-lg flex flex-col z-20">
-            <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-indigo-500 to-purple-600">
+            <div className="p-4 border-b border-gray-200 bg-linear-to-r from-indigo-500 to-purple-600">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-white font-bold text-lg">📍 Points</h3>
                 <button
@@ -1215,7 +1242,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
                   <p className="text-xs mt-1">Cliquez sur "Ajouter" puis sur la carte</p>
                 </div>
               ) : (
-                points.map((p: any) => (
+                points.map((p: MapPoint) => (
                   <div
                     key={p.id}
                     onClick={() => openPopupForPoint(p)}
@@ -1242,9 +1269,9 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
         {/* Conteneur principal de la carte */}
         <div className="flex-1 flex flex-col">
         {/* Sélecteur d'événements et barre de recherche */}
-        <div className="relative z-30 bg-gradient-to-r from-indigo-500 via-purple-600 to-blue-600 backdrop-blur-md p-4 shadow-lg">
+        <div className="relative z-30 bg-linear-to-r from-indigo-500 via-purple-600 to-blue-600 backdrop-blur-md p-4 shadow-lg">
           {/* Dégradé de transition en bas */}
-          <div className="absolute bottom-0 left-0 right-0 h-2 bg-gradient-to-b from-transparent to-white/20"></div>
+          <div className="absolute bottom-0 left-0 right-0 h-2 bg-linear-to-b from-transparent to-white/20"></div>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <label className="text-white font-medium">Événement :</label>
@@ -1476,7 +1503,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
       {/* Panneau bas: Frise chronologique (visible seulement en mode timeline) */}
       {viewMode === "timeline" && (
         <div className="h-72 bg-white/95 backdrop-blur-md border-t border-gray-200 shadow-lg flex flex-col z-20">
-          <div className="p-2 border-b border-gray-200 bg-gradient-to-r from-indigo-500 to-purple-600 flex items-center justify-between">
+          <div className="p-2 border-b border-gray-200 bg-linear-to-r from-indigo-500 to-purple-600 flex items-center justify-between">
             <h3 className="text-white font-bold text-base">📅 Frise chronologique</h3>
             {/* Toggle Points / Frise */}
             <div className="flex bg-white/20 rounded-lg p-1">

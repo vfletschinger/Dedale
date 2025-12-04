@@ -56,8 +56,9 @@ export function useEvents(): UseEventsReturn {
         try {
             const eventsData = await fetchEvents();
             setEvents(eventsData);
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Erreur inconnue';
+            setError(message);
             console.error('Erreur lors du chargement des événements:', err);
         } finally {
             setIsLoading(false);
@@ -69,7 +70,7 @@ export function useEvents(): UseEventsReturn {
         try {
             const types = await fetchGeometryTypes();
             setGeometryTypes(types);
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error('Erreur lors du chargement des types de géométrie:', err);
             // Ne pas définir d'erreur car ce n'est pas critique pour l'UI
         }
@@ -81,8 +82,9 @@ export function useEvents(): UseEventsReturn {
         try {
             const event = await fetchEventById(eventId);
             setSelectedEvent(event);
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Erreur inconnue';
+            setError(message);
             console.error('Erreur lors de la sélection de l\'événement:', err);
         }
     }, []);
@@ -97,8 +99,9 @@ export function useEvents(): UseEventsReturn {
             // Retourner le nouvel événement créé
             const newEvent = await fetchEventById(eventId);
             return newEvent;
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Erreur inconnue';
+            setError(message);
             console.error('Erreur lors de la création de l\'événement:', err);
             return null;
         }
@@ -115,8 +118,9 @@ export function useEvents(): UseEventsReturn {
             if (selectedEvent?.id === eventId) {
                 await selectEvent(eventId);
             }
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Erreur inconnue';
+            setError(message);
             console.error('Erreur lors de la modification de l\'événement:', err);
         }
     }, [loadEvents, selectedEvent, selectEvent]);
@@ -132,8 +136,9 @@ export function useEvents(): UseEventsReturn {
             if (selectedEvent?.id === eventId) {
                 setSelectedEvent(null);
             }
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Erreur inconnue';
+            setError(message);
             console.error('Erreur lors de la suppression de l\'événement:', err);
         }
     }, [loadEvents, selectedEvent]);
@@ -148,8 +153,9 @@ export function useEvents(): UseEventsReturn {
             if (selectedEvent && selectedEvent.id === geometry.event_id) {
                 await selectEvent(selectedEvent.id);
             }
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Erreur inconnue';
+            setError(message);
             console.error('Erreur lors de l\'ajout de la géométrie:', err);
         }
     }, [selectedEvent, selectEvent]);
@@ -164,8 +170,9 @@ export function useEvents(): UseEventsReturn {
             if (selectedEvent && selectedEvent.id === geometry.event_id) {
                 await selectEvent(selectedEvent.id);
             }
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Erreur inconnue';
+            setError(message);
             console.error('Erreur lors de la modification de la géométrie:', err);
         }
     }, [selectedEvent, selectEvent]);
@@ -180,8 +187,9 @@ export function useEvents(): UseEventsReturn {
             if (selectedEvent) {
                 await selectEvent(selectedEvent.id);
             }
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Erreur inconnue';
+            setError(message);
             console.error('Erreur lors de la suppression de la géométrie:', err);
         }
     }, [selectedEvent, selectEvent]);

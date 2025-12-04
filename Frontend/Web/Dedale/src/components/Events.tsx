@@ -54,10 +54,10 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
       const eventsData = await invoke<Event[]>("fetch_events");
       console.log("📊 Événements reçus:", eventsData);
       setEvents(eventsData);
-      onEventsLoaded && onEventsLoaded(eventsData);
-    } catch (err) {
+      if (onEventsLoaded) onEventsLoaded(eventsData);
+    } catch (err: unknown) {
       console.error("❌ Erreur lors du chargement des événements:", err);
-      setError((err as any)?.message || "Erreur inconnue");
+      setError(err instanceof Error ? err.message : "Erreur inconnue");
     } finally {
       setLoading(false);
     }
@@ -65,11 +65,8 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
 
   useEffect(() => {
     loadEvents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const createEvent = async () => {
-    invoke("insert_event", { event: formData });
-  }
 
   const handleCreateEvent = async () => {
     try {
