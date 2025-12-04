@@ -101,7 +101,7 @@ export default function InterestPointsScreen() {
     }, [])
   );
 
-  const handleDelete = (pointId: number) => {
+  const handleDelete = (pointId: string) => {
     Alert.alert(
       "Confirmer la suppression",
       "Êtes-vous sûr de vouloir supprimer ce point ? Cette action est irréversible.",

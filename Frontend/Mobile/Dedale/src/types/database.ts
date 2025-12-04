@@ -1,19 +1,19 @@
 export type InterestPointsType = {
-  id: number;
+  id: string;  // UUID
   x: number;
   y: number;
   event_id?: number; // Optional - populated from junction table when querying with event context
 };
 
 export type CommentType = {
-  id: number;
-  point_id: number;
+  id: string;  // UUID
+  point_id: string;  // UUID reference
   value: string;
 };
 
 export type PictureType = {
-  id: number;
-  point_id: number;
+  id: string;  // UUID
+  point_id: string;  // UUID reference
   image: string;
 };
 
@@ -39,8 +39,8 @@ export type EventWithGeometries = EventType & {
 };
 
 export type ObstacleType = {
-  id: number;
-  point_id: number;
+  id: string;  // UUID
+  point_id: string;  // UUID reference
   type_id: number;
   number: number;
   name?: string;

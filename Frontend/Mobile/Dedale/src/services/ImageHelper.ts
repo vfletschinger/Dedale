@@ -2,10 +2,11 @@ import * as FileSystem from 'expo-file-system/legacy';
 import getDatabase from '../../assets/migrations';
 import * as ImagePicker from 'expo-image-picker';
 import { Alert } from 'react-native';
+import { generateUUID } from './Helper';
 
 const db = getDatabase();
 
-export const saveImageToBDD = async (file: string, pointId: number) => {
+export const saveImageToBDD = async (file: string, pointId: string) => {
     try{
       console.log('Saving image for point ID:', pointId, file);
       
@@ -13,9 +14,10 @@ export const saveImageToBDD = async (file: string, pointId: number) => {
       const base64 = await imageToBase64(file);
       console.log('Image converted to base64, length:', base64.length);
       
+      const pictureId = generateUUID();
       const result = db.runSync(
-        'INSERT INTO picture (point_id, image) VALUES (?, ?)',
-        [pointId, base64]
+        'INSERT INTO picture (id, point_id, image) VALUES (?, ?, ?)',
+        [pictureId, pointId, base64]
       );
       
       return result;

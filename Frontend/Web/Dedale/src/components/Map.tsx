@@ -39,7 +39,7 @@ interface GeometryData {
 function parseWKTtoGeoJSON(wkt: string): GeoJSON.Geometry | null {
   try {
     const wktTrimmed = wkt.trim().toUpperCase();
-    
+
     // POINT(x y)
     if (wktTrimmed.startsWith("POINT")) {
       const match = wkt.match(/POINT\s*\(\s*([-\d.]+)\s+([-\d.]+)\s*\)/i);
@@ -50,7 +50,7 @@ function parseWKTtoGeoJSON(wkt: string): GeoJSON.Geometry | null {
         };
       }
     }
-    
+
     // LINESTRING(x1 y1, x2 y2, ...)
     if (wktTrimmed.startsWith("LINESTRING")) {
       const match = wkt.match(/LINESTRING\s*\(\s*(.+)\s*\)/i);
@@ -65,7 +65,7 @@ function parseWKTtoGeoJSON(wkt: string): GeoJSON.Geometry | null {
         };
       }
     }
-    
+
     // POLYGON((x1 y1, x2 y2, ...))
     if (wktTrimmed.startsWith("POLYGON")) {
       const match = wkt.match(/POLYGON\s*\(\s*\(\s*(.+)\s*\)\s*\)/i);
@@ -80,7 +80,7 @@ function parseWKTtoGeoJSON(wkt: string): GeoJSON.Geometry | null {
         };
       }
     }
-    
+
     console.warn("WKT non reconnu:", wkt);
     return null;
   } catch (err) {
@@ -606,7 +606,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
       id: "event-geometries-line",
       type: "line",
       source: "event-geometries",
-      filter: ["any", 
+      filter: ["any",
         ["==", ["geometry-type"], "LineString"],
         ["==", ["geometry-type"], "Polygon"]
       ],
@@ -675,22 +675,22 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
   // Fonction pour surligner une géométrie sur la carte
   const highlightGeometry = (geom: GeometryData | null) => {
     if (!map) return;
-    
+
     // Supprimer l'ancien surlignage
     if (map.getLayer("highlight-geometry-fill")) map.removeLayer("highlight-geometry-fill");
     if (map.getLayer("highlight-geometry-line")) map.removeLayer("highlight-geometry-line");
     if (map.getSource("highlight-geometry")) map.removeSource("highlight-geometry");
-    
+
     if (!geom) {
       setSelectedGeometryId(null);
       return;
     }
-    
+
     setSelectedGeometryId(geom.id);
-    
+
     const geometry = parseWKTtoGeoJSON(geom.geom);
     if (!geometry) return;
-    
+
     const geojson: GeoJSON.FeatureCollection = {
       type: "FeatureCollection",
       features: [{
@@ -699,12 +699,12 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
         properties: { id: geom.id },
       }],
     };
-    
+
     map.addSource("highlight-geometry", {
       type: "geojson",
       data: geojson,
     });
-    
+
     // Style de surlignage plus visible
     if (geometry.type === "Polygon") {
       map.addLayer({
@@ -717,7 +717,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
         },
       });
     }
-    
+
     map.addLayer({
       id: "highlight-geometry-line",
       type: "line",
@@ -728,7 +728,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
         "line-dasharray": [2, 2],
       },
     });
-    
+
     // Centrer la carte sur la géométrie
     let coords: number[][] = [];
     if (geometry.type === "Polygon") {
@@ -738,7 +738,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
     } else if (geometry.type === "Point") {
       coords = [geometry.coordinates as number[]];
     }
-    
+
     if (coords.length > 0) {
       const bounds = coords.reduce(
         (acc: maplibregl.LngLatBounds, coord: number[]) => {
@@ -753,11 +753,11 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
   // Fonction pour supprimer une géométrie
   const handleDeleteGeometry = async (geometryId: number) => {
     if (!confirm("Êtes-vous sûr de vouloir supprimer cette géométrie ?")) return;
-    
+
     try {
       await invoke("delete_geometry", { geometryId });
       console.log("✅ Géométrie supprimée:", geometryId);
-      
+
       // Rafraîchir la liste
       const eventId = selectedEvent?.id;
       if (eventId) {
@@ -765,7 +765,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
         setGeometries(geoms);
         if (map) refreshGeometriesOnMap(map, geoms);
       }
-      
+
       // Désélectionner si c'était la géométrie sélectionnée
       if (selectedGeometryId === geometryId) {
         highlightGeometry(null);
@@ -779,26 +779,26 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
   // Fonction pour démarrer l'édition d'une géométrie
   const startEditGeometry = (geom: GeometryData) => {
     if (!drawRef.current || !map) return;
-    
+
     setEditingGeometryId(geom.id);
     highlightGeometry(null); // Supprimer le surlignage
-    
+
     // Convertir WKT en GeoJSON et l'ajouter au Draw
     const geometry = parseWKTtoGeoJSON(geom.geom);
     if (!geometry) return;
-    
+
     const feature: GeoJSON.Feature = {
       type: "Feature",
       id: `edit-${geom.id}`,
       geometry,
       properties: { originalId: geom.id },
     };
-    
+
     // Supprimer toutes les features du Draw et ajouter celle-ci
     drawRef.current.deleteAll();
     drawRef.current.add(feature as any);
     drawRef.current.changeMode("direct_select", { featureId: `edit-${geom.id}` });
-    
+
     // Masquer la géométrie originale
     if (map.getLayer("event-geometries-fill")) {
       map.setFilter("event-geometries-fill", ["!=", ["get", "id"], geom.id]);
@@ -814,19 +814,19 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
   // Fonction pour sauvegarder les modifications d'une géométrie
   const saveEditGeometry = async () => {
     if (!drawRef.current || !editingGeometryId) return;
-    
+
     const features = drawRef.current.getAll();
     if (features.features.length === 0) {
       alert("Aucune géométrie à sauvegarder");
       return;
     }
-    
+
     const feature = features.features[0];
     try {
       const wkt = geoJSONtoWKT(feature.geometry as GeoJSON.Geometry);
       await invoke("update_geometry", { geometryId: editingGeometryId, geom: wkt });
       console.log("✅ Géométrie mise à jour:", editingGeometryId);
-      
+
       // Rafraîchir
       const eventId = selectedEvent?.id;
       if (eventId && map) {
@@ -834,7 +834,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
         setGeometries(geoms);
         refreshGeometriesOnMap(map, geoms);
       }
-      
+
       cancelEditGeometry();
     } catch (err) {
       console.error("Erreur mise à jour géométrie:", err);
@@ -845,17 +845,17 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
   // Fonction pour annuler l'édition
   const cancelEditGeometry = () => {
     if (!drawRef.current || !map) return;
-    
+
     drawRef.current.deleteAll();
     drawRef.current.changeMode("simple_select");
     setEditingGeometryId(null);
-    
+
     // Restaurer les filtres des couches
     if (map.getLayer("event-geometries-fill")) {
       map.setFilter("event-geometries-fill", ["==", ["geometry-type"], "Polygon"]);
     }
     if (map.getLayer("event-geometries-line")) {
-      map.setFilter("event-geometries-line", ["any", 
+      map.setFilter("event-geometries-line", ["any",
         ["==", ["geometry-type"], "LineString"],
         ["==", ["geometry-type"], "Polygon"]
       ]);
@@ -974,7 +974,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
 
     mapInstance.on("load", () => {
       fetchAndDisplayPoints(mapInstance, selectedEventId);
-      
+
       // Initialiser MapboxDraw pour le dessin de géométries
       const draw = new MapboxDraw({
         displayControlsDefault: false,
@@ -1055,21 +1055,21 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
         try {
           const wkt = geoJSONtoWKT(feature.geometry);
           console.log("📐 Création géométrie:", wkt);
-          
+
           await invoke("create_geometry", {
             eventId: eventId,
             geom: wkt,
           });
-          
+
           console.log("✅ Géométrie sauvegardée");
-          
+
           // Supprimer la feature dessinée (elle sera rechargée depuis la DB)
           draw.delete(feature.id);
-          
+
           // Recharger les géométries depuis la DB
           const geoms = await invoke<GeometryData[]>("fetch_geometries_for_event", { eventId });
           setGeometries(geoms);
-          
+
           // Rafraîchir l'affichage des géométries sur la carte
           refreshGeometriesOnMap(mapInstance, geoms);
         } catch (err) {
@@ -1094,18 +1094,18 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
   // Recharger les points quand l'événement sélectionné change
   useEffect(() => {
     if (!map) return;
-    
+
     const reloadPoints = async () => {
       const eventId = selectedEvent?.id ?? null;
       console.log("🔄 Changement d'événement, rechargement des points pour event_id:", eventId);
-      
+
       try {
         const freshPoints = await invoke<any[]>("get_points", { eventId: eventId });
         console.log(`📍 ${freshPoints.length} point(s) récupéré(s) pour event ${eventId}`);
-        
+
         pointsRef.current = freshPoints;
         setPoints(freshPoints);
-        
+
         // Mettre à jour la source GeoJSON
         if (map.getSource("db-points")) {
           const geojson = {
@@ -1130,7 +1130,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
         console.error("Erreur rechargement points:", err);
       }
     };
-    
+
     reloadPoints();
   }, [selectedEvent, map]);
 
@@ -1270,9 +1270,9 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
     try {
       const canvas = map.getCanvas();
       canvas.style.cursor = awaitingMapClick ? "crosshair" : "";
-    } catch (err) {}
+    } catch (err) { }
     return () => {
-      try { if (map) map.getCanvas().style.cursor = ""; } catch (e) {}
+      try { if (map) map.getCanvas().style.cursor = ""; } catch (e) { }
     };
   }, [awaitingMapClick, map]);
 
@@ -1307,11 +1307,10 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
             <h3 className="text-white font-bold text-lg">📍 Points</h3>
             <button
               onClick={handleAddPointClick}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
-                awaitingMapClick
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${awaitingMapClick
                   ? 'bg-yellow-400 text-yellow-900 animate-pulse'
                   : 'bg-white/20 text-white hover:bg-white/30'
-              }`}
+                }`}
             >
               {awaitingMapClick ? '⏳ Cliquez' : '+ Ajouter'}
             </button>
@@ -1418,10 +1417,10 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
               <option value="">Choisir un événement...</option>
               {events.map((event) => (
                 <option key={event.id} value={event.id}>
-                  {event.event_type === 'Marathon' && '🏃‍♂️'} 
-                  {event.event_type === 'Cyclisme' && '🚴‍♂️'} 
-                  {event.event_type === 'Trail' && '🥾'} 
-                  {!['Marathon', 'Cyclisme', 'Trail'].includes(event.event_type)} 
+                  {event.event_type === 'Marathon' && '🏃‍♂️'}
+                  {event.event_type === 'Cyclisme' && '🚴‍♂️'}
+                  {event.event_type === 'Trail' && '🥾'}
+                  {!['Marathon', 'Cyclisme', 'Trail'].includes(event.event_type)}
                   {event.name || `Événement #${event.id}`}
                   {event.status === 'active' && ' 🟢'}
                   {event.status === 'planned' && ' 🔵'}
@@ -1460,181 +1459,177 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
         <div className="flex-1 flex overflow-hidden relative">
           {/* Carte */}
           <div ref={mapContainer} className="flex-1 h-full" />
-          
+
           {/* Barre d'outils de dessin flottante - visible uniquement si un événement est sélectionné */}
           {selectedEvent && (
-          <div className="absolute top-4 left-4 z-10">
-            <div className="bg-white/95 backdrop-blur-md rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-              {/* Bouton toggle */}
-              <button
-                onClick={() => setIsDrawingToolsOpen(!isDrawingToolsOpen)}
-                className={`w-full px-4 py-3 flex items-center gap-2 font-medium transition-all duration-200 ${
-                  isDrawingToolsOpen 
-                    ? 'bg-indigo-500 text-white' 
-                    : 'bg-white text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                <span className="text-lg">🛠️</span>
-                <span>Outils</span>
-                <span className={`ml-auto transition-transform duration-200 ${isDrawingToolsOpen ? 'rotate-180' : ''}`}>
-                  ▼
-                </span>
-              </button>
-              
-              {/* Panneau d'outils */}
-              {isDrawingToolsOpen && (
-                <div className="p-3 border-t border-gray-100 space-y-2">
-                  <p className="text-xs text-gray-500 mb-2">Dessiner une géométrie :</p>
-                  
-                  {/* Bouton Polygone */}
-                  <button
-                    onClick={startDrawPolygon}
-                    disabled={!selectedEvent}
-                    className={`w-full px-3 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all duration-200 ${
-                      drawingMode === "polygon"
-                        ? 'bg-indigo-500 text-white shadow-md'
-                        : selectedEvent
-                          ? 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
-                          : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+            <div className="absolute top-4 left-4 z-10">
+              <div className="bg-white/95 backdrop-blur-md rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+                {/* Bouton toggle */}
+                <button
+                  onClick={() => setIsDrawingToolsOpen(!isDrawingToolsOpen)}
+                  className={`w-full px-4 py-3 flex items-center gap-2 font-medium transition-all duration-200 ${isDrawingToolsOpen
+                      ? 'bg-indigo-500 text-white'
+                      : 'bg-white text-gray-700 hover:bg-gray-50'
                     }`}
-                  >
-                    <span className="text-lg">⬡</span>
-                    <span>Polygone (zone)</span>
-                  </button>
-                  
-                  {/* Bouton Ligne */}
-                  <button
-                    onClick={startDrawLine}
-                    disabled={!selectedEvent}
-                    className={`w-full px-3 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all duration-200 ${
-                      drawingMode === "line"
-                        ? 'bg-green-500 text-white shadow-md'
-                        : selectedEvent
-                          ? 'bg-green-50 text-green-700 hover:bg-green-100'
-                          : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    }`}
-                  >
-                    <span className="text-lg">╱</span>
-                    <span>Ligne (chemin)</span>
-                  </button>
-                  
-                  {/* Bouton Annuler */}
-                  {drawingMode !== "none" && (
+                >
+                  <span className="text-lg">🛠️</span>
+                  <span>Outils</span>
+                  <span className={`ml-auto transition-transform duration-200 ${isDrawingToolsOpen ? 'rotate-180' : ''}`}>
+                    ▼
+                  </span>
+                </button>
+
+                {/* Panneau d'outils */}
+                {isDrawingToolsOpen && (
+                  <div className="p-3 border-t border-gray-100 space-y-2">
+                    <p className="text-xs text-gray-500 mb-2">Dessiner une géométrie :</p>
+
+                    {/* Bouton Polygone */}
                     <button
-                      onClick={cancelDrawing}
-                      className="w-full px-3 py-2 rounded-lg flex items-center gap-2 text-sm font-medium bg-red-50 text-red-600 hover:bg-red-100 transition-all duration-200"
+                      onClick={startDrawPolygon}
+                      disabled={!selectedEvent}
+                      className={`w-full px-3 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all duration-200 ${drawingMode === "polygon"
+                          ? 'bg-indigo-500 text-white shadow-md'
+                          : selectedEvent
+                            ? 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
+                            : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        }`}
                     >
-                      <span className="text-lg">✕</span>
-                      <span>Annuler le dessin</span>
+                      <span className="text-lg">⬡</span>
+                      <span>Polygone (zone)</span>
                     </button>
-                  )}
-                  
-                  {/* Message d'aide */}
-                  {drawingMode !== "none" && (
-                    <div className="mt-2 p-2 bg-blue-50 rounded-lg text-xs text-blue-700">
-                      <p className="font-medium">💡 Instructions :</p>
-                      {drawingMode === "polygon" && (
-                        <p>Cliquez pour placer les sommets du polygone. Double-cliquez pour terminer.</p>
-                      )}
-                      {drawingMode === "line" && (
-                        <p>Cliquez pour placer les points du chemin. Double-cliquez pour terminer.</p>
-                      )}
-                    </div>
-                  )}
-                  
-                  {!selectedEvent && (
-                    <p className="text-xs text-amber-600 mt-2">
-                      ⚠️ Sélectionnez un événement pour dessiner
-                    </p>
-                  )}
-                  
-                  {/* Affichage du nombre de géométries et liste */}
-                  {selectedEvent && geometries.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-gray-100">
+
+                    {/* Bouton Ligne */}
+                    <button
+                      onClick={startDrawLine}
+                      disabled={!selectedEvent}
+                      className={`w-full px-3 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all duration-200 ${drawingMode === "line"
+                          ? 'bg-green-500 text-white shadow-md'
+                          : selectedEvent
+                            ? 'bg-green-50 text-green-700 hover:bg-green-100'
+                            : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        }`}
+                    >
+                      <span className="text-lg">╱</span>
+                      <span>Ligne (chemin)</span>
+                    </button>
+
+                    {/* Bouton Annuler */}
+                    {drawingMode !== "none" && (
                       <button
-                        onClick={() => setIsGeometryListOpen(!isGeometryListOpen)}
-                        className="w-full flex items-center justify-between text-xs text-gray-600 hover:text-gray-800"
+                        onClick={cancelDrawing}
+                        className="w-full px-3 py-2 rounded-lg flex items-center gap-2 text-sm font-medium bg-red-50 text-red-600 hover:bg-red-100 transition-all duration-200"
                       >
-                        <span>📐 {geometries.length} géométrie(s)</span>
-                        <span className={`transition-transform ${isGeometryListOpen ? 'rotate-180' : ''}`}>▼</span>
+                        <span className="text-lg">✕</span>
+                        <span>Annuler le dessin</span>
                       </button>
-                      
-                      {isGeometryListOpen && (
-                        <div className="mt-2 max-h-48 overflow-y-auto space-y-1">
-                          {geometries.map((geom) => {
-                            const { label, icon } = getGeometryTypeLabel(geom.geom);
-                            const isSelected = selectedGeometryId === geom.id;
-                            const isEditing = editingGeometryId === geom.id;
-                            
-                            return (
-                              <div
-                                key={geom.id}
-                                className={`p-2 rounded-lg text-xs transition-all ${
-                                  isEditing 
-                                    ? 'bg-amber-100 border border-amber-300'
-                                    : isSelected 
-                                      ? 'bg-indigo-100 border border-indigo-300' 
-                                      : 'bg-gray-50 hover:bg-gray-100 border border-transparent'
-                                }`}
-                              >
-                                <div className="flex items-center justify-between">
-                                  <button
-                                    onClick={() => highlightGeometry(isSelected ? null : geom)}
-                                    className="flex items-center gap-1 text-left flex-1"
-                                  >
-                                    <span>{icon}</span>
-                                    <span className="font-medium">{label} #{geom.id}</span>
-                                  </button>
-                                  
-                                  {!editingGeometryId && (
-                                    <div className="flex gap-1">
+                    )}
+
+                    {/* Message d'aide */}
+                    {drawingMode !== "none" && (
+                      <div className="mt-2 p-2 bg-blue-50 rounded-lg text-xs text-blue-700">
+                        <p className="font-medium">💡 Instructions :</p>
+                        {drawingMode === "polygon" && (
+                          <p>Cliquez pour placer les sommets du polygone. Double-cliquez pour terminer.</p>
+                        )}
+                        {drawingMode === "line" && (
+                          <p>Cliquez pour placer les points du chemin. Double-cliquez pour terminer.</p>
+                        )}
+                      </div>
+                    )}
+
+                    {!selectedEvent && (
+                      <p className="text-xs text-amber-600 mt-2">
+                        ⚠️ Sélectionnez un événement pour dessiner
+                      </p>
+                    )}
+
+                    {/* Affichage du nombre de géométries et liste */}
+                    {selectedEvent && geometries.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-gray-100">
+                        <button
+                          onClick={() => setIsGeometryListOpen(!isGeometryListOpen)}
+                          className="w-full flex items-center justify-between text-xs text-gray-600 hover:text-gray-800"
+                        >
+                          <span>📐 {geometries.length} géométrie(s)</span>
+                          <span className={`transition-transform ${isGeometryListOpen ? 'rotate-180' : ''}`}>▼</span>
+                        </button>
+
+                        {isGeometryListOpen && (
+                          <div className="mt-2 max-h-48 overflow-y-auto space-y-1">
+                            {geometries.map((geom) => {
+                              const { label, icon } = getGeometryTypeLabel(geom.geom);
+                              const isSelected = selectedGeometryId === geom.id;
+                              const isEditing = editingGeometryId === geom.id;
+
+                              return (
+                                <div
+                                  key={geom.id}
+                                  className={`p-2 rounded-lg text-xs transition-all ${isEditing
+                                      ? 'bg-amber-100 border border-amber-300'
+                                      : isSelected
+                                        ? 'bg-indigo-100 border border-indigo-300'
+                                        : 'bg-gray-50 hover:bg-gray-100 border border-transparent'
+                                    }`}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <button
+                                      onClick={() => highlightGeometry(isSelected ? null : geom)}
+                                      className="flex items-center gap-1 text-left flex-1"
+                                    >
+                                      <span>{icon}</span>
+                                      <span className="font-medium">{label} #{geom.id}</span>
+                                    </button>
+
+                                    {!editingGeometryId && (
+                                      <div className="flex gap-1">
+                                        <button
+                                          onClick={() => startEditGeometry(geom)}
+                                          className="p-1 rounded hover:bg-blue-100 text-blue-600"
+                                          title="Modifier"
+                                        >
+                                          ✏️
+                                        </button>
+                                        <button
+                                          onClick={() => handleDeleteGeometry(geom.id)}
+                                          className="p-1 rounded hover:bg-red-100 text-red-600"
+                                          title="Supprimer"
+                                        >
+                                          🗑️
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {isEditing && (
+                                    <div className="mt-2 flex gap-1">
                                       <button
-                                        onClick={() => startEditGeometry(geom)}
-                                        className="p-1 rounded hover:bg-blue-100 text-blue-600"
-                                        title="Modifier"
+                                        onClick={saveEditGeometry}
+                                        className="flex-1 px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600"
                                       >
-                                        ✏️
+                                        ✓ Sauvegarder
                                       </button>
                                       <button
-                                        onClick={() => handleDeleteGeometry(geom.id)}
-                                        className="p-1 rounded hover:bg-red-100 text-red-600"
-                                        title="Supprimer"
+                                        onClick={cancelEditGeometry}
+                                        className="flex-1 px-2 py-1 bg-gray-400 text-white rounded text-xs hover:bg-gray-500"
                                       >
-                                        🗑️
+                                        ✕ Annuler
                                       </button>
                                     </div>
                                   )}
                                 </div>
-                                
-                                {isEditing && (
-                                  <div className="mt-2 flex gap-1">
-                                    <button
-                                      onClick={saveEditGeometry}
-                                      className="flex-1 px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600"
-                                    >
-                                      ✓ Sauvegarder
-                                    </button>
-                                    <button
-                                      onClick={cancelEditGeometry}
-                                      className="flex-1 px-2 py-1 bg-gray-400 text-white rounded text-xs hover:bg-gray-500"
-                                    >
-                                      ✕ Annuler
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
           )}
-          
+
           {/* Panneau droit: détails du point sélectionné OU formulaire d'ajout */}
           {(selectedPoint || addingPointCoords) && (
             <div className="w-96 bg-white/95 backdrop-blur-md border-l border-gray-200 shadow-lg flex flex-col overflow-hidden">
