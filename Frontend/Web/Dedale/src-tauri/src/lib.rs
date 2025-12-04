@@ -5,6 +5,7 @@ use tauri::Manager;
 mod db;
 mod excel;
 mod map;
+mod map_static;
 mod pdf;
 mod seed;
 mod socket;

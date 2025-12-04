@@ -1,14 +1,34 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import * as path from '@tauri-apps/api/path';
 import QrCode from './QrCode';
+
+// Interface pour les événements
+interface SimpleEvent {
+    id: number;
+    name: string;
+}
 
 function Data() {
     const [qrCodeBase64, setQrCodeBase64] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
-    // État pour les messages de statut (Export, PDF)
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const [events, setEvents] = useState<SimpleEvent[]>([]);
+    const [selectedEventId, setSelectedEventId] = useState<string>("");
+
+    // --- CHARGEMENT DES ÉVÉNEMENTS ---
+    useEffect(() => {
+        const loadEvents = async () => {
+            try {
+                const evts = await invoke<any[]>("fetch_events");
+                setEvents(evts.map(e => ({ id: e.id, name: e.name })));
+            } catch (e) {
+                console.error("Erreur chargement événements:", e);
+            }
+        };
+        loadEvents();
+    }, []);
 
     // Fonction pour l'export Excel
     const generate_excel = useCallback(async () => {
@@ -17,64 +37,61 @@ function Data() {
             const appDataPath = await path.appDataDir();
             if (!appDataPath) throw new Error("Impossible de récupérer AppData");
 
-            // Utilisation de mockPath.join
             const db_url = await path.join(appDataPath, 'mydatabase.db');
-            const excel_path_str = await path.join(appDataPath, 'points.xlsx');
-            
-            console.log(`Chemin de la BDD: ${db_url}`);
-            console.log(`Chemin Excel: ${excel_path_str}`);
+            const filename = selectedEventId
+                ? `points_event_${selectedEventId}.xlsx`
+                : 'points_all.xlsx';
 
-            // Utilisation de mockInvoke
-            await invoke('export_points_excel', { dbUrl: db_url, excelPathStr: excel_path_str });
+            const excel_path_str = await path.join(appDataPath, filename);
 
-            setMessage({ 
-                type: 'success', 
-                text: `Exportation Excel réussie. Le fichier est simulé à : ${excel_path_str}` 
+            const eventIdParam = selectedEventId ? parseInt(selectedEventId) : null;
+
+            await invoke('export_points_excel', {
+                dbUrl: db_url,
+                excelPathStr: excel_path_str,
+                eventId: eventIdParam
+            });
+
+            setMessage({
+                type: 'success',
+                text: `Export réussi : ${filename}`
             });
         } catch (error) {
-            console.error("Erreur lors de l'exportation Excel:", error);
-            setMessage({ 
-                type: 'error', 
-                text: `Erreur d'exportation: ${String(error)}. Vérifiez la console.` 
-            });
+            console.error("Erreur export Excel:", error);
+            setMessage({ type: 'error', text: `Erreur: ${String(error)}` });
         }
-    }, []);
+    }, [selectedEventId]);
 
     // Fonction pour la création de PDF
     const createPdf = useCallback(async () => {
         setMessage(null);
         try {
-            // Utilisation de mockInvoke
-            await invoke("create_pdf");
-            setMessage({ 
-                type: 'success', 
-                text: "Génération PDF lancée avec succès (simulée). Vérifiez votre dossier de données." 
+            const eventIdParam = selectedEventId ? parseInt(selectedEventId) : null;
+
+            await invoke("create_pdf", { eventId: eventIdParam });
+
+            setMessage({
+                type: 'success',
+                text: "PDF généré avec succès. Vérifiez le dossier temporaire."
             });
         } catch (error) {
-            console.error("Erreur lors de la création du PDF:", error);
-            setMessage({ 
-                type: 'error', 
-                text: `Erreur de création PDF: ${String(error)}. Vérifiez la console.` 
-            });
+            console.error("Erreur PDF:", error);
+            setMessage({ type: 'error', text: `Erreur PDF: ${String(error)}` });
         }
-    }, []);
+    }, [selectedEventId]);
 
 
-    // Fonction pour le démarrage du serveur et génération du QR code
+    // Fonction QR Code (Inchangée)
     const qr_code = useCallback(async () => {
         setIsLoading(true);
         setError(null);
         setQrCodeBase64(null);
         setMessage(null);
-
         try {
-            // Utilisation de mockInvoke
             const base64String = await invoke<string>('start_server');
-            
             setQrCodeBase64(base64String);
-            
         } catch (err) {
-            console.error('Erreur au démarrage du serveur:', err);
+            console.error('Erreur serveur:', err);
             setError(String(err));
         } finally {
             setIsLoading(false);
@@ -85,26 +102,19 @@ function Data() {
         if (!base64) return '';
         return `data:image/png;base64,${base64}`;
     }
-    
-    // Classes de base pour les boutons
+
     const baseBtn = "w-full px-6 py-3 font-semibold rounded-xl transition duration-300 shadow-md transform hover:scale-[1.02]";
-    
     const exportBtnClass = `${baseBtn} bg-green-500 text-white hover:bg-green-600 focus:ring-4 focus:ring-green-300`;
     const pdfBtnClass = `${baseBtn} bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-4 focus:ring-indigo-300`;
-    const connectBtnClass = qrCodeBase64 
+    const connectBtnClass = qrCodeBase64
         ? `${baseBtn} bg-blue-500 text-white hover:bg-blue-600 focus:ring-4 focus:ring-blue-300`
         : `${baseBtn} bg-gray-700 text-white hover:bg-gray-800 focus:ring-4 focus:ring-gray-400`;
 
-    // Composant de feedback pour les messages (success/error)
     const FeedbackMessage = ({ type, text }: { type: 'success' | 'error'; text: string }) => {
-        const classes = type === 'success' 
-            ? "bg-green-100 border-green-500 text-green-700"
-            : "bg-red-100 border-red-500 text-red-700";
-        const title = type === 'success' ? "Succès" : "Erreur";
-
+        const classes = type === 'success' ? "bg-green-100 border-green-500 text-green-700" : "bg-red-100 border-red-500 text-red-700";
         return (
             <div className={`p-4 border-l-4 ${classes} rounded-lg shadow-inner mt-4 w-full max-w-lg mx-auto`}>
-                <p className="font-bold">{title}</p>
+                <p className="font-bold">{type === 'success' ? "Succès" : "Erreur"}</p>
                 <p className="text-sm break-all">{text}</p>
             </div>
         );
@@ -122,48 +132,68 @@ function Data() {
                     </p>
                 </header>
 
-                {/* Section des Messages de Statut Global */}
                 {message && <FeedbackMessage type={message.type} text={message.text} />}
-
 
                 <div className="mt-8 grid lg:grid-cols-3 gap-8">
 
-                    {/* COLONNE 1: Gestion des Données (Export/PDF) */}
-                    <div className="lg:col-span-1 bg-gray-50 p-6 rounded-2xl border border-gray-200 shadow-lg h-full">
+                    {/* Gestion des Données (Export/PDF) */}
+                    <div className="lg:col-span-1 bg-gray-50 p-6 rounded-2xl border border-gray-200 shadow-lg h-full flex flex-col">
                         <h2 className="text-2xl font-bold text-gray-700 mb-6 border-b pb-2">
                             Gestion des Fichiers
                         </h2>
-                        <div className="space-y-4">
+
+                        {/* --- SÉLECTEUR D'ÉVÉNEMENT --- */}
+                        <div className="mb-6">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Filtrer par événement</label>
+                            <div className="relative">
+                                <select
+                                    value={selectedEventId}
+                                    onChange={(e) => setSelectedEventId(e.target.value)}
+                                    className="block w-full pl-3 pr-10 py-3 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-xl border shadow-sm bg-white"
+                                >
+                                    <option value="">📂 Tous les événements</option>
+                                    <hr />
+                                    {events.map((evt) => (
+                                        <option key={evt.id} value={evt.id}>
+                                            🔹 {evt.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-2 italic">
+                                {selectedEventId
+                                    ? "L'export ne contiendra que les points de cet événement."
+                                    : "L'export contiendra la totalité de la base de données."}
+                            </p>
+                        </div>
+
+                        <div className="space-y-4 mt-auto">
                             <button
-                                className={exportBtnClass}
+                                className={`${exportBtnClass} ${!selectedEventId ? 'opacity-90' : ''}`}
                                 onClick={generate_excel}
-                                aria-label="Exporter les données au format Excel"
                             >
-                                Exporter les Données (Excel)
+                                Exporter Excel {selectedEventId ? "(Filtré)" : "(Complet)"}
                             </button>
                             <button
-                                className={pdfBtnClass}
+                                className={`${pdfBtnClass} ${!selectedEventId ? 'opacity-90' : ''}`}
                                 onClick={createPdf}
-                                aria-label="Créer un rapport PDF"
                             >
-                                Créer un Rapport (PDF)
+                                Générer PDF {selectedEventId ? "(Filtré)" : "(Complet)"}
                             </button>
                         </div>
                     </div>
 
-
-                    {/* COLONNE 2 & 3: Connexion Mobile (QR Code) */}
+                    {/* Connexion Mobile (QR Code) */}
                     <div className="lg:col-span-2 bg-blue-50 p-6 rounded-2xl border-2 border-dashed border-blue-200 shadow-lg flex flex-col items-center justify-center min-h-[300px]">
                         <h2 className="text-2xl font-bold text-blue-700 mb-6 text-center">
                             Connexion de l'Application Mobile
                         </h2>
-                        
+
                         <div className="w-full max-w-md">
                             <button
                                 className={connectBtnClass}
                                 onClick={qr_code}
                                 disabled={isLoading}
-                                aria-label={qrCodeBase64 ? "Serveur déjà démarré" : "Démarrer le serveur et connecter l'application"}
                             >
                                 {isLoading ? (
                                     <span className="flex items-center justify-center">
@@ -171,7 +201,7 @@ function Data() {
                                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                         </svg>
-                                        Démarrage du serveur...
+                                        Démarrage...
                                     </span>
                                 ) : (
                                     qrCodeBase64 ? "Serveur WebSocket Actif" : "Démarrer Serveur & Connecter App Mobile"
@@ -179,29 +209,25 @@ function Data() {
                             </button>
                         </div>
 
-                        {/* Contenu dynamique : Erreur / QR Code */}
-                        <div className="mt-8">
+                        <div className="mt-8 w-full flex justify-center">
                             {error && (
-                                <div className="p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg text-center shadow-lg">
+                                <div className="p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg text-center shadow-lg w-full max-w-md">
                                     <h3 className="font-bold mb-1">Erreur Critique</h3>
-                                    <p className="text-sm">Impossible de démarrer le serveur. Erreur: <code className="text-xs break-all">{error}</code></p>
+                                    <p className="text-sm">Impossible de démarrer le serveur. <br /><code className="text-xs">{error}</code></p>
                                 </div>
                             )}
-                            
+
                             {qrCodeBase64 && !isLoading && (
-                                <div className="flex flex-col items-center">
-                                    <p className="text-lg text-gray-700 mb-4 font-medium">
-                                        Scannez ce code depuis l'application mobile.
-                                    </p>
-                                    <QrCode 
-                                        qrCodeUri={getQrCodeUri(qrCodeBase64)} 
-                                    />
+                                <div className="flex flex-col items-center animate-in fade-in zoom-in duration-300">
+                                    <p className="text-lg text-gray-700 mb-4 font-medium">Scannez ce code :</p>
+                                    <div className="p-4 bg-white rounded-xl shadow-md">
+                                        <QrCode qrCodeUri={getQrCodeUri(qrCodeBase64)} />
+                                    </div>
                                 </div>
                             )}
                         </div>
                     </div>
                 </div>
-
             </div>
         </div>
     );
