@@ -33,7 +33,7 @@ pub async fn export_points_excel(app: AppHandle) -> Result<(), String> {
         if !p.obstacles.is_empty() {
             for obstacle in &p.obstacles {
                 worksheet
-                    .write_number(current_row, 0, p.id as f64)
+                    .write_string(current_row, 0, &p.id)
                     .map_err(|e| e.to_string())?;
                 worksheet
                     .write_number(current_row, 1, p.x)
@@ -68,7 +68,7 @@ pub async fn export_points_excel(app: AppHandle) -> Result<(), String> {
             }
         } else {
             worksheet
-                .write_number(current_row, 0, p.id as f64)
+                .write_string(current_row, 0, &p.id)
                 .map_err(|e| e.to_string())?;
             worksheet
                 .write_number(current_row, 1, p.x)

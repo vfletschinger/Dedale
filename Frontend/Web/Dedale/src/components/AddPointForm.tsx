@@ -101,8 +101,8 @@ export default function AddPointForm({
       const obstaclesSnake = mergedObstacles
         .filter((o) => o.number && o.number > 0)
         .map((o) => ({
-          id: 0,
-          point_id: 0,
+          id: "",
+          point_id: "",
           type_id: Number(o.typeId),
           number: Number(o.number),
           name: o.name ?? null,
@@ -112,15 +112,15 @@ export default function AddPointForm({
         }));
 
       const comments = comment
-        ? [{ id: 0, point_id: 0, value: comment }]
+        ? [{ id: "", point_id: "", value: comment }]
         : [];
 
-      const picturesPayload = pictures.map((p) => ({ id: 0, point_id: 0, image: p.startsWith("data:") ? p : `data:image/png;base64,${p}` }));
+      const picturesPayload = pictures.map((p) => ({ id: "", point_id: "", image: p.startsWith("data:") ? p : `data:image/png;base64,${p}` }));
 
       // Build PointDetail shape expected by Rust `insert_point_details`
       const detail = {
         point: {
-          id: 0,
+          id: "",
           x: Number(x),
           y: Number(y),
           pose: pose || null,
@@ -133,7 +133,7 @@ export default function AddPointForm({
 
       console.log("📍 Envoi du point:", JSON.stringify(detail, null, 2));
       console.log("🎯 Event ID:", eventId);
-      const insertedIds = await invoke<number[]>("insert_point", { 
+      const insertedIds = await invoke<string[]>("insert_point", { 
         details: [detail], 
         eventId: eventId || null 
       });
