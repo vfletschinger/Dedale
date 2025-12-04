@@ -31,7 +31,7 @@ export default function PointCard({
   displayNavigationArrow = true,
   displayKnob = true,
 }: PointCardProps) {
-  const [address, setAddress] = useState<string>("Chargement...");
+  const [, setAddress] = useState<string>("Chargement...");
 
   useEffect(() => {
     const fetchAddress = async () => {

@@ -7,7 +7,7 @@ import React, {
   useCallback,
 } from "react";
 import { InterestPointsType } from "../types/database";
-import getDatabase from "../../assets/migrations";
+import { getDatabase } from "../../assets/migrations";
 
 interface PointsContextType {
   pointsByEvent: { [key: number]: InterestPointsType[] };

@@ -1,23 +1,24 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { View, Text, Pressable, Alert } from "react-native";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import MapView, {
   Marker,
   Polyline,
   Region,
-  UrlTile,
   PROVIDER_DEFAULT,
 } from "react-native-maps";
 import * as Location from "expo-location";
-import { InterestPointsType } from "../types/database";
 
 export default function RouteNavigation() {
   const route = useRoute();
   const navigation = useNavigation();
-  const points: InterestPointsType[] = (route.params as any)?.points ?? [];
+  const points = useMemo(
+    () => (route.params as any)?.points ?? [],
+    [route.params]
+  );
 
   const [currentRegion, setCurrentRegion] = useState<Region | undefined>();
-  const [currentLocation, setCurrentLocation] = useState<{
+  const [, setCurrentLocation] = useState<{
     latitude: number;
     longitude: number;
   } | null>(null);
@@ -145,7 +146,7 @@ export default function RouteNavigation() {
     return () => {
       watchLocation.then((subscription) => subscription.remove());
     };
-  }, []);
+  }, [points]);
 
   const goToNextPoint = () => {
     if (currentPointIndex < points.length - 1) {

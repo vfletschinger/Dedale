@@ -10,11 +10,16 @@ import {
 } from "react-native";
 import CustomButton from "../components/CustomButton";
 import QRCodeScanner from "../components/QrCodeScanner";
-import Feather from "@expo/vector-icons/Feather";
+import { Feather } from "@expo/vector-icons";
 import { useEvent, EventWithStatus } from "../context/EventContext";
 import { useWebSocket } from "../context/WebSocketContext";
-import { useNavigation } from "@react-navigation/native";
-import getDatabase from "../../assets/migrations";
+import { getDatabase } from "../../assets/migrations";
+import {
+  InterestPointsType,
+  CommentType,
+  PictureType,
+  ObstacleType,
+} from "../types/database";
 import EventItem from "../components/EventItem";
 
 export default function SettingsScreen() {
@@ -30,7 +35,6 @@ export default function SettingsScreen() {
   } = useEvent();
   const { isConnected, sendEvent } = useWebSocket();
   const db = getDatabase();
-  const navigation = useNavigation<any>();
 
   const selectedEvent = getSelectedEvent();
 
@@ -351,42 +355,27 @@ export default function SettingsScreen() {
               Data Synchronization
             </Text>
 
-            <Text className="text-sm text-gray-600 text-center mb-4">
-              Scannez un QR code pour recevoir ou envoyer des données
-            </Text>
-
-            <View className="w-full gap-3">
-              {/* Bouton pour recevoir (scan QR du desktop) */}
-              <CustomButton
-                onPress={() => {
-                  setScanMode('receive');
-                  setScanQR(true);
-                }}
-                title="📥 Recevoir des événements"
-              />
-
-              {/* Bouton pour envoyer (scan QR du desktop) */}
-              <CustomButton
-                onPress={() => {
-                  if (!selectedEvent) {
-                    Alert.alert(
-                      "Aucun événement sélectionné",
-                      "Veuillez sélectionner un événement à exporter."
-                    );
-                    return;
-                  }
-                  setScanMode('send');
-                  setScanQR(true);
-                }}
-                title="📤 Envoyer l'événement au bureau"
-                disabled={!selectedEvent}
-              />
-            </View>
-
-            {isConnected && (
-              <Text className="text-sm text-green-600 text-center mt-4">
-                ✓ Connecté à l'application de bureau
-              </Text>
+            {!isConnected ? (
+              <>
+                <Text className="text-sm text-gray-600 text-center mb-6">
+                  Scan QR code to connect desktop application
+                </Text>
+                <CustomButton
+                  onPress={() => setScanQR(true)}
+                  title="Scan QR Code"
+                />
+              </>
+            ) : (
+              <>
+                <Text className="text-sm text-green-600 text-center mb-6">
+                  ✓ Connecté à l&apos;application de bureau
+                </Text>
+                <CustomButton
+                  onPress={handleExportEvent}
+                  title="Exporter l'événement vers l'application de bureau"
+                  disabled={!selectedEvent}
+                />
+              </>
             )}
           </View>
         </View>
