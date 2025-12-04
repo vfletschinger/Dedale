@@ -14,7 +14,7 @@ import {
   useFocusEffect,
 } from "@react-navigation/native";
 import React, { useCallback, useState } from "react";
-import getDatabase from "../../assets/migrations";
+import { getDatabase } from "../../assets/migrations";
 import {
   PointDetailType,
   CommentType,
@@ -130,6 +130,7 @@ export default function PointDetails() {
   useFocusEffect(
     useCallback(() => {
       fetchPoint();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pointId])
   );
 
@@ -313,11 +314,6 @@ export default function PointDetails() {
       console.error("Erreur:", error);
       Alert.alert("Erreur", "Impossible de sauvegarder les obstacles");
     }
-  };
-
-  const handleAddObstacles = () => {
-    setEditingObstacles(false);
-    setIsObstacleSelectorVisible(true);
   };
 
   const handleEditObstacles = () => {

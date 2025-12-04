@@ -10,11 +10,10 @@ import {
 } from "react-native";
 import CustomButton from "../components/CustomButton";
 import QRCodeScanner from "../components/QrCodeScanner";
-import Feather from "@expo/vector-icons/Feather";
+import { Feather } from "@expo/vector-icons";
 import { useEvent, EventWithStatus } from "../context/EventContext";
 import { useWebSocket } from "../context/WebSocketContext";
-import { useNavigation } from "@react-navigation/native";
-import getDatabase from "../../assets/migrations";
+import { getDatabase } from "../../assets/migrations";
 import {
   InterestPointsType,
   CommentType,
@@ -48,7 +47,6 @@ export default function SettingsScreen() {
   } = useEvent();
   const { isConnected, sendEvent } = useWebSocket();
   const db = getDatabase();
-  const navigation = useNavigation<any>();
 
   const selectedEvent = getSelectedEvent();
 
@@ -371,7 +369,7 @@ export default function SettingsScreen() {
             ) : (
               <>
                 <Text className="text-sm text-green-600 text-center mb-6">
-                  ✓ Connecté à l'application de bureau
+                  ✓ Connecté à l&apos;application de bureau
                 </Text>
                 <CustomButton
                   onPress={handleExportEvent}

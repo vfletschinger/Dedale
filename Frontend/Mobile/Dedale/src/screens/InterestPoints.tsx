@@ -8,9 +8,9 @@ import {
   Alert,
 } from "react-native";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState } from "react";
 import { InterestPointsType } from "../types/database";
-import getDatabase from "../../assets/migrations";
+import { getDatabase } from "../../assets/migrations";
 
 import {
   calculateDistance,
@@ -190,7 +190,7 @@ export default function InterestPointsScreen() {
     <View className="flex-1 bg-gray-50">
       {/* Header */}
       <View className="header">
-        <Text className="header-title-lg mb-2">Points d'intérêt</Text>
+        <Text className="header-title-lg mb-2">Points d&apos;intérêt</Text>
         <Text className="header-subtitle">
           {sortedList.length}{" "}
           {sortedList.length > 1 ? "points enregistrés" : "point enregistré"}
@@ -233,9 +233,9 @@ export default function InterestPointsScreen() {
           <View className="empty-icon">
             <Text className="text-5xl">📍</Text>
           </View>
-          <Text className="empty-title">Aucun point d'intérêt</Text>
+          <Text className="empty-title">Aucun point d&apos;intérêt</Text>
           <Text className="empty-text">
-            Commencez par enregistrer votre premier point d'intérêt
+            Commencez par enregistrer votre premier point d&apos;intérêt
           </Text>
           <Pressable
             className="btn-add-point"

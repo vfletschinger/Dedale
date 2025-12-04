@@ -1,6 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, Modal, Pressable, ScrollView, TextInput } from 'react-native';
-import getDatabase from '../../assets/migrations';
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  Text,
+  Modal,
+  Pressable,
+  ScrollView,
+  TextInput,
+} from "react-native";
+import { getDatabase } from "../../assets/migrations";
 
 type ObstacleType = {
   id: number;
@@ -21,7 +28,7 @@ type ObstacleSelectorProps = {
   onClose: () => void;
   onSave: (obstacles: SelectedObstacle[]) => void;
   initialObstacles?: SelectedObstacle[];
-  editMode?: boolean; 
+  editMode?: boolean;
 };
 
 export default function ObstacleSelector({
@@ -29,31 +36,38 @@ export default function ObstacleSelector({
   onClose,
   onSave,
   initialObstacles = [],
-  editMode = false
+  editMode = false,
 }: ObstacleSelectorProps) {
   const db = getDatabase();
-  const [availableObstacles, setAvailableObstacles] = useState<ObstacleType[]>([]);
-  const [selectedObstacles, setSelectedObstacles] = useState<SelectedObstacle[]>(initialObstacles);
+  const [availableObstacles, setAvailableObstacles] = useState<ObstacleType[]>(
+    []
+  );
+  const [selectedObstacles, setSelectedObstacles] =
+    useState<SelectedObstacle[]>(initialObstacles);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [selectedType, setSelectedType] = useState<ObstacleType | null>(null);
-  const [obstacleNumber, setObstacleNumber] = useState('1');
+  const [obstacleNumber, setObstacleNumber] = useState("1");
 
   useEffect(() => {
     if (visible) {
       fetchObstacleTypes();
       setSelectedObstacles(initialObstacles);
       setSelectedType(null);
-      setObstacleNumber('1');
+      setObstacleNumber("1");
       setIsDropdownOpen(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, initialObstacles]);
 
   const fetchObstacleTypes = () => {
     try {
-      const types = db.getAllSync<ObstacleType>('SELECT * FROM obstacle_type');
+      const types = db.getAllSync<ObstacleType>("SELECT * FROM obstacle_type");
       setAvailableObstacles(types || []);
     } catch (error) {
-      console.error('Erreur lors de la récupération des types d\'obstacles:', error);
+      console.error(
+        "Erreur lors de la récupération des types d'obstacles:",
+        error
+      );
     }
   };
 
@@ -61,16 +75,16 @@ export default function ObstacleSelector({
     if (!selectedType) return;
 
     const number = parseInt(obstacleNumber) || 1;
-    
+
     const newObstacle: SelectedObstacle = {
       type_id: selectedType.id,
       name: selectedType.name,
-      number: number
+      number: number,
     };
 
     setSelectedObstacles([...selectedObstacles, newObstacle]);
     setSelectedType(null);
-    setObstacleNumber('1');
+    setObstacleNumber("1");
     setIsDropdownOpen(false);
   };
 
@@ -87,7 +101,7 @@ export default function ObstacleSelector({
   const handleCancel = () => {
     setSelectedObstacles([]);
     setSelectedType(null);
-    setObstacleNumber('1');
+    setObstacleNumber("1");
     setIsDropdownOpen(false);
     onClose();
   };
@@ -102,20 +116,24 @@ export default function ObstacleSelector({
       <View className="flex-1 justify-center items-center bg-black/50 p-4">
         <View className="bg-white rounded-3xl p-6 w-full max-w-lg max-h-[85%]">
           <Text className="text-2xl font-bold mb-4 text-center">
-            {editMode ? 'Modifier les obstacles' : 'Ajouter des obstacles'}
+            {editMode ? "Modifier les obstacles" : "Ajouter des obstacles"}
           </Text>
 
           {/* Dropdown de sélection */}
           <View className="mb-4">
             <Text className="text-sm font-semibold mb-2 text-gray-700">
-              Type d'obstacle
+              Type d&apos;obstacle
             </Text>
             <Pressable
               onPress={() => setIsDropdownOpen(!isDropdownOpen)}
               className="border border-gray-300 rounded-lg p-3 bg-white"
             >
-              <Text className={selectedType ? 'text-gray-900' : 'text-gray-400'}>
-                {selectedType ? selectedType.name : 'Sélectionner un obstacle...'}
+              <Text
+                className={selectedType ? "text-gray-900" : "text-gray-400"}
+              >
+                {selectedType
+                  ? selectedType.name
+                  : "Sélectionner un obstacle..."}
               </Text>
             </Pressable>
 
@@ -163,7 +181,7 @@ export default function ObstacleSelector({
             onPress={handleAddObstacle}
             disabled={!selectedType}
             className={`py-3 rounded-lg mb-4 ${
-              selectedType ? 'bg-green-500' : 'bg-gray-300'
+              selectedType ? "bg-green-500" : "bg-gray-300"
             }`}
           >
             <Text className="text-center text-white font-semibold">
@@ -216,7 +234,8 @@ export default function ObstacleSelector({
               className="flex-1 bg-blue-500 py-3 rounded-lg"
             >
               <Text className="text-center text-white font-semibold">
-                {editMode ? 'Mettre à jour' : 'Valider'} ({selectedObstacles.length})
+                {editMode ? "Mettre à jour" : "Valider"} (
+                {selectedObstacles.length})
               </Text>
             </Pressable>
           </View>

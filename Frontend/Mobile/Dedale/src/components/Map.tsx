@@ -1,11 +1,5 @@
 import * as React from "react";
-import {
-  View,
-  Alert,
-  Platform,
-  ActivityIndicator,
-  StyleSheet,
-} from "react-native";
+import { View, Alert, ActivityIndicator, StyleSheet } from "react-native";
 import MapView, {
   Marker,
   PROVIDER_DEFAULT,
@@ -91,7 +85,7 @@ export default function OfflineMap({
     } else {
       setListPoint([]);
     }
-  }, [selectedEventId, pointsByEvent]);
+  }, [selectedEventId, pointsByEvent, mapRef]);
 
   React.useEffect(() => {
     if (selectedEventId && geometriesByEvent[selectedEventId]) {
@@ -157,6 +151,7 @@ export default function OfflineMap({
     };
 
     initialize();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const parseWKT = (wkt: string) => {
