@@ -8,6 +8,9 @@ import {
   Pressable,
   FlatList,
   TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
 } from "react-native";
 import React, { useState, useRef } from "react";
 import CustomButton from "../components/CustomButton";
@@ -16,8 +19,7 @@ import Map from "../components/Map";
 import MapView, { Marker } from "react-native-maps";
 import * as Location from "expo-location";
 import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system";
-import getDatabase from "../../assets/migrations";
+import { getDatabase } from "../../assets/migrations";
 import * as ImageHelper from "../services/ImageHelper";
 import { useEvent } from "../context/EventContext";
 import { usePoints } from "../context/PointsContext";
@@ -84,7 +86,7 @@ export default function RegisterPointScreen() {
           },
           800
         );
-      } catch (e) {
+      } catch {
         // ignore animate errors
       }
     }
@@ -302,106 +304,118 @@ export default function RegisterPointScreen() {
         animationType="slide"
         onRequestClose={() => setIsModalVisible(false)}
       >
-        <View className="modal-bottom">
-          <View className="modal-bottom-content max-h-[80%]">
-            <Text className="text-lg font-semibold mb-3">
-              Ajouter un point d'intérêt
-            </Text>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          className="flex-1 justify-end"
+        >
+          <View className="modal-bottom-content">
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              style={{ maxHeight: "100%" }}
+            >
+              <Text className="text-lg font-semibold mb-3">
+                Ajouter un point d&apos;intérêt
+              </Text>
 
-            {/* Commentaire */}
-            <TextInput
-              className="input-multiline mb-3"
-              placeholder="Entrez le commentaire du point"
-              value={pointComment}
-              onChangeText={setPointComment}
-              multiline
-            />
-
-            {/* Bouton pour ajouter des obstacles */}
-            <CustomButton
-              title={`Ajouter des obstacles ${selectedObstacles.length > 0 ? `(${selectedObstacles.length})` : ""}`}
-              onPress={() => setIsObstacleSelectorVisible(true)}
-            />
-
-            {/* Affichage des obstacles sélectionnés */}
-            {selectedObstacles.length > 0 && (
-              <View className="my-2">
-                <Text className="font-semibold mb-1">
-                  Obstacles sélectionnés :
-                </Text>
-                <View className="flex-row flex-wrap gap-2">
-                  {selectedObstacles.map((obs, idx) => (
-                    <View key={idx} className="obstacle-tag">
-                      <Text className="obstacle-tag-text">
-                        {obs.name} ({obs.number})
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            )}
-
-            {/* Bouton pour prendre une photo */}
-            <CustomButton title="Prendre une photo" onPress={pickImage} />
-
-            {/* Liste des images */}
-            {selectedImages.length > 0 ? (
-              <FlatList
-                horizontal
-                data={selectedImages}
-                keyExtractor={(item) => item}
-                renderItem={({ item }) => (
-                  <View className="relative mr-2 my-2">
-                    <Image source={{ uri: item }} className="image-thumbnail" />
-                    <TouchableOpacity
-                      onPress={() => removeImage(item)}
-                      className="image-remove-btn"
-                    >
-                      <Text className="image-remove-text">X</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-                className="my-2"
+              {/* Commentaire */}
+              <TextInput
+                className="input-multiline mb-3"
+                placeholder="Entrez le commentaire du point"
+                value={pointComment}
+                onChangeText={setPointComment}
+                multiline
               />
-            ) : null}
 
-            {/* Bouton enregistrer */}
-            <CustomButton
-              title="Enregistrer le point"
-              onPress={async () => {
-                if (location) {
-                  const insertedId = await savePointToDB(
-                    location.longitude,
-                    location.latitude,
-                    pointComment
-                  );
-                  if (insertedId) {
-                    await refreshPoints();
-                    Alert.alert("Succès", "Point enregistré avec succès");
-                    setIsModalVisible(false);
-                    setPointComment("");
-                    setSelectedImages([]);
-                    setSelectedObstacles([]);
-                    setLocation(null);
+              {/* Bouton pour ajouter des obstacles */}
+              <CustomButton
+                title={`Ajouter des obstacles ${selectedObstacles.length > 0 ? `(${selectedObstacles.length})` : ""}`}
+                onPress={() => setIsObstacleSelectorVisible(true)}
+              />
+
+              {/* Affichage des obstacles sélectionnés */}
+              {selectedObstacles.length > 0 && (
+                <View className="my-2">
+                  <Text className="font-semibold mb-1">
+                    Obstacles sélectionnés :
+                  </Text>
+                  <View className="flex-row flex-wrap gap-2">
+                    {selectedObstacles.map((obs, idx) => (
+                      <View key={idx} className="obstacle-tag">
+                        <Text className="obstacle-tag-text">
+                          {obs.name} ({obs.number})
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {/* Bouton pour prendre une photo */}
+              <CustomButton title="Prendre une photo" onPress={pickImage} />
+
+              {/* Liste des images */}
+              {selectedImages.length > 0 ? (
+                <FlatList
+                  horizontal
+                  data={selectedImages}
+                  keyExtractor={(item) => item}
+                  renderItem={({ item }) => (
+                    <View className="relative mr-2 my-2">
+                      <Image
+                        source={{ uri: item }}
+                        className="image-thumbnail"
+                      />
+                      <TouchableOpacity
+                        onPress={() => removeImage(item)}
+                        className="image-remove-btn"
+                      >
+                        <Text className="image-remove-text">X</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                  className="my-2"
+                />
+              ) : null}
+
+              {/* Bouton enregistrer */}
+              <CustomButton
+                title="Enregistrer le point"
+                onPress={async () => {
+                  if (location) {
+                    const insertedId = await savePointToDB(
+                      location.longitude,
+                      location.latitude,
+                      pointComment
+                    );
+                    if (insertedId) {
+                      await refreshPoints();
+                      Alert.alert("Succès", "Point enregistré avec succès");
+                      setIsModalVisible(false);
+                      setPointComment("");
+                      setSelectedImages([]);
+                      setSelectedObstacles([]);
+                      setLocation(null);
+                    }
+                  } else {
+                    Alert.alert("Erreur", "Aucune position à enregistrer.");
                   }
-                } else {
-                  Alert.alert("Erreur", "Aucune position à enregistrer.");
-                }
-              }}
-            />
+                }}
+              />
 
-            {/* Bouton annuler */}
-            <CustomButton
-              title="Annuler"
-              onPress={() => {
-                setIsModalVisible(false);
-                setPointComment("");
-                setSelectedImages([]);
-                setSelectedObstacles([]);
-              }}
-            />
+              {/* Bouton annuler */}
+              <CustomButton
+                title="Annuler"
+                onPress={() => {
+                  setIsModalVisible(false);
+                  setPointComment("");
+                  setSelectedImages([]);
+                  setSelectedObstacles([]);
+                }}
+              />
+            </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Composant ObstacleSelector */}

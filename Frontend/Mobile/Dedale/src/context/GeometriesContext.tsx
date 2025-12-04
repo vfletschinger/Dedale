@@ -7,7 +7,7 @@ import React, {
   useCallback,
 } from "react";
 import { GeometryType } from "../types/database";
-import getDatabase from "../../assets/migrations";
+import { getDatabase } from "../../assets/migrations";
 
 interface GeometriesContextType {
   geometriesByEvent: { [key: number]: GeometryType[] };
