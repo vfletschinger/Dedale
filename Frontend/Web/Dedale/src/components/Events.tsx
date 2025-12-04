@@ -366,7 +366,7 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
                     }}
                     className="px-3 py-1 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
                   >
-                    📱 Recevoir du mobile
+                   Import
                   </button>
                   <button
                     onClick={(e) => {

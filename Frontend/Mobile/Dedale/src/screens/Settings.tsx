@@ -41,7 +41,7 @@ export default function SettingsScreen() {
   const deleteEventLocally = (eventId: number) => {
     try {
       // Récupérer tous les points liés à cet événement
-      const pointIds = db.getAllSync<{ point_id: number }>(
+      const pointIds = db.getAllSync<{ point_id: string }>(
         "SELECT point_id FROM point_event WHERE event_id = ?",
         [eventId]
       );

@@ -146,6 +146,15 @@ class WebSocketClient {
             if (this.onResponseCallback) {
               this.onResponseCallback(response);
             }
+          } else if (data.event !== undefined && data.points !== undefined) {
+            // Format d'export: { event: {...}, points: [...] }
+            const event: EventType = data.event;
+            const points: PointDetailType[] = data.points;
+            console.log("📦 Événement avec points reçu:", event.name, "- Points:", points.length);
+            if (this.onMessageCallback) {
+              this.onMessageCallback([event]);
+            }
+            // TODO: Stocker les points si nécessaire
           } else if (Array.isArray(data)) {
             // It's events data (legacy format - direct array)
             const events: EventType[] = data;
@@ -153,9 +162,11 @@ class WebSocketClient {
             if (this.onMessageCallback) {
               this.onMessageCallback(events);
             }
+          } else {
+            console.log("⚠️ Format de message non reconnu:", JSON.stringify(data).substring(0, 100));
           }
         } catch (error) {
-          console.log("🤔 Message non reconnu:", e.data);
+          console.log("🤔 Message non-JSON reçu:", e.data);
           if (this.isLoading) {
             console.log(
               "📝 Message reçu pendant le chargement, possiblement un écho"

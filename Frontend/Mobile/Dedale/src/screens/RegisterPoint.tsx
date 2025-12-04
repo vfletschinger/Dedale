@@ -21,6 +21,7 @@ import getDatabase from "../../assets/migrations";
 import * as ImageHelper from "../services/ImageHelper";
 import { useEvent } from "../context/EventContext";
 import { usePoints } from "../context/PointsContext";
+import { generateUUID } from "../services/Helper";
 
 type SelectedObstacle = {
   type_id: number;
@@ -126,23 +127,19 @@ export default function RegisterPointScreen() {
     commentValue: string = ""
   ) => {
     try {
-      const pointResult: any = db.runSync(
-        "INSERT INTO point (x, y) VALUES (?, ?)",
-        [x, y]
+      // Générer un UUID pour le point
+      const pointId = generateUUID();
+      
+      db.runSync(
+        "INSERT INTO point (id, x, y) VALUES (?, ?, ?)",
+        [pointId, x, y]
       );
-
-      const insertedPointId = pointResult.lastInsertRowId as number;
-      if (!insertedPointId || insertedPointId === 0) {
-        throw new Error(
-          "Impossible de récupérer l'ID du point qui vient d'être créé."
-        );
-      }
 
       // Associate point with current event via junction table
       if (selectedEventId) {
         db.runSync(
           "INSERT INTO point_event (point_id, event_id) VALUES (?, ?)",
-          [insertedPointId, selectedEventId]
+          [pointId, selectedEventId]
         );
       }
 
@@ -150,7 +147,7 @@ export default function RegisterPointScreen() {
       if (selectedImages.length > 0) {
         for (const imageUri of selectedImages) {
           try {
-            await ImageHelper.saveImageToBDD(imageUri, insertedPointId);
+            await ImageHelper.saveImageToBDD(imageUri, pointId);
           } catch (imgErr) {
             console.error(
               `Erreur lors de la sauvegarde de l'image ${imageUri} :`,
@@ -168,8 +165,10 @@ export default function RegisterPointScreen() {
 
       // Sauvegarder le commentaire
       if (commentValue.trim()) {
-        db.runSync("INSERT INTO comment (point_id, value) VALUES (?, ?)", [
-          insertedPointId,
+        const commentId = generateUUID();
+        db.runSync("INSERT INTO comment (id, point_id, value) VALUES (?, ?, ?)", [
+          commentId,
+          pointId,
           commentValue,
         ]);
       }
@@ -178,9 +177,10 @@ export default function RegisterPointScreen() {
       if (selectedObstacles.length > 0) {
         for (const obstacle of selectedObstacles) {
           try {
+            const obstacleId = generateUUID();
             db.runSync(
-              "INSERT INTO obstacle (point_id, type_id, number) VALUES (?, ?, ?)",
-              [insertedPointId, obstacle.type_id, obstacle.number]
+              "INSERT INTO obstacle (id, point_id, type_id, number) VALUES (?, ?, ?, ?)",
+              [obstacleId, pointId, obstacle.type_id, obstacle.number]
             );
           } catch (obstErr) {
             console.error(
@@ -195,7 +195,7 @@ export default function RegisterPointScreen() {
         }
       }
 
-      return insertedPointId;
+      return pointId;
     } catch (error: any) {
       console.error(
         "Erreur lors de la sauvegarde du point/commentaire :",

@@ -73,12 +73,12 @@ struct MobileExport {
 
 /// Structure pour un point dans l'export mobile (format différent du desktop)
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
 struct MobilePointDetail {
-    id: i32,
+    id: String,  // UUID
     x: f64,
     y: f64,
-    event_id: i64,
+    #[serde(default)]
+    event_id: Option<i64>,
     #[serde(default)]
     comments: Vec<MobileComment>,
     #[serde(default)]
@@ -88,26 +88,23 @@ struct MobilePointDetail {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
 struct MobileComment {
-    id: i32,
-    point_id: i32,
+    id: String,  // UUID
+    point_id: String,  // UUID reference
     value: String,
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
 struct MobilePicture {
-    id: i32,
-    point_id: i32,
+    id: String,  // UUID
+    point_id: String,  // UUID reference
     image: String,
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
 struct MobileObstacle {
-    id: i32,
-    point_id: i32,
+    id: String,  // UUID
+    point_id: String,  // UUID reference
     type_id: i64,
     number: i32,
 }
@@ -133,7 +130,7 @@ fn random_port() -> u16 {
 }
 
 /// Insère les points au format mobile dans la base de données
-async fn insert_mobile_points(app: &AppHandle, points: Vec<MobilePointDetail>) -> Result<(), String> {
+async fn insert_mobile_points(app: &AppHandle, event_id: i64, points: Vec<MobilePointDetail>) -> Result<(), String> {
     let pool = get_db_pool(app).await?;
     let mut tx: Transaction<Sqlite> = pool
         .begin()
@@ -143,26 +140,26 @@ async fn insert_mobile_points(app: &AppHandle, points: Vec<MobilePointDetail>) -
     for point in &points {
         // Insérer ou mettre à jour le point
         sqlx::query(r#"INSERT OR REPLACE INTO point (id, x, y) VALUES (?, ?, ?)"#)
-            .bind(point.id)
+            .bind(&point.id)
             .bind(point.x)
             .bind(point.y)
             .execute(&mut *tx)
             .await
             .map_err(|e| format!("Erreur INSERT point {}: {}", point.id, e))?;
 
-        // Lier le point à l'event
-        sqlx::query(r#"INSERT OR IGNORE INTO event_point (event_id, point_id) VALUES (?, ?)"#)
-            .bind(point.event_id)
-            .bind(point.id)
+        // Lier le point à l'event (utiliser l'event_id passé en paramètre)
+        sqlx::query(r#"INSERT OR IGNORE INTO point_event (event_id, point_id) VALUES (?, ?)"#)
+            .bind(event_id)
+            .bind(&point.id)
             .execute(&mut *tx)
             .await
-            .map_err(|e| format!("Erreur INSERT event_point: {}", e))?;
+            .map_err(|e| format!("Erreur INSERT point_event: {}", e))?;
 
         // Insérer les commentaires
         for comment in &point.comments {
             sqlx::query(r#"INSERT OR REPLACE INTO comment (id, point_id, value) VALUES (?, ?, ?)"#)
-                .bind(comment.id)
-                .bind(comment.point_id)
+                .bind(&comment.id)
+                .bind(&comment.point_id)
                 .bind(&comment.value)
                 .execute(&mut *tx)
                 .await
@@ -172,8 +169,8 @@ async fn insert_mobile_points(app: &AppHandle, points: Vec<MobilePointDetail>) -
         // Insérer les images
         for picture in &point.pictures {
             sqlx::query(r#"INSERT OR REPLACE INTO picture (id, point_id, image) VALUES (?, ?, ?)"#)
-                .bind(picture.id)
-                .bind(picture.point_id)
+                .bind(&picture.id)
+                .bind(&picture.point_id)
                 .bind(&picture.image)
                 .execute(&mut *tx)
                 .await
@@ -183,8 +180,8 @@ async fn insert_mobile_points(app: &AppHandle, points: Vec<MobilePointDetail>) -
         // Insérer les obstacles
         for obstacle in &point.obstacles {
             sqlx::query(r#"INSERT OR REPLACE INTO obstacle (id, point_id, type_id, number) VALUES (?, ?, ?, ?)"#)
-                .bind(obstacle.id)
-                .bind(obstacle.point_id)
+                .bind(&obstacle.id)
+                .bind(&obstacle.point_id)
                 .bind(obstacle.type_id)
                 .bind(obstacle.number)
                 .execute(&mut *tx)
@@ -371,17 +368,18 @@ async fn handle_websocket(
                     if let Ok(mobile_export) = serde_json::from_str::<MobileExport>(&text) {
                         let points_count = mobile_export.points.len();
                         let event_name = mobile_export.event.name.clone();
+                        let event_id = mobile_export.event.id;
                         
                         println!("📱 Export mobile reçu: event '{}' (id: {}) avec {} point(s)", 
                             event_name, 
-                            mobile_export.event.id,
+                            event_id,
                             points_count
                         );
                         
                         // Insérer les points dans la base de données
                         if points_count > 0 {
                             println!("🚀 Insertion de {} point(s) en base de données...", points_count);
-                            match insert_mobile_points(&app, mobile_export.points).await {
+                            match insert_mobile_points(&app, event_id, mobile_export.points).await {
                                 Ok(_) => {
                                     println!("✅ Points insérés avec succès !");
                                 }
@@ -709,12 +707,13 @@ async fn handle_receive_websocket(
                     if let Ok(mobile_export) = serde_json::from_str::<MobileExport>(&text) {
                         let points_count = mobile_export.points.len();
                         let event_name = mobile_export.event.name.clone();
+                        let event_id = mobile_export.event.id;
                         
                         println!("📱 Export reçu: '{}' avec {} point(s)", event_name, points_count);
                         
                         if points_count > 0 {
                             println!("🚀 Insertion de {} point(s)...", points_count);
-                            match insert_mobile_points(&app, mobile_export.points).await {
+                            match insert_mobile_points(&app, event_id, mobile_export.points).await {
                                 Ok(_) => {
                                     println!("✅ Points insérés avec succès !");
                                     
@@ -746,6 +745,11 @@ async fn handle_receive_websocket(
                         let _ = websocket.write(Message::Text(response_json.into()));
                         let _ = websocket.flush();
                     } else {
+                        // Log l'erreur de parsing pour debug
+                        match serde_json::from_str::<MobileExport>(&text) {
+                            Err(e) => println!("⚠️ Erreur parsing MobileExport: {}", e),
+                            _ => {}
+                        }
                         println!("⚠️ Format de message non reconnu");
                     }
                 }
