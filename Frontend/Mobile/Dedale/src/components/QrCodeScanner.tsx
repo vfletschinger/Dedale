@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   Text,
   View,
@@ -14,12 +14,13 @@ import {
   BarcodeScanningResult,
 } from "expo-camera";
 import WebSocketClient from "./WebSocketClient";
-const { width } = Dimensions.get("window");
-const SCANNER_SIZE = width * 0.7;
 import { getDatabase } from "../../assets/migrations";
 import { useWebSocket } from "../context/WebSocketContext";
 import { useEvent } from "../context/EventContext";
 import { EventType } from "../types/database";
+
+const { width } = Dimensions.get("window");
+const SCANNER_SIZE = width * 0.7;
 
 const QRCodeScanner = ({
   setScanQR,

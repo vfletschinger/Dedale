@@ -6,7 +6,7 @@ import React, {
   useEffect,
   ReactNode,
 } from "react";
-import getDatabase from "../../assets/migrations";
+import { getDatabase } from "../../assets/migrations";
 import { EventType } from "../types/database";
 
 // Type pour le statut calculé d'un événement

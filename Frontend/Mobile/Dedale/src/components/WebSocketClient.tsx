@@ -51,9 +51,7 @@ class WebSocketClient {
   /**
    * Tente d'établir la connexion WebSocket.
    */
-  public connect(
-    onMessage?: (events: EventType[]) => void
-  ): Promise<boolean> {
+  public connect(onMessage?: (events: EventType[]) => void): Promise<boolean> {
     this.onMessageCallback = onMessage;
 
     return new Promise((resolve, reject) => {
@@ -118,7 +116,7 @@ class WebSocketClient {
               this.onMessageCallback(events);
             }
           }
-        } catch (error) {
+        } catch {
           console.log("🤔 Message non reconnu:", e.data);
           if (this.isLoading) {
             console.log(
