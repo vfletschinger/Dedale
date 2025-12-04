@@ -18,8 +18,9 @@ import {
   getUserLocation,
 } from "../services/Helper";
 import { deletePoint } from "../services/databaseAcces";
-import { get } from "react-native/Libraries/TurboModule/TurboModuleRegistry";
 import InterestPointCard from "../components/PointCard";
+import { useEvent } from "../context/EventContext";
+import { usePoints } from "../context/PointsContext";
 
 function ModalPointItem({
   item,
@@ -43,7 +44,7 @@ function ModalPointItem({
   return (
     <Pressable
       onPress={onToggle}
-      className={`flex-row items-center justify-between p-3 rounded-lg mb-2 ${selected ? "bg-blue-50" : "bg-white"}`}
+      className={selected ? "modal-select-item-active" : "modal-select-item"}
     >
       <View className="flex-1 mr-2">
         <Text className="font-medium">Point #{item.id}</Text>
@@ -51,7 +52,7 @@ function ModalPointItem({
           {address}
         </Text>
       </View>
-      <View className="w-8 h-8 rounded-full items-center justify-center border border-gray-300">
+      <View className="modal-checkbox">
         <Text>{selected ? "✓" : ""}</Text>
       </View>
     </Pressable>
@@ -64,7 +65,9 @@ export default function InterestPointsScreen() {
   const [sortedList, setSortedList] = useState<InterestPointsType[]>([]);
   const [sortBy, setSortBy] = useState<"recent" | "distance">("recent");
   const db = getDatabase();
-  const [loading, setLoading] = useState(true);
+  const { selectedEventId } = useEvent();
+  const { pointsByEvent, loading: pointsLoading } = usePoints();
+
   const [location, setLocation] = useState<{
     latitude: number;
     longitude: number;
@@ -72,18 +75,13 @@ export default function InterestPointsScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
-  const fetchInterestPoint = async () => {
-    try {
-      const points = db.getAllSync<InterestPointsType>("SELECT * FROM point");
-      console.log("Points récupérés:", points);
-      setListPoint(points);
-    } catch (error) {
-      console.error("Erreur lors de la récupération:", error);
+  useEffect(() => {
+    if (selectedEventId && pointsByEvent[selectedEventId]) {
+      setListPoint(pointsByEvent[selectedEventId]);
+    } else {
       setListPoint([]);
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [selectedEventId, pointsByEvent]);
 
   const fetchLocation = async () => {
     try {
@@ -99,12 +97,11 @@ export default function InterestPointsScreen() {
 
   useFocusEffect(
     React.useCallback(() => {
-      fetchInterestPoint();
       fetchLocation();
     }, [])
   );
 
-  const handleDelete = (pointId: number) => {
+  const handleDelete = (pointId: string) => {
     Alert.alert(
       "Confirmer la suppression",
       "Êtes-vous sûr de vouloir supprimer ce point ? Cette action est irréversible.",
@@ -116,8 +113,10 @@ export default function InterestPointsScreen() {
           onPress: () => {
             const success = deletePoint(pointId, db);
             if (success) {
-              Alert.alert("Succès", "Point supprimé avec succès");
-              fetchInterestPoint();
+              Alert.alert(
+                "Succès",
+                "Point supprimé avec succès. Veuillez relancer l'application."
+              );
             } else {
               Alert.alert("Erreur", "Impossible de supprimer le point");
             }
@@ -159,7 +158,6 @@ export default function InterestPointsScreen() {
   };
 
   const openSelectionModal = () => {
-    // reset selection to empty by default (or you could persist previous)
     setSelectedIds([]);
     setModalVisible(true);
   };
@@ -177,7 +175,7 @@ export default function InterestPointsScreen() {
     navigation.navigate("CreateRoute", { points: selectedPoints });
   };
 
-  if (loading) {
+  if (pointsLoading) {
     return (
       <View className="flex-1 items-center justify-center bg-gray-50">
         <ActivityIndicator size="large" color="#3b82f6" />
@@ -191,32 +189,38 @@ export default function InterestPointsScreen() {
   return (
     <View className="flex-1 bg-gray-50">
       {/* Header */}
-      <View className="bg-blue-500 pt-12 pb-6 px-4 shadow-sm">
-        <Text className="text-white text-3xl font-bold mb-2">
-          Points d'intérêt
-        </Text>
-        <Text className="text-blue-100 text-base">
+      <View className="header">
+        <Text className="header-title-lg mb-2">Points d'intérêt</Text>
+        <Text className="header-subtitle">
           {sortedList.length}{" "}
           {sortedList.length > 1 ? "points enregistrés" : "point enregistré"}
         </Text>
         {/* Boutons de tri */}
-        <View className="flex-row mt-4 bg-blue-400/50 rounded-full p-1">
+        <View className="toggle-container">
           <Pressable
             onPress={() => setSortBy("recent")}
-            className={`flex-1 py-2 rounded-full ${sortBy === "recent" ? "bg-white" : ""}`}
+            className={
+              sortBy === "recent" ? "toggle-item-active" : "toggle-item"
+            }
           >
             <Text
-              className={`text-center font-semibold ${sortBy === "recent" ? "text-blue-600" : "text-white"}`}
+              className={
+                sortBy === "recent" ? "toggle-text-active" : "toggle-text"
+              }
             >
               Plus récent
             </Text>
           </Pressable>
           <Pressable
             onPress={() => setSortBy("distance")}
-            className={`flex-1 py-2 rounded-full ${sortBy === "distance" ? "bg-white" : ""}`}
+            className={
+              sortBy === "distance" ? "toggle-item-active" : "toggle-item"
+            }
           >
             <Text
-              className={`text-center font-semibold ${sortBy === "distance" ? "text-blue-600" : "text-white"}`}
+              className={
+                sortBy === "distance" ? "toggle-text-active" : "toggle-text"
+              }
             >
               Plus proche
             </Text>
@@ -224,19 +228,17 @@ export default function InterestPointsScreen() {
         </View>
       </View>
 
-      {sortedList.length === 0 && !loading ? (
-        <View className="flex-1 items-center justify-center px-8">
-          <View className="bg-white rounded-full w-24 h-24 items-center justify-center mb-6 shadow-md">
+      {sortedList.length === 0 && !pointsLoading ? (
+        <View className="empty-state">
+          <View className="empty-icon">
             <Text className="text-5xl">📍</Text>
           </View>
-          <Text className="text-gray-800 text-xl font-bold mb-2 text-center">
-            Aucun point d'intérêt
-          </Text>
-          <Text className="text-gray-500 text-base text-center leading-6">
+          <Text className="empty-title">Aucun point d'intérêt</Text>
+          <Text className="empty-text">
             Commencez par enregistrer votre premier point d'intérêt
           </Text>
           <Pressable
-            className="mt-8 bg-blue-500 px-8 py-4 rounded-full shadow-md active:bg-blue-600"
+            className="btn-add-point"
             onPress={() => navigation.navigate("RegisterPoint")}
           >
             <Text className="text-white font-semibold text-base">
@@ -320,13 +322,13 @@ export default function InterestPointsScreen() {
             <View className="flex-row justify-between mt-3">
               <Pressable
                 onPress={() => setModalVisible(false)}
-                className="flex-1 mr-2 bg-gray-200 rounded-full p-3 items-center"
+                className="modal-btn-cancel"
               >
                 <Text>Annuler</Text>
               </Pressable>
               <Pressable
                 onPress={validateSelection}
-                className="flex-1 ml-2 bg-blue-500 rounded-full p-3 items-center"
+                className="modal-btn-confirm"
               >
                 <Text className="text-white font-semibold">
                   Valider ({selectedIds.length})
