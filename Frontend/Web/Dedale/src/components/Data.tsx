@@ -19,7 +19,6 @@ function Data() {
     const [qrCodeBase64, setQrCodeBase64] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
-    // État pour les messages de statut (Export, PDF)
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     
     // États pour la sélection d'événements
@@ -51,57 +50,57 @@ function Data() {
             const appDataPath = await path.appDataDir();
             if (!appDataPath) throw new Error("Impossible de récupérer AppData");
 
-            // Utilisation de mockPath.join
             const db_url = await path.join(appDataPath, 'mydatabase.db');
-            const excel_path_str = await path.join(appDataPath, 'points.xlsx');
-            
-            console.log(`Chemin de la BDD: ${db_url}`);
-            console.log(`Chemin Excel: ${excel_path_str}`);
+            const filename = selectedEventId
+                ? `points_event_${selectedEventId}.xlsx`
+                : 'points_all.xlsx';
 
-            // Utilisation de mockInvoke
-            await invoke('export_points_excel', { dbUrl: db_url, excelPathStr: excel_path_str });
+            const excel_path_str = await path.join(appDataPath, filename);
 
-            setMessage({ 
-                type: 'success', 
-                text: `Exportation Excel réussie. Le fichier est simulé à : ${excel_path_str}` 
+            const eventIdParam = selectedEventId ? parseInt(selectedEventId) : null;
+
+            await invoke('export_points_excel', {
+                dbUrl: db_url,
+                excelPathStr: excel_path_str,
+                eventId: eventIdParam
+            });
+
+            setMessage({
+                type: 'success',
+                text: `Export réussi : ${filename}`
             });
         } catch (error) {
-            console.error("Erreur lors de l'exportation Excel:", error);
-            setMessage({ 
-                type: 'error', 
-                text: `Erreur d'exportation: ${String(error)}. Vérifiez la console.` 
-            });
+            console.error("Erreur export Excel:", error);
+            setMessage({ type: 'error', text: `Erreur: ${String(error)}` });
         }
-    }, []);
+    }, [selectedEventId]);
 
     // Fonction pour la création de PDF
     const createPdf = useCallback(async () => {
         setMessage(null);
         try {
-            // Utilisation de mockInvoke
-            await invoke("create_pdf");
-            setMessage({ 
-                type: 'success', 
-                text: "Génération PDF lancée avec succès (simulée). Vérifiez votre dossier de données." 
+            const eventIdParam = selectedEventId ? parseInt(selectedEventId) : null;
+
+            await invoke("create_pdf", { eventId: eventIdParam });
+
+            setMessage({
+                type: 'success',
+                text: "PDF généré avec succès. Vérifiez le dossier temporaire."
             });
         } catch (error) {
-            console.error("Erreur lors de la création du PDF:", error);
-            setMessage({ 
-                type: 'error', 
-                text: `Erreur de création PDF: ${String(error)}. Vérifiez la console.` 
-            });
+            console.error("Erreur PDF:", error);
+            setMessage({ type: 'error', text: `Erreur PDF: ${String(error)}` });
         }
-    }, []);
+    }, [selectedEventId]);
 
 
-    // Fonction pour le démarrage du serveur et génération du QR code
+    // Fonction QR Code (Inchangée)
     const qr_code = useCallback(async () => {
         // Charger les events et démarrer directement
         setIsLoading(true);
         setError(null);
         setQrCodeBase64(null);
         setMessage(null);
-
         try {
             // Charger tous les événements
             const eventsData = await invoke<Event[]>("fetch_events");
@@ -157,26 +156,19 @@ function Data() {
         if (!base64) return '';
         return `data:image/png;base64,${base64}`;
     }
-    
-    // Classes de base pour les boutons
+
     const baseBtn = "w-full px-6 py-3 font-semibold rounded-xl transition duration-300 shadow-md transform hover:scale-[1.02]";
-    
     const exportBtnClass = `${baseBtn} bg-green-500 text-white hover:bg-green-600 focus:ring-4 focus:ring-green-300`;
     const pdfBtnClass = `${baseBtn} bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-4 focus:ring-indigo-300`;
-    const connectBtnClass = qrCodeBase64 
+    const connectBtnClass = qrCodeBase64
         ? `${baseBtn} bg-blue-500 text-white hover:bg-blue-600 focus:ring-4 focus:ring-blue-300`
         : `${baseBtn} bg-gray-700 text-white hover:bg-gray-800 focus:ring-4 focus:ring-gray-400`;
 
-    // Composant de feedback pour les messages (success/error)
     const FeedbackMessage = ({ type, text }: { type: 'success' | 'error'; text: string }) => {
-        const classes = type === 'success' 
-            ? "bg-green-100 border-green-500 text-green-700"
-            : "bg-red-100 border-red-500 text-red-700";
-        const title = type === 'success' ? "Succès" : "Erreur";
-
+        const classes = type === 'success' ? "bg-green-100 border-green-500 text-green-700" : "bg-red-100 border-red-500 text-red-700";
         return (
             <div className={`p-4 border-l-4 ${classes} rounded-lg shadow-inner mt-4 w-full max-w-lg mx-auto`}>
-                <p className="font-bold">{title}</p>
+                <p className="font-bold">{type === 'success' ? "Succès" : "Erreur"}</p>
                 <p className="text-sm break-all">{text}</p>
             </div>
         );
@@ -194,31 +186,53 @@ function Data() {
                     </p>
                 </header>
 
-                {/* Section des Messages de Statut Global */}
                 {message && <FeedbackMessage type={message.type} text={message.text} />}
-
 
                 <div className="mt-8 grid lg:grid-cols-3 gap-8">
 
-                    {/* COLONNE 1: Gestion des Données (Export/PDF) */}
-                    <div className="lg:col-span-1 bg-gray-50 p-6 rounded-2xl border border-gray-200 shadow-lg h-full">
+                    {/* Gestion des Données (Export/PDF) */}
+                    <div className="lg:col-span-1 bg-gray-50 p-6 rounded-2xl border border-gray-200 shadow-lg h-full flex flex-col">
                         <h2 className="text-2xl font-bold text-gray-700 mb-6 border-b pb-2">
                             Gestion des Fichiers
                         </h2>
-                        <div className="space-y-4">
+
+                        {/* --- SÉLECTEUR D'ÉVÉNEMENT --- */}
+                        <div className="mb-6">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Filtrer par événement</label>
+                            <div className="relative">
+                                <select
+                                    value={selectedEventId}
+                                    onChange={(e) => setSelectedEventId(e.target.value)}
+                                    className="block w-full pl-3 pr-10 py-3 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-xl border shadow-sm bg-white"
+                                >
+                                    <option value="">📂 Tous les événements</option>
+                                    <hr />
+                                    {events.map((evt) => (
+                                        <option key={evt.id} value={evt.id}>
+                                            🔹 {evt.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-2 italic">
+                                {selectedEventId
+                                    ? "L'export ne contiendra que les points de cet événement."
+                                    : "L'export contiendra la totalité de la base de données."}
+                            </p>
+                        </div>
+
+                        <div className="space-y-4 mt-auto">
                             <button
-                                className={exportBtnClass}
+                                className={`${exportBtnClass} ${!selectedEventId ? 'opacity-90' : ''}`}
                                 onClick={generate_excel}
-                                aria-label="Exporter les données au format Excel"
                             >
-                                Exporter les Données (Excel)
+                                Exporter Excel {selectedEventId ? "(Filtré)" : "(Complet)"}
                             </button>
                             <button
-                                className={pdfBtnClass}
+                                className={`${pdfBtnClass} ${!selectedEventId ? 'opacity-90' : ''}`}
                                 onClick={createPdf}
-                                aria-label="Créer un rapport PDF"
                             >
-                                Créer un Rapport (PDF)
+                                Générer PDF {selectedEventId ? "(Filtré)" : "(Complet)"}
                             </button>
                         </div>
                     </div>
@@ -356,7 +370,6 @@ function Data() {
                         )}
                     </div>
                 </div>
-
             </div>
         </div>
     );
