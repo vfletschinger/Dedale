@@ -572,7 +572,7 @@ pub async fn retrieve_data_by_event(
         let event_ids = fetch_event_ids(&pool, id).await?;
 
         points.push(Point {
-            id: id,
+            id,
             x: row.get("x"),
             y: row.get("y"),
             pose: row.get("pose"),
@@ -623,17 +623,17 @@ pub async fn insert_point_details(
             assigned_ids.push(new_id);
         } else {
             // Respect provided id
-            sqlx::query(r#"INSERT OR REPLACE INTO point (id, x, y, pose, depose) VALUES (?, ?, ?, ?, ?)"#)
-                .bind(detail.point.id)
-                .bind(detail.point.x)
-                .bind(detail.point.y)
-                .bind(&detail.point.pose)
-                .bind(&detail.point.depose)
-                .execute(&mut *tx)
-                .await
-                .map_err(|e| {
-                    format!("Erreur INSERT/REPLACE point ID {} : {}", detail.point.id, e)
-                })?;
+            sqlx::query(
+                r#"INSERT OR REPLACE INTO point (id, x, y, pose, depose) VALUES (?, ?, ?, ?, ?)"#,
+            )
+            .bind(detail.point.id)
+            .bind(detail.point.x)
+            .bind(detail.point.y)
+            .bind(&detail.point.pose)
+            .bind(&detail.point.depose)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| format!("Erreur INSERT/REPLACE point ID {} : {}", detail.point.id, e))?;
             assigned_ids.push(detail.point.id as i64);
         }
     }
@@ -675,7 +675,7 @@ pub async fn insert_point_details(
     }
     // obstacles and types
     for (idx, detail) in details.iter().enumerate() {
-        let assigned_point_id = assigned_ids[idx] as i64;
+        let assigned_point_id = assigned_ids[idx];
         for obstacle in &detail.obstacle {
             let point_id_to_use = if obstacle.point_id == 0 {
                 assigned_point_id
@@ -795,7 +795,7 @@ pub async fn update_point_dates(
     depose: Option<String>,
 ) -> Result<(), String> {
     let pool = get_db_pool(&app).await?;
-    
+
     sqlx::query("UPDATE point SET pose = ?, depose = ? WHERE id = ?")
         .bind(&pose)
         .bind(&depose)
@@ -803,8 +803,11 @@ pub async fn update_point_dates(
         .execute(&pool)
         .await
         .map_err(|e| format!("Failed to update point dates: {}", e))?;
-    
-    println!("[DB] ✅ Dates du point {} mises à jour: pose={:?}, depose={:?}", point_id, pose, depose);
+
+    println!(
+        "[DB] ✅ Dates du point {} mises à jour: pose={:?}, depose={:?}",
+        point_id, pose, depose
+    );
     Ok(())
 }
 
@@ -972,7 +975,7 @@ pub async fn create_team(app: AppHandle, name: String) -> Result<Team, String> {
 
     Ok(Team {
         id: new_id,
-        name: name,
+        name,
         number: 0,
         event_ids: Vec::new(),
     })
@@ -1084,7 +1087,7 @@ pub async fn create_person(
         lastname,
         email,
         address,
-        phone_number: phone_number,
+        phone_number,
     })
 }
 

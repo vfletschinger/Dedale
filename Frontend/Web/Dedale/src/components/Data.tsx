@@ -1,33 +1,46 @@
 import { useState, useCallback, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import * as path from '@tauri-apps/api/path';
 import QrCode from './QrCode';
 
-// Interface pour les événements
-interface SimpleEvent {
+type Event = {
     id: number;
     name: string;
-}
+    description: string;
+    dateDebut: string;
+    dateFin: string;
+    statut: string;
+};
+
+type TransferPhase = 'idle' | 'qr_displayed' | 'connected';
 
 function Data() {
     const [qrCodeBase64, setQrCodeBase64] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-    const [events, setEvents] = useState<SimpleEvent[]>([]);
-    const [selectedEventId, setSelectedEventId] = useState<string>("");
+    
+    // États pour la sélection d'événements
+    const [events, setEvents] = useState<Event[]>([]);
+    const [selectedEventIds, setSelectedEventIds] = useState<Set<number>>(new Set());
+    
+    // États pour le transfert
+    const [transferPhase, setTransferPhase] = useState<TransferPhase>('idle');
+    const [sentEventIds, setSentEventIds] = useState<Set<number>>(new Set());
+    const [sendingEventId, setSendingEventId] = useState<number | null>(null);
 
-    // --- CHARGEMENT DES ÉVÉNEMENTS ---
+    // Écouter l'événement de connexion mobile
     useEffect(() => {
-        const loadEvents = async () => {
-            try {
-                const evts = await invoke<any[]>("fetch_events");
-                setEvents(evts.map(e => ({ id: e.id, name: e.name })));
-            } catch (e) {
-                console.error("Erreur chargement événements:", e);
-            }
+        const unlisten = listen('mobile-connected', () => {
+            console.log('📱 Mobile connecté !');
+            setTransferPhase('connected');
+            setMessage({ type: 'success', text: 'Mobile connecté !' });
+        });
+
+        return () => {
+            unlisten.then(fn => fn());
         };
-        loadEvents();
     }, []);
 
     // Fonction pour l'export Excel
@@ -83,19 +96,60 @@ function Data() {
 
     // Fonction QR Code (Inchangée)
     const qr_code = useCallback(async () => {
+        // Charger les events et démarrer directement
         setIsLoading(true);
         setError(null);
         setQrCodeBase64(null);
         setMessage(null);
         try {
-            const base64String = await invoke<string>('start_server');
+            // Charger tous les événements
+            const eventsData = await invoke<Event[]>("fetch_events");
+            setEvents(eventsData);
+            const allEventIds = eventsData.map(e => e.id);
+            setSelectedEventIds(new Set(allEventIds));
+
+            // Démarrer le serveur avec tous les événements
+            console.log("📤 Transfert des événements:", allEventIds);
+            
+            const base64String = await invoke<string>('start_server', { 
+                eventIds: allEventIds 
+            });
+            
             setQrCodeBase64(base64String);
+            setTransferPhase('qr_displayed');
+            setSentEventIds(new Set());
+            setMessage({ 
+                type: 'success', 
+                text: `Serveur démarré avec ${allEventIds.length} événement(s).` 
+            });
         } catch (err) {
-            console.error('Erreur serveur:', err);
+            console.error('Erreur:', err);
             setError(String(err));
         } finally {
             setIsLoading(false);
         }
+    }, []);
+
+    // Envoyer un événement spécifique au mobile
+    const sendEventToMobile = useCallback(async (eventId: number) => {
+        setSendingEventId(eventId);
+        try {
+            await invoke('send_event_to_mobile', { eventId });
+            setSentEventIds(prev => new Set([...prev, eventId]));
+            setMessage({ type: 'success', text: `Événement ${eventId} envoyé au mobile !` });
+        } catch (err) {
+            console.error('Erreur envoi événement:', err);
+            setMessage({ type: 'error', text: `Erreur: ${String(err)}` });
+        } finally {
+            setSendingEventId(null);
+        }
+    }, []);
+
+    const terminateTransfer = useCallback(async () => {
+        setQrCodeBase64(null);
+        setTransferPhase('idle');
+        setSentEventIds(new Set());
+        setMessage({ type: 'success', text: 'Transfert terminé.' });
     }, []);
 
     const getQrCodeUri = (base64: string | null): string => {
@@ -183,49 +237,137 @@ function Data() {
                         </div>
                     </div>
 
-                    {/* Connexion Mobile (QR Code) */}
-                    <div className="lg:col-span-2 bg-blue-50 p-6 rounded-2xl border-2 border-dashed border-blue-200 shadow-lg flex flex-col items-center justify-center min-h-[300px]">
+
+                    {/* COLONNE 2 & 3: Connexion Mobile (QR Code) */}
+                    <div className="lg:col-span-2 bg-blue-50 p-6 rounded-2xl border-2 border-dashed border-blue-200 shadow-lg flex flex-col min-h-[300px]">
                         <h2 className="text-2xl font-bold text-blue-700 mb-6 text-center">
                             Connexion de l'Application Mobile
                         </h2>
-
-                        <div className="w-full max-w-md">
-                            <button
-                                className={connectBtnClass}
-                                onClick={qr_code}
-                                disabled={isLoading}
-                            >
-                                {isLoading ? (
-                                    <span className="flex items-center justify-center">
-                                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                        </svg>
-                                        Démarrage...
-                                    </span>
-                                ) : (
-                                    qrCodeBase64 ? "Serveur WebSocket Actif" : "Démarrer Serveur & Connecter App Mobile"
-                                )}
-                            </button>
-                        </div>
-
-                        <div className="mt-8 w-full flex justify-center">
-                            {error && (
-                                <div className="p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg text-center shadow-lg w-full max-w-md">
-                                    <h3 className="font-bold mb-1">Erreur Critique</h3>
-                                    <p className="text-sm">Impossible de démarrer le serveur. <br /><code className="text-xs">{error}</code></p>
+                        
+                        {/* Phase initiale: bouton pour démarrer */}
+                        {transferPhase === 'idle' && (
+                            <div className="flex-1 flex flex-col items-center justify-center">
+                                <div className="w-full max-w-md">
+                                    <button
+                                        className={connectBtnClass}
+                                        onClick={qr_code}
+                                        disabled={isLoading}
+                                        aria-label="Démarrer le serveur et connecter l'application"
+                                    >
+                                        {isLoading ? (
+                                            <span className="flex items-center justify-center">
+                                                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                </svg>
+                                                Démarrage du serveur...
+                                            </span>
+                                        ) : (
+                                            "Transférer vers l'App Mobile"
+                                        )}
+                                    </button>
                                 </div>
-                            )}
+                            </div>
+                        )}
 
-                            {qrCodeBase64 && !isLoading && (
-                                <div className="flex flex-col items-center animate-in fade-in zoom-in duration-300">
-                                    <p className="text-lg text-gray-700 mb-4 font-medium">Scannez ce code :</p>
-                                    <div className="p-4 bg-white rounded-xl shadow-md">
-                                        <QrCode qrCodeUri={getQrCodeUri(qrCodeBase64)} />
+                        {/* Phase QR affiché: uniquement le QR code en attente de connexion */}
+                        {transferPhase === 'qr_displayed' && qrCodeBase64 && (
+                            <div className="flex-1 flex flex-col items-center justify-center">
+                                <div className="flex flex-col items-center">
+                                    <p className="text-lg text-gray-700 mb-4 font-medium">
+                                        Scannez ce code depuis l'application mobile
+                                    </p>
+                                    <QrCode qrCodeUri={getQrCodeUri(qrCodeBase64)} />
+                                    <p className="text-sm text-gray-500 mt-4 animate-pulse">
+                                        En attente de connexion...
+                                    </p>
+                                </div>
+                                
+                                {/* Bouton Annuler */}
+                                <div className="mt-6">
+                                    <button
+                                        onClick={terminateTransfer}
+                                        className="px-6 py-2 bg-gray-400 hover:bg-gray-500 text-white font-medium rounded-lg transition-colors"
+                                    >
+                                        Annuler
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Phase connecté: liste des events avec boutons Envoyer */}
+                        {transferPhase === 'connected' && (
+                            <div className="flex-1 flex flex-col">
+                                {/* Header connexion */}
+                                <div className="flex items-center justify-center gap-2 mb-4 p-3 bg-green-100 rounded-lg">
+                                    <span className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
+                                    <span className="text-green-700 font-medium">Mobile connecté</span>
+                                </div>
+
+                                {/* Liste des événements à envoyer */}
+                                <div className="flex-1 bg-white rounded-xl p-4 border border-gray-200 overflow-y-auto max-h-64">
+                                    <h3 className="font-semibold text-gray-700 mb-3">
+                                        Événements à transférer ({selectedEventIds.size})
+                                    </h3>
+                                    <div className="space-y-2">
+                                        {events.filter(e => selectedEventIds.has(e.id)).map((event) => (
+                                            <div 
+                                                key={event.id}
+                                                className={`flex items-center justify-between p-3 rounded-lg border ${
+                                                    sentEventIds.has(event.id) 
+                                                        ? 'bg-green-50 border-green-300' 
+                                                        : 'bg-gray-50 border-gray-200'
+                                                }`}
+                                            >
+                                                <div className="flex-1 min-w-0 mr-3">
+                                                    <div className="font-medium text-gray-800 truncate">
+                                                        {event.name}
+                                                    </div>
+                                                    <div className="text-xs text-gray-500 truncate">
+                                                        {event.description}
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={() => sendEventToMobile(event.id)}
+                                                    disabled={sendingEventId === event.id || sentEventIds.has(event.id)}
+                                                    className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                                                        sentEventIds.has(event.id)
+                                                            ? 'bg-green-500 text-white cursor-default'
+                                                            : sendingEventId === event.id
+                                                            ? 'bg-blue-300 text-white cursor-wait'
+                                                            : 'bg-blue-500 hover:bg-blue-600 text-white'
+                                                    }`}
+                                                >
+                                                    {sentEventIds.has(event.id) 
+                                                        ? '✓ Envoyé' 
+                                                        : sendingEventId === event.id 
+                                                        ? 'Envoi...' 
+                                                        : 'Envoyer'}
+                                                </button>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
-                            )}
-                        </div>
+
+                                {/* Bouton Terminer */}
+                                <div className="mt-4">
+                                    <button
+                                        onClick={terminateTransfer}
+                                        className="w-full px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl transition-colors shadow-md"
+                                    >
+                                        Terminer le transfert
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Erreur */}
+                        {error && (
+                            <div className="mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg text-center shadow-lg">
+                                <h3 className="font-bold mb-1">Erreur Critique</h3>
+                                <p className="text-sm">Impossible de démarrer le serveur. Erreur: <code className="text-xs break-all">{error}</code></p>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

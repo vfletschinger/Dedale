@@ -136,7 +136,7 @@ pub async fn create_pdf(app: AppHandle, event_id: Option<i64>) -> Result<(), Str
         } else {
             p.comments
                 .iter()
-                .map(|c| format!("{}", c.value))
+                .map(|c| c.value.to_string())
                 .collect::<Vec<String>>()
                 .join(", ")
         };
