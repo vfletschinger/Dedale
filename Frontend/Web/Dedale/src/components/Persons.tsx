@@ -30,7 +30,7 @@ export default function Persons() {
     };
 
     useEffect(() => {
-        const unlistenNav = listen<any>('navigate-to-person', (event) => {
+        const unlistenNav = listen<{ id: number }>('navigate-to-person', (event) => {
             const targetId = event.payload.id;
             setPeople(currentPeople => {
                 const found = currentPeople.find(p => p.id === targetId);
@@ -89,7 +89,7 @@ export default function Persons() {
                         teamId={viewingTeam.id}
                         teamName={viewingTeam.name}
                         onClose={() => setViewingTeam(null)}
-                        onDelete={(_) => {
+                        onDelete={() => {
                             setViewingTeam(null);
                         }}
                         onMemberClick={(member) => {
@@ -102,7 +102,7 @@ export default function Persons() {
             )}
 
             {/* --- SIDEBAR FILTRES --- */}
-            <div className="w-64 p-6 bg-white rounded-lg shadow-lg flex-shrink-0 flex flex-col gap-6">
+            <div className="w-64 p-6 bg-white rounded-lg shadow-lg shrink-0 flex flex-col gap-6">
                 <h2 className="text-xl font-bold text-gray-800 border-b pb-2">🔍 Filtres</h2>
                 <div>
                     <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase">Recherche</label>

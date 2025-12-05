@@ -1,20 +1,20 @@
-use crate::db::{get_db_pool, insert_point_details, Event, PointDetail};
+use crate::db::{get_db_pool, insert_point_details, PointDetail};
 use base64::{engine::general_purpose, Engine as _};
 use image::Luma;
 use local_ip_address::local_ip;
+use once_cell::sync::Lazy;
 use qrcode::QrCode;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use sqlx::{Row, Sqlite, Transaction};
 use std::io::Cursor;
 use std::net::SocketAddr;
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter};
 use tungstenite::accept;
 use tungstenite::Message;
-use std::sync::mpsc::{channel, Sender, Receiver};
-use once_cell::sync::Lazy;
 
 /// Canal global pour envoyer des événements au thread WebSocket
 static EVENT_SENDER: Lazy<Mutex<Option<Sender<TransferEvent>>>> = Lazy::new(|| Mutex::new(None));
@@ -74,7 +74,7 @@ struct MobileExport {
 /// Structure pour un point dans l'export mobile (format différent du desktop)
 #[derive(Debug, Deserialize)]
 struct MobilePointDetail {
-    id: String,  // UUID
+    id: String, // UUID
     x: f64,
     y: f64,
     #[serde(default)]
@@ -89,22 +89,22 @@ struct MobilePointDetail {
 
 #[derive(Debug, Deserialize)]
 struct MobileComment {
-    id: String,  // UUID
-    point_id: String,  // UUID reference
+    id: String,       // UUID
+    point_id: String, // UUID reference
     value: String,
 }
 
 #[derive(Debug, Deserialize)]
 struct MobilePicture {
-    id: String,  // UUID
-    point_id: String,  // UUID reference
+    id: String,       // UUID
+    point_id: String, // UUID reference
     image: String,
 }
 
 #[derive(Debug, Deserialize)]
 struct MobileObstacle {
-    id: String,  // UUID
-    point_id: String,  // UUID reference
+    id: String,       // UUID
+    point_id: String, // UUID reference
     type_id: i64,
     number: i32,
 }
@@ -130,7 +130,11 @@ fn random_port() -> u16 {
 }
 
 /// Insère les points au format mobile dans la base de données
-async fn insert_mobile_points(app: &AppHandle, event_id: i64, points: Vec<MobilePointDetail>) -> Result<(), String> {
+async fn insert_mobile_points(
+    app: &AppHandle,
+    event_id: i64,
+    points: Vec<MobilePointDetail>,
+) -> Result<(), String> {
     let pool = get_db_pool(app).await?;
     let mut tx: Transaction<Sqlite> = pool
         .begin()
@@ -198,15 +202,14 @@ async fn insert_mobile_points(app: &AppHandle, event_id: i64, points: Vec<Mobile
 }
 
 /// Récupère les events sélectionnés pour le transfert
-async fn fetch_events_for_transfer(app: &AppHandle, event_ids: &[i64]) -> Result<Vec<TransferEvent>, String> {
+async fn fetch_events_for_transfer(
+    app: &AppHandle,
+    event_ids: &[i64],
+) -> Result<Vec<TransferEvent>, String> {
     let pool = get_db_pool(app).await?;
 
     // Récupérer les events sélectionnés
-    let event_ids_placeholder = event_ids
-        .iter()
-        .map(|_| "?")
-        .collect::<Vec<_>>()
-        .join(",");
+    let event_ids_placeholder = event_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
 
     let events_query = format!(
         "SELECT id, name, description, date_debut, date_fin, statut, geometry FROM event WHERE id IN ({})",
@@ -248,15 +251,18 @@ async fn handle_websocket(
     event_receiver: Receiver<TransferEvent>,
 ) -> Result<(), String> {
     println!("📱 Client mobile connecté, en attente d'actions...");
-    
+
     // Émettre un événement Tauri pour notifier le frontend
     app.emit("mobile-connected", ()).unwrap_or_else(|e| {
         eprintln!("⚠️ Erreur émission événement mobile-connected: {}", e);
     });
-    
+
     // Passer le socket en mode non-bloquant pour pouvoir vérifier le canal
-    websocket.get_ref().set_nonblocking(true).map_err(|e| format!("Erreur set_nonblocking: {}", e))?;
-    
+    websocket
+        .get_ref()
+        .set_nonblocking(true)
+        .map_err(|e| format!("Erreur set_nonblocking: {}", e))?;
+
     // Envoyer un message de bienvenue avec le nombre d'events disponibles
     let welcome = serde_json::json!({
         "type": "connected",
@@ -266,7 +272,9 @@ async fn handle_websocket(
     websocket
         .write(Message::Text(welcome.to_string().into()))
         .map_err(|e| format!("Erreur envoi welcome: {}", e))?;
-    websocket.flush().map_err(|e| format!("Erreur flush: {}", e))?;
+    websocket
+        .flush()
+        .map_err(|e| format!("Erreur flush: {}", e))?;
 
     // Boucle principale - attendre les actions du client ou les événements du frontend
     loop {
@@ -279,25 +287,27 @@ async fn handle_websocket(
             });
             let json_data = serde_json::to_string(&response)
                 .map_err(|e| format!("Erreur sérialisation JSON: {}", e))?;
-            
+
             websocket
                 .write(Message::Text(json_data.into()))
                 .map_err(|e| format!("Erreur envoi événement: {}", e))?;
-            websocket.flush().map_err(|e| format!("Erreur flush: {}", e))?;
-            
+            websocket
+                .flush()
+                .map_err(|e| format!("Erreur flush: {}", e))?;
+
             println!("✅ Événement {} envoyé avec succès !", event.id);
-            
+
             // Émettre un événement pour confirmer l'envoi au frontend
             app.emit("event-sent", event.id).unwrap_or_else(|e| {
                 eprintln!("⚠️ Erreur émission événement event-sent: {}", e);
             });
         }
-        
+
         // Vérifier s'il y a un message du client
         match websocket.read() {
             Ok(msg) => {
                 println!("Reçu : {}", msg);
-                
+
                 if let Message::Text(text) = msg.clone() {
                     // Essayer de parser comme une action du client
                     if let Ok(client_action) = serde_json::from_str::<ClientAction>(&text) {
@@ -305,7 +315,7 @@ async fn handle_websocket(
                             "get_events" => {
                                 // Le mobile demande les events
                                 println!("📤 Le mobile demande les événements...");
-                                
+
                                 let events = fetch_events_for_transfer(app, &event_ids).await?;
                                 let response = serde_json::json!({
                                     "type": "events",
@@ -319,7 +329,9 @@ async fn handle_websocket(
                                 websocket
                                     .write(Message::Text(json_data.into()))
                                     .map_err(|e| format!("Erreur envoi données: {}", e))?;
-                                websocket.flush().map_err(|e| format!("Erreur flush: {}", e))?;
+                                websocket
+                                    .flush()
+                                    .map_err(|e| format!("Erreur flush: {}", e))?;
 
                                 println!("✅ Événements envoyés avec succès !");
                                 continue;
@@ -327,14 +339,14 @@ async fn handle_websocket(
                             "terminate" => {
                                 // Le mobile demande la fermeture
                                 println!("🔚 Le mobile demande la fermeture de la connexion");
-                                
+
                                 let response = serde_json::json!({
                                     "type": "goodbye",
                                     "message": "Connexion terminée"
                                 });
                                 let _ = websocket.write(Message::Text(response.to_string().into()));
                                 let _ = websocket.flush();
-                                
+
                                 // Fermer proprement
                                 let _ = websocket.close(None);
                                 println!("👋 Connexion fermée proprement");
@@ -346,11 +358,14 @@ async fn handle_websocket(
                         }
                         continue;
                     }
-                    
+
                     // Essayer de parser comme un accusé de réception d'event (objet unique)
                     if let Ok(event_ack) = serde_json::from_str::<EventAck>(&text) {
-                        println!("✅ Accusé de réception reçu pour l'event: {} (id: {})", event_ack.name, event_ack.id);
-                        
+                        println!(
+                            "✅ Accusé de réception reçu pour l'event: {} (id: {})",
+                            event_ack.name, event_ack.id
+                        );
+
                         // Envoyer une confirmation
                         let response = AckResponse {
                             code: 3,
@@ -363,23 +378,25 @@ async fn handle_websocket(
                         let _ = websocket.flush();
                         continue;
                     }
-                    
+
                     // Essayer de parser comme un export mobile (event + points)
                     if let Ok(mobile_export) = serde_json::from_str::<MobileExport>(&text) {
                         let points_count = mobile_export.points.len();
                         let event_name = mobile_export.event.name.clone();
                         let event_id = mobile_export.event.id;
-                        
-                        println!("📱 Export mobile reçu: event '{}' (id: {}) avec {} point(s)", 
-                            event_name, 
-                            event_id,
-                            points_count
+
+                        println!(
+                            "📱 Export mobile reçu: event '{}' (id: {}) avec {} point(s)",
+                            event_name, event_id, points_count
                         );
-                        
+
                         // Insérer les points dans la base de données
                         if points_count > 0 {
-                            println!("🚀 Insertion de {} point(s) en base de données...", points_count);
-                            match insert_mobile_points(&app, event_id, mobile_export.points).await {
+                            println!(
+                                "🚀 Insertion de {} point(s) en base de données...",
+                                points_count
+                            );
+                            match insert_mobile_points(app, event_id, mobile_export.points).await {
                                 Ok(_) => {
                                     println!("✅ Points insérés avec succès !");
                                     // Émettre un événement pour notifier le frontend
@@ -393,20 +410,21 @@ async fn handle_websocket(
                                         code: 1,
                                         message: format!("Erreur insertion points: {}", e),
                                     };
-                                    let response_json = serde_json::to_string(&error_response).unwrap_or_default();
+                                    let response_json =
+                                        serde_json::to_string(&error_response).unwrap_or_default();
                                     let _ = websocket.write(Message::Text(response_json.into()));
                                     let _ = websocket.flush();
                                     continue;
                                 }
                             }
                         }
-                        
+
                         // Envoyer une confirmation de succès
                         let response = AckResponse {
                             code: 3,
-                            message: format!("Event '{}' et {} point(s) reçus avec succès", 
-                                event_name, 
-                                points_count
+                            message: format!(
+                                "Event '{}' et {} point(s) reçus avec succès",
+                                event_name, points_count
                             ),
                         };
                         let response_json = serde_json::to_string(&response).unwrap_or_default();
@@ -416,7 +434,7 @@ async fn handle_websocket(
                         let _ = websocket.flush();
                         continue;
                     }
-                    
+
                     // Sinon, essayer de parser comme un tableau de PointDetail
                     match serde_json::from_str::<Vec<PointDetail>>(&text) {
                         Ok(point_details_vec) => {
@@ -426,7 +444,7 @@ async fn handle_websocket(
                             );
 
                             println!("🚀 Début de l'insertion en base de données...");
-                            match insert_point_details(&app, point_details_vec).await {
+                            match insert_point_details(app, point_details_vec).await {
                                 Ok(_) => {
                                     println!("✅ Insertion terminée avec succès ! Envoi du message 'fini'...");
 
@@ -506,8 +524,11 @@ async fn handle_websocket(
 
 #[tauri::command]
 pub fn start_server(app: AppHandle, event_ids: Vec<i64>) -> Result<String, String> {
-    println!("🚀 Démarrage du serveur WebSocket pour {} événement(s)", event_ids.len());
-    
+    println!(
+        "🚀 Démarrage du serveur WebSocket pour {} événement(s)",
+        event_ids.len()
+    );
+
     let ip = local_ip().map_err(|e| e.to_string())?;
     let port = random_port();
     let socket = SocketAddr::new(ip, port);
@@ -542,26 +563,29 @@ pub fn start_server(app: AppHandle, event_ids: Vec<i64>) -> Result<String, Strin
                     match accept(stream) {
                         Ok(ws) => {
                             println!("Client WebSocket connecté");
-                            
+
                             // Créer le canal pour cet client
                             let (sender, receiver) = channel::<TransferEvent>();
-                            
+
                             // Stocker le sender globalement
                             if let Ok(mut global_sender) = EVENT_SENDER.lock() {
                                 *global_sender = Some(sender);
                             }
-                            
+
                             let app_clone = app_for_thread.clone();
                             let event_ids_clone = Arc::clone(&event_ids_arc);
                             thread::spawn(move || {
                                 // Create a Tokio runtime to run the async function
                                 let rt = tokio::runtime::Runtime::new().unwrap();
                                 rt.block_on(async {
-                                    if let Err(e) = handle_websocket(&app_clone, ws, event_ids_clone, receiver).await {
+                                    if let Err(e) =
+                                        handle_websocket(&app_clone, ws, event_ids_clone, receiver)
+                                            .await
+                                    {
                                         eprintln!("Erreur WebSocket: {}", e);
                                     }
                                 });
-                                
+
                                 // Nettoyer le sender global quand la connexion se termine
                                 if let Ok(mut global_sender) = EVENT_SENDER.lock() {
                                     *global_sender = None;
@@ -583,10 +607,10 @@ pub fn start_server(app: AppHandle, event_ids: Vec<i64>) -> Result<String, Strin
 #[tauri::command]
 pub async fn send_event_to_mobile(app: AppHandle, event_id: i64) -> Result<(), String> {
     println!("📤 Demande d'envoi de l'événement {} au mobile", event_id);
-    
+
     // Récupérer l'événement depuis la base de données
     let pool = get_db_pool(&app).await?;
-    
+
     let row = sqlx::query(
         "SELECT id, name, description, date_debut, date_fin, statut, geometry FROM event WHERE id = ?"
     )
@@ -595,7 +619,7 @@ pub async fn send_event_to_mobile(app: AppHandle, event_id: i64) -> Result<(), S
     .await
     .map_err(|e| format!("Erreur récupération event: {}", e))?
     .ok_or_else(|| format!("Event {} non trouvé", event_id))?;
-    
+
     let event = TransferEvent {
         id: row.get("id"),
         name: row.get("name"),
@@ -605,24 +629,29 @@ pub async fn send_event_to_mobile(app: AppHandle, event_id: i64) -> Result<(), S
         statut: row.get("statut"),
         geometry: row.get("geometry"),
     };
-    
+
     // Envoyer via le canal global
-    let sender = EVENT_SENDER.lock()
+    let sender = EVENT_SENDER
+        .lock()
         .map_err(|e| format!("Erreur lock: {}", e))?
         .clone()
         .ok_or_else(|| "Aucun mobile connecté".to_string())?;
-    
-    sender.send(event)
+
+    sender
+        .send(event)
         .map_err(|e| format!("Erreur envoi via canal: {}", e))?;
-    
+
     Ok(())
 }
 
 /// Démarrer un serveur WebSocket pour recevoir les données du mobile
 #[tauri::command]
 pub fn start_receive_server(app: AppHandle, event_id: i64) -> Result<String, String> {
-    println!("📥 Démarrage du serveur de réception pour l'événement {}", event_id);
-    
+    println!(
+        "📥 Démarrage du serveur de réception pour l'événement {}",
+        event_id
+    );
+
     let ip = local_ip().map_err(|e| e.to_string())?;
     let port = random_port();
     let socket = SocketAddr::new(ip, port);
@@ -650,24 +679,24 @@ pub fn start_receive_server(app: AppHandle, event_id: i64) -> Result<String, Str
 
         for stream in listener.incoming() {
             match stream {
-                Ok(stream) => {
-                    match accept(stream) {
-                        Ok(ws) => {
-                            println!("📱 Client mobile connecté pour réception");
-                            let app_clone = app_for_thread.clone();
-                            
-                            thread::spawn(move || {
-                                let rt = tokio::runtime::Runtime::new().unwrap();
-                                rt.block_on(async {
-                                    if let Err(e) = handle_receive_websocket(&app_clone, ws, event_id).await {
-                                        eprintln!("Erreur WebSocket réception: {}", e);
-                                    }
-                                });
+                Ok(stream) => match accept(stream) {
+                    Ok(ws) => {
+                        println!("📱 Client mobile connecté pour réception");
+                        let app_clone = app_for_thread.clone();
+
+                        thread::spawn(move || {
+                            let rt = tokio::runtime::Runtime::new().unwrap();
+                            rt.block_on(async {
+                                if let Err(e) =
+                                    handle_receive_websocket(&app_clone, ws, event_id).await
+                                {
+                                    eprintln!("Erreur WebSocket réception: {}", e);
+                                }
                             });
-                        }
-                        Err(e) => eprintln!("Erreur accept WebSocket : {}", e),
+                        });
                     }
-                }
+                    Err(e) => eprintln!("Erreur accept WebSocket : {}", e),
+                },
                 Err(e) => eprintln!("Erreur connexion : {}", e),
             }
         }
@@ -683,12 +712,12 @@ async fn handle_receive_websocket(
     event_id: i64,
 ) -> Result<(), String> {
     println!("📥 Client connecté pour réception, event_id: {}", event_id);
-    
+
     // Émettre un événement Tauri pour notifier le frontend
     app.emit("mobile-connected", ()).unwrap_or_else(|e| {
         eprintln!("⚠️ Erreur émission événement mobile-connected: {}", e);
     });
-    
+
     // Envoyer un message de bienvenue
     let welcome = serde_json::json!({
         "type": "ready_to_receive",
@@ -698,33 +727,42 @@ async fn handle_receive_websocket(
     websocket
         .write(Message::Text(welcome.to_string().into()))
         .map_err(|e| format!("Erreur envoi welcome: {}", e))?;
-    websocket.flush().map_err(|e| format!("Erreur flush: {}", e))?;
+    websocket
+        .flush()
+        .map_err(|e| format!("Erreur flush: {}", e))?;
 
     // Boucle de réception
     loop {
         match websocket.read() {
             Ok(msg) => {
                 if let Message::Text(text) = msg {
-                    println!("📥 Message reçu: {}...", &text.chars().take(100).collect::<String>());
-                    
+                    println!(
+                        "📥 Message reçu: {}...",
+                        &text.chars().take(100).collect::<String>()
+                    );
+
                     // Parser comme un export mobile
                     if let Ok(mobile_export) = serde_json::from_str::<MobileExport>(&text) {
                         let points_count = mobile_export.points.len();
                         let event_name = mobile_export.event.name.clone();
                         let event_id = mobile_export.event.id;
-                        
-                        println!("📱 Export reçu: '{}' avec {} point(s)", event_name, points_count);
-                        
+
+                        println!(
+                            "📱 Export reçu: '{}' avec {} point(s)",
+                            event_name, points_count
+                        );
+
                         if points_count > 0 {
                             println!("🚀 Insertion de {} point(s)...", points_count);
-                            match insert_mobile_points(&app, event_id, mobile_export.points).await {
+                            match insert_mobile_points(app, event_id, mobile_export.points).await {
                                 Ok(_) => {
                                     println!("✅ Points insérés avec succès !");
-                                    
+
                                     // Émettre un événement pour notifier le frontend
-                                    app.emit("points-received", points_count).unwrap_or_else(|e| {
-                                        eprintln!("⚠️ Erreur émission points-received: {}", e);
-                                    });
+                                    app.emit("points-received", points_count)
+                                        .unwrap_or_else(|e| {
+                                            eprintln!("⚠️ Erreur émission points-received: {}", e);
+                                        });
                                 }
                                 Err(e) => {
                                     eprintln!("❌ Erreur insertion: {}", e);
@@ -732,14 +770,15 @@ async fn handle_receive_websocket(
                                         code: 1,
                                         message: format!("Erreur: {}", e),
                                     };
-                                    let response_json = serde_json::to_string(&error_response).unwrap_or_default();
+                                    let response_json =
+                                        serde_json::to_string(&error_response).unwrap_or_default();
                                     let _ = websocket.write(Message::Text(response_json.into()));
                                     let _ = websocket.flush();
                                     continue;
                                 }
                             }
                         }
-                        
+
                         // Confirmation de succès
                         let response = AckResponse {
                             code: 3,
@@ -750,10 +789,7 @@ async fn handle_receive_websocket(
                         let _ = websocket.flush();
                     } else {
                         // Log l'erreur de parsing pour debug
-                        match serde_json::from_str::<MobileExport>(&text) {
-                            Err(e) => println!("⚠️ Erreur parsing MobileExport: {}", e),
-                            _ => {}
-                        }
+                        if let Err(e) = serde_json::from_str::<MobileExport>(&text) { println!("⚠️ Erreur parsing MobileExport: {}", e) }
                         println!("⚠️ Format de message non reconnu");
                     }
                 }

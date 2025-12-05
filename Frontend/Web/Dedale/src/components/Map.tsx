@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useMemo } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import MapboxDraw from "@mapbox/mapbox-gl-draw";
@@ -7,6 +7,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import PointDetails from "./PointDetails";
 import AddPointForm from "./AddPointForm";
+
+// Date initiale pour le calcul de la timeline (stable pour éviter les re-renders)
+const INITIAL_NOW = Date.now();
 
 // Fonction pour convertir GeoJSON en WKT
 function geoJSONtoWKT(geometry: GeoJSON.Geometry): string {
@@ -34,6 +37,44 @@ interface GeometryData {
   id: number;
   event_id: number;
   geom: string;
+}
+
+// Type pour les obstacles
+interface Obstacle {
+  id?: number;
+  name?: string;
+  number?: number;
+  description?: string;
+  width?: number;
+  length?: number;
+}
+
+// Type pour les points de la carte
+interface MapPoint {
+  id: number;
+  x: number;
+  y: number;
+  pose?: string | null;
+  depose?: string | null;
+  obstacles?: Obstacle[];
+  comments?: { id: number; value: string }[];
+  pictures?: { id: number; image: string }[];
+}
+
+// Type pour les événements
+interface MapEvent {
+  id: number;
+  name?: string;
+  event_type?: string;
+  status?: string;
+  statut?: string;
+}
+
+// Type pour les résultats de recherche Nominatim
+interface SearchResult {
+  lon: string;
+  lat: string;
+  display_name: string;
 }
 
 // Fonction pour parser WKT et convertir en GeoJSON
@@ -106,378 +147,246 @@ function formatDateShort(dateStr: string | null | undefined): string {
   }
 }
 
-// Helper pour formater une date complète
-function formatDateFull(dateStr: string | null | undefined): string {
-  if (!dateStr) return "Non défini";
-  try {
-    const date = new Date(dateStr);
-    return date.toLocaleString("fr-FR", {
-      weekday: "short",
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return dateStr;
-  }
-}
-
-// Type pour les entrées de la frise (pose ou dépose)
-type TimelineEntry = {
-  id: number;
-  pointId: number;
-  type: 'pose' | 'depose';
-  date: Date;
-  point: any;
-};
-
-// Composant Frise Chronologique
-function TimelineView({ 
+// Composant Frise Chronologique personnalisée
+function TimelinePanel({ 
   points, 
-  onPointClick, 
-  fullscreen 
+  onPointClick 
 }: { 
-  points: any[]; 
-  onPointClick: (point: any) => void;
-  fullscreen: boolean;
+  points: MapPoint[]; 
+  onPointClick: (point: MapPoint) => void;
 }) {
-  const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
-  const [filter, setFilter] = useState<'all' | 'pose' | 'depose'>('all');
-  const MAX_POINTS_PER_DAY = 5;
+  const [obstacleFilter, setObstacleFilter] = useState<string>("all");
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  const toggleDayExpansion = (day: string) => {
-    setExpandedDays(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(day)) {
-        newSet.delete(day);
-      } else {
-        newSet.add(day);
+  // Extraire tous les types d'obstacles uniques des points (obstacles sont des objets avec name)
+  const obstacleTypes = useMemo(() => {
+    const types = new Set<string>();
+    points.forEach(p => {
+      if (p.obstacles && Array.isArray(p.obstacles)) {
+        p.obstacles.forEach((obs: Obstacle) => {
+          // Les obstacles sont des objets avec une propriété 'name'
+          const obsName = obs?.name;
+          if (obsName) types.add(obsName);
+        });
       }
-      return newSet;
+    });
+    return Array.from(types).sort();
+  }, [points]);
+
+  // Helper pour vérifier si un point contient un type d'obstacle
+  const pointHasObstacle = (point: MapPoint, obstacleName: string) => {
+    if (!point.obstacles || !Array.isArray(point.obstacles)) return false;
+    return point.obstacles.some((obs: Obstacle) => {
+      const obsName = obs?.name;
+      return obsName === obstacleName;
     });
   };
 
-  // Créer des entrées séparées pour chaque pose et dépose
-  const timelineEntries: TimelineEntry[] = [];
-  let entryId = 0;
-  
-  points.forEach(p => {
-    if (p.pose && (filter === 'all' || filter === 'pose')) {
-      timelineEntries.push({
-        id: entryId++,
-        pointId: p.id,
-        type: 'pose',
-        date: new Date(p.pose),
-        point: p,
-      });
+  // Filtrer les points selon le filtre d'obstacle et trier par date de début
+  const filteredPoints = useMemo(() => {
+    let filtered;
+    if (obstacleFilter === "all") {
+      filtered = points.filter(p => p.pose && p.depose);
+    } else {
+      filtered = points.filter(p => 
+        p.pose && 
+        p.depose && 
+        pointHasObstacle(p, obstacleFilter)
+      );
     }
-    if (p.depose && (filter === 'all' || filter === 'depose')) {
-      timelineEntries.push({
-        id: entryId++,
-        pointId: p.id,
-        type: 'depose',
-        date: new Date(p.depose),
-        point: p,
-      });
+    // Trier par date de pose (la plus proche en premier)
+    return filtered.sort((a, b) => new Date(a.pose!).getTime() - new Date(b.pose!).getTime());
+  }, [points, obstacleFilter]);
+
+  // Calculer les bornes de temps
+  const timeRange = useMemo(() => {
+    if (filteredPoints.length === 0) {
+      return { min: INITIAL_NOW - 12 * 60 * 60 * 1000, max: INITIAL_NOW + 12 * 60 * 60 * 1000 };
     }
-  });
+    
+    const times = filteredPoints.flatMap(p => [
+      new Date(p.pose!).getTime(),
+      new Date(p.depose!).getTime()
+    ]);
+    const min = Math.min(...times);
+    const max = Math.max(...times);
+    const padding = (max - min) * 0.1 || 3600000;
+    
+    return { min: min - padding, max: max + padding };
+  }, [filteredPoints]);
 
-  // Trier par date
-  timelineEntries.sort((a, b) => a.date.getTime() - b.date.getTime());
+  // Fonction pour formater une date
+  const formatTime = (timestamp: number) => {
+    const date = new Date(timestamp);
+    return date.toLocaleString("fr-FR", {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  };
 
-  if (timelineEntries.length === 0) {
+  // Fonction pour calculer la position en pourcentage
+  const getPosition = (timestamp: number) => {
+    const range = timeRange.max - timeRange.min;
+    if (range === 0) return 50;
+    return ((timestamp - timeRange.min) / range) * 100;
+  };
+
+  // Nombre total de points avec dates
+  const totalPointsWithDates = points.filter(p => p.pose && p.depose).length;
+
+  // Générer les marqueurs de temps - doit être avant tout return conditionnel
+  const timeMarkers = useMemo(() => {
+    const markers: number[] = [];
+    const range = timeRange.max - timeRange.min;
+    const step = range / 6; // 6 marqueurs
+    for (let i = 0; i <= 6; i++) {
+      markers.push(timeRange.min + step * i);
+    }
+    return markers;
+  }, [timeRange]);
+
+  if (totalPointsWithDates === 0) {
     return (
-      <div className="space-y-4">
-        {/* Filtres */}
-        <div className="flex gap-2 flex-wrap">
-          <button
-            onClick={() => setFilter('all')}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-              filter === 'all' 
-                ? 'bg-indigo-500 text-white shadow-md' 
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            Tout
-          </button>
-          <button
-            onClick={() => setFilter('pose')}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-              filter === 'pose' 
-                ? 'bg-green-500 text-white shadow-md' 
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            ▲ Poses
-          </button>
-          <button
-            onClick={() => setFilter('depose')}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-              filter === 'depose' 
-                ? 'bg-red-500 text-white shadow-md' 
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            ▼ Déposes
-          </button>
-        </div>
-        
-        <div className="text-center text-gray-500 py-8">
-          <div className="text-4xl mb-2">📅</div>
-          <p>Aucun point avec dates</p>
+      <div className="flex items-center justify-center h-full text-gray-500">
+        <div className="text-center">
+          <div className="text-3xl mb-2">📅</div>
+          <p className="text-sm">Aucun point avec dates pose/dépose</p>
+          <p className="text-xs mt-1">Ajoutez des dates aux points pour les voir sur la frise</p>
         </div>
       </div>
     );
   }
 
-  // Grouper les entrées par jour
-  const groupedByDay: { [key: string]: TimelineEntry[] } = {};
-  timelineEntries.forEach(entry => {
-    const dateKey = entry.date.toLocaleDateString("fr-FR", {
-      weekday: "long",
-      day: "2-digit",
-      month: "long",
-      year: "numeric",
-    });
-    if (!groupedByDay[dateKey]) {
-      groupedByDay[dateKey] = [];
-    }
-    groupedByDay[dateKey].push(entry);
-  });
+  return (
+    <div className="h-full flex flex-col">
+      {/* Barre de filtre */}
+      <div className="shrink-0 px-3 py-2 bg-gray-50 border-b border-gray-200 flex items-center gap-3">
+        <label className="text-sm font-medium text-gray-600 flex items-center gap-1">
+          <span>🏷️</span>
+          <span>Type d'obstacle:</span>
+        </label>
+        <select
+          value={obstacleFilter}
+          onChange={(e) => setObstacleFilter(e.target.value)}
+          className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+        >
+          <option value="all">Tous les points ({totalPointsWithDates})</option>
+          {obstacleTypes.map(type => {
+            const count = points.filter(p => 
+              p.pose && p.depose && pointHasObstacle(p, type)
+            ).length;
+            return (
+              <option key={type} value={type}>
+                {type} ({count})
+              </option>
+            );
+          })}
+        </select>
+        {obstacleFilter !== "all" && (
+          <button
+            onClick={() => setObstacleFilter("all")}
+            className="px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-md transition-colors"
+          >
+            ✕ Réinitialiser
+          </button>
+        )}
+        <span className="text-xs text-gray-500 ml-auto">
+          {filteredPoints.length} point(s) affiché(s)
+        </span>
+      </div>
 
-  const days = Object.keys(groupedByDay);
-
-  // Composant de filtres
-  const FilterButtons = () => (
-    <div className="flex gap-2 flex-wrap mb-4">
-      <button
-        onClick={() => setFilter('all')}
-        className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-          filter === 'all' 
-            ? 'bg-indigo-500 text-white shadow-md' 
-            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-        }`}
-      >
-        Tout ({points.filter(p => p.pose || p.depose).length})
-      </button>
-      <button
-        onClick={() => setFilter('pose')}
-        className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-          filter === 'pose' 
-            ? 'bg-green-500 text-white shadow-md' 
-            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-        }`}
-      >
-        ▲ Poses ({points.filter(p => p.pose).length})
-      </button>
-      <button
-        onClick={() => setFilter('depose')}
-        className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-          filter === 'depose' 
-            ? 'bg-red-500 text-white shadow-md' 
-            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-        }`}
-      >
-        ▼ Déposes ({points.filter(p => p.depose).length})
-      </button>
-    </div>
-  );
-
-  if (fullscreen) {
-    // Vue plein écran : frise horizontale avec tous les jours
-    return (
-      <div className="space-y-6">
-        <FilterButtons />
-        
-        {days.map((day) => (
-          <div key={day} className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-            <div className="px-6 py-4 bg-gradient-to-r from-indigo-500 to-purple-600">
-              <h3 className="text-white font-bold text-lg">{day}</h3>
-              <p className="text-white/70 text-sm">{groupedByDay[day].length} événement(s)</p>
+      {/* Timeline */}
+      {filteredPoints.length === 0 ? (
+        <div className="flex-1 flex items-center justify-center text-gray-500">
+          <div className="text-center">
+            <div className="text-3xl mb-2">🔍</div>
+            <p className="text-sm">Aucun point avec l'obstacle "{obstacleFilter}"</p>
+            <button
+              onClick={() => setObstacleFilter("all")}
+              className="mt-2 px-3 py-1 text-sm bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-lg transition-colors"
+            >
+              Voir tous les points
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex-1 flex flex-col overflow-hidden" ref={containerRef}>
+          {/* En-tête avec les marqueurs de temps */}
+          <div className="shrink-0 flex border-b border-gray-200 bg-linear-to-r from-indigo-500 to-purple-600">
+            <div className="w-24 shrink-0 px-2 py-1 text-xs font-semibold text-white border-r border-white/20">
+              Points
             </div>
-            
-            <div className="p-6">
-              {/* Ligne de temps horizontale */}
-              <div className="relative">
-                {/* Ligne de base */}
-                <div className="absolute top-8 left-0 right-0 h-1 bg-gradient-to-r from-indigo-200 via-purple-200 to-pink-200 rounded-full"></div>
-                
-                {/* Points sur la frise */}
-                <div className="flex gap-4 overflow-x-auto pb-4">
-                  {(() => {
-                    const dayEntries = groupedByDay[day];
-                    const isExpanded = expandedDays.has(day);
-                    const visibleEntries = isExpanded ? dayEntries : dayEntries.slice(0, MAX_POINTS_PER_DAY);
-                    const hiddenCount = dayEntries.length - MAX_POINTS_PER_DAY;
-                    
-                    return (
-                      <>
-                        {visibleEntries.map((entry) => (
-                          <div 
-                            key={entry.id}
-                            className="flex-shrink-0 relative pt-12"
-                            style={{ minWidth: fullscreen ? '200px' : '150px' }}
-                          >
-                            {/* Connecteur vertical */}
-                            <div className={`absolute top-4 left-1/2 -translate-x-1/2 w-0.5 h-8 ${
-                              entry.type === 'pose' ? 'bg-green-300' : 'bg-red-300'
-                            }`}></div>
-                            
-                            {/* Point sur la ligne */}
-                            <div 
-                              className={`absolute top-6 left-1/2 -translate-x-1/2 w-5 h-5 rounded-full border-4 border-white shadow-lg cursor-pointer hover:scale-125 transition-transform ${
-                                entry.type === 'pose' 
-                                  ? 'bg-gradient-to-br from-green-400 to-green-600' 
-                                  : 'bg-gradient-to-br from-red-400 to-red-600'
-                              }`}
-                              onClick={() => onPointClick(entry.point)}
-                            ></div>
-                            
-                            {/* Carte du point */}
-                            <div 
-                              onClick={() => onPointClick(entry.point)}
-                              className={`bg-white rounded-xl border-2 shadow-md hover:shadow-lg cursor-pointer transition-all p-4 ${
-                                entry.type === 'pose' 
-                                  ? 'border-green-200 hover:border-green-400' 
-                                  : 'border-red-200 hover:border-red-400'
-                              }`}
-                            >
-                              <div className="flex items-center gap-2 mb-2">
-                                <span className={`text-lg ${entry.type === 'pose' ? 'text-green-500' : 'text-red-500'}`}>
-                                  {entry.type === 'pose' ? '▲' : '▼'}
-                                </span>
-                                <span className="font-bold text-gray-800">Point #{entry.pointId}</span>
-                              </div>
-                              
-                              <div className={`flex items-center gap-2 text-xs ${
-                                entry.type === 'pose' ? 'text-green-600' : 'text-red-600'
-                              }`}>
-                                <span className={`w-2 h-2 rounded-full ${
-                                  entry.type === 'pose' ? 'bg-green-500' : 'bg-red-500'
-                                }`}></span>
-                                <span>
-                                  {entry.type === 'pose' ? 'Pose' : 'Dépose'}: {entry.date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
-                                </span>
-                              </div>
-                              
-                              <div className="text-xs text-gray-400 mt-2">
-                                {entry.point.obstacles?.length || 0} obstacle(s)
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                        
-                        {/* Bouton voir plus / voir moins */}
-                        {hiddenCount > 0 && (
-                          <div 
-                            className="flex-shrink-0 relative pt-12"
-                            style={{ minWidth: '120px' }}
-                          >
-                            <div className="absolute top-4 left-1/2 -translate-x-1/2 w-0.5 h-8 bg-indigo-300"></div>
-                            <button
-                              onClick={() => toggleDayExpansion(day)}
-                              className="absolute top-6 left-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 border-4 border-white shadow-lg flex items-center justify-center hover:scale-110 transition-transform"
-                            >
-                              <span className="text-white font-bold text-xs">{isExpanded ? '−' : `+${hiddenCount}`}</span>
-                            </button>
-                            
-                            <div className="mt-8 text-center">
-                              <span className="text-xs text-gray-500">
-                                {isExpanded ? 'Voir moins' : `${hiddenCount} de plus`}
-                              </span>
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    );
-                  })()}
+            <div className="flex-1 relative h-8">
+              {timeMarkers.map((time, i) => (
+                <div
+                  key={i}
+                  className="absolute top-0 h-full flex items-center"
+                  style={{ left: `${(i / 6) * 100}%` }}
+                >
+                  <span className="text-[10px] text-white/90 whitespace-nowrap transform -translate-x-1/2">
+                    {formatTime(time)}
+                  </span>
                 </div>
-              </div>
+              ))}
             </div>
           </div>
-        ))}
-      </div>
-    );
-  }
 
-  // Vue sidebar : frise verticale compacte
-  return (
-    <div className="space-y-4">
-      <FilterButtons />
-      
-      {days.map((day) => {
-        const dayEntries = groupedByDay[day];
-        const isExpanded = expandedDays.has(day);
-        const visibleEntries = isExpanded ? dayEntries : dayEntries.slice(0, MAX_POINTS_PER_DAY);
-        const hiddenCount = dayEntries.length - MAX_POINTS_PER_DAY;
-        
-        return (
-          <div key={day} className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-            <div className="px-3 py-2 bg-gradient-to-r from-indigo-100 to-purple-100 border-b border-indigo-100 flex items-center justify-between">
-              <h4 className="text-indigo-800 font-semibold text-xs">{day}</h4>
-              <span className="text-indigo-600 text-xs">{dayEntries.length} événement(s)</span>
-            </div>
-            
-            <div className="relative pl-6 pr-2 py-2">
-              {/* Ligne verticale */}
-              <div className="absolute left-3 top-0 bottom-0 w-0.5 bg-gradient-to-b from-indigo-300 to-purple-300"></div>
-              
-              {visibleEntries.map((entry) => (
-                <div 
-                  key={entry.id}
-                  className="relative mb-3 last:mb-0"
+          {/* Corps de la timeline avec scroll */}
+          <div className="flex-1 overflow-y-auto">
+            {filteredPoints.map((point, index) => {
+              const startPos = getPosition(new Date(point.pose!).getTime());
+              const endPos = getPosition(new Date(point.depose!).getTime());
+              const width = Math.max(endPos - startPos, 2);
+
+              return (
+                <div
+                  key={point.id}
+                  className={`flex border-b border-gray-200 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                  style={{ height: '40px' }}
                 >
-                  {/* Point sur la ligne */}
-                  <div className={`absolute -left-3 top-2 w-3 h-3 rounded-full border-2 border-white shadow ${
-                    entry.type === 'pose' 
-                      ? 'bg-gradient-to-br from-green-400 to-green-600' 
-                      : 'bg-gradient-to-br from-red-400 to-red-600'
-                  }`}></div>
+                  {/* Label du point */}
+                  <div className="w-24 shrink-0 px-2 flex items-center text-xs font-medium text-gray-700 border-r border-gray-200">
+                    Point #{point.id}
+                  </div>
                   
-                  {/* Carte du point */}
-                  <div 
-                    onClick={() => onPointClick(entry.point)}
-                    className={`ml-2 p-2 rounded-lg cursor-pointer transition-colors border ${
-                      entry.type === 'pose'
-                        ? 'bg-green-50 hover:bg-green-100 border-green-200 hover:border-green-300'
-                        : 'bg-red-50 hover:bg-red-100 border-red-200 hover:border-red-300'
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span className={`text-sm ${entry.type === 'pose' ? 'text-green-500' : 'text-red-500'}`}>
-                        {entry.type === 'pose' ? '▲' : '▼'}
-                      </span>
-                      <span className="font-semibold text-gray-800 text-sm">Point #{entry.pointId}</span>
-                    </div>
+                  {/* Barre de temps */}
+                  <div className="flex-1 relative">
+                    {/* Grille verticale */}
+                    {timeMarkers.map((_, i) => (
+                      <div
+                        key={i}
+                        className="absolute top-0 bottom-0 border-l border-gray-200"
+                        style={{ left: `${(i / 6) * 100}%` }}
+                      />
+                    ))}
                     
-                    <div className={`text-xs mt-0.5 ${
-                      entry.type === 'pose' ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      {entry.date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                    {/* Bloc de durée */}
+                    <div
+                      onClick={() => onPointClick(point)}
+                      className="absolute top-1 bottom-1 rounded cursor-pointer transition-all hover:scale-y-110 hover:brightness-110 shadow-sm"
+                      style={{
+                        left: `${startPos}%`,
+                        width: `${width}%`,
+                        background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                        minWidth: '20px'
+                      }}
+                      title={`Point #${point.id}\nPose: ${formatTime(new Date(point.pose!).getTime())}\nDépose: ${formatTime(new Date(point.depose!).getTime())}`}
+                    >
+                      <div className="h-full flex items-center justify-center px-1 overflow-hidden">
+                        <span className="text-[10px] text-white font-medium truncate">
+                          #{point.id}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              ))}
-              
-              {/* Bouton voir plus / voir moins */}
-              {hiddenCount > 0 && (
-                <div className="relative mb-3">
-                  <button
-                    onClick={() => toggleDayExpansion(day)}
-                    className="ml-2 w-full p-2 bg-amber-50 hover:bg-amber-100 rounded-lg cursor-pointer transition-colors border border-amber-200 text-center"
-                  >
-                    <span className="text-amber-700 font-medium text-xs">
-                      {isExpanded ? '▲ Voir moins' : `▼ Voir ${hiddenCount} événement(s) de plus`}
-                    </span>
-                  </button>
-                </div>
-              )}
-            </div>
+              );
+            })}
           </div>
-        );
-      })}
+        </div>
+      )}
     </div>
   );
 }
@@ -488,16 +397,16 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
   const [map, setMap] = useState<maplibregl.Map | null>(null);
   const drawRef = useRef<MapboxDraw | null>(null);
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<any[]>([]);
+  const [results, setResults] = useState<SearchResult[]>([]);
   const [currentMarker, setCurrentMarker] = useState<maplibregl.Marker | null>(
     null
   );
-  const pointsRef = useRef<any[]>([]);
-  const [points, setPoints] = useState<any[]>([]);
-  const [selectedPoint, setSelectedPoint] = useState<any | null>(null);
+  const pointsRef = useRef<MapPoint[]>([]);
+  const [points, setPoints] = useState<MapPoint[]>([]);
+  const [selectedPoint, setSelectedPoint] = useState<MapPoint | null>(null);
   const [addingPointCoords, setAddingPointCoords] = useState<{ lng: number; lat: number } | null>(null);
-  const [selectedEvent, setSelectedEvent] = useState<any>(null);
-  const [events, setEvents] = useState<any[]>([]);
+  const [selectedEvent, setSelectedEvent] = useState<MapEvent | null>(null);
+  const [events, setEvents] = useState<MapEvent[]>([]);
   const [awaitingMapClick, setAwaitingMapClick] = useState(false);
   const awaitingMapClickRef = useRef(false);
   const selectedEventIdRef = useRef<number | null>(null);
@@ -507,8 +416,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
   const [selectedGeometryId, setSelectedGeometryId] = useState<number | null>(null);
   const [editingGeometryId, setEditingGeometryId] = useState<number | null>(null);
   const [isGeometryListOpen, setIsGeometryListOpen] = useState(false);
-  const [sidebarMode, setSidebarMode] = useState<"list" | "timeline">("list");
-  const [isTimelineFullscreen, setIsTimelineFullscreen] = useState(false);
+  const [viewMode, setViewMode] = useState<"points" | "timeline">("points");
 
   // Synchroniser la ref avec le state
   useEffect(() => {
@@ -519,8 +427,8 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
   useEffect(() => {
     const loadAllEvents = async () => {
       try {
-        const allEvents = await invoke("fetch_events");
-        setEvents(allEvents as any[]);
+        const allEvents = await invoke<MapEvent[]>("fetch_events");
+        setEvents(allEvents);
       } catch (err) {
         console.error("Erreur lors du chargement des événements:", err);
       }
@@ -533,10 +441,10 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
     const loadSelectedEvent = async () => {
       if (selectedEventId) {
         try {
-          const allEvents = await invoke("fetch_events");
-          const event = (allEvents as any[]).find(e => e.id === selectedEventId);
-          setSelectedEvent(event);
-          setEvents(allEvents as any[]);
+          const allEvents = await invoke<MapEvent[]>("fetch_events");
+          const event = allEvents.find(e => e.id === selectedEventId);
+          setSelectedEvent(event ?? null);
+          setEvents(allEvents);
         } catch (err) {
           console.error("Erreur lors du chargement de l'événement:", err);
         }
@@ -548,7 +456,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
   // Fonction pour changer d'événement
   const handleEventChange = (eventId: string) => {
     const event = events.find(e => e.id === parseInt(eventId));
-    setSelectedEvent(event);
+    setSelectedEvent(event ?? null);
   };
 
   // Fonction pour rafraîchir les géométries sur la carte
@@ -798,6 +706,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
 
     // Supprimer toutes les features du Draw et ajouter celle-ci
     drawRef.current.deleteAll();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     drawRef.current.add(feature as any);
     drawRef.current.changeMode("direct_select", { featureId: `edit-${geom.id}` });
 
@@ -879,15 +788,15 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
     const fetchAndDisplayPoints = async (mapObj: maplibregl.Map, eventId?: number | null) => {
       try {
         console.log("🔄 Chargement des points pour event_id:", eventId);
-        const points = await invoke<any[]>("get_points", { eventId: eventId || null });
+        const points = await invoke<MapPoint[]>("get_points", { eventId: eventId || null });
         console.log(`📍 ${points.length} point(s) récupéré(s)`);
 
         pointsRef.current = points;
         setPoints(points);
 
-        const geojson = {
+        const geojson: GeoJSON.FeatureCollection<GeoJSON.Point> = {
           type: "FeatureCollection",
-          features: points.map((p: any) => ({
+          features: points.map((p: MapPoint) => ({
             type: "Feature",
             geometry: {
               type: "Point",
@@ -900,7 +809,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
               pictures: p.pictures,
             },
           })),
-        } as GeoJSON.FeatureCollection<GeoJSON.Point, any>;
+        };
 
         if (!mapObj.getSource("db-points")) {
           mapObj.addSource("db-points", {
@@ -923,7 +832,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
           });
 
           // --- CLICK LISTENER START ---
-          mapObj.on("click", "db-points-layer", async (e: any) => {
+          mapObj.on("click", "db-points-layer", async (e: maplibregl.MapLayerMouseEvent) => {
             const f = e.features?.[0];
             if (!f) return;
             const pointId = f.properties?.id;
@@ -1043,6 +952,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
       drawRef.current = draw;
 
       // Handler pour la création d'une géométrie
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       mapInstance.on("draw.create", async (e: any) => {
         const feature = e.features[0];
         if (!feature) return;
@@ -1092,6 +1002,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
     mapRef.current = mapInstance;
 
     return () => mapInstance.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Recharger les points quand l'événement sélectionné change
@@ -1103,7 +1014,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
       console.log("🔄 Changement d'événement, rechargement des points pour event_id:", eventId);
 
       try {
-        const freshPoints = await invoke<any[]>("get_points", { eventId: eventId });
+        const freshPoints = await invoke<MapPoint[]>("get_points", { eventId: eventId });
         console.log(`📍 ${freshPoints.length} point(s) récupéré(s) pour event ${eventId}`);
 
         pointsRef.current = freshPoints;
@@ -1111,9 +1022,9 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
 
         // Mettre à jour la source GeoJSON
         if (map.getSource("db-points")) {
-          const geojson = {
+          const geojson: GeoJSON.FeatureCollection<GeoJSON.Point> = {
             type: "FeatureCollection",
-            features: freshPoints.map((p: any) => ({
+            features: freshPoints.map((p: MapPoint) => ({
               type: "Feature",
               geometry: {
                 type: "Point",
@@ -1127,6 +1038,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
               },
             })),
           };
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (map.getSource("db-points") as maplibregl.GeoJSONSource).setData(geojson as any);
         }
       } catch (err) {
@@ -1165,7 +1077,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
   }, [selectedEvent, map]);
 
   // Fonction pour sélectionner une suggestion
-  const handleSelect = (place: any) => {
+  const handleSelect = (place: SearchResult) => {
     if (!map) return;
 
     const { lon, lat, display_name } = place;
@@ -1210,7 +1122,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
   }, [query]);
 
   // Sélectionne un point et centre la carte dessus (utilisé par la liste à gauche)
-  const openPopupForPoint = async (point: any) => {
+  const openPopupForPoint = async (point: MapPoint) => {
     if (!map || !point) return;
     const coords: [number, number] = [Number(point.x), Number(point.y)];
     map.flyTo({ center: coords, zoom: 15 });
@@ -1222,7 +1134,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
     if (!map) return;
     const currentEventId = selectedEventIdRef.current;
     try {
-      const freshPoints = await invoke<any[]>("get_points", { eventId: currentEventId || null });
+      const freshPoints = await invoke<MapPoint[]>("get_points", { eventId: currentEventId || null });
       pointsRef.current = freshPoints;
       setPoints(freshPoints);
 
@@ -1234,9 +1146,9 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
 
       // Mettre à jour la source GeoJSON
       if (map.getSource("db-points")) {
-        const geojson = {
+        const geojson: GeoJSON.FeatureCollection<GeoJSON.Point> = {
           type: "FeatureCollection",
-          features: freshPoints.map((p: any) => ({
+          features: freshPoints.map((p: MapPoint) => ({
             type: "Feature",
             geometry: {
               type: "Point",
@@ -1250,6 +1162,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
             },
           })),
         };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (map.getSource("db-points") as maplibregl.GeoJSONSource).setData(geojson as any);
       }
     } catch (err) {
@@ -1323,141 +1236,95 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
     try {
       const canvas = map.getCanvas();
       canvas.style.cursor = awaitingMapClick ? "crosshair" : "";
-    } catch (err) { }
+    } catch { /* ignore */ }
     return () => {
-      try { if (map) map.getCanvas().style.cursor = ""; } catch (e) { }
+      try { if (map) map.getCanvas().style.cursor = ""; } catch { /* ignore */ }
     };
   }, [awaitingMapClick, map]);
 
   return (
-    <div className="h-full flex bg-gradient-to-br from-slate-50 to-blue-50 overflow-hidden">
-      {/* Frise chronologique en plein écran */}
-      {isTimelineFullscreen && (
-        <div className="absolute inset-0 z-50 bg-white/95 backdrop-blur-md flex flex-col">
-          <div className="p-4 bg-gradient-to-r from-indigo-500 to-purple-600 flex items-center justify-between">
-            <h2 className="text-white font-bold text-xl">📅 Frise chronologique</h2>
-            <button
-              onClick={() => setIsTimelineFullscreen(false)}
-              className="px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-colors"
-            >
-              ✕ Fermer
-            </button>
-          </div>
-          <div className="flex-1 overflow-auto p-6">
-            <TimelineView 
-              points={points} 
-              onPointClick={openPopupForPoint}
-              fullscreen={true}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Panneau gauche: liste des points ou frise */}
-      <div className="w-72 bg-white/90 backdrop-blur-md border-r border-gray-200 shadow-lg flex flex-col z-20">
-        <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-indigo-500 to-purple-600">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-white font-bold text-lg">📍 Points</h3>
-            <button
-              onClick={handleAddPointClick}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${awaitingMapClick
-                  ? 'bg-yellow-400 text-yellow-900 animate-pulse'
-                  : 'bg-white/20 text-white hover:bg-white/30'
-                }`}
-            >
-              {awaitingMapClick ? '⏳ Cliquez' : '+ Ajouter'}
-            </button>
-          </div>
-          {/* Toggle Liste / Frise */}
-          <div className="flex bg-white/20 rounded-lg p-1">
-            <button
-              onClick={() => setSidebarMode("list")}
-              className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                sidebarMode === "list"
-                  ? 'bg-white text-indigo-600 shadow-sm'
-                  : 'text-white/80 hover:text-white hover:bg-white/10'
-              }`}
-            >
-              📋 Liste
-            </button>
-            <button
-              onClick={() => setSidebarMode("timeline")}
-              className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                sidebarMode === "timeline"
-                  ? 'bg-white text-indigo-600 shadow-sm'
-                  : 'text-white/80 hover:text-white hover:bg-white/10'
-              }`}
-            >
-              📅 Frise
-            </button>
-          </div>
-        </div>
-        
-        <div className="flex-1 overflow-y-auto p-2">
-          {sidebarMode === "list" ? (
-            // Mode Liste
-            points.length === 0 ? (
-              <div className="text-center text-gray-500 py-8">
-                <div className="text-4xl mb-2">📭</div>
-                <p>Aucun point</p>
-                <p className="text-xs mt-1">Cliquez sur "Ajouter" puis sur la carte</p>
-              </div>
-            ) : (
-              points.map((p: any) => (
-                <div
-                  key={p.id}
-                  onClick={() => openPopupForPoint(p)}
-                  className="p-3 mb-2 bg-white rounded-xl border border-gray-100 hover:border-indigo-300 hover:shadow-md cursor-pointer transition-all duration-200 hover:translate-x-1"
+    <div className="h-full flex flex-col bg-linear-to-br from-slate-50 to-blue-50 overflow-hidden">
+      {/* Conteneur principal: sidebar + carte */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Panneau gauche: liste des points (visible seulement en mode points) */}
+        {viewMode === "points" && (
+          <div className="w-72 bg-white/90 backdrop-blur-md border-r border-gray-200 shadow-lg flex flex-col z-20">
+            <div className="p-4 border-b border-gray-200 bg-linear-to-r from-indigo-500 to-purple-600">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-white font-bold text-lg">📍 Points</h3>
+                <button
+                  onClick={handleAddPointClick}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${awaitingMapClick
+                      ? 'bg-yellow-400 text-yellow-900 animate-pulse'
+                      : 'bg-white/20 text-white hover:bg-white/30'
+                    }`}
                 >
-                  <div className="font-semibold text-gray-800">Point #{p.id}</div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {p.obstacles?.length || 0} obstacle(s) • {p.comments?.length || 0} commentaire(s)
-                  </div>
-                  {(p.pose || p.depose) && (
-                    <div className="text-xs text-purple-600 mt-1">
-                      {p.pose && `🕐 Pose: ${formatDateShort(p.pose)}`}
-                      {p.pose && p.depose && ' • '}
-                      {p.depose && `Dépose: ${formatDateShort(p.depose)}`}
-                    </div>
-                  )}
-                </div>
-              ))
-            )
-          ) : (
-            // Mode Frise
-            <div className="space-y-2">
-              {points.filter(p => p.pose || p.depose).length === 0 ? (
+                  {awaitingMapClick ? '⏳ Cliquez' : '+ Ajouter'}
+                </button>
+              </div>
+              {/* Toggle Points / Frise */}
+              <div className="flex bg-white/20 rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode("points")}
+                  className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    viewMode === "points"
+                      ? 'bg-white text-indigo-600 shadow-sm'
+                      : 'text-white/80 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  📋 Points
+                </button>
+                <button
+                  onClick={() => setViewMode("timeline")}
+                  className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    viewMode === "timeline"
+                      ? 'bg-white text-indigo-600 shadow-sm'
+                      : 'text-white/80 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  📅 Frise
+                </button>
+              </div>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-2">
+              {points.length === 0 ? (
                 <div className="text-center text-gray-500 py-8">
-                  <div className="text-4xl mb-2">📅</div>
-                  <p>Aucun point avec dates</p>
-                  <p className="text-xs mt-1">Ajoutez des dates pose/dépose aux points</p>
+                  <div className="text-4xl mb-2">📭</div>
+                  <p>Aucun point</p>
+                  <p className="text-xs mt-1">Cliquez sur "Ajouter" puis sur la carte</p>
                 </div>
               ) : (
-                <>
-                  <button
-                    onClick={() => setIsTimelineFullscreen(true)}
-                    className="w-full px-3 py-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                points.map((p: MapPoint) => (
+                  <div
+                    key={p.id}
+                    onClick={() => openPopupForPoint(p)}
+                    className="p-3 mb-2 bg-white rounded-xl border border-gray-100 hover:border-indigo-300 hover:shadow-md cursor-pointer transition-all duration-200 hover:translate-x-1"
                   >
-                    🔍 Voir en plein écran
-                  </button>
-                  <TimelineView 
-                    points={points} 
-                    onPointClick={openPopupForPoint}
-                    fullscreen={false}
-                  />
-                </>
+                    <div className="font-semibold text-gray-800">Point #{p.id}</div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {p.obstacles?.length || 0} obstacle(s) • {p.comments?.length || 0} commentaire(s)
+                    </div>
+                    {(p.pose || p.depose) && (
+                      <div className="text-xs text-purple-600 mt-1">
+                        {p.pose && `🕐 Pose: ${formatDateShort(p.pose)}`}
+                        {p.pose && p.depose && ' • '}
+                        {p.depose && `Dépose: ${formatDateShort(p.depose)}`}
+                      </div>
+                    )}
+                  </div>
+                ))
               )}
             </div>
-          )}
-        </div>
-      </div>
+          </div>
+        )}
 
-      {/* Conteneur principal de la carte */}
-      <div className="flex-1 flex flex-col">
+        {/* Conteneur principal de la carte */}
+        <div className="flex-1 flex flex-col">
         {/* Sélecteur d'événements et barre de recherche */}
-        <div className="relative z-30 bg-gradient-to-r from-indigo-500 via-purple-600 to-blue-600 backdrop-blur-md p-4 shadow-lg">
+        <div className="relative z-30 bg-linear-to-r from-indigo-500 via-purple-600 to-blue-600 backdrop-blur-md p-4 shadow-lg">
           {/* Dégradé de transition en bas */}
-          <div className="absolute bottom-0 left-0 right-0 h-2 bg-gradient-to-b from-transparent to-white/20"></div>
+          <div className="absolute bottom-0 left-0 right-0 h-2 bg-linear-to-b from-transparent to-white/20"></div>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <label className="text-white font-medium">Événement :</label>
@@ -1682,33 +1549,73 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
               </div>
             </div>
           )}
-
-          {/* Panneau droit: détails du point sélectionné OU formulaire d'ajout */}
-          {(selectedPoint || addingPointCoords) && (
-            <div className="w-96 bg-white/95 backdrop-blur-md border-l border-gray-200 shadow-lg flex flex-col overflow-hidden">
-              <div className="flex-1 overflow-y-auto">
-                {selectedPoint ? (
-                  <PointDetails
-                    point={selectedPoint}
-                    onClose={() => setSelectedPoint(null)}
-                    onRefresh={refreshPoints}
-                  />
-                ) : addingPointCoords ? (
-                  <AddPointForm
-                    initialCoords={addingPointCoords}
-                    onClose={() => setAddingPointCoords(null)}
-                    onSaved={() => {
-                      setAddingPointCoords(null);
-                      refreshPoints();
-                    }}
-                    eventId={selectedEventIdRef.current}
-                  />
-                ) : null}
-              </div>
-            </div>
-          )}
         </div>
       </div>
+      </div>
+
+      {/* Panneau bas: Frise chronologique (visible seulement en mode timeline) */}
+      {viewMode === "timeline" && (
+        <div className="h-72 bg-white/95 backdrop-blur-md border-t border-gray-200 shadow-lg flex flex-col z-20">
+          <div className="p-2 border-b border-gray-200 bg-linear-to-r from-indigo-500 to-purple-600 flex items-center justify-between">
+            <h3 className="text-white font-bold text-base">📅 Frise chronologique</h3>
+            {/* Toggle Points / Frise */}
+            <div className="flex bg-white/20 rounded-lg p-1">
+              <button
+                onClick={() => setViewMode("points")}
+                className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${
+                  viewMode === "points"
+                    ? 'bg-white text-indigo-600 shadow-sm'
+                    : 'text-white/80 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                📋 Points
+              </button>
+              <button
+                onClick={() => setViewMode("timeline")}
+                className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${
+                  viewMode === "timeline"
+                    ? 'bg-white text-indigo-600 shadow-sm'
+                    : 'text-white/80 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                📅 Frise
+              </button>
+            </div>
+          </div>
+          
+          <div className="flex-1 overflow-hidden">
+            <TimelinePanel 
+              points={points} 
+              onPointClick={openPopupForPoint}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Panneau droit: détails du point sélectionné OU formulaire d'ajout (position absolue) */}
+      {(selectedPoint || addingPointCoords) && (
+        <div className="absolute top-0 right-0 bottom-0 w-96 bg-white/95 backdrop-blur-md border-l border-gray-200 shadow-lg flex flex-col z-50">
+          <div className="flex-1 overflow-y-auto">
+            {selectedPoint ? (
+              <PointDetails
+                point={selectedPoint}
+                onClose={() => setSelectedPoint(null)}
+                onRefresh={refreshPoints}
+              />
+            ) : addingPointCoords ? (
+              <AddPointForm
+                initialCoords={addingPointCoords}
+                onClose={() => setAddingPointCoords(null)}
+                onSaved={() => {
+                  setAddingPointCoords(null);
+                  refreshPoints();
+                }}
+                eventId={selectedEventIdRef.current}
+              />
+            ) : null}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

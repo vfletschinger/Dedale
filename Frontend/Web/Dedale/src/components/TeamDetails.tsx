@@ -124,13 +124,13 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
         try {
             // On utilise fetch_events (qui renvoie des objets un peu différents, attention au mapping si besoin)
             // Ici on suppose que fetch_events renvoie un tableau compatible ou on mappe
-            const allEvents = await invoke<any[]>("fetch_events");
+            const allEvents = await invoke<{ id: number; name: string; statut: string }[]>("fetch_events");
             const existingIds = new Set(currentEvents.map(e => e.id));
 
             // On filtre et on adapte le type si nécessaire
             const filtered = allEvents
-                .filter((e: any) => !existingIds.has(e.id))
-                .map((e: any) => ({ id: e.id, name: e.name, statut: e.statut }));
+                .filter((e) => !existingIds.has(e.id))
+                .map((e) => ({ id: e.id, name: e.name, statut: e.statut }));
 
             setAvailableEvents(filtered);
         } catch (e) { console.error(e); }
@@ -197,7 +197,7 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
             )}
 
             {/* HEADER */}
-            <div className="bg-gray-50 border-b border-gray-100 p-4 flex justify-between items-center flex-shrink-0 relative">
+            <div className="bg-gray-50 border-b border-gray-100 p-4 flex justify-between items-center shrink-0 relative">
                 <div className="flex-1 mr-4">
                     {isEditing ? (
                         <input
@@ -231,11 +231,11 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
             </div>
 
             {/* ONGLETS */}
-            <div className="flex border-b border-gray-100 flex-shrink-0">
-                <button onClick={() => isEditing ? "" : setActiveTab('members')} className={`flex-1 py-3 text-sm font-medium transition-colors ${activeTab === 'members' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-gray-500 hover:text-gray-700'}`}>
+            <div className="flex border-b border-gray-100 shrink-0">
+                <button onClick={() => { if (!isEditing) setActiveTab('members'); }} className={`flex-1 py-3 text-sm font-medium transition-colors ${activeTab === 'members' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-gray-500 hover:text-gray-700'}`}>
                     👥 Membres ({currentMembers.length})
                 </button>
-                <button onClick={() => isEditing ? "" : setActiveTab('events')} className={`flex-1 py-3 text-sm font-medium transition-colors ${activeTab === 'events' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-gray-500 hover:text-gray-700'}`}>
+                <button onClick={() => { if (!isEditing) setActiveTab('events'); }} className={`flex-1 py-3 text-sm font-medium transition-colors ${activeTab === 'events' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-gray-500 hover:text-gray-700'}`}>
                     📅 Événements ({currentEvents.length})
                 </button>
             </div>
@@ -248,10 +248,10 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
                     <div className="space-y-3">
                         {currentMembers.map((member) => (
                             <div key={member.id} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg transition-colors border border-transparent hover:border-blue-300 cursor-pointer group" onClick={() => {
-                                isEditing ? "" : onMemberClick(member);
+                                if (!isEditing) onMemberClick(member);
                             }}>
                                 <div className="flex items-center gap-3 overflow-hidden">
-                                    <div className="w-8 h-8 rounded-full bg-blue-100 flex-shrink-0 flex items-center justify-center text-blue-700 font-bold text-xs">
+                                    <div className="w-8 h-8 rounded-full bg-blue-100 shrink-0 flex items-center justify-center text-blue-700 font-bold text-xs">
                                         {member.firstname[0]}{member.lastname[0]}
                                     </div>
                                     <div className="overflow-hidden">
@@ -261,8 +261,10 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
                                 </div>
                                 <button
                                     onClick={(e) => {
-                                        isEditing ? "" : e.stopPropagation();
-                                        isEditing ? "" : handleRemoveMember(member.id);
+                                        if (!isEditing) {
+                                            e.stopPropagation();
+                                            handleRemoveMember(member.id);
+                                        }
                                     }}
                                     className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 p-1"
                                 >                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -271,7 +273,7 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
                         ))}
 
                         {/* AJOUT MEMBRE */}
-                        {isEditing ? "" : isAddingMember ? (
+                        {!isEditing && (isAddingMember ? (
                             <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
                                 <p className="text-xs font-bold text-blue-800 mb-2">Ajouter un membre</p>
                                 <div className="flex gap-2">
@@ -287,7 +289,7 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
                             <button onClick={startAddingMember} className="w-full py-2 mt-2 border border-dashed border-gray-300 rounded-lg text-gray-500 text-xs hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all flex items-center justify-center gap-1">
                                 <span>+</span> Ajouter un membre
                             </button>
-                        )}
+                        ))}
                         {currentMembers.length === 0 && !isAddingMember && <p className="text-gray-400 text-center text-sm py-4">Aucun membre.</p>}
                     </div>
                 )}
@@ -297,24 +299,26 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
                     <div className="space-y-3">
                         {currentEvents.map((event) => (
                             <div key={event.id} onClick={() => {
-                                isEditing ? "" : onClose();
-                                isEditing ? "" : emit("navigate-to-map", { eventId: event.id });
+                                if (!isEditing) {
+                                    onClose();
+                                    emit("navigate-to-map", { eventId: event.id });
+                                }
                             }} className="flex justify-between items-center group p-3 border border-gray-100 rounded-lg hover:shadow-sm hover:border-blue-200 transition-all bg-white">
                                 <div className="overflow-hidden">
                                     <div className="flex items-center gap-2">
                                         <p className="text-sm font-semibold text-gray-800 truncate">{event.name}</p>
-                                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${event.statut === 'Actif' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>{event.statut || 'Planifié'}</span>
+                                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0 ${event.statut === 'Actif' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>{event.statut || 'Planifié'}</span>
                                     </div>
                                 </div>
                                 {/* Bouton supprimer */}
-                                <button onClick={() => isEditing ? "" : handleRemoveEvent(event.id)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 p-1 ml-2 flex-shrink-0">
+                                <button onClick={() => { if (!isEditing) handleRemoveEvent(event.id); }} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 p-1 ml-2 shrink-0">
                                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
                             </div>
                         ))}
 
                         {/* AJOUT ÉVÉNEMENT */}
-                        {isEditing ? "" : isAddingEvent ? (
+                        {!isEditing && isAddingEvent && (
                             <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100 animate-in fade-in slide-in-from-top-2">
                                 <p className="text-xs font-bold text-blue-800 mb-2">Lier à un événement</p>
                                 <div className="flex gap-2">
@@ -331,9 +335,10 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
                                     <button onClick={() => setIsAddingEvent(false)} className="text-gray-500 px-2">✕</button>
                                 </div>
                             </div>
-                        ) : (
+                        )}
+                        {!isEditing && !isAddingEvent && (
                             <button
-                                onClick={() => { isEditing ? "" : startAddingEvent() }}
+                                onClick={() => startAddingEvent()}
                                 className="w-full py-2 mt-2 border border-dashed border-gray-300 rounded-lg text-gray-500 text-xs hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all flex items-center justify-center gap-1"
                             >
                                 <span>+</span> Lier à un événement
@@ -346,7 +351,7 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
             </div>
 
             {/* FOOTER */}
-            <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-between items-center flex-shrink-0">
+            <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-between items-center shrink-0">
                 {isEditing ? (
                     <div className="flex gap-2 w-full">
                         <button onClick={() => { setIsEditing(false); setEditedName(teamName); }} className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded text-sm text-gray-700 hover:bg-gray-50">Annuler</button>

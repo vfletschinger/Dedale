@@ -57,7 +57,7 @@ pub async fn create_pdf(app: AppHandle) -> Result<(), String> {
         } else {
             p.comments
                 .iter()
-                .map(|c| format!("{}", c.value))
+                .map(|c| c.value.to_string())
                 .collect::<Vec<String>>()
                 .join(", ")
         };

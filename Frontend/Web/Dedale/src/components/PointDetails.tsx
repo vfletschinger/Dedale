@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 // Fonction pour afficher un ID court (8 premiers caractères)
 const shortId = (id: string | number): string => {
@@ -45,6 +45,16 @@ export type ObstacleType = {
   length: number;
 };
 
+interface MergedObstacle {
+  typeId: number;
+  name: string;
+  description: string;
+  width: number;
+  length: number;
+  number: number;
+  obstacleId: number | null;
+}
+
 // Resolve image src helper (support data:image or base64 string)
 function resolveImageSrc(image: string) {
   if (!image) return "";
@@ -63,33 +73,19 @@ export default function PointDetails({
 }) {
   const [showObstaclesPopup, setShowObstaclesPopup] = useState(false);
   const [showDatesPopup, setShowDatesPopup] = useState(false);
-  const [_, setObstacleTypes] = useState<ObstacleType[]>([]);
-  const [mergedObstacles, setMergedObstacles] = useState<any[]>([]);
+  const [mergedObstacles, setMergedObstacles] = useState<MergedObstacle[]>([]);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [editPose, setEditPose] = useState<string>("");
   const [editDepose, setEditDepose] = useState<string>("");
 
-  useEffect(() => {
-    if (showDatesPopup && point) {
-      setEditPose(point.pose || "");
-      setEditDepose(point.depose || "");
-    }
-  }, [showDatesPopup, point]);
-
-  useEffect(() => {
-    if (showObstaclesPopup && point) {
-      fetchTypes();
-    }
-  }, [showObstaclesPopup, point]);
-
   // Fetch and merge obstacle types with the point's obstacles
-  async function fetchTypes() {
+  const fetchTypes = useCallback(async () => {
+    if (!point) return;
     try {
       const types: ObstacleType[] = await invoke("fetch_obstacle_types");
-      setObstacleTypes(types);
 
       const merged = types.map((type) => {
-        const existing = point?.obstacles.find((o) => o.name === type.name);
+        const existing = point.obstacles.find((o) => o.name === type.name);
         return {
           typeId: type.id,
           name: type.name,
@@ -104,7 +100,24 @@ export default function PointDetails({
     } catch (error) {
       console.error("Failed to fetch obstacle types:", error);
     }
-  }
+  }, [point]);
+
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (showDatesPopup && point) {
+      setEditPose(point.pose || "");
+      setEditDepose(point.depose || "");
+    }
+  }, [showDatesPopup, point]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (showObstaclesPopup && point) {
+      fetchTypes();
+    }
+  }, [showObstaclesPopup, point, fetchTypes]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   function incrementObstacle(typeId: number) {
     setMergedObstacles((prev) =>

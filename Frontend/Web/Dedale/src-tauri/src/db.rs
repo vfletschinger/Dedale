@@ -679,7 +679,7 @@ pub async fn retrieve_data_by_event(
         let event_ids = fetch_event_ids(&pool, &id).await?;
 
         points.push(Point {
-            id: id,
+            id,
             x: row.get("x"),
             y: row.get("y"),
             pose: row.get("pose"),
@@ -714,18 +714,22 @@ pub async fn insert_point_details(
             // Générer un nouvel UUID pour ce point
             generate_uuid()
         } else {
+            // Utiliser l'ID fourni
             detail.point.id.clone()
         };
         
-        sqlx::query(r#"INSERT OR REPLACE INTO point (id, x, y, pose, depose) VALUES (?, ?, ?, ?, ?)"#)
-            .bind(&point_id)
-            .bind(detail.point.x)
-            .bind(detail.point.y)
-            .bind(&detail.point.pose)
-            .bind(&detail.point.depose)
-            .execute(&mut *tx)
-            .await
-            .map_err(|e| format!("Erreur INSERT point ID {} : {}", point_id, e))?;
+        // Insérer le point
+        sqlx::query(
+            r#"INSERT OR REPLACE INTO point (id, x, y, pose, depose) VALUES (?, ?, ?, ?, ?)"#,
+        )
+        .bind(&point_id)
+        .bind(detail.point.x)
+        .bind(detail.point.y)
+        .bind(&detail.point.pose)
+        .bind(&detail.point.depose)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| format!("Erreur INSERT/REPLACE point ID {} : {}", point_id, e))?;
         
         assigned_ids.push(point_id);
     }
@@ -902,7 +906,7 @@ pub async fn update_point_dates(
     depose: Option<String>,
 ) -> Result<(), String> {
     let pool = get_db_pool(&app).await?;
-    
+
     sqlx::query("UPDATE point SET pose = ?, depose = ? WHERE id = ?")
         .bind(&pose)
         .bind(&depose)
@@ -910,8 +914,11 @@ pub async fn update_point_dates(
         .execute(&pool)
         .await
         .map_err(|e| format!("Failed to update point dates: {}", e))?;
-    
-    println!("[DB] ✅ Dates du point {} mises à jour: pose={:?}, depose={:?}", point_id, pose, depose);
+
+    println!(
+        "[DB] ✅ Dates du point {} mises à jour: pose={:?}, depose={:?}",
+        point_id, pose, depose
+    );
     Ok(())
 }
 
@@ -1079,7 +1086,7 @@ pub async fn create_team(app: AppHandle, name: String) -> Result<Team, String> {
 
     Ok(Team {
         id: new_id,
-        name: name,
+        name,
         number: 0,
         event_ids: Vec::new(),
     })
@@ -1191,7 +1198,7 @@ pub async fn create_person(
         lastname,
         email,
         address,
-        phone_number: phone_number,
+        phone_number,
     })
 }
 
