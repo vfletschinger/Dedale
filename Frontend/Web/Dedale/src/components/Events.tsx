@@ -106,6 +106,7 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
       if (unlistenConnectedFn) unlistenConnectedFn();
       if (unlistenPointsUpdatedFn) unlistenPointsUpdatedFn();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [receivingEventId]);
 
   // Fonction pour démarrer la réception depuis le mobile

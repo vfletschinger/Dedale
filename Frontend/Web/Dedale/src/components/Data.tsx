@@ -50,7 +50,7 @@ function Data() {
     useEffect(() => {
         const loadEvents = async () => {
             try {
-                const evts = await invoke<any[]>("fetch_events");
+                const evts = await invoke<Event[]>("fetch_events");
                 setEvents(evts);
             } catch (e) {
                 console.error("Erreur chargement événements:", e);

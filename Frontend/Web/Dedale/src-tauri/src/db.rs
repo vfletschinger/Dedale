@@ -35,7 +35,7 @@ pub struct User {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Point {
-    pub id: String,  // UUID
+    pub id: String, // UUID
     pub x: f64,
     pub y: f64,
     #[serde(default)]
@@ -60,11 +60,11 @@ pub struct ObstacleType {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Obstacle {
-    pub id: String,  // UUID
+    pub id: String, // UUID
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     pub number: Option<i32>,
-    pub point_id: String,  // UUID reference
+    pub point_id: String, // UUID reference
     pub type_id: i64,
     pub description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -75,9 +75,9 @@ pub struct Obstacle {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PointSimple {
-    pub id: String,  // UUID
-    pub x: f64, // Coordonnée X (ou latitude)
-    pub y: f64, // Coordonnée Y (ou longitude)
+    pub id: String, // UUID
+    pub x: f64,     // Coordonnée X (ou latitude)
+    pub y: f64,     // Coordonnée Y (ou longitude)
     #[serde(default)]
     pub pose: Option<String>,
     #[serde(default)]
@@ -88,14 +88,14 @@ pub struct PointSimple {
 pub struct Comment {
     pub id: String,       // UUID
     pub point_id: String, // UUID reference
-    pub value: String, // Le texte du commentaire
+    pub value: String,    // Le texte du commentaire
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Picture {
     pub id: String,       // UUID
     pub point_id: String, // UUID reference
-    pub image: String, // Le chemin ou le contenu encodé de l'image (ex: base64, URL)
+    pub image: String,    // Le chemin ou le contenu encodé de l'image (ex: base64, URL)
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -395,9 +395,11 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
 
     if needs_uuid_migration {
         println!("[DB] 🔄 Migration UUID détectée comme nécessaire, exécution...");
-        
+
         // Recréer la table point avec id TEXT
-        let _ = sqlx::query("ALTER TABLE point RENAME TO point_old").execute(&pool).await;
+        let _ = sqlx::query("ALTER TABLE point RENAME TO point_old")
+            .execute(&pool)
+            .await;
         sqlx::query(
             "CREATE TABLE point (
                 id TEXT PRIMARY KEY,
@@ -405,39 +407,58 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
                 y REAL,
                 pose TEXT,
                 depose TEXT
-            )"
-        ).execute(&pool).await.map_err(|e| format!("Migration point: {}", e))?;
-        let _ = sqlx::query("INSERT INTO point SELECT CAST(id AS TEXT), x, y, pose, depose FROM point_old").execute(&pool).await;
+            )",
+        )
+        .execute(&pool)
+        .await
+        .map_err(|e| format!("Migration point: {}", e))?;
+        let _ = sqlx::query(
+            "INSERT INTO point SELECT CAST(id AS TEXT), x, y, pose, depose FROM point_old",
+        )
+        .execute(&pool)
+        .await;
         let _ = sqlx::query("DROP TABLE point_old").execute(&pool).await;
 
         // Recréer la table comment avec id TEXT et point_id TEXT
-        let _ = sqlx::query("ALTER TABLE comment RENAME TO comment_old").execute(&pool).await;
+        let _ = sqlx::query("ALTER TABLE comment RENAME TO comment_old")
+            .execute(&pool)
+            .await;
         sqlx::query(
             "CREATE TABLE comment (
                 id TEXT PRIMARY KEY,
                 point_id TEXT,
                 value TEXT,
                 FOREIGN KEY (point_id) REFERENCES point (id)
-            )"
-        ).execute(&pool).await.map_err(|e| format!("Migration comment: {}", e))?;
+            )",
+        )
+        .execute(&pool)
+        .await
+        .map_err(|e| format!("Migration comment: {}", e))?;
         let _ = sqlx::query("INSERT INTO comment SELECT CAST(id AS TEXT), CAST(point_id AS TEXT), value FROM comment_old").execute(&pool).await;
         let _ = sqlx::query("DROP TABLE comment_old").execute(&pool).await;
 
         // Recréer la table picture avec id TEXT et point_id TEXT
-        let _ = sqlx::query("ALTER TABLE picture RENAME TO picture_old").execute(&pool).await;
+        let _ = sqlx::query("ALTER TABLE picture RENAME TO picture_old")
+            .execute(&pool)
+            .await;
         sqlx::query(
             "CREATE TABLE picture (
                 id TEXT PRIMARY KEY,
                 point_id TEXT,
                 image TEXT,
                 FOREIGN KEY (point_id) REFERENCES point (id)
-            )"
-        ).execute(&pool).await.map_err(|e| format!("Migration picture: {}", e))?;
+            )",
+        )
+        .execute(&pool)
+        .await
+        .map_err(|e| format!("Migration picture: {}", e))?;
         let _ = sqlx::query("INSERT INTO picture SELECT CAST(id AS TEXT), CAST(point_id AS TEXT), image FROM picture_old").execute(&pool).await;
         let _ = sqlx::query("DROP TABLE picture_old").execute(&pool).await;
 
         // Recréer la table obstacle avec id TEXT et point_id TEXT
-        let _ = sqlx::query("ALTER TABLE obstacle RENAME TO obstacle_old").execute(&pool).await;
+        let _ = sqlx::query("ALTER TABLE obstacle RENAME TO obstacle_old")
+            .execute(&pool)
+            .await;
         sqlx::query(
             "CREATE TABLE obstacle (
                 id TEXT PRIMARY KEY,
@@ -447,13 +468,18 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
                 description TEXT,
                 FOREIGN KEY (point_id) REFERENCES point (id),
                 FOREIGN KEY (type_id) REFERENCES obstacle_type (id)
-            )"
-        ).execute(&pool).await.map_err(|e| format!("Migration obstacle: {}", e))?;
+            )",
+        )
+        .execute(&pool)
+        .await
+        .map_err(|e| format!("Migration obstacle: {}", e))?;
         let _ = sqlx::query("INSERT INTO obstacle SELECT CAST(id AS TEXT), CAST(point_id AS TEXT), type_id, number, description FROM obstacle_old").execute(&pool).await;
         let _ = sqlx::query("DROP TABLE obstacle_old").execute(&pool).await;
 
         // Recréer la table point_event avec point_id TEXT
-        let _ = sqlx::query("ALTER TABLE point_event RENAME TO point_event_old").execute(&pool).await;
+        let _ = sqlx::query("ALTER TABLE point_event RENAME TO point_event_old")
+            .execute(&pool)
+            .await;
         sqlx::query(
             "CREATE TABLE point_event (
                 id INTEGER PRIMARY KEY,
@@ -462,10 +488,15 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
                 FOREIGN KEY (point_id) REFERENCES point(id) ON DELETE CASCADE,
                 FOREIGN KEY (event_id) REFERENCES event(id) ON DELETE CASCADE,
                 UNIQUE(point_id, event_id)
-            )"
-        ).execute(&pool).await.map_err(|e| format!("Migration point_event: {}", e))?;
+            )",
+        )
+        .execute(&pool)
+        .await
+        .map_err(|e| format!("Migration point_event: {}", e))?;
         let _ = sqlx::query("INSERT INTO point_event SELECT id, CAST(point_id AS TEXT), event_id FROM point_event_old").execute(&pool).await;
-        let _ = sqlx::query("DROP TABLE point_event_old").execute(&pool).await;
+        let _ = sqlx::query("DROP TABLE point_event_old")
+            .execute(&pool)
+            .await;
 
         println!("[DB] ✅ Migration UUID terminée");
     }
@@ -717,7 +748,7 @@ pub async fn insert_point_details(
             // Utiliser l'ID fourni
             detail.point.id.clone()
         };
-        
+
         // Insérer le point
         sqlx::query(
             r#"INSERT OR REPLACE INTO point (id, x, y, pose, depose) VALUES (?, ?, ?, ?, ?)"#,
@@ -730,7 +761,7 @@ pub async fn insert_point_details(
         .execute(&mut *tx)
         .await
         .map_err(|e| format!("Erreur INSERT/REPLACE point ID {} : {}", point_id, e))?;
-        
+
         assigned_ids.push(point_id);
     }
     // ÉTAPE 2: Insérer les données liées (commentaires)

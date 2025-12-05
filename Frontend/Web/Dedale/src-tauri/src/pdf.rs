@@ -102,9 +102,7 @@ pub async fn create_pdf(app: AppHandle, event_id: Option<i64>) -> Result<(), Str
                       ]
                     ]
                     "#,
-                    dx_pct,
-                    dy_pct,
-                    p.id
+                    dx_pct, dy_pct, p.id
                 ));
             }
         }

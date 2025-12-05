@@ -61,7 +61,7 @@ export default function Navigation({
             </div>
             <div className="hidden sm:block">
               <h1 className="text-xl font-bold bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">
-                Dedale Sports
+                Dedale
               </h1>
             </div>
           </div>

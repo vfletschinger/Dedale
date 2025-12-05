@@ -401,7 +401,10 @@ async fn handle_websocket(
                                     println!("✅ Points insérés avec succès !");
                                     // Émettre un événement pour notifier le frontend
                                     if let Err(e) = app.emit("points-updated", event_id) {
-                                        eprintln!("⚠️ Erreur émission événement points-updated: {}", e);
+                                        eprintln!(
+                                            "⚠️ Erreur émission événement points-updated: {}",
+                                            e
+                                        );
                                     }
                                 }
                                 Err(e) => {
@@ -760,7 +763,10 @@ async fn handle_receive_websocket(
 
                                     // Émettre un événement pour notifier le frontend
                                     if let Err(e) = app.emit("points-updated", event_id) {
-                                        eprintln!("⚠️ Erreur émission événement points-updated: {}", e);
+                                        eprintln!(
+                                            "⚠️ Erreur émission événement points-updated: {}",
+                                            e
+                                        );
                                     }
                                 }
                                 Err(e) => {
@@ -788,7 +794,9 @@ async fn handle_receive_websocket(
                         let _ = websocket.flush();
                     } else {
                         // Log l'erreur de parsing pour debug
-                        if let Err(e) = serde_json::from_str::<MobileExport>(&text) { println!("⚠️ Erreur parsing MobileExport: {}", e) }
+                        if let Err(e) = serde_json::from_str::<MobileExport>(&text) {
+                            println!("⚠️ Erreur parsing MobileExport: {}", e)
+                        }
                         println!("⚠️ Format de message non reconnu");
                     }
                 }
