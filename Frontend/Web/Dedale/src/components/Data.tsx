@@ -20,11 +20,14 @@ function Data() {
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-    
-    // États pour la sélection d'événements
+
+    // États pour la sélection d'événements pour le transfert
     const [events, setEvents] = useState<Event[]>([]);
     const [selectedEventIds, setSelectedEventIds] = useState<Set<number>>(new Set());
-    
+
+    // Etat pour la sélection d'événement pour l'export/PDF
+    const [selectedEventId, setSelectedEventId] = useState<string>("");
+
     // États pour le transfert
     const [transferPhase, setTransferPhase] = useState<TransferPhase>('idle');
     const [sentEventIds, setSentEventIds] = useState<Set<number>>(new Set());
@@ -41,6 +44,19 @@ function Data() {
         return () => {
             unlisten.then(fn => fn());
         };
+    }, []);
+
+    // --- CHARGEMENT DES ÉVÉNEMENTS ---
+    useEffect(() => {
+        const loadEvents = async () => {
+            try {
+                const evts = await invoke<any[]>("fetch_events");
+                setEvents(evts);
+            } catch (e) {
+                console.error("Erreur chargement événements:", e);
+            }
+        };
+        loadEvents();
     }, []);
 
     // Fonction pour l'export Excel
@@ -110,17 +126,17 @@ function Data() {
 
             // Démarrer le serveur avec tous les événements
             console.log("📤 Transfert des événements:", allEventIds);
-            
-            const base64String = await invoke<string>('start_server', { 
-                eventIds: allEventIds 
+
+            const base64String = await invoke<string>('start_server', {
+                eventIds: allEventIds
             });
-            
+
             setQrCodeBase64(base64String);
             setTransferPhase('qr_displayed');
             setSentEventIds(new Set());
-            setMessage({ 
-                type: 'success', 
-                text: `Serveur démarré avec ${allEventIds.length} événement(s).` 
+            setMessage({
+                type: 'success',
+                text: `Serveur démarré avec ${allEventIds.length} événement(s).`
             });
         } catch (err) {
             console.error('Erreur:', err);
@@ -243,7 +259,7 @@ function Data() {
                         <h2 className="text-2xl font-bold text-blue-700 mb-6 text-center">
                             Connexion de l'Application Mobile
                         </h2>
-                        
+
                         {/* Phase initiale: bouton pour démarrer */}
                         {transferPhase === 'idle' && (
                             <div className="flex-1 flex flex-col items-center justify-center">
@@ -282,7 +298,7 @@ function Data() {
                                         En attente de connexion...
                                     </p>
                                 </div>
-                                
+
                                 {/* Bouton Annuler */}
                                 <div className="mt-6">
                                     <button
@@ -311,13 +327,12 @@ function Data() {
                                     </h3>
                                     <div className="space-y-2">
                                         {events.filter(e => selectedEventIds.has(e.id)).map((event) => (
-                                            <div 
+                                            <div
                                                 key={event.id}
-                                                className={`flex items-center justify-between p-3 rounded-lg border ${
-                                                    sentEventIds.has(event.id) 
-                                                        ? 'bg-green-50 border-green-300' 
-                                                        : 'bg-gray-50 border-gray-200'
-                                                }`}
+                                                className={`flex items-center justify-between p-3 rounded-lg border ${sentEventIds.has(event.id)
+                                                    ? 'bg-green-50 border-green-300'
+                                                    : 'bg-gray-50 border-gray-200'
+                                                    }`}
                                             >
                                                 <div className="flex-1 min-w-0 mr-3">
                                                     <div className="font-medium text-gray-800 truncate">
@@ -330,19 +345,18 @@ function Data() {
                                                 <button
                                                     onClick={() => sendEventToMobile(event.id)}
                                                     disabled={sendingEventId === event.id || sentEventIds.has(event.id)}
-                                                    className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-                                                        sentEventIds.has(event.id)
-                                                            ? 'bg-green-500 text-white cursor-default'
-                                                            : sendingEventId === event.id
+                                                    className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${sentEventIds.has(event.id)
+                                                        ? 'bg-green-500 text-white cursor-default'
+                                                        : sendingEventId === event.id
                                                             ? 'bg-blue-300 text-white cursor-wait'
                                                             : 'bg-blue-500 hover:bg-blue-600 text-white'
-                                                    }`}
+                                                        }`}
                                                 >
-                                                    {sentEventIds.has(event.id) 
-                                                        ? '✓ Envoyé' 
-                                                        : sendingEventId === event.id 
-                                                        ? 'Envoi...' 
-                                                        : 'Envoyer'}
+                                                    {sentEventIds.has(event.id)
+                                                        ? '✓ Envoyé'
+                                                        : sendingEventId === event.id
+                                                            ? 'Envoi...'
+                                                            : 'Envoyer'}
                                                 </button>
                                             </div>
                                         ))}
