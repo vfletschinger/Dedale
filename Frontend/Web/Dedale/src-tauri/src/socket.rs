@@ -1,4 +1,4 @@
-use crate::db::{get_db_pool, insert_point_details, Event, PointDetail};
+use crate::db::{get_db_pool, insert_point_details, PointDetail};
 use base64::{engine::general_purpose, Engine as _};
 use image::Luma;
 use local_ip_address::local_ip;
@@ -12,7 +12,7 @@ use std::net::SocketAddr;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter};
 use tungstenite::accept;
 use tungstenite::Message;
 
@@ -396,7 +396,7 @@ async fn handle_websocket(
                                 "🚀 Insertion de {} point(s) en base de données...",
                                 points_count
                             );
-                            match insert_mobile_points(&app, event_id, mobile_export.points).await {
+                            match insert_mobile_points(app, event_id, mobile_export.points).await {
                                 Ok(_) => {
                                     println!("✅ Points insérés avec succès !");
                                 }
@@ -440,7 +440,7 @@ async fn handle_websocket(
                             );
 
                             println!("🚀 Début de l'insertion en base de données...");
-                            match insert_point_details(&app, point_details_vec).await {
+                            match insert_point_details(app, point_details_vec).await {
                                 Ok(_) => {
                                     println!("✅ Insertion terminée avec succès ! Envoi du message 'fini'...");
 
@@ -750,7 +750,7 @@ async fn handle_receive_websocket(
 
                         if points_count > 0 {
                             println!("🚀 Insertion de {} point(s)...", points_count);
-                            match insert_mobile_points(&app, event_id, mobile_export.points).await {
+                            match insert_mobile_points(app, event_id, mobile_export.points).await {
                                 Ok(_) => {
                                     println!("✅ Points insérés avec succès !");
 
@@ -785,10 +785,7 @@ async fn handle_receive_websocket(
                         let _ = websocket.flush();
                     } else {
                         // Log l'erreur de parsing pour debug
-                        match serde_json::from_str::<MobileExport>(&text) {
-                            Err(e) => println!("⚠️ Erreur parsing MobileExport: {}", e),
-                            _ => {}
-                        }
+                        if let Err(e) = serde_json::from_str::<MobileExport>(&text) { println!("⚠️ Erreur parsing MobileExport: {}", e) }
                         println!("⚠️ Format de message non reconnu");
                     }
                 }
