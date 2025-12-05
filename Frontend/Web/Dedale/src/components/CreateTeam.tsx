@@ -29,8 +29,8 @@ export default function CreateTeam({ onClose, onTeamCreated }: CreateTeamProps) 
             const newTeam = await invoke<Team>("create_team", { name });
             onTeamCreated(newTeam);
             onClose();
-        } catch (err: any) {
-            setError(err?.message || "Erreur lors de la création");
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : "Erreur lors de la création");
         } finally {
             setLoading(false);
         }

@@ -1,6 +1,24 @@
 import React, { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
+interface MergedObstacle {
+  typeId: number;
+  name: string;
+  description: string;
+  width: number;
+  length: number;
+  number: number;
+  obstacleId: number | null;
+}
+
+interface ObstacleType {
+  id: number;
+  name: string;
+  description: string;
+  width: number;
+  length: number;
+}
+
 export default function AddPointForm({
   initialCoords,
   onClose,
@@ -15,7 +33,7 @@ export default function AddPointForm({
   const [x, setX] = useState<number>(initialCoords.lng);
   const [y, setY] = useState<number>(initialCoords.lat);
   const [comment, setComment] = useState<string>("");
-  const [mergedObstacles, setMergedObstacles] = useState<any[]>([]);
+  const [mergedObstacles, setMergedObstacles] = useState<MergedObstacle[]>([]);
   const [pictures, setPictures] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [pose, setPose] = useState<string>("");
@@ -28,7 +46,7 @@ export default function AddPointForm({
 
   async function fetchTypes() {
     try {
-      const types: any[] = await invoke("fetch_obstacle_types");
+      const types: ObstacleType[] = await invoke("fetch_obstacle_types");
 
       const merged = types.map((type) => ({
         typeId: type.id,
@@ -150,9 +168,9 @@ export default function AddPointForm({
   }
 
   return (
-    <div className="h-full flex flex-col bg-gradient-to-b from-white to-gray-50">
+    <div className="h-full flex flex-col bg-linear-to-b from-white to-gray-50">
       {/* Header */}
-      <div className="p-4 bg-gradient-to-r from-emerald-500 to-teal-600 text-white">
+      <div className="p-4 bg-linear-to-r from-emerald-500 to-teal-600 text-white">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-xl font-bold">➕ Nouveau Point</h2>
@@ -173,7 +191,7 @@ export default function AddPointForm({
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {/* Coordonnées Section */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-4 py-3 bg-gradient-to-r from-indigo-50 to-blue-50 border-b border-indigo-100 flex items-center gap-2">
+          <div className="px-4 py-3 bg-linear-to-r from-indigo-50 to-blue-50 border-b border-indigo-100 flex items-center gap-2">
             <span className="text-xl">📍</span>
             <span className="font-semibold text-gray-800">Coordonnées</span>
           </div>
@@ -205,7 +223,7 @@ export default function AddPointForm({
 
         {/* Dates Pose/Dépose Section */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-4 py-3 bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple-100 flex items-center gap-2">
+          <div className="px-4 py-3 bg-linear-to-r from-purple-50 to-pink-50 border-b border-purple-100 flex items-center gap-2">
             <span className="text-xl">🕐</span>
             <span className="font-semibold text-gray-800">Dates Pose / Dépose</span>
           </div>
@@ -241,7 +259,7 @@ export default function AddPointForm({
 
         {/* Commentaire Section */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-4 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100 flex items-center gap-2">
+          <div className="px-4 py-3 bg-linear-to-r from-blue-50 to-indigo-50 border-b border-blue-100 flex items-center gap-2">
             <span className="text-xl">💬</span>
             <span className="font-semibold text-gray-800">Commentaire</span>
           </div>
@@ -258,7 +276,7 @@ export default function AddPointForm({
 
         {/* Obstacles Section */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-4 py-3 bg-gradient-to-r from-orange-50 to-amber-50 border-b border-orange-100 flex items-center gap-2">
+          <div className="px-4 py-3 bg-linear-to-r from-orange-50 to-amber-50 border-b border-orange-100 flex items-center gap-2">
             <span className="text-xl">🚧</span>
             <span className="font-semibold text-gray-800">Obstacles</span>
             <span className="px-2 py-0.5 bg-orange-200 text-orange-800 text-xs font-medium rounded-full">
@@ -301,7 +319,7 @@ export default function AddPointForm({
 
         {/* Photos Section */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-4 py-3 bg-gradient-to-r from-green-50 to-emerald-50 border-b border-green-100 flex items-center gap-2">
+          <div className="px-4 py-3 bg-linear-to-r from-green-50 to-emerald-50 border-b border-green-100 flex items-center gap-2">
             <span className="text-xl">📸</span>
             <span className="font-semibold text-gray-800">Photos</span>
             {pictures.length > 0 && (
@@ -343,7 +361,7 @@ export default function AddPointForm({
         <button
           onClick={handleSave}
           disabled={saving}
-          className="flex-1 px-4 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-semibold rounded-xl transition-all shadow-sm hover:shadow-md disabled:opacity-50"
+          className="flex-1 px-4 py-3 bg-linear-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-semibold rounded-xl transition-all shadow-sm hover:shadow-md disabled:opacity-50"
         >
           {saving ? "⏳ Enregistrement..." : "✓ Ajouter le point"}
         </button>

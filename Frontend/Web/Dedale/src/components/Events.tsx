@@ -61,10 +61,10 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
       const eventsData = await invoke<Event[]>("fetch_events");
       console.log("📊 Événements reçus:", eventsData);
       setEvents(eventsData);
-      onEventsLoaded && onEventsLoaded(eventsData);
-    } catch (err) {
+      if (onEventsLoaded) onEventsLoaded(eventsData);
+    } catch (err: unknown) {
       console.error("❌ Erreur lors du chargement des événements:", err);
-      setError((err as any)?.message || "Erreur inconnue");
+      setError(err instanceof Error ? err.message : "Erreur inconnue");
     } finally {
       setLoading(false);
     }
@@ -72,56 +72,8 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
 
   useEffect(() => {
     loadEvents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Écouter les événements de réception de points
-  useEffect(() => {
-    const unlistenConnected = listen('mobile-connected', () => {
-      console.log('📱 Mobile connecté pour réception !');
-      setReceiveStatus('Mobile connecté ! En attente des données...');
-    });
-
-    const unlistenPointsReceived = listen<number>('points-received', (event) => {
-      console.log('📦 Points reçus:', event.payload);
-      setPointsReceived(prev => prev + event.payload);
-      setReceiveStatus(`${event.payload} point(s) reçu(s) !`);
-      loadEvents(); // Recharger les événements
-    });
-
-    return () => {
-      unlistenConnected.then(fn => fn());
-      unlistenPointsReceived.then(fn => fn());
-    };
-  }, []);
-
-  // Fonction pour démarrer la réception depuis le mobile
-  const handleReceiveFromMobile = async (eventId: number) => {
-    try {
-      setReceivingEventId(eventId);
-      setReceiveStatus('Génération du QR code...');
-      setPointsReceived(0);
-      
-      console.log('📱 Démarrage serveur de réception pour event:', eventId);
-      const qrCodeBase64 = await invoke<string>('start_receive_server', { eventId });
-      
-      setReceiveQrCode(qrCodeBase64);
-      setReceiveStatus('Scannez le QR code avec le mobile');
-    } catch (err) {
-      console.error('❌ Erreur démarrage serveur réception:', err);
-      setReceiveStatus(`Erreur: ${err}`);
-    }
-  };
-
-  const closeReceiveModal = () => {
-    setReceiveQrCode(null);
-    setReceivingEventId(null);
-    setReceiveStatus('En attente...');
-    setPointsReceived(0);
-  };
-
-  const createEvent = async () => {
-    invoke("insert_event", { event: formData });
-  }
 
   const handleCreateEvent = async () => {
     try {

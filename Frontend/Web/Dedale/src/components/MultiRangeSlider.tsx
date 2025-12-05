@@ -51,6 +51,7 @@ const MultiRangeSlider = ({ min, max, onChange }: MultiRangeSliderProps) => {
 
     useEffect(() => {
         onChange(minVal, maxVal);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [minVal, maxVal]);
 
     // --- NOUVELLE FONCTION : GESTION DU CLIC SUR LA BARRE ---
@@ -105,7 +106,7 @@ const MultiRangeSlider = ({ min, max, onChange }: MultiRangeSliderProps) => {
                     setMinVal(value);
                     minValRef.current = value;
                 }}
-                className="thumb pointer-events-none absolute h-0 w-full outline-none z-[3] top-1/2 -translate-y-1/2 left-0"
+                className="thumb pointer-events-none absolute h-0 w-full outline-none z-3 top-1/2 -translate-y-1/2 left-0"
                 style={{ zIndex: minVal > 10 - 5 ? "5" : "3" }}
             />
 
@@ -119,13 +120,13 @@ const MultiRangeSlider = ({ min, max, onChange }: MultiRangeSliderProps) => {
                     setMaxVal(value);
                     maxValRef.current = value;
                 }}
-                className="thumb pointer-events-none absolute h-0 w-full outline-none z-[4] top-1/2 -translate-y-1/2 left-0"
+                className="thumb pointer-events-none absolute h-0 w-full outline-none z-4 top-1/2 -translate-y-1/2 left-0"
             />
 
             {/* BARRES VISUELLES (Inchangées) */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-18px)] h-1.5 z-[1] pointer-events-none">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-18px)] h-1.5 z-1 pointer-events-none">
                 <div className="absolute top-0 left-0 h-full w-full rounded bg-gray-200"></div>
-                <div ref={range} className="absolute top-0 h-full rounded bg-blue-500 z-[2]"></div>
+                <div ref={range} className="absolute top-0 h-full rounded bg-blue-500 z-2"></div>
             </div>
         </div>
     );
