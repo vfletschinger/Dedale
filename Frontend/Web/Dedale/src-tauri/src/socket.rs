@@ -759,10 +759,9 @@ async fn handle_receive_websocket(
                                     println!("✅ Points insérés avec succès !");
 
                                     // Émettre un événement pour notifier le frontend
-                                    app.emit("points-received", points_count)
-                                        .unwrap_or_else(|e| {
-                                            eprintln!("⚠️ Erreur émission points-received: {}", e);
-                                        });
+                                    if let Err(e) = app.emit("points-updated", event_id) {
+                                        eprintln!("⚠️ Erreur émission événement points-updated: {}", e);
+                                    }
                                 }
                                 Err(e) => {
                                     eprintln!("❌ Erreur insertion: {}", e);

@@ -46,12 +46,11 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
     statut: "planned",
     geometry: ""
   });
-  
+
   // État pour le QR code de réception
   const [receiveQrCode, setReceiveQrCode] = useState<string | null>(null);
   const [receivingEventId, setReceivingEventId] = useState<number | null>(null);
   const [receiveStatus, setReceiveStatus] = useState<string>("En attente...");
-  const [pointsReceived, setPointsReceived] = useState<number>(0);
 
   const loadEvents = async () => {
     setLoading(true);
@@ -78,7 +77,7 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
   // Écouter les événements de réception de points
   useEffect(() => {
     let unlistenConnectedFn: (() => void) | null = null;
-    let unlistenPointsReceivedFn: (() => void) | null = null;
+    let unlistenPointsUpdatedFn: (() => void) | null = null;
     let isMounted = true;
 
     const setupListeners = async () => {
@@ -88,12 +87,15 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
         setReceiveStatus('Mobile connecté ! En attente des données...');
       });
 
-      unlistenPointsReceivedFn = await listen<number>('points-received', (event) => {
+      unlistenPointsUpdatedFn = await listen<number>('points-updated', (event) => {
         if (!isMounted) return;
-        console.log('📦 Points reçus:', event.payload);
-        setPointsReceived(event.payload); // Remplacer au lieu d'additionner
-        setReceiveStatus(`${event.payload} point(s) reçu(s) !`);
-        loadEvents(); // Recharger les événements
+        const eventId = event.payload;
+        console.log('📦 Points mis à jour pour event_id:', eventId);
+        // Si c'est l'événement qu'on est en train de recevoir
+        if (eventId === receivingEventId) {
+          setReceiveStatus(`Points reçus avec succès !`);
+          loadEvents(); // Recharger les événements
+        }
       });
     };
 
@@ -102,20 +104,19 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
     return () => {
       isMounted = false;
       if (unlistenConnectedFn) unlistenConnectedFn();
-      if (unlistenPointsReceivedFn) unlistenPointsReceivedFn();
+      if (unlistenPointsUpdatedFn) unlistenPointsUpdatedFn();
     };
-  }, []);
+  }, [receivingEventId]);
 
   // Fonction pour démarrer la réception depuis le mobile
   const handleReceiveFromMobile = async (eventId: number) => {
     try {
       setReceivingEventId(eventId);
       setReceiveStatus('Génération du QR code...');
-      setPointsReceived(0);
-      
+
       console.log('📱 Démarrage serveur de réception pour event:', eventId);
       const qrCodeBase64 = await invoke<string>('start_receive_server', { eventId });
-      
+
       setReceiveQrCode(qrCodeBase64);
       setReceiveStatus('Scannez le QR code avec le mobile');
     } catch (err) {
@@ -128,12 +129,7 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
     setReceiveQrCode(null);
     setReceivingEventId(null);
     setReceiveStatus('En attente...');
-    setPointsReceived(0);
   };
-
-  const createEvent = async () => {
-    invoke("insert_event", { event: formData });
-  }
 
   const handleCreateEvent = async () => {
     try {
@@ -156,11 +152,11 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
         ...formData,
         timestamp: new Date().toISOString()
       };
-      
+
       console.log(" Création d'un nouvel événement...", newEvent);
       await invoke("insert_event", { event: newEvent });
       console.log(" Événement créé avec succès");
-      
+
       // Réinitialiser le formulaire
       setFormData({
         name: "",
@@ -211,7 +207,7 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
       <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
         <h3 className="font-bold">Erreur</h3>
         <p>{error}</p>
-        <button 
+        <button
           onClick={loadEvents}
           className="mt-2 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
         >
@@ -358,14 +354,13 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
                   )}
                   <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
                     <span>Sélectionné
- Du {formatDate(event.dateDebut)} au {formatDate(event.dateFin)}</span>
-                    <span className={`px-2 py-1 rounded-full text-xs ${
-                      event.statut === 'active' 
-                        ? 'bg-green-100 text-green-800'
-                        : event.statut === 'planned'
+                      Du {formatDate(event.dateDebut)} au {formatDate(event.dateFin)}</span>
+                    <span className={`px-2 py-1 rounded-full text-xs ${event.statut === 'active'
+                      ? 'bg-green-100 text-green-800'
+                      : event.statut === 'planned'
                         ? 'bg-blue-100 text-blue-800'
                         : 'bg-gray-100 text-gray-800'
-                    }`}>
+                      }`}>
                       {event.statut}
                     </span>
                   </div>
@@ -378,7 +373,7 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
                     }}
                     className="px-3 py-1 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
                   >
-                   Import
+                    Import
                   </button>
                   <button
                     onClick={(e) => {
@@ -396,7 +391,7 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
                     }}
                     className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
                   >
-                     Supprimer
+                    Supprimer
                   </button>
                 </div>
               </div>
@@ -415,24 +410,19 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
             <p className="text-gray-600 text-center mb-4">
               Scannez ce QR code avec l'application mobile pour envoyer les points de l'événement.
             </p>
-            
+
             <div className="flex justify-center mb-4">
-              <img 
-                src={`data:image/png;base64,${receiveQrCode}`} 
-                alt="QR Code" 
+              <img
+                src={`data:image/png;base64,${receiveQrCode}`}
+                alt="QR Code"
                 className="w-48 h-48"
               />
             </div>
-            
+
             <div className="text-center mb-4">
               <p className="text-sm text-gray-500">{receiveStatus}</p>
-              {pointsReceived > 0 && (
-                <p className="text-green-600 font-semibold mt-2">
-                  ✅ {pointsReceived} point(s) reçu(s)
-                </p>
-              )}
             </div>
-            
+
             <div className="flex justify-center">
               <button
                 onClick={closeReceiveModal}

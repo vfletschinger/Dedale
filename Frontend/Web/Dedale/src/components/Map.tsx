@@ -148,11 +148,11 @@ function formatDateShort(dateStr: string | null | undefined): string {
 }
 
 // Composant Frise Chronologique personnalisée
-function TimelinePanel({ 
-  points, 
-  onPointClick 
-}: { 
-  points: MapPoint[]; 
+function TimelinePanel({
+  points,
+  onPointClick
+}: {
+  points: MapPoint[];
   onPointClick: (point: MapPoint) => void;
 }) {
   const [obstacleFilter, setObstacleFilter] = useState<string>("all");
@@ -188,9 +188,9 @@ function TimelinePanel({
     if (obstacleFilter === "all") {
       filtered = points.filter(p => p.pose && p.depose);
     } else {
-      filtered = points.filter(p => 
-        p.pose && 
-        p.depose && 
+      filtered = points.filter(p =>
+        p.pose &&
+        p.depose &&
         pointHasObstacle(p, obstacleFilter)
       );
     }
@@ -203,7 +203,7 @@ function TimelinePanel({
     if (filteredPoints.length === 0) {
       return { min: INITIAL_NOW - 12 * 60 * 60 * 1000, max: INITIAL_NOW + 12 * 60 * 60 * 1000 };
     }
-    
+
     const times = filteredPoints.flatMap(p => [
       new Date(p.pose!).getTime(),
       new Date(p.depose!).getTime()
@@ -211,7 +211,7 @@ function TimelinePanel({
     const min = Math.min(...times);
     const max = Math.max(...times);
     const padding = (max - min) * 0.1 || 3600000;
-    
+
     return { min: min - padding, max: max + padding };
   }, [filteredPoints]);
 
@@ -274,7 +274,7 @@ function TimelinePanel({
         >
           <option value="all">Tous les points ({totalPointsWithDates})</option>
           {obstacleTypes.map(type => {
-            const count = points.filter(p => 
+            const count = points.filter(p =>
               p.pose && p.depose && pointHasObstacle(p, type)
             ).length;
             return (
@@ -350,7 +350,7 @@ function TimelinePanel({
                   <div className="w-24 shrink-0 px-2 flex items-center text-xs font-medium text-gray-700 border-r border-gray-200">
                     Point #{point.id}
                   </div>
-                  
+
                   {/* Barre de temps */}
                   <div className="flex-1 relative">
                     {/* Grille verticale */}
@@ -361,7 +361,7 @@ function TimelinePanel({
                         style={{ left: `${(i / 6) * 100}%` }}
                       />
                     ))}
-                    
+
                     {/* Bloc de durée */}
                     <div
                       onClick={() => onPointClick(point)}
@@ -1049,6 +1049,58 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
     reloadPoints();
   }, [selectedEvent, map]);
 
+  // Listener pour la mise à jour des points en temps réel (transfert du mobile)
+  useEffect(() => {
+    if (!map) return;
+
+    const unlistenPromise = listen<number>("points-updated", async (event) => {
+      const updatedEventId = event.payload;
+      console.log("🔄 Événement 'points-updated' reçu pour event_id:", updatedEventId);
+
+      // Si l'événement reçu est celui actuellement affichée, recharger les points
+      if (selectedEvent?.id === updatedEventId) {
+        console.log("📍 Mise à jour des points pour l'événement actuel");
+        try {
+          const freshPoints = await invoke<MapPoint[]>("get_points", { eventId: updatedEventId });
+          console.log(`✅ ${freshPoints.length} nouveau/nouveaux point(s) détecté(s)`);
+
+          pointsRef.current = freshPoints;
+          setPoints(freshPoints);
+
+          // Mettre à jour la source GeoJSON
+          if (map.getSource("db-points")) {
+            const geojson: GeoJSON.FeatureCollection<GeoJSON.Point> = {
+              type: "FeatureCollection",
+              features: freshPoints.map((p: MapPoint) => ({
+                type: "Feature",
+                geometry: {
+                  type: "Point",
+                  coordinates: [Number(p.x), Number(p.y)] as [number, number],
+                },
+                properties: {
+                  id: p.id,
+                  obstacles: p.obstacles,
+                  comments: p.comments,
+                  pictures: p.pictures,
+                },
+              })),
+            };
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (map.getSource("db-points") as maplibregl.GeoJSONSource).setData(geojson as any);
+          }
+        } catch (err) {
+          console.error("Erreur mise à jour des points via transfert:", err);
+        }
+      } else {
+        console.log("📝 Points reçus pour un autre événement (id:", updatedEventId, ") - non affiché actuellement");
+      }
+    });
+
+    return () => {
+      unlistenPromise.then((fn) => fn());
+    };
+  }, [map, selectedEvent]);
+
   // Charger et afficher les géométries quand l'événement sélectionné change
   useEffect(() => {
     if (!map) return;
@@ -1174,14 +1226,14 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
   useEffect(() => {
     const unlisten = listen<number>("points-updated", async (event) => {
       console.log("📥 Points mis à jour, event_id:", event.payload);
-      
+
       // Utiliser mapRef pour accéder à la carte
       const currentMap = mapRef.current;
       if (!currentMap) {
         console.log("⚠️ Map non prête, skip refresh");
         return;
       }
-      
+
       const currentEventId = selectedEventIdRef.current;
       try {
         const freshPoints = await invoke<any[]>("get_points", { eventId: currentEventId || null });
@@ -1255,8 +1307,8 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
                 <button
                   onClick={handleAddPointClick}
                   className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${awaitingMapClick
-                      ? 'bg-yellow-400 text-yellow-900 animate-pulse'
-                      : 'bg-white/20 text-white hover:bg-white/30'
+                    ? 'bg-yellow-400 text-yellow-900 animate-pulse'
+                    : 'bg-white/20 text-white hover:bg-white/30'
                     }`}
                 >
                   {awaitingMapClick ? '⏳ Cliquez' : '+ Ajouter'}
@@ -1266,27 +1318,25 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
               <div className="flex bg-white/20 rounded-lg p-1">
                 <button
                   onClick={() => setViewMode("points")}
-                  className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                    viewMode === "points"
+                  className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${viewMode === "points"
                       ? 'bg-white text-indigo-600 shadow-sm'
                       : 'text-white/80 hover:text-white hover:bg-white/10'
-                  }`}
+                    }`}
                 >
                   📋 Points
                 </button>
                 <button
                   onClick={() => setViewMode("timeline")}
-                  className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                    viewMode === "timeline"
+                  className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${viewMode === "timeline"
                       ? 'bg-white text-indigo-600 shadow-sm'
                       : 'text-white/80 hover:text-white hover:bg-white/10'
-                  }`}
+                    }`}
                 >
                   📅 Frise
                 </button>
               </div>
             </div>
-            
+
             <div className="flex-1 overflow-y-auto p-2">
               {points.length === 0 ? (
                 <div className="text-center text-gray-500 py-8">
@@ -1321,236 +1371,236 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
 
         {/* Conteneur principal de la carte */}
         <div className="flex-1 flex flex-col">
-        {/* Sélecteur d'événements et barre de recherche */}
-        <div className="relative z-30 bg-linear-to-r from-indigo-500 via-purple-600 to-blue-600 backdrop-blur-md p-4 shadow-lg">
-          {/* Dégradé de transition en bas */}
-          <div className="absolute bottom-0 left-0 right-0 h-2 bg-linear-to-b from-transparent to-white/20"></div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <label className="text-white font-medium">Événement :</label>
-            </div>
-            <select
-              value={selectedEvent?.id || ""}
-              onChange={(e) => handleEventChange(e.target.value)}
-              className="max-w-xs px-4 py-2 bg-white/90 backdrop-blur-sm border border-white/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-transparent text-gray-800 font-medium transition-all duration-300 hover:bg-white hover:shadow-lg"
-            >
-              <option value="">Choisir un événement...</option>
-              {events.map((event) => (
-                <option key={event.id} value={event.id}>
-                  {event.event_type === 'Marathon' && '🏃‍♂️'}
-                  {event.event_type === 'Cyclisme' && '🚴‍♂️'}
-                  {event.event_type === 'Trail' && '🥾'}
-                  {!['Marathon', 'Cyclisme', 'Trail'].includes(event.event_type)}
-                  {event.name || `Événement #${event.id}`}
-                  {event.status === 'active' && ' 🟢'}
-                  {event.status === 'planned' && ' 🔵'}
-                </option>
-              ))}
-            </select>
-            
-            {/* Barre de recherche d'adresses */}
-            <div className="relative flex-1">
-              <input
-                type="text"
-                placeholder="🔍 Rechercher un lieu..."
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onBlur={() => setTimeout(() => setResults([]), 150)}
-                className="w-full px-4 py-2 bg-white/90 backdrop-blur-sm border border-white/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-transparent text-gray-800 font-medium transition-all duration-300 hover:bg-white hover:shadow-lg"
-              />
-
-              {/* Liste de suggestions */}
-              <div className={`absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-lg border border-gray-200 max-h-40 overflow-y-auto transition-all duration-300 ease-out z-50 ${results.length > 0 ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2 pointer-events-none h-0 mt-0'}`}>
-                {results.map((r, i) => (
-                  <div
-                    key={i}
-                    className="p-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-all duration-200 hover:pl-5"
-                    onClick={() => handleSelect(r)}
-                  >
-                    <div className="text-sm text-gray-800">{r.display_name}</div>
-                  </div>
+          {/* Sélecteur d'événements et barre de recherche */}
+          <div className="relative z-30 bg-linear-to-r from-indigo-500 via-purple-600 to-blue-600 backdrop-blur-md p-4 shadow-lg">
+            {/* Dégradé de transition en bas */}
+            <div className="absolute bottom-0 left-0 right-0 h-2 bg-linear-to-b from-transparent to-white/20"></div>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <label className="text-white font-medium">Événement :</label>
+              </div>
+              <select
+                value={selectedEvent?.id || ""}
+                onChange={(e) => handleEventChange(e.target.value)}
+                className="max-w-xs px-4 py-2 bg-white/90 backdrop-blur-sm border border-white/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-transparent text-gray-800 font-medium transition-all duration-300 hover:bg-white hover:shadow-lg"
+              >
+                <option value="">Choisir un événement...</option>
+                {events.map((event) => (
+                  <option key={event.id} value={event.id}>
+                    {event.event_type === 'Marathon' && '🏃‍♂️'}
+                    {event.event_type === 'Cyclisme' && '🚴‍♂️'}
+                    {event.event_type === 'Trail' && '🥾'}
+                    {!['Marathon', 'Cyclisme', 'Trail'].includes(event.event_type)}
+                    {event.name || `Événement #${event.id}`}
+                    {event.status === 'active' && ' 🟢'}
+                    {event.status === 'planned' && ' 🔵'}
+                  </option>
                 ))}
+              </select>
+
+              {/* Barre de recherche d'adresses */}
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  placeholder="🔍 Rechercher un lieu..."
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onBlur={() => setTimeout(() => setResults([]), 150)}
+                  className="w-full px-4 py-2 bg-white/90 backdrop-blur-sm border border-white/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-transparent text-gray-800 font-medium transition-all duration-300 hover:bg-white hover:shadow-lg"
+                />
+
+                {/* Liste de suggestions */}
+                <div className={`absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-lg border border-gray-200 max-h-40 overflow-y-auto transition-all duration-300 ease-out z-50 ${results.length > 0 ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2 pointer-events-none h-0 mt-0'}`}>
+                  {results.map((r, i) => (
+                    <div
+                      key={i}
+                      className="p-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-all duration-200 hover:pl-5"
+                      onClick={() => handleSelect(r)}
+                    >
+                      <div className="text-sm text-gray-800">{r.display_name}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Conteneur de la carte et panneau détails */}
-        <div className="flex-1 flex overflow-hidden relative">
-          {/* Carte */}
-          <div ref={mapContainer} className="flex-1 h-full" />
+          {/* Conteneur de la carte et panneau détails */}
+          <div className="flex-1 flex overflow-hidden relative">
+            {/* Carte */}
+            <div ref={mapContainer} className="flex-1 h-full" />
 
-          {/* Barre d'outils de dessin flottante - visible uniquement si un événement est sélectionné */}
-          {selectedEvent && (
-            <div className="absolute top-4 left-4 z-10">
-              <div className="bg-white/95 backdrop-blur-md rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-                {/* Bouton toggle */}
-                <button
-                  onClick={() => setIsDrawingToolsOpen(!isDrawingToolsOpen)}
-                  className={`w-full px-4 py-3 flex items-center gap-2 font-medium transition-all duration-200 ${isDrawingToolsOpen
+            {/* Barre d'outils de dessin flottante - visible uniquement si un événement est sélectionné */}
+            {selectedEvent && (
+              <div className="absolute top-4 left-4 z-10">
+                <div className="bg-white/95 backdrop-blur-md rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+                  {/* Bouton toggle */}
+                  <button
+                    onClick={() => setIsDrawingToolsOpen(!isDrawingToolsOpen)}
+                    className={`w-full px-4 py-3 flex items-center gap-2 font-medium transition-all duration-200 ${isDrawingToolsOpen
                       ? 'bg-indigo-500 text-white'
                       : 'bg-white text-gray-700 hover:bg-gray-50'
-                    }`}
-                >
-                  <span className="text-lg">🛠️</span>
-                  <span>Outils</span>
-                  <span className={`ml-auto transition-transform duration-200 ${isDrawingToolsOpen ? 'rotate-180' : ''}`}>
-                    ▼
-                  </span>
-                </button>
+                      }`}
+                  >
+                    <span className="text-lg">🛠️</span>
+                    <span>Outils</span>
+                    <span className={`ml-auto transition-transform duration-200 ${isDrawingToolsOpen ? 'rotate-180' : ''}`}>
+                      ▼
+                    </span>
+                  </button>
 
-                {/* Panneau d'outils */}
-                {isDrawingToolsOpen && (
-                  <div className="p-3 border-t border-gray-100 space-y-2">
-                    <p className="text-xs text-gray-500 mb-2">Dessiner une géométrie :</p>
+                  {/* Panneau d'outils */}
+                  {isDrawingToolsOpen && (
+                    <div className="p-3 border-t border-gray-100 space-y-2">
+                      <p className="text-xs text-gray-500 mb-2">Dessiner une géométrie :</p>
 
-                    {/* Bouton Polygone */}
-                    <button
-                      onClick={startDrawPolygon}
-                      disabled={!selectedEvent}
-                      className={`w-full px-3 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all duration-200 ${drawingMode === "polygon"
+                      {/* Bouton Polygone */}
+                      <button
+                        onClick={startDrawPolygon}
+                        disabled={!selectedEvent}
+                        className={`w-full px-3 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all duration-200 ${drawingMode === "polygon"
                           ? 'bg-indigo-500 text-white shadow-md'
                           : selectedEvent
                             ? 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
                             : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                        }`}
-                    >
-                      <span className="text-lg">⬡</span>
-                      <span>Polygone (zone)</span>
-                    </button>
+                          }`}
+                      >
+                        <span className="text-lg">⬡</span>
+                        <span>Polygone (zone)</span>
+                      </button>
 
-                    {/* Bouton Ligne */}
-                    <button
-                      onClick={startDrawLine}
-                      disabled={!selectedEvent}
-                      className={`w-full px-3 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all duration-200 ${drawingMode === "line"
+                      {/* Bouton Ligne */}
+                      <button
+                        onClick={startDrawLine}
+                        disabled={!selectedEvent}
+                        className={`w-full px-3 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all duration-200 ${drawingMode === "line"
                           ? 'bg-green-500 text-white shadow-md'
                           : selectedEvent
                             ? 'bg-green-50 text-green-700 hover:bg-green-100'
                             : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                        }`}
-                    >
-                      <span className="text-lg">╱</span>
-                      <span>Ligne (chemin)</span>
-                    </button>
-
-                    {/* Bouton Annuler */}
-                    {drawingMode !== "none" && (
-                      <button
-                        onClick={cancelDrawing}
-                        className="w-full px-3 py-2 rounded-lg flex items-center gap-2 text-sm font-medium bg-red-50 text-red-600 hover:bg-red-100 transition-all duration-200"
+                          }`}
                       >
-                        <span className="text-lg">✕</span>
-                        <span>Annuler le dessin</span>
+                        <span className="text-lg">╱</span>
+                        <span>Ligne (chemin)</span>
                       </button>
-                    )}
 
-                    {/* Message d'aide */}
-                    {drawingMode !== "none" && (
-                      <div className="mt-2 p-2 bg-blue-50 rounded-lg text-xs text-blue-700">
-                        <p className="font-medium">💡 Instructions :</p>
-                        {drawingMode === "polygon" && (
-                          <p>Cliquez pour placer les sommets du polygone. Double-cliquez pour terminer.</p>
-                        )}
-                        {drawingMode === "line" && (
-                          <p>Cliquez pour placer les points du chemin. Double-cliquez pour terminer.</p>
-                        )}
-                      </div>
-                    )}
-
-                    {!selectedEvent && (
-                      <p className="text-xs text-amber-600 mt-2">
-                        ⚠️ Sélectionnez un événement pour dessiner
-                      </p>
-                    )}
-
-                    {/* Affichage du nombre de géométries et liste */}
-                    {selectedEvent && geometries.length > 0 && (
-                      <div className="mt-3 pt-3 border-t border-gray-100">
+                      {/* Bouton Annuler */}
+                      {drawingMode !== "none" && (
                         <button
-                          onClick={() => setIsGeometryListOpen(!isGeometryListOpen)}
-                          className="w-full flex items-center justify-between text-xs text-gray-600 hover:text-gray-800"
+                          onClick={cancelDrawing}
+                          className="w-full px-3 py-2 rounded-lg flex items-center gap-2 text-sm font-medium bg-red-50 text-red-600 hover:bg-red-100 transition-all duration-200"
                         >
-                          <span>📐 {geometries.length} géométrie(s)</span>
-                          <span className={`transition-transform ${isGeometryListOpen ? 'rotate-180' : ''}`}>▼</span>
+                          <span className="text-lg">✕</span>
+                          <span>Annuler le dessin</span>
                         </button>
+                      )}
 
-                        {isGeometryListOpen && (
-                          <div className="mt-2 max-h-48 overflow-y-auto space-y-1">
-                            {geometries.map((geom) => {
-                              const { label, icon } = getGeometryTypeLabel(geom.geom);
-                              const isSelected = selectedGeometryId === geom.id;
-                              const isEditing = editingGeometryId === geom.id;
+                      {/* Message d'aide */}
+                      {drawingMode !== "none" && (
+                        <div className="mt-2 p-2 bg-blue-50 rounded-lg text-xs text-blue-700">
+                          <p className="font-medium">💡 Instructions :</p>
+                          {drawingMode === "polygon" && (
+                            <p>Cliquez pour placer les sommets du polygone. Double-cliquez pour terminer.</p>
+                          )}
+                          {drawingMode === "line" && (
+                            <p>Cliquez pour placer les points du chemin. Double-cliquez pour terminer.</p>
+                          )}
+                        </div>
+                      )}
 
-                              return (
-                                <div
-                                  key={geom.id}
-                                  className={`p-2 rounded-lg text-xs transition-all ${isEditing
+                      {!selectedEvent && (
+                        <p className="text-xs text-amber-600 mt-2">
+                          ⚠️ Sélectionnez un événement pour dessiner
+                        </p>
+                      )}
+
+                      {/* Affichage du nombre de géométries et liste */}
+                      {selectedEvent && geometries.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-gray-100">
+                          <button
+                            onClick={() => setIsGeometryListOpen(!isGeometryListOpen)}
+                            className="w-full flex items-center justify-between text-xs text-gray-600 hover:text-gray-800"
+                          >
+                            <span>📐 {geometries.length} géométrie(s)</span>
+                            <span className={`transition-transform ${isGeometryListOpen ? 'rotate-180' : ''}`}>▼</span>
+                          </button>
+
+                          {isGeometryListOpen && (
+                            <div className="mt-2 max-h-48 overflow-y-auto space-y-1">
+                              {geometries.map((geom) => {
+                                const { label, icon } = getGeometryTypeLabel(geom.geom);
+                                const isSelected = selectedGeometryId === geom.id;
+                                const isEditing = editingGeometryId === geom.id;
+
+                                return (
+                                  <div
+                                    key={geom.id}
+                                    className={`p-2 rounded-lg text-xs transition-all ${isEditing
                                       ? 'bg-amber-100 border border-amber-300'
                                       : isSelected
                                         ? 'bg-indigo-100 border border-indigo-300'
                                         : 'bg-gray-50 hover:bg-gray-100 border border-transparent'
-                                    }`}
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <button
-                                      onClick={() => highlightGeometry(isSelected ? null : geom)}
-                                      className="flex items-center gap-1 text-left flex-1"
-                                    >
-                                      <span>{icon}</span>
-                                      <span className="font-medium">{label} #{geom.id}</span>
-                                    </button>
+                                      }`}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <button
+                                        onClick={() => highlightGeometry(isSelected ? null : geom)}
+                                        className="flex items-center gap-1 text-left flex-1"
+                                      >
+                                        <span>{icon}</span>
+                                        <span className="font-medium">{label} #{geom.id}</span>
+                                      </button>
 
-                                    {!editingGeometryId && (
-                                      <div className="flex gap-1">
+                                      {!editingGeometryId && (
+                                        <div className="flex gap-1">
+                                          <button
+                                            onClick={() => startEditGeometry(geom)}
+                                            className="p-1 rounded hover:bg-blue-100 text-blue-600"
+                                            title="Modifier"
+                                          >
+                                            ✏️
+                                          </button>
+                                          <button
+                                            onClick={() => handleDeleteGeometry(geom.id)}
+                                            className="p-1 rounded hover:bg-red-100 text-red-600"
+                                            title="Supprimer"
+                                          >
+                                            🗑️
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {isEditing && (
+                                      <div className="mt-2 flex gap-1">
                                         <button
-                                          onClick={() => startEditGeometry(geom)}
-                                          className="p-1 rounded hover:bg-blue-100 text-blue-600"
-                                          title="Modifier"
+                                          onClick={saveEditGeometry}
+                                          className="flex-1 px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600"
                                         >
-                                          ✏️
+                                          ✓ Sauvegarder
                                         </button>
                                         <button
-                                          onClick={() => handleDeleteGeometry(geom.id)}
-                                          className="p-1 rounded hover:bg-red-100 text-red-600"
-                                          title="Supprimer"
+                                          onClick={cancelEditGeometry}
+                                          className="flex-1 px-2 py-1 bg-gray-400 text-white rounded text-xs hover:bg-gray-500"
                                         >
-                                          🗑️
+                                          ✕ Annuler
                                         </button>
                                       </div>
                                     )}
                                   </div>
-
-                                  {isEditing && (
-                                    <div className="mt-2 flex gap-1">
-                                      <button
-                                        onClick={saveEditGeometry}
-                                        className="flex-1 px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600"
-                                      >
-                                        ✓ Sauvegarder
-                                      </button>
-                                      <button
-                                        onClick={cancelEditGeometry}
-                                        className="flex-1 px-2 py-1 bg-gray-400 text-white rounded text-xs hover:bg-gray-500"
-                                      >
-                                        ✕ Annuler
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
       </div>
 
       {/* Panneau bas: Frise chronologique (visible seulement en mode timeline) */}
@@ -1562,30 +1612,28 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
             <div className="flex bg-white/20 rounded-lg p-1">
               <button
                 onClick={() => setViewMode("points")}
-                className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${
-                  viewMode === "points"
+                className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${viewMode === "points"
                     ? 'bg-white text-indigo-600 shadow-sm'
                     : 'text-white/80 hover:text-white hover:bg-white/10'
-                }`}
+                  }`}
               >
                 📋 Points
               </button>
               <button
                 onClick={() => setViewMode("timeline")}
-                className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${
-                  viewMode === "timeline"
+                className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${viewMode === "timeline"
                     ? 'bg-white text-indigo-600 shadow-sm'
                     : 'text-white/80 hover:text-white hover:bg-white/10'
-                }`}
+                  }`}
               >
                 📅 Frise
               </button>
             </div>
           </div>
-          
+
           <div className="flex-1 overflow-hidden">
-            <TimelinePanel 
-              points={points} 
+            <TimelinePanel
+              points={points}
               onPointClick={openPopupForPoint}
             />
           </div>
