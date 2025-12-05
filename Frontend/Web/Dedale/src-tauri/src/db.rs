@@ -623,17 +623,17 @@ pub async fn insert_point_details(
             assigned_ids.push(new_id);
         } else {
             // Respect provided id
-            sqlx::query(r#"INSERT OR REPLACE INTO point (id, x, y, pose, depose) VALUES (?, ?, ?, ?, ?)"#)
-                .bind(detail.point.id)
-                .bind(detail.point.x)
-                .bind(detail.point.y)
-                .bind(&detail.point.pose)
-                .bind(&detail.point.depose)
-                .execute(&mut *tx)
-                .await
-                .map_err(|e| {
-                    format!("Erreur INSERT/REPLACE point ID {} : {}", detail.point.id, e)
-                })?;
+            sqlx::query(
+                r#"INSERT OR REPLACE INTO point (id, x, y, pose, depose) VALUES (?, ?, ?, ?, ?)"#,
+            )
+            .bind(detail.point.id)
+            .bind(detail.point.x)
+            .bind(detail.point.y)
+            .bind(&detail.point.pose)
+            .bind(&detail.point.depose)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| format!("Erreur INSERT/REPLACE point ID {} : {}", detail.point.id, e))?;
             assigned_ids.push(detail.point.id as i64);
         }
     }
@@ -795,7 +795,7 @@ pub async fn update_point_dates(
     depose: Option<String>,
 ) -> Result<(), String> {
     let pool = get_db_pool(&app).await?;
-    
+
     sqlx::query("UPDATE point SET pose = ?, depose = ? WHERE id = ?")
         .bind(&pose)
         .bind(&depose)
@@ -803,8 +803,11 @@ pub async fn update_point_dates(
         .execute(&pool)
         .await
         .map_err(|e| format!("Failed to update point dates: {}", e))?;
-    
-    println!("[DB] ✅ Dates du point {} mises à jour: pose={:?}, depose={:?}", point_id, pose, depose);
+
+    println!(
+        "[DB] ✅ Dates du point {} mises à jour: pose={:?}, depose={:?}",
+        point_id, pose, depose
+    );
     Ok(())
 }
 

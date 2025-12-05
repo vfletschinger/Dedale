@@ -716,7 +716,7 @@ pub async fn seed_database(pool: &SqlitePool) -> Result<(), String> {
         let event_id = *event_ids
             .get(g.event_idx)
             .ok_or("Invalid event index for geometry")?;
-        
+
         sqlx::query("INSERT INTO geometry (event_id, geom) VALUES (?, ?)")
             .bind(event_id)
             .bind(g.geom)
