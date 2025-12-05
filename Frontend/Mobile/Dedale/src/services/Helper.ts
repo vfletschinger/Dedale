@@ -12,6 +12,14 @@ export const generateUUID = (): string => {
   });
 };
 
+/**
+ * Retourne une version courte de l'UUID pour l'affichage (8 premiers caractères)
+ */
+export const shortId = (id: string): string => {
+  if (!id) return '';
+  return id.substring(0, 8);
+};
+
 export const getUserLocation = async () => {
   let { status } = await Location.requestForegroundPermissionsAsync();
   if (status !== 'granted') {

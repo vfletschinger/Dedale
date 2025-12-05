@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import { View, Text, Pressable, Alert } from "react-native";
 import { useRoute, useNavigation } from "@react-navigation/native";
+import { shortId } from "../services/Helper";
 import MapView, {
   Marker,
   Polyline,
@@ -243,7 +244,7 @@ export default function RouteNavigation() {
             key={point.id}
             coordinate={{ latitude: point.y, longitude: point.x }}
             pinColor={index === currentPointIndex ? "#3b82f6" : "#9ca3af"}
-            title={`Point #${point.id}`}
+            title={`Point #${shortId(point.id)}`}
             description={
               index === currentPointIndex
                 ? "Point actuel"
@@ -277,7 +278,7 @@ export default function RouteNavigation() {
             Point {currentPointIndex + 1} / {points.length}
           </Text>
           <Text className="nav-point-name">
-            Point #{points[currentPointIndex].id}
+            Point #{shortId(points[currentPointIndex].id)}
           </Text>
         </View>
 

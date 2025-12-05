@@ -16,6 +16,7 @@ import {
   calculateDistance,
   getAddressFromCoords,
   getUserLocation,
+  shortId,
 } from "../services/Helper";
 import { deletePoint } from "../services/databaseAcces";
 import InterestPointCard from "../components/PointCard";
@@ -47,7 +48,7 @@ function ModalPointItem({
       className={selected ? "modal-select-item-active" : "modal-select-item"}
     >
       <View className="flex-1 mr-2">
-        <Text className="font-medium">Point #{item.id}</Text>
+        <Text className="font-medium">Point #{shortId(item.id)}</Text>
         <Text className="text-xs text-gray-500" numberOfLines={2}>
           {address}
         </Text>
@@ -66,7 +67,7 @@ export default function InterestPointsScreen() {
   const [sortBy, setSortBy] = useState<"recent" | "distance">("recent");
   const db = getDatabase();
   const { selectedEventId } = useEvent();
-  const { pointsByEvent, loading: pointsLoading } = usePoints();
+  const { pointsByEvent, loading: pointsLoading, refreshPoints } = usePoints();
 
   const [location, setLocation] = useState<{
     latitude: number;
@@ -113,10 +114,8 @@ export default function InterestPointsScreen() {
           onPress: () => {
             const success = deletePoint(pointId, db);
             if (success) {
-              Alert.alert(
-                "Succès",
-                "Point supprimé avec succès. Veuillez relancer l'application."
-              );
+              refreshPoints(); // Rafraîchir la liste des points
+              Alert.alert("Succès", "Point supprimé avec succès.");
             } else {
               Alert.alert("Erreur", "Impossible de supprimer le point");
             }
@@ -129,7 +128,7 @@ export default function InterestPointsScreen() {
   useEffect(() => {
     let sorted = [...listPoint];
     if (sortBy === "recent") {
-      sorted.sort((a, b) => b.id - a.id);
+      sorted.sort((a, b) => b.id.localeCompare(a.id));
     } else if (sortBy === "distance" && location) {
       sorted.sort((a, b) => {
         const distA = calculateDistance(

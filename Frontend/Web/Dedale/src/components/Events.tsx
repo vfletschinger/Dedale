@@ -76,21 +76,32 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
 
   // Écouter les événements de réception de points
   useEffect(() => {
-    const unlistenConnected = listen('mobile-connected', () => {
-      console.log('📱 Mobile connecté pour réception !');
-      setReceiveStatus('Mobile connecté ! En attente des données...');
-    });
+    let unlistenConnectedFn: (() => void) | null = null;
+    let unlistenPointsReceivedFn: (() => void) | null = null;
+    let isMounted = true;
 
-    const unlistenPointsReceived = listen<number>('points-received', (event) => {
-      console.log('📦 Points reçus:', event.payload);
-      setPointsReceived(prev => prev + event.payload);
-      setReceiveStatus(`${event.payload} point(s) reçu(s) !`);
-      loadEvents(); // Recharger les événements
-    });
+    const setupListeners = async () => {
+      unlistenConnectedFn = await listen('mobile-connected', () => {
+        if (!isMounted) return;
+        console.log('📱 Mobile connecté pour réception !');
+        setReceiveStatus('Mobile connecté ! En attente des données...');
+      });
+
+      unlistenPointsReceivedFn = await listen<number>('points-received', (event) => {
+        if (!isMounted) return;
+        console.log('📦 Points reçus:', event.payload);
+        setPointsReceived(event.payload); // Remplacer au lieu d'additionner
+        setReceiveStatus(`${event.payload} point(s) reçu(s) !`);
+        loadEvents(); // Recharger les événements
+      });
+    };
+
+    setupListeners();
 
     return () => {
-      unlistenConnected.then(fn => fn());
-      unlistenPointsReceived.then(fn => fn());
+      isMounted = false;
+      if (unlistenConnectedFn) unlistenConnectedFn();
+      if (unlistenPointsReceivedFn) unlistenPointsReceivedFn();
     };
   }, []);
 

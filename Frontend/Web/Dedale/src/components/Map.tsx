@@ -4,6 +4,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import MapboxDraw from "@mapbox/mapbox-gl-draw";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import PointDetails from "./PointDetails";
 import AddPointForm from "./AddPointForm";
 
@@ -483,6 +484,7 @@ function TimelineView({
 
 function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }) {
   const mapContainer = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<maplibregl.Map | null>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
   const drawRef = useRef<MapboxDraw | null>(null);
   const [query, setQuery] = useState("");
@@ -868,7 +870,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
 
     const mapInstance = new maplibregl.Map({
       container: mapContainer.current,
-      style: "http://localhost:8082/styles/basic-preview/style.json",
+      style: "http://localhost:8080/styles/basic-preview/style.json",
       center: [7.7635, 48.5465],
       zoom: 13,
     });
@@ -1087,6 +1089,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
 
     setCurrentMarker(initialMarker);
     setMap(mapInstance);
+    mapRef.current = mapInstance;
 
     return () => mapInstance.remove();
   }, []);
@@ -1253,6 +1256,56 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
       console.error("Erreur refresh points:", err);
     }
   };
+
+  // Écouter les mises à jour de points depuis le backend (ex: import mobile)
+  useEffect(() => {
+    const unlisten = listen<number>("points-updated", async (event) => {
+      console.log("📥 Points mis à jour, event_id:", event.payload);
+      
+      // Utiliser mapRef pour accéder à la carte
+      const currentMap = mapRef.current;
+      if (!currentMap) {
+        console.log("⚠️ Map non prête, skip refresh");
+        return;
+      }
+      
+      const currentEventId = selectedEventIdRef.current;
+      try {
+        const freshPoints = await invoke<any[]>("get_points", { eventId: currentEventId || null });
+        console.log(`📍 ${freshPoints.length} point(s) récupéré(s) après import`);
+        pointsRef.current = freshPoints;
+        setPoints(freshPoints);
+
+        // Mettre à jour la source GeoJSON
+        if (currentMap.getSource("db-points")) {
+          const geojson = {
+            type: "FeatureCollection",
+            features: freshPoints.map((p: any) => ({
+              type: "Feature",
+              geometry: {
+                type: "Point",
+                coordinates: [Number(p.x), Number(p.y)] as [number, number],
+              },
+              properties: {
+                id: p.id,
+                obstacles: p.obstacles,
+                comments: p.comments,
+                pictures: p.pictures,
+              },
+            })),
+          };
+          (currentMap.getSource("db-points") as maplibregl.GeoJSONSource).setData(geojson as any);
+          console.log("✅ Carte mise à jour avec les nouveaux points");
+        }
+      } catch (err) {
+        console.error("Erreur refresh points après import:", err);
+      }
+    });
+
+    return () => {
+      unlisten.then((f) => f());
+    };
+  }, []);
 
   // Gestion du clic pour ajouter un point
   const handleAddPointClick = () => {

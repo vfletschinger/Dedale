@@ -44,6 +44,12 @@ export const updatePointCoordinates = (pointId: string, x: number, y: number, db
 };
 
 export const deletePoint = (id: string, db: any) => {
+  // Supprimer les données liées d'abord
+  db.runSync('DELETE FROM comment WHERE point_id = ?', [id]);
+  db.runSync('DELETE FROM picture WHERE point_id = ?', [id]);
+  db.runSync('DELETE FROM obstacle WHERE point_id = ?', [id]);
+  db.runSync('DELETE FROM point_event WHERE point_id = ?', [id]);
+  // Puis supprimer le point
   const result = db.runSync('DELETE FROM point WHERE id = ?', [id]);
   return result;
 };

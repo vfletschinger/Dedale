@@ -382,6 +382,10 @@ async fn handle_websocket(
                             match insert_mobile_points(&app, event_id, mobile_export.points).await {
                                 Ok(_) => {
                                     println!("✅ Points insérés avec succès !");
+                                    // Émettre un événement pour notifier le frontend
+                                    if let Err(e) = app.emit("points-updated", event_id) {
+                                        eprintln!("⚠️ Erreur émission événement points-updated: {}", e);
+                                    }
                                 }
                                 Err(e) => {
                                     eprintln!("❌ Erreur d'insertion des points: {}", e);
