@@ -88,7 +88,7 @@ pub async fn create_pdf(app: AppHandle, event_id: Option<i64>) -> Result<(), Str
             let pct_x = (p.x - map.bounds.min_x) / width_geo;
             let pct_y = (map.bounds.max_y - p.y) / height_geo;
 
-            if pct_x >= 0.0 && pct_x <= 1.0 && pct_y >= 0.0 && pct_y <= 1.0 {
+            if (0.0..=1.0).contains(&pct_x) && (0.0..=1.0).contains(&pct_y) {
                 let dx_pct = (pct_x * 100.0) as i32;
                 let dy_pct = (pct_y * 100.0) as i32;
                 typst_src.push_str(&format!(

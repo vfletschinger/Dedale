@@ -659,6 +659,7 @@ pub async fn insert_obstacles(
 }
 
 // Récupère tous les points avec leurs obstacles
+#[allow(dead_code)]
 pub async fn retrieve_data(app: &AppHandle) -> Result<Vec<Point>, String> {
     retrieve_data_by_event(app, None).await
 }

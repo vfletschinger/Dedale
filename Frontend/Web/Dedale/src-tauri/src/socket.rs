@@ -35,6 +35,7 @@ struct TransferEvent {
 /// Structure pour un accusé de réception d'event du mobile
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 struct EventAck {
     id: i64,
     name: String,
@@ -73,6 +74,7 @@ struct MobileExport {
 
 /// Structure pour un point dans l'export mobile (format différent du desktop)
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct MobilePointDetail {
     id: String, // UUID
     x: f64,
@@ -112,6 +114,7 @@ struct MobileObstacle {
 /// Structure pour l'event dans l'export mobile
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 struct MobileExportEvent {
     id: i64,
     name: String,
