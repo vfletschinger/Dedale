@@ -5,7 +5,7 @@ import MapboxDraw from "@mapbox/mapbox-gl-draw";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import PointDetails from "./PointDetails";
+import PointDetails, { type Point } from "./PointDetails";
 import AddPointForm from "./AddPointForm";
 
 // Date initiale pour le calcul de la timeline (stable pour éviter les re-renders)
@@ -1327,10 +1327,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
                 </button>
                 <button
                   onClick={() => setViewMode("timeline")}
-                  className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${viewMode === "timeline"
-                      ? 'bg-white text-indigo-600 shadow-sm'
-                      : 'text-white/80 hover:text-white hover:bg-white/10'
-                    }`}
+                  className="flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-all text-white/80 hover:text-white hover:bg-white/10"
                 >
                   📅 Frise
                 </button>
@@ -1390,7 +1387,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
                     {event.event_type === 'Marathon' && '🏃‍♂️'}
                     {event.event_type === 'Cyclisme' && '🚴‍♂️'}
                     {event.event_type === 'Trail' && '🥾'}
-                    {!['Marathon', 'Cyclisme', 'Trail'].includes(event.event_type)}
+                    {event.event_type && !['Marathon', 'Cyclisme', 'Trail'].includes(event.event_type)}
                     {event.name || `Événement #${event.id}`}
                     {event.status === 'active' && ' 🟢'}
                     {event.status === 'planned' && ' 🔵'}
@@ -1612,10 +1609,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
             <div className="flex bg-white/20 rounded-lg p-1">
               <button
                 onClick={() => setViewMode("points")}
-                className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${viewMode === "points"
-                    ? 'bg-white text-indigo-600 shadow-sm'
-                    : 'text-white/80 hover:text-white hover:bg-white/10'
-                  }`}
+                className="px-3 py-1 rounded-md text-sm font-medium transition-all text-white/80 hover:text-white hover:bg-white/10"
               >
                 📋 Points
               </button>
@@ -1646,7 +1640,12 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
           <div className="flex-1 overflow-y-auto">
             {selectedPoint ? (
               <PointDetails
-                point={selectedPoint}
+                point={{
+                  ...selectedPoint,
+                  obstacles: (selectedPoint.obstacles || []).map(o => ({ ...o, id: o.id ?? 0 })),
+                  comments: (selectedPoint.comments || []).map(c => ({ ...c })),
+                  pictures: (selectedPoint.pictures || []).map(p => ({ ...p }))
+                } as Point}
                 onClose={() => setSelectedPoint(null)}
                 onRefresh={refreshPoints}
               />

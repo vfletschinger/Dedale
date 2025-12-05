@@ -5,6 +5,31 @@ export interface Event {
     geometry?: string;
 }
 
+// Type pour les inputs lors de la création/modification d'un événement
+export interface EventInput {
+    name?: string;
+    date_debut?: string;
+    date_fin?: string;
+    description?: string;
+    statut?: string;
+}
+
+// Type pour les géométries d'événement
+export interface GeometryType {
+    id: number;
+    name: string;
+    description?: string;
+    color?: string;
+}
+
+// Type pour les inputs lors de la création/modification d'une géométrie
+export interface EventGeometryInput {
+    event_id: number;
+    geometry_type_id: number;
+    geom: string;
+    style_properties?: string;
+}
+
 export const DEFAULT_GEOMETRY_TYPES: Event[] = [
     { id: 1, name: 'Zone de couverture', date: new Date(), geometry: '#4CAF50' },
     { id: 2, name: 'Tracé de course', date: new Date(), geometry: '#2196F3' },
