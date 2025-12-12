@@ -28,9 +28,11 @@ stages:
     - $WEB_PATH/node_modules/
   policy: pull-push
 
-# Job de qualité Rust 
+# Job de qualité Rust
 check_rust_quality:
   stage: quality
+  rules:
+    - if: $CI_COMMIT_BRANCH != "main"
   cache:
     - <<: *cache_cargo
   before_script:
@@ -47,10 +49,12 @@ check_rust_quality:
     expire_in: 1 week
   allow_failure: false
 
-# Job de lint frontend 
+# Job de lint frontend
 lint_frontend:
   stage: quality
   image: node:22-slim
+  rules:
+    - if: $CI_COMMIT_BRANCH != "main"
   cache:
     - <<: *cache_npm
   script:
@@ -70,7 +74,7 @@ lint_frontend:
 build_for_tests:
   stage: build
   rules:
-    - if: $CI_COMMIT_BRANCH == "web" || $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "web" || $CI_COMMIT_BRANCH == "develop"
   needs:
     - job: check_rust_quality
     - job: lint_frontend
@@ -87,7 +91,7 @@ build_for_tests:
     - npm ci --prefer-offline
     # Génère uniquement l'exécutable pour les tests
     - npm run tauri build -- --no-bundle --verbose
-    
+
   artifacts:
     paths:
       - $PROJECT_PATH/target/release/dedale
@@ -97,7 +101,7 @@ build_for_tests:
 test_e2e:
   stage: test
   rules:
-    - if: $CI_COMMIT_BRANCH == "web" || $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "web" || $CI_COMMIT_BRANCH == "develop"
   needs: ["build_for_tests"]
   cache:
     - key: "${CI_COMMIT_REF_SLUG}-webdriver"
@@ -131,7 +135,7 @@ build_app_windows:
   needs:
     - job: test_e2e
   cache:
-    # Cache séparé pour Windows 
+    # Cache séparé pour Windows
     - key: "${CI_COMMIT_REF_SLUG}-cargo-windows"
       paths:
         - .cargo/registry/
@@ -150,9 +154,9 @@ build_app_windows:
     - cd $WEB_PATH
     - export PATH="$CARGO_HOME/bin:$PATH"
     - npm ci --prefer-offline
-    
+
     - npm run tauri build -- --runner cargo-xwin --target x86_64-pc-windows-msvc --verbose
-    
+
   artifacts:
     paths:
       - $PROJECT_PATH/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe

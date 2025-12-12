@@ -1,10 +1,12 @@
-stages: 
+stages:
   - quality
 
 image: node:22-slim
 
 lint:
   stage: quality
+  rules:
+    - if: $CI_COMMIT_BRANCH != "main"
   before_script:
     - cd Frontend/Mobile/Dedale
     - npm install -g eas-cli
@@ -12,7 +14,7 @@ lint:
   script:
     - npx expo lint > mobile_lint.txt || true
   artifacts:
-    paths: 
+    paths:
       - Frontend/Mobile/Dedale/mobile_lint.txt
     expire_in: 1 week
     when: always
