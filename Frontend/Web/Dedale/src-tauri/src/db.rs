@@ -12,7 +12,7 @@ use std::str::FromStr;
 use tauri::{AppHandle, Manager};
 
 /// Génère un UUID v4
-fn generate_uuid() -> String {
+pub fn generate_uuid() -> String {
     let mut rng = rand::rng();
     let bytes: [u8; 16] = rng.random();
     format!(
@@ -25,6 +25,160 @@ fn generate_uuid() -> String {
     )
 }
 
+/// Valide le format d'un UUID
+pub fn is_valid_uuid(uuid: &str) -> bool {
+    let parts: Vec<&str> = uuid.split('-').collect();
+    if parts.len() != 5 {
+        return false;
+    }
+    let expected_lengths = [8, 4, 4, 4, 12];
+    for (part, expected_len) in parts.iter().zip(expected_lengths.iter()) {
+        if part.len() != *expected_len {
+            return false;
+        }
+        if !part.chars().all(|c| c.is_ascii_hexdigit()) {
+            return false;
+        }
+    }
+    true
+}
+
+/// Valide un nom d'utilisateur
+pub fn is_valid_username(username: &str) -> bool {
+    !username.is_empty()
+        && username.len() >= 3
+        && username.len() <= 50
+        && username
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+}
+
+/// Valide un rôle utilisateur
+pub fn is_valid_role(role: &str) -> bool {
+    matches!(role, "admin" | "user" | "guest" | "moderator")
+}
+
+/// Formate un statut d'événement
+pub fn format_event_status(statut: &str) -> &'static str {
+    match statut.to_lowercase().as_str() {
+        "actif" | "active" | "en_cours" => "En cours",
+        "termine" | "finished" | "completed" => "Terminé",
+        "annule" | "cancelled" | "canceled" => "Annulé",
+        "planifie" | "planned" | "scheduled" => "Planifié",
+        _ => "Inconnu",
+    }
+}
+
+/// Valide une coordonnée de point
+pub fn is_valid_point_coordinate(x: f64, y: f64) -> bool {
+    x.is_finite() && y.is_finite() && x >= -180.0 && x <= 180.0 && y >= -90.0 && y <= 90.0
+}
+
+/// Valide une date au format ISO
+pub fn is_valid_date_format(date: &str) -> bool {
+    // Format attendu: YYYY-MM-DD ou YYYY-MM-DDTHH:MM:SS
+    if date.len() < 10 {
+        return false;
+    }
+    let date_part = &date[..10];
+    let parts: Vec<&str> = date_part.split('-').collect();
+    if parts.len() != 3 {
+        return false;
+    }
+    let year: Result<i32, _> = parts[0].parse();
+    let month: Result<u32, _> = parts[1].parse();
+    let day: Result<u32, _> = parts[2].parse();
+
+    match (year, month, day) {
+        (Ok(y), Ok(m), Ok(d)) => y >= 1900 && y <= 2100 && m >= 1 && m <= 12 && d >= 1 && d <= 31,
+        _ => false,
+    }
+}
+
+/// Génère un hash de mot de passe sécurisé
+pub fn hash_password(password: &str) -> Result<String, String> {
+    hash(password, DEFAULT_COST).map_err(|e| format!("Hash error: {}", e))
+}
+
+/// Vérifie un mot de passe contre son hash
+pub fn verify_password(password: &str, hash: &str) -> bool {
+    verify(password, hash).unwrap_or(false)
+}
+
+/// Valide la longueur d'un mot de passe
+pub fn is_valid_password_length(password: &str) -> bool {
+    password.len() >= 8 && password.len() <= 128
+}
+
+/// Construit une requête SQL pour les placeholders
+pub fn build_sql_placeholders(count: usize) -> String {
+    if count == 0 {
+        return String::new();
+    }
+    vec!["?"; count].join(", ")
+}
+
+/// Construit une clause WHERE IN
+pub fn build_where_in_clause(field: &str, count: usize) -> String {
+    if count == 0 {
+        return format!("{} IN ()", field);
+    }
+    format!("{} IN ({})", field, build_sql_placeholders(count))
+}
+
+/// Valide un email basique
+pub fn is_valid_email(email: &str) -> bool {
+    let at_count = email.chars().filter(|c| *c == '@').count();
+    if at_count != 1 {
+        return false;
+    }
+    let parts: Vec<&str> = email.split('@').collect();
+    if parts.len() != 2 {
+        return false;
+    }
+    let local = parts[0];
+    let domain = parts[1];
+    !local.is_empty() && !domain.is_empty() && domain.contains('.')
+}
+
+/// Valide un numéro de téléphone
+pub fn is_valid_phone_number(phone: &str) -> bool {
+    let digits: String = phone.chars().filter(|c| c.is_ascii_digit()).collect();
+    digits.len() >= 10 && digits.len() <= 15
+}
+
+/// Sanitize une chaîne pour éviter les injections SQL basiques
+pub fn sanitize_string(input: &str) -> String {
+    input
+        .replace('"', "\"")
+        .replace('\'', "''")
+        .replace('\\', "\\\\")
+}
+
+/// Tronque une chaîne à une longueur maximale
+pub fn truncate_string(s: &str, max_len: usize) -> String {
+    if s.len() <= max_len {
+        s.to_string()
+    } else {
+        format!("{}...", &s[..max_len.saturating_sub(3)])
+    }
+}
+
+/// Calcule le nombre total d'obstacles pour une liste de points
+pub fn count_total_obstacles(points: &[Point]) -> usize {
+    points.iter().map(|p| p.obstacles.len()).sum()
+}
+
+/// Calcule le nombre total de commentaires pour une liste de points
+pub fn count_total_comments(points: &[Point]) -> usize {
+    points.iter().map(|p| p.comments.len()).sum()
+}
+
+/// Calcule le nombre total de photos pour une liste de points
+pub fn count_total_pictures(points: &[Point]) -> usize {
+    points.iter().map(|p| p.pictures.len()).sum()
+}
+
 #[derive(sqlx::FromRow, Debug, Serialize, Deserialize)]
 pub struct User {
     pub id: i64,
@@ -35,7 +189,7 @@ pub struct User {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Point {
-    pub id: String,  // UUID
+    pub id: String, // UUID
     pub x: f64,
     pub y: f64,
     #[serde(default)]
@@ -60,11 +214,11 @@ pub struct ObstacleType {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Obstacle {
-    pub id: String,  // UUID
+    pub id: String, // UUID
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     pub number: Option<i32>,
-    pub point_id: String,  // UUID reference
+    pub point_id: String, // UUID reference
     pub type_id: i64,
     pub description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -75,9 +229,9 @@ pub struct Obstacle {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PointSimple {
-    pub id: String,  // UUID
-    pub x: f64, // Coordonnée X (ou latitude)
-    pub y: f64, // Coordonnée Y (ou longitude)
+    pub id: String, // UUID
+    pub x: f64,     // Coordonnée X (ou latitude)
+    pub y: f64,     // Coordonnée Y (ou longitude)
     #[serde(default)]
     pub pose: Option<String>,
     #[serde(default)]
@@ -88,14 +242,14 @@ pub struct PointSimple {
 pub struct Comment {
     pub id: String,       // UUID
     pub point_id: String, // UUID reference
-    pub value: String, // Le texte du commentaire
+    pub value: String,    // Le texte du commentaire
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Picture {
     pub id: String,       // UUID
     pub point_id: String, // UUID reference
-    pub image: String, // Le chemin ou le contenu encodé de l'image (ex: base64, URL)
+    pub image: String,    // Le chemin ou le contenu encodé de l'image (ex: base64, URL)
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -395,9 +549,11 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
 
     if needs_uuid_migration {
         println!("[DB] 🔄 Migration UUID détectée comme nécessaire, exécution...");
-        
+
         // Recréer la table point avec id TEXT
-        let _ = sqlx::query("ALTER TABLE point RENAME TO point_old").execute(&pool).await;
+        let _ = sqlx::query("ALTER TABLE point RENAME TO point_old")
+            .execute(&pool)
+            .await;
         sqlx::query(
             "CREATE TABLE point (
                 id TEXT PRIMARY KEY,
@@ -405,39 +561,58 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
                 y REAL,
                 pose TEXT,
                 depose TEXT
-            )"
-        ).execute(&pool).await.map_err(|e| format!("Migration point: {}", e))?;
-        let _ = sqlx::query("INSERT INTO point SELECT CAST(id AS TEXT), x, y, pose, depose FROM point_old").execute(&pool).await;
+            )",
+        )
+        .execute(&pool)
+        .await
+        .map_err(|e| format!("Migration point: {}", e))?;
+        let _ = sqlx::query(
+            "INSERT INTO point SELECT CAST(id AS TEXT), x, y, pose, depose FROM point_old",
+        )
+        .execute(&pool)
+        .await;
         let _ = sqlx::query("DROP TABLE point_old").execute(&pool).await;
 
         // Recréer la table comment avec id TEXT et point_id TEXT
-        let _ = sqlx::query("ALTER TABLE comment RENAME TO comment_old").execute(&pool).await;
+        let _ = sqlx::query("ALTER TABLE comment RENAME TO comment_old")
+            .execute(&pool)
+            .await;
         sqlx::query(
             "CREATE TABLE comment (
                 id TEXT PRIMARY KEY,
                 point_id TEXT,
                 value TEXT,
                 FOREIGN KEY (point_id) REFERENCES point (id)
-            )"
-        ).execute(&pool).await.map_err(|e| format!("Migration comment: {}", e))?;
+            )",
+        )
+        .execute(&pool)
+        .await
+        .map_err(|e| format!("Migration comment: {}", e))?;
         let _ = sqlx::query("INSERT INTO comment SELECT CAST(id AS TEXT), CAST(point_id AS TEXT), value FROM comment_old").execute(&pool).await;
         let _ = sqlx::query("DROP TABLE comment_old").execute(&pool).await;
 
         // Recréer la table picture avec id TEXT et point_id TEXT
-        let _ = sqlx::query("ALTER TABLE picture RENAME TO picture_old").execute(&pool).await;
+        let _ = sqlx::query("ALTER TABLE picture RENAME TO picture_old")
+            .execute(&pool)
+            .await;
         sqlx::query(
             "CREATE TABLE picture (
                 id TEXT PRIMARY KEY,
                 point_id TEXT,
                 image TEXT,
                 FOREIGN KEY (point_id) REFERENCES point (id)
-            )"
-        ).execute(&pool).await.map_err(|e| format!("Migration picture: {}", e))?;
+            )",
+        )
+        .execute(&pool)
+        .await
+        .map_err(|e| format!("Migration picture: {}", e))?;
         let _ = sqlx::query("INSERT INTO picture SELECT CAST(id AS TEXT), CAST(point_id AS TEXT), image FROM picture_old").execute(&pool).await;
         let _ = sqlx::query("DROP TABLE picture_old").execute(&pool).await;
 
         // Recréer la table obstacle avec id TEXT et point_id TEXT
-        let _ = sqlx::query("ALTER TABLE obstacle RENAME TO obstacle_old").execute(&pool).await;
+        let _ = sqlx::query("ALTER TABLE obstacle RENAME TO obstacle_old")
+            .execute(&pool)
+            .await;
         sqlx::query(
             "CREATE TABLE obstacle (
                 id TEXT PRIMARY KEY,
@@ -447,13 +622,18 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
                 description TEXT,
                 FOREIGN KEY (point_id) REFERENCES point (id),
                 FOREIGN KEY (type_id) REFERENCES obstacle_type (id)
-            )"
-        ).execute(&pool).await.map_err(|e| format!("Migration obstacle: {}", e))?;
+            )",
+        )
+        .execute(&pool)
+        .await
+        .map_err(|e| format!("Migration obstacle: {}", e))?;
         let _ = sqlx::query("INSERT INTO obstacle SELECT CAST(id AS TEXT), CAST(point_id AS TEXT), type_id, number, description FROM obstacle_old").execute(&pool).await;
         let _ = sqlx::query("DROP TABLE obstacle_old").execute(&pool).await;
 
         // Recréer la table point_event avec point_id TEXT
-        let _ = sqlx::query("ALTER TABLE point_event RENAME TO point_event_old").execute(&pool).await;
+        let _ = sqlx::query("ALTER TABLE point_event RENAME TO point_event_old")
+            .execute(&pool)
+            .await;
         sqlx::query(
             "CREATE TABLE point_event (
                 id INTEGER PRIMARY KEY,
@@ -462,10 +642,15 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
                 FOREIGN KEY (point_id) REFERENCES point(id) ON DELETE CASCADE,
                 FOREIGN KEY (event_id) REFERENCES event(id) ON DELETE CASCADE,
                 UNIQUE(point_id, event_id)
-            )"
-        ).execute(&pool).await.map_err(|e| format!("Migration point_event: {}", e))?;
+            )",
+        )
+        .execute(&pool)
+        .await
+        .map_err(|e| format!("Migration point_event: {}", e))?;
         let _ = sqlx::query("INSERT INTO point_event SELECT id, CAST(point_id AS TEXT), event_id FROM point_event_old").execute(&pool).await;
-        let _ = sqlx::query("DROP TABLE point_event_old").execute(&pool).await;
+        let _ = sqlx::query("DROP TABLE point_event_old")
+            .execute(&pool)
+            .await;
 
         println!("[DB] ✅ Migration UUID terminée");
     }
@@ -717,7 +902,7 @@ pub async fn insert_point_details(
             // Utiliser l'ID fourni
             detail.point.id.clone()
         };
-        
+
         // Insérer le point
         sqlx::query(
             r#"INSERT OR REPLACE INTO point (id, x, y, pose, depose) VALUES (?, ?, ?, ?, ?)"#,
@@ -730,7 +915,7 @@ pub async fn insert_point_details(
         .execute(&mut *tx)
         .await
         .map_err(|e| format!("Erreur INSERT/REPLACE point ID {} : {}", point_id, e))?;
-        
+
         assigned_ids.push(point_id);
     }
     // ÉTAPE 2: Insérer les données liées (commentaires)
