@@ -70,52 +70,33 @@ lint_frontend:
     expire_in: 1 week
   allow_failure: false
 
-# --- JOB 2 : BUILD LINUX (uniquement pour les tests E2E) ---
-build_for_tests:
-  stage: build
+# --- JOB 2 & 3 : BUILD AND TEST E2E ---
+test_e2e:
+  stage: test
   rules:
     - if: $CI_COMMIT_BRANCH == "web" || $CI_COMMIT_BRANCH == "develop"
   needs:
     - job: check_rust_quality
     - job: lint_frontend
   cache:
-    - key: "${CI_COMMIT_REF_SLUG}-cargo-test"
-      paths:
-        - .cargo/registry/
-        - .cargo/git/
-        - $PROJECT_PATH/target/release/
-      policy: pull-push
     - <<: *cache_npm
-  script:
-    - cd $WEB_PATH
-    - npm ci --prefer-offline
-    # Génère uniquement l'exécutable pour les tests
-    - npm run tauri build -- --no-bundle --verbose
-
-  artifacts:
-    paths:
-      - $PROJECT_PATH/target/release/dedale
-    expire_in: 1 day
-
-# --- JOB 3 : TESTS WEBDRIVER (E2E) ---
-test_e2e:
-  stage: test
-  rules:
-    - if: $CI_COMMIT_BRANCH == "web" || $CI_COMMIT_BRANCH == "develop"
-  needs: ["build_for_tests"]
-  cache:
+    - <<: *cache_cargo
     - key: "${CI_COMMIT_REF_SLUG}-webdriver"
       paths:
         - $PROJECT_PATH/webdriver/webdriverio/node_modules/
       policy: pull-push
   script:
-    - cd $PROJECT_PATH
-    # Vérifier que tauri-driver est disponible
+    # Build for E2E tests
+    - cd $WEB_PATH
+    - npm ci --prefer-offline
+    - npm run tauri build -- --no-bundle --verbose
+
+    # Run E2E tests
+    - cd $CI_PROJECT_DIR/$PROJECT_PATH
     - which tauri-driver
     - cd webdriver/webdriverio
     - npm ci --prefer-offline
     - mkdir -p reports screenshots logs
-    # Lancement des tests WebdriverIO avec xvfb-run (serveur d'affichage virtuel)
     - xvfb-run -a -s "-screen 0 1920x1080x24" npm run test
 
   artifacts:
@@ -127,7 +108,41 @@ test_e2e:
     expire_in: 1 week
   allow_failure: false
 
-# --- JOB 4 : BUILD WINDOWS (cross-compilation depuis Linux) ---
+test_front:
+  stage: test
+  rules:
+    - if: $CI_COMMIT_BRANCH == "web" || $CI_COMMIT_BRANCH == "develop"
+  cache:
+    - <<: *cache_npm
+  script:
+    - cd $WEB_PATH
+    - npm ci --prefer-offline
+    - npm test -- --ci --reporters=default --reporters=jest-junit
+  artifacts:
+    when: always
+    paths:
+      - $PROJECT_PATH/reports/
+    expire_in: 1 week
+  allow_failure: false
+
+test_backend:
+  stage: test
+  rules:
+    - if: $CI_COMMIT_BRANCH == "web" || $CI_COMMIT_BRANCH == "develop"
+  cache:
+    - <<: *cache_cargo
+  script:
+    - cd $PROJECT_PATH
+    - mkdir -p reports
+    - cargo test --all --verbose 2>&1 | tee reports/cargoTest_report.txt
+  artifacts:
+    when: always
+    paths:
+      - $PROJECT_PATH/reports/
+    expire_in: 1 week
+  allow_failure: false
+
+# --- JOB 4 : BUILD WINDOWS ---
 build_app_windows:
   stage: release
   rules:
