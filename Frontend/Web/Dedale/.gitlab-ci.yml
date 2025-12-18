@@ -3,7 +3,7 @@ variables:
   WEB_PATH: "Frontend/Web/Dedale"
   CARGO_HOME: $CI_PROJECT_DIR/.cargo
   npm_config_cache: $CI_PROJECT_DIR/.npm
-  CI_IMAGE_FULL: "registry.gitlab.com/crs/t5-crs/dedale-ci"
+  CI_IMAGE_FULL: $CI_REGISTRY_IMAGE
 
 image: $CI_IMAGE_FULL:latest
 
