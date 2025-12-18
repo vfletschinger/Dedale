@@ -11,20 +11,25 @@ stages:
 build_ci_image:
   stage: build-image
   image: docker:latest
-  rules:
-    - changes:
-        - Frontend/Web/Dedale/Dockerfile
+  # rules:
+  #   - changes:
+  #       - Frontend/Web/Dedale/Dockerfile
   services:
     - name: docker:dind
       command: ["--tls=false"]
-
+  rules:
+    - changes:
+        - Frontend/Web/Dedale/Dockerfile
+      when: on_success
+    - when: manual
+      allow_failure: true
   variables:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
     DOCKER_DRIVER: overlay2
   before_script:
     - until docker info; do sleep 1; done
-    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin registry.gitlab.com
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin $CI_REGISTRY
   script:
     - docker build -t $CI_IMAGE_FULL:latest -t $CI_IMAGE_FULL:$CI_COMMIT_SHORT_SHA -f $WEB_PATH/Dockerfile .
     - docker push $CI_IMAGE_FULL:latest
