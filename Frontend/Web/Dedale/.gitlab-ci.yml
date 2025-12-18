@@ -1,4 +1,11 @@
-image: $CI_REGISTRY_IMAGE/dedale-ci:latest
+variables:
+  PROJECT_PATH: "Frontend/Web/Dedale/src-tauri"
+  WEB_PATH: "Frontend/Web/Dedale"
+  CARGO_HOME: $CI_PROJECT_DIR/.cargo
+  npm_config_cache: $CI_PROJECT_DIR/.npm
+  CI_IMAGE_FULL: "registry.gitlab.com/crs/t5-crs/dedale-ci"
+
+image: $CI_IMAGE_FULL:latest
 
 stages:
   - build-image
@@ -11,18 +18,12 @@ stages:
 build_ci_image:
   stage: build-image
   image: docker:latest
-  # rules:
-  #   - changes:
-  #       - Frontend/Web/Dedale/Dockerfile
   services:
     - name: docker:dind
       command: ["--tls=false"]
-  rules:
-    - changes:
-        - Frontend/Web/Dedale/Dockerfile
-      when: on_success
-    - when: manual
-      allow_failure: true
+  # rules:
+  #   - changes:
+  #       - Frontend/Web/Dedale/Dockerfile
   variables:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
@@ -31,15 +32,10 @@ build_ci_image:
     - until docker info; do sleep 1; done
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin $CI_REGISTRY
   script:
+    - echo "Building image $CI_IMAGE_FULL:latest"
     - docker build -t $CI_IMAGE_FULL:latest -t $CI_IMAGE_FULL:$CI_COMMIT_SHORT_SHA -f $WEB_PATH/Dockerfile .
     - docker push $CI_IMAGE_FULL:latest
     - docker push $CI_IMAGE_FULL:$CI_COMMIT_SHORT_SHA
-
-variables:
-  PROJECT_PATH: "Frontend/Web/Dedale/src-tauri"
-  WEB_PATH: "Frontend/Web/Dedale"
-  CARGO_HOME: $CI_PROJECT_DIR/.cargo
-  npm_config_cache: $CI_PROJECT_DIR/.npm
 
 .cache_cargo: &cache_cargo
   key: "${CI_COMMIT_REF_SLUG}-cargo"
