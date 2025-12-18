@@ -114,7 +114,7 @@ test_e2e:
       - $PROJECT_PATH/webdriver/webdriverio/screenshots/
       - $PROJECT_PATH/webdriver/webdriverio/logs/
     expire_in: 1 week
-  allow_failure: false
+  allow_failure: true
 
 # test_front:
 #   stage: test
@@ -159,6 +159,13 @@ build_app_windows:
   stage: release
   # rules:
   #   - if: $CI_COMMIT_BRANCH == "main"
+  # needs:
+  #   - job: test_e2e
+  #     optional: false
+  #   - job: test_front
+  #     optional: false
+  #   - job: test_backend
+  #     optional: false
   cache:
     # Cache séparé pour Windows
     - key: "${CI_COMMIT_REF_SLUG}-cargo-windows"

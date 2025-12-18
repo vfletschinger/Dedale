@@ -3,7 +3,7 @@ describe("Dedale Application", () => {
   // HOOK DE CONFIGURATION - Gestion du premier lancement
   // ============================================
 
-  beforeAll(async () => {
+  before(async () => {
     // Attendre que l'app se charge
     await browser.pause(3000);
 
