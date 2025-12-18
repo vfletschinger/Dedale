@@ -11,6 +11,7 @@ stages:
   - build
   - test
   - release
+  - deploy
 
 .cache_cargo: &cache_cargo
   key: "${CI_COMMIT_REF_SLUG}-cargo"
@@ -210,7 +211,7 @@ upload_package:
 
 # --- GITLAB RELEASE ---
 release_windows:
-  stage: release
+  stage: deploy
   image: registry.gitlab.com/gitlab-org/release-cli:latest
   # rules:
   #   - if: $CI_COMMIT_BRANCH == "main"
