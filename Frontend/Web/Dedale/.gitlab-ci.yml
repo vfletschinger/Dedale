@@ -1,17 +1,31 @@
-image: ivangabriele/tauri:debian-bookworm-22
+image: $CI_REGISTRY_IMAGE/dedale-ci:latest
+
+stages:
+  - build-image
+  - quality
+  - test
+  - release
+  - deploy
+
+# build l'image custom
+build_ci_image:
+  stage: build-image
+  image: docker:latest
+  services:
+    - docker:dind
+  rules:
+    - changes:
+        - Frontend/Web/Dedale/Dockerfile
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker build -t $CI_REGISTRY_IMAGE/dedale-ci:latest -f Frontend/Web/Dedale/Dockerfile .
+    - docker push $CI_REGISTRY_IMAGE/dedale-ci:latest
 
 variables:
   PROJECT_PATH: "Frontend/Web/Dedale/src-tauri"
   WEB_PATH: "Frontend/Web/Dedale"
   CARGO_HOME: $CI_PROJECT_DIR/.cargo
   npm_config_cache: $CI_PROJECT_DIR/.npm
-
-stages:
-  - quality
-  - build
-  - test
-  - release
-  - deploy
 
 .cache_cargo: &cache_cargo
   key: "${CI_COMMIT_REF_SLUG}-cargo"
@@ -57,7 +71,6 @@ check_rust_quality:
 # Job de lint frontend
 lint_frontend:
   stage: quality
-  image: node:22-slim
   rules:
     - if: $CI_COMMIT_BRANCH != "main"
   cache:
@@ -175,16 +188,8 @@ build_app_windows:
         - .cargo/git/db/
       policy: pull-push
     - <<: *cache_npm
-  before_script:
-    - apt-get update -qq && apt-get install -y --no-install-recommends nsis
-    - apt-get install -y --no-install-recommends lld llvm clang
-    - rustup target add x86_64-pc-windows-msvc
-    - cargo install --locked cargo-xwin
-    # Ajouter le chemin de cargo-xwin au PATH
-    - export PATH="$CARGO_HOME/bin:$PATH"
   script:
     - cd $WEB_PATH
-    - export PATH="$CARGO_HOME/bin:$PATH"
     - npm ci --prefer-offline
 
     - npm run tauri build -- --runner cargo-xwin --target x86_64-pc-windows-msvc --verbose
@@ -239,10 +244,13 @@ release_windows:
       **Date:** $CI_COMMIT_TIMESTAMP
 
       ### Téléchargement
-      Téléchargez l'installateur Windows ci-dessous.
+      Téléchargez l'installateur Windows ci-dessus.
 
       ### Configuration requise
       - Windows 10/11 (64-bit)
+
+      ### 📝 Dernières modifications
+          $CI_COMMIT_TITLE
 
     assets:
       links:
