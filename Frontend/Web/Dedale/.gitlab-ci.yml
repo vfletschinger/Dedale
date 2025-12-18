@@ -3,9 +3,8 @@ variables:
   WEB_PATH: "Frontend/Web/Dedale"
   CARGO_HOME: $CI_PROJECT_DIR/.cargo
   npm_config_cache: $CI_PROJECT_DIR/.npm
-  CI_IMAGE_FULL: $CI_REGISTRY_IMAGE
 
-image: $CI_IMAGE_FULL:latest
+image: $CI_REGISTRY_IMAGE:latest
 
 stages:
   - build-image
@@ -32,10 +31,10 @@ build_ci_image:
     - until docker info; do sleep 1; done
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin $CI_REGISTRY
   script:
-    - echo "Building image $CI_IMAGE_FULL:latest"
-    - docker build -t $CI_IMAGE_FULL:latest -t $CI_IMAGE_FULL:$CI_COMMIT_SHORT_SHA -f $WEB_PATH/Dockerfile .
-    - docker push $CI_IMAGE_FULL:latest
-    - docker push $CI_IMAGE_FULL:$CI_COMMIT_SHORT_SHA
+    - echo "Building image $CI_REGISTRY_IMAGE:latest"
+    - docker build -t $CI_REGISTRY_IMAGE:latest -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA -f $WEB_PATH/Dockerfile .
+    - docker push $CI_REGISTRY_IMAGE:latest
+    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
 
 .cache_cargo: &cache_cargo
   key: "${CI_COMMIT_REF_SLUG}-cargo"
