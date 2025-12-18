@@ -1,10 +1,13 @@
-stages: 
+stages:
   - quality
+  - test
 
 image: node:22-slim
 
 lint:
   stage: quality
+  rules:
+    - if: $CI_COMMIT_BRANCH != "main"
   before_script:
     - cd Frontend/Mobile/Dedale
     - npm install -g eas-cli
@@ -12,8 +15,24 @@ lint:
   script:
     - npx expo lint > mobile_lint.txt || true
   artifacts:
-    paths: 
+    paths:
       - Frontend/Mobile/Dedale/mobile_lint.txt
     expire_in: 1 week
     when: always
-  allow_failure: true
+  allow_failure: false
+
+test:
+  stage: test
+  rules:
+    - if: $CI_COMMIT_BRANCH != "dev_mobile" || $CI_COMMIT_BRANCH != "develop"
+  before_script:
+    - cd Frontend/Mobile/Dedale
+    - npm install -ci
+  script:
+    - npm test -- --ci --reporters=default --reporters=jest-junit
+  artifacts:
+    paths:
+      - Frontend/Mobile/Dedale/junit.xml
+    expire_in: 1 week
+    when: always
+  allow_failure: false

@@ -1,29 +1,28 @@
-# Use a specific version of Node.js for reproducibility
-FROM node:20-slim
+FROM ivangabriele/tauri:debian-bookworm-22
 
-# Set environment variables for non-interactive frontend installation
+LABEL maintainer="CRS T5 Team"
+LABEL description="Image CI pour Dedale"
+
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install dependencies for Tauri
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    curl \
-    wget \
-    file \
-    libssl-dev \
-    libgtk-3-dev \
-    libwebkit2gtk-4.1-dev \
-    libjavascriptcoregtk-4.1-dev \
-    libayatana-appindicator3-dev \
-    librsvg2-dev \
-    # Clean up apt cache to reduce image size
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Cross-compilation Windows
+    nsis \
+    lld \
+    llvm \
+    clang \
+    # Tests E2E headless
+    xvfb \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Rust
-ENV RUSTUP_HOME=/usr/local/rustup \
-    CARGO_HOME=/usr/local/cargo \
-    PATH=/usr/local/cargo/bin:$PATH
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+RUN rustup component add rustfmt clippy \
+    && rustup target add x86_64-pc-windows-msvc \
+    && cargo install --locked cargo-xwin
 
-# Set the working directory
-WORKDIR /app
+RUN echo "=== Vérification ===" && \
+    node --version && \
+    rustc --version && \
+    cargo clippy --version && \
+    which cargo-xwin && \
+    makensis -VERSION && \
+    echo "=== OK ==="
