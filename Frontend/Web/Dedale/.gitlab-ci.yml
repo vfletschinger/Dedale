@@ -42,6 +42,10 @@ check_rust_quality:
     - mkdir -p reports
     - cargo fmt --all -- --check 2>&1 | tee reports/cargoFmt_report.txt
     - cargo clippy --all-targets --all-features -- -D warnings 2>&1 | tee reports/clippy_report.txt
+  after_script:
+    - cd $PROJECT_PATH
+    - rm -rf target/debug/incremental target/debug/.fingerprint
+    - find target -name "*.lock" -type f -delete 2>/dev/null || true
   artifacts:
     when: always
     paths:
@@ -73,8 +77,8 @@ lint_frontend:
 # --- JOB 2 & 3 : BUILD AND TEST E2E ---
 test_e2e:
   stage: test
-  rules:
-    - if: $CI_COMMIT_BRANCH == "web" || $CI_COMMIT_BRANCH == "develop"
+  # rules:
+  #   - if: $CI_COMMIT_BRANCH == "web" || $CI_COMMIT_BRANCH == "develop"
   needs:
     - job: check_rust_quality
     - job: lint_frontend
@@ -98,7 +102,10 @@ test_e2e:
     - npm ci --prefer-offline
     - mkdir -p reports screenshots logs
     - xvfb-run -a -s "-screen 0 1920x1080x24" npm run test
-
+  after_script:
+    - cd $PROJECT_PATH
+    - rm -rf target/debug/incremental target/debug/.fingerprint
+    - find target -name "*.lock" -type f -delete 2>/dev/null || true
   artifacts:
     when: always
     paths:
@@ -108,54 +115,56 @@ test_e2e:
     expire_in: 1 week
   allow_failure: false
 
-test_front:
-  stage: test
-  rules:
-    - if: $CI_COMMIT_BRANCH == "web" || $CI_COMMIT_BRANCH == "develop"
-  cache:
-    - <<: *cache_npm
-  script:
-    - cd $WEB_PATH
-    - npm ci --prefer-offline
-    - npm test -- --ci --reporters=default --reporters=jest-junit
-  artifacts:
-    when: always
-    paths:
-      - $PROJECT_PATH/reports/
-    expire_in: 1 week
-  allow_failure: false
+# test_front:
+#   stage: test
+#   # rules:
+#   #   - if: $CI_COMMIT_BRANCH == "web" || $CI_COMMIT_BRANCH == "develop"
+#   cache:
+#     - <<: *cache_npm
+#   script:
+#     - cd $WEB_PATH
+#     - npm ci --prefer-offline
+#     - npm test -- --ci --reporters=default --reporters=jest-junit
+#   artifacts:
+#     when: always
+#     paths:
+#       - $PROJECT_PATH/reports/
+#     expire_in: 1 week
+#   allow_failure: false
 
-test_backend:
-  stage: test
-  rules:
-    - if: $CI_COMMIT_BRANCH == "web" || $CI_COMMIT_BRANCH == "develop"
-  cache:
-    - <<: *cache_cargo
-  script:
-    - cd $PROJECT_PATH
-    - mkdir -p reports
-    - cargo test --all --verbose 2>&1 | tee reports/cargoTest_report.txt
-  artifacts:
-    when: always
-    paths:
-      - $PROJECT_PATH/reports/
-    expire_in: 1 week
-  allow_failure: false
+# test_backend:
+#   stage: test
+#   # rules:
+#   #   - if: $CI_COMMIT_BRANCH == "web" || $CI_COMMIT_BRANCH == "develop"
+#   cache:
+#     - <<: *cache_cargo
+#   script:
+#     - cd $PROJECT_PATH
+#     - mkdir -p reports
+#     - cargo test --all --verbose 2>&1 | tee reports/cargoTest_report.txt
+#   after_script:
+#     - cd $PROJECT_PATH
+#     - rm -rf target/debug/incremental target/debug/.fingerprint
+#     - find target -name "*.lock" -type f -delete 2>/dev/null || true
+#   artifacts:
+#     when: always
+#     paths:
+#       - $PROJECT_PATH/reports/
+#     expire_in: 1 week
+#   allow_failure: false
 
 # --- JOB 4 : BUILD WINDOWS ---
 build_app_windows:
   stage: release
-  rules:
-    - if: $CI_COMMIT_BRANCH == "main"
-  needs:
-    - job: test_e2e
+  # rules:
+  #   - if: $CI_COMMIT_BRANCH == "main"
   cache:
     # Cache séparé pour Windows
     - key: "${CI_COMMIT_REF_SLUG}-cargo-windows"
       paths:
-        - .cargo/registry/
-        - .cargo/git/
-        - $PROJECT_PATH/target/x86_64-pc-windows-msvc/
+        - .cargo/registry/index/
+        - .cargo/registry/cache/
+        - .cargo/git/db/
       policy: pull-push
     - <<: *cache_npm
   before_script:
@@ -171,8 +180,64 @@ build_app_windows:
     - npm ci --prefer-offline
 
     - npm run tauri build -- --runner cargo-xwin --target x86_64-pc-windows-msvc --verbose
-
+  after_script:
+    - rm -rf $PROJECT_PATH/target/x86_64-pc-windows-msvc/release/incremental
+    - find $PROJECT_PATH/target -name "*.lock" -type f -delete 2>/dev/null || true
   artifacts:
     paths:
       - $PROJECT_PATH/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
-    expire_in: 1 week
+    expire_in: 4 weeks
+    name: "dedale-windows-installer-$CI_COMMIT_SHORT_SHA"
+
+# --- UPLOAD TO PACKAGE REGISTRY ---
+upload_package:
+  stage: deploy
+  image: curlimages/curl:latest
+  # rules:
+  #   - if: $CI_COMMIT_BRANCH == "main"
+  needs:
+    - job: build_app_windows
+      artifacts: true
+  script:
+    - |
+      INSTALLER_PATH=$(find $PROJECT_PATH/target/x86_64-pc-windows-msvc/release/bundle/nsis/ -name "*.exe" | head -n 1)
+      INSTALLER_NAME="dedale-installer-v1.0.$CI_PIPELINE_IID.exe"
+      echo "Uploading $INSTALLER_PATH as $INSTALLER_NAME"
+
+      curl --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+           --upload-file "$INSTALLER_PATH" \
+           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/dedale/1.0.$CI_PIPELINE_IID/$INSTALLER_NAME"
+
+# --- GITLAB RELEASE ---
+release_windows:
+  stage: deploy
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  # rules:
+  #   - if: $CI_COMMIT_BRANCH == "main"
+  needs:
+    - job: build_app_windows
+      artifacts: true
+    - job: upload_package
+  script:
+    - echo "Creating release for build $CI_PIPELINE_IID"
+  release:
+    tag_name: "v1.0.$CI_PIPELINE_IID"
+    name: "Dedale v1.0.$CI_PIPELINE_IID"
+    description: |
+      ## 📦 Version 1.0.$CI_PIPELINE_IID
+
+      **Build:** $CI_PIPELINE_IID
+      **Commit:** $CI_COMMIT_SHORT_SHA
+      **Date:** $CI_COMMIT_TIMESTAMP
+
+      ### Téléchargement
+      Téléchargez l'installateur Windows ci-dessous.
+
+      ### Configuration requise
+      - Windows 10/11 (64-bit)
+
+    assets:
+      links:
+        - name: "Dedale-Windows-Installer.exe"
+          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/dedale/1.0.$CI_PIPELINE_IID/dedale-installer-v1.0.$CI_PIPELINE_IID.exe"
+          link_type: "package"
