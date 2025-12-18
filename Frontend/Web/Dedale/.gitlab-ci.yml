@@ -11,11 +11,17 @@ stages:
 build_ci_image:
   stage: build-image
   image: docker:latest
-  services:
-    - docker:dind
   rules:
     - changes:
         - Frontend/Web/Dedale/Dockerfile
+  services:
+    - name: docker:dind
+      command: ["--tls=false"]
+
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+    DOCKER_DRIVER: overlay2
   script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - docker build -t $CI_REGISTRY_IMAGE/dedale-ci:latest -f Frontend/Web/Dedale/Dockerfile .
