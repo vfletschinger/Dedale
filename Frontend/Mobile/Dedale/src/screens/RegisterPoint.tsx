@@ -131,19 +131,12 @@ export default function RegisterPointScreen() {
     try {
       // Générer un UUID pour le point
       const pointId = generateUUID();
-      
-      db.runSync(
-        "INSERT INTO point (id, x, y) VALUES (?, ?, ?)",
-        [pointId, x, y]
-      );
 
-      // Associate point with current event via junction table
-      if (selectedEventId) {
-        db.runSync(
-          "INSERT INTO point_event (point_id, event_id) VALUES (?, ?)",
-          [pointId, selectedEventId]
-        );
-      }
+      // Insérer le point avec event_id direct et le commentaire
+      db.runSync(
+        "INSERT INTO point (id, event_id, x, y, comment) VALUES (?, ?, ?, ?, ?)",
+        [pointId, selectedEventId, x, y, commentValue.trim() || null]
+      );
 
       // Sauvegarder les images
       if (selectedImages.length > 0) {
@@ -165,33 +158,23 @@ export default function RegisterPointScreen() {
         }
       }
 
-      // Sauvegarder le commentaire
-      if (commentValue.trim()) {
-        const commentId = generateUUID();
-        db.runSync("INSERT INTO comment (id, point_id, value) VALUES (?, ?, ?)", [
-          commentId,
-          pointId,
-          commentValue,
-        ]);
-      }
-
-      // Sauvegarder les obstacles
+      // Sauvegarder les équipements (anciennement obstacles)
       if (selectedObstacles.length > 0) {
         for (const obstacle of selectedObstacles) {
           try {
-            const obstacleId = generateUUID();
+            const equipementId = generateUUID();
             db.runSync(
-              "INSERT INTO obstacle (id, point_id, type_id, number) VALUES (?, ?, ?, ?)",
-              [obstacleId, pointId, obstacle.type_id, obstacle.number]
+              "INSERT INTO equipement (id, point_id, type_id, quantity) VALUES (?, ?, ?, ?)",
+              [equipementId, pointId, obstacle.type_id, obstacle.number]
             );
-          } catch (obstErr) {
+          } catch (equipErr) {
             console.error(
-              "Erreur lors de la sauvegarde de l'obstacle:",
-              obstErr
+              "Erreur lors de la sauvegarde de l'équipement:",
+              equipErr
             );
             Alert.alert(
               "Attention",
-              `Le point a été enregistré mais un obstacle n'a pas pu être ajouté.`
+              `Le point a été enregistré mais un équipement n'a pas pu être ajouté.`
             );
           }
         }
