@@ -4,6 +4,7 @@ stages:
 
 print_mr_link:
   stage: info
+  image: alpine:latest
   script:
     - |
       if [[ "$CI_COMMIT_BRANCH" == feature/* ]]; then
