@@ -13,6 +13,7 @@ type Event = {
     statut: string;
 };
 
+
 type TransferPhase = 'idle' | 'qr_displayed' | 'connected';
 
 function Data() {
