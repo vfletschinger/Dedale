@@ -1,6 +1,25 @@
 import * as Location from 'expo-location';
 import { Alert } from 'react-native';
 
+/**
+ * Génère un UUID v4
+ */
+export const generateUUID = (): string => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
+/**
+ * Retourne une version courte de l'UUID pour l'affichage (8 premiers caractères)
+ */
+export const shortId = (id: string): string => {
+  if (!id) return '';
+  return id.substring(0, 8);
+};
+
 export const getUserLocation = async () => {
   let { status } = await Location.requestForegroundPermissionsAsync();
   if (status !== 'granted') {

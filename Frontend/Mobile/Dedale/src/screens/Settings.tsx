@@ -10,33 +10,31 @@ import {
 } from "react-native";
 import CustomButton from "../components/CustomButton";
 import QRCodeScanner from "../components/QrCodeScanner";
-import { Feather } from "@expo/vector-icons";
+import Feather from "@expo/vector-icons/Feather";
 import { useEvent, EventWithStatus } from "../context/EventContext";
 import { useWebSocket } from "../context/WebSocketContext";
-import { getDatabase } from "../../assets/migrations";
+import { useNavigation } from "@react-navigation/native";
+import getDatabase from "../../assets/migrations";
+import EventItem from "../components/EventItem";
 import {
   InterestPointsType,
-  CommentType,
   PictureType,
-  ObstacleType,
+  EquipementType,
 } from "../types/database";
-import EventItem from "../components/EventItem";
-import { WebSocketResponse } from "../components/WebSocketClient";
 
-// Type pour l'export complet d'un événement avec ses données liées
 type PointWithDetails = InterestPointsType & {
-  comments: CommentType[];
   pictures: PictureType[];
-  obstacles: ObstacleType[];
+  equipements: EquipementType[];
 };
 
 type EventExportData = {
-  event: EventWithStatus;
+  event: any;
   points: PointWithDetails[];
 };
 
 export default function SettingsScreen() {
   const [scanQR, setScanQR] = useState(false);
+  const [scanMode, setScanMode] = useState<"receive" | "send">("receive");
   const [isEventListExpanded, setIsEventListExpanded] = useState(false);
   const {
     selectedEventId,
@@ -47,6 +45,7 @@ export default function SettingsScreen() {
   } = useEvent();
   const { isConnected, sendEvent } = useWebSocket();
   const db = getDatabase();
+  const navigation = useNavigation<any>();
 
   const selectedEvent = getSelectedEvent();
 
@@ -54,38 +53,16 @@ export default function SettingsScreen() {
     setSelectedEventId(event.id);
   };
 
-  const deleteEventLocally = (eventId: number) => {
+  const deleteEventLocally = (eventId: string) => {
     try {
-      // Récupérer tous les points liés à cet événement
-      const pointIds = db.getAllSync<{ point_id: number }>(
-        "SELECT point_id FROM point_event WHERE event_id = ?",
-        [eventId]
-      );
+      // Supprimer les parcours et zones liés à l'événement
+      db.runSync("DELETE FROM parcours WHERE event_id = ?", [eventId]);
+      db.runSync("DELETE FROM zone WHERE event_id = ?", [eventId]);
 
-      // Pour chaque point, supprimer ses données associées
-      for (const { point_id } of pointIds) {
-        // Vérifier si le point n'est pas lié à d'autres événements
-        const otherLinks = db.getFirstSync<{ count: number }>(
-          "SELECT COUNT(*) as count FROM point_event WHERE point_id = ? AND event_id != ?",
-          [point_id, eventId]
-        );
+      // Les points, équipements et pictures seront supprimés par CASCADE
+      db.runSync("DELETE FROM point WHERE event_id = ?", [eventId]);
 
-        // Si le point n'est lié à aucun autre événement, supprimer ses données
-        if (!otherLinks || otherLinks.count === 0) {
-          db.runSync("DELETE FROM comment WHERE point_id = ?", [point_id]);
-          db.runSync("DELETE FROM picture WHERE point_id = ?", [point_id]);
-          db.runSync("DELETE FROM obstacle WHERE point_id = ?", [point_id]);
-          db.runSync("DELETE FROM point WHERE id = ?", [point_id]);
-        }
-      }
-
-      // Supprimer les géométries liées à l'événement
-      db.runSync("DELETE FROM geometry WHERE event_id = ?", [eventId]);
-
-      // Delete the many-to-many relationship (point_event)
-      db.runSync("DELETE FROM point_event WHERE event_id = ?", [eventId]);
-
-      // Delete the event itself
+      // Supprimer l'événement lui-même
       db.runSync("DELETE FROM event WHERE id = ?", [eventId]);
 
       console.log(
@@ -105,7 +82,7 @@ export default function SettingsScreen() {
     }
   };
 
-  const getEventExportData = (eventId: number): EventExportData | null => {
+  const getEventExportData = (eventId: string): EventExportData | null => {
     try {
       // Utiliser l'événement du contexte (déjà avec le statut calculé)
       const event = events.find((e) => e.id === eventId);
@@ -113,33 +90,25 @@ export default function SettingsScreen() {
 
       // Récupérer les points liés à l'événement
       const points = db.getAllSync<InterestPointsType>(
-        `SELECT p.id, p.x, p.y, pe.event_id 
-         FROM point p 
-         INNER JOIN point_event pe ON p.id = pe.point_id 
-         WHERE pe.event_id = ?`,
+        `SELECT p.* FROM point p WHERE p.event_id = ?`,
         [eventId]
       );
 
-      // Pour chaque point, récupérer ses commentaires, photos et obstacles
+      // Pour chaque point, récupérer ses photos et équipements
       const pointsWithDetails: PointWithDetails[] = points.map((point) => {
-        const comments = db.getAllSync<CommentType>(
-          "SELECT * FROM comment WHERE point_id = ?",
-          [point.id]
-        );
         const pictures = db.getAllSync<PictureType>(
           "SELECT * FROM picture WHERE point_id = ?",
           [point.id]
         );
-        const obstacles = db.getAllSync<ObstacleType>(
-          "SELECT * FROM obstacle WHERE point_id = ?",
+        const equipements = db.getAllSync<EquipementType>(
+          "SELECT * FROM equipement WHERE point_id = ?",
           [point.id]
         );
 
         return {
           ...point,
-          comments,
           pictures,
-          obstacles,
+          equipements,
         };
       });
 
@@ -274,7 +243,18 @@ export default function SettingsScreen() {
       </View>
 
       {scanQR ? (
-        <QRCodeScanner setScanQR={setScanQR} />
+        <QRCodeScanner
+          setScanQR={setScanQR}
+          mode={scanMode}
+          eventToSend={scanMode === "send" ? selectedEvent : undefined}
+          onExportSuccess={() => {
+            if (selectedEvent) {
+              deleteEventLocally(selectedEvent.id);
+            }
+            setScanQR(false);
+            setScanMode("receive");
+          }}
+        />
       ) : (
         <View className="flex-1 p-5">
           {/* Section Événement actuel */}
@@ -356,27 +336,42 @@ export default function SettingsScreen() {
               Data Synchronization
             </Text>
 
-            {!isConnected ? (
-              <>
-                <Text className="text-sm text-gray-600 text-center mb-6">
-                  Scan QR code to connect desktop application
-                </Text>
-                <CustomButton
-                  onPress={() => setScanQR(true)}
-                  title="Scan QR Code"
-                />
-              </>
-            ) : (
-              <>
-                <Text className="text-sm text-green-600 text-center mb-6">
-                  ✓ Connecté à l&apos;application de bureau
-                </Text>
-                <CustomButton
-                  onPress={handleExportEvent}
-                  title="Exporter l'événement vers l'application de bureau"
-                  disabled={!selectedEvent}
-                />
-              </>
+            <Text className="text-sm text-gray-600 text-center mb-4">
+              Scannez un QR code pour recevoir ou envoyer des données
+            </Text>
+
+            <View className="w-full gap-3">
+              {/* Bouton pour recevoir (scan QR du desktop) */}
+              <CustomButton
+                onPress={() => {
+                  setScanMode("receive");
+                  setScanQR(true);
+                }}
+                title="📥 Recevoir des événements"
+              />
+
+              {/* Bouton pour envoyer (scan QR du desktop) */}
+              <CustomButton
+                onPress={() => {
+                  if (!selectedEvent) {
+                    Alert.alert(
+                      "Aucun événement sélectionné",
+                      "Veuillez sélectionner un événement à exporter."
+                    );
+                    return;
+                  }
+                  setScanMode("send");
+                  setScanQR(true);
+                }}
+                title="📤 Envoyer l'événement au bureau"
+                disabled={!selectedEvent}
+              />
+            </View>
+
+            {isConnected && (
+              <Text className="text-sm text-green-600 text-center mt-4">
+                ✓ Connecté à l'application de bureau
+              </Text>
             )}
           </View>
         </View>

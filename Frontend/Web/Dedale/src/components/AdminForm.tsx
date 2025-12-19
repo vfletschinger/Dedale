@@ -21,9 +21,9 @@ export default function AdminForm({ onSubmit }: Props) {
     try {
       // Delegate the creation to parent (avoid double-invoke)
       await onSubmit(username, password);
-    } catch (e: any) {
-      console.error('create admin failed', e);
-      setError(e?.message ?? String(e));
+    } catch (err: unknown) {
+      console.error('create admin failed', err);
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }

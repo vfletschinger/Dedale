@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import TeamDetails, { TeamDetailData, Person, Event } from "./TeamDetails";
 import CreateTeam from "./CreateTeam";
 import { listen } from "@tauri-apps/api/event";
@@ -23,7 +23,7 @@ interface SelectedTeamState {
   data: TeamDetailData | undefined;
 }
 
-function Teams({ onTeamClick }: any) {
+function Teams({ onTeamClick }: { onTeamClick?: (teamId: number) => void }) {
   const [teams, setTeams] = useState<Team[]>([]);
   const [availableEvents, setAvailableEvents] = useState<SimpleEvent[]>([]);
   const [loading, setLoading] = useState(false);
@@ -48,10 +48,10 @@ function Teams({ onTeamClick }: any) {
     try {
       const [teamsData, eventsData] = await Promise.all([
         invoke<Team[]>("fetch_teams"),
-        invoke<any[]>("fetch_events")
+        invoke<{ id: number; name: string }[]>("fetch_events")
       ]);
       setTeams(teamsData);
-      setAvailableEvents(eventsData.map((e: any) => ({ id: e.id, name: e.name })));
+      setAvailableEvents(eventsData.map((e) => ({ id: e.id, name: e.name })));
     } catch (e) {
       console.error(e);
     } finally {
@@ -70,7 +70,7 @@ function Teams({ onTeamClick }: any) {
       setDetailsCache({});
     });
 
-    const unlistenNav = listen<any>('navigate-to-team', (event) => {
+    const unlistenNav = listen<{ id: number; name: string }>('navigate-to-team', (event) => {
       const teamToOpen = event.payload;
       const teamObj: Team = {
         id: teamToOpen.id,
@@ -87,6 +87,7 @@ function Teams({ onTeamClick }: any) {
       unlisten.then(f => f());
       unlistenNav.then(f => f());
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
 
@@ -117,7 +118,7 @@ function Teams({ onTeamClick }: any) {
     return data;
   };
 
-  const handleMouseEnter = (teamId: number) => { fetchDetailsForTeam(teamId).catch(err => console.error(err)); };
+  const handleMouseEnter = (teamId: number) => { fetchDetailsForTeam(teamId).catch(() => { /* ignore */ }); };
 
   const handleOpenTeam = async (team: Team) => {
     if (loadingTeamId === team.id) return;
@@ -209,7 +210,7 @@ function Teams({ onTeamClick }: any) {
       )}
 
       {/* --- SIDEBAR FILTRES --- */}
-      <div className="w-64 p-6 bg-white rounded-lg shadow-lg flex-shrink-0 flex flex-col gap-6">
+      <div className="w-64 p-6 bg-white rounded-lg shadow-lg shrink-0 flex flex-col gap-6">
         <h2 className="text-xl font-bold text-gray-800 border-b pb-2">🔍 Filtres</h2>
 
         {/* 1. Recherche Nom */}
@@ -341,7 +342,7 @@ function Teams({ onTeamClick }: any) {
                     key={team.id}
                     onMouseEnter={() => handleMouseEnter(team.id)}
                     onClick={() => handleOpenTeam(team)}
-                    className="relative p-3 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200 hover:shadow-md hover:scale-[1.02] transition-all cursor-pointer flex flex-col justify-between"
+                    className="relative p-3 bg-linear-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200 hover:shadow-md hover:scale-[1.02] transition-all cursor-pointer flex flex-col justify-between"
                   >
                     {loadingTeamId === team.id && (
                       <div className="absolute top-2 right-2"><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div></div>

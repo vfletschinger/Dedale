@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { Event, EventInput, EventGeometry, EventGeometryInput, GeometryType } from '../types/event';
+import type { Event, EventInput, EventGeometryInput, GeometryType } from '../types/event';
 
 // ========== SERVICES POUR LES ÉVÉNEMENTS ==========
 
@@ -120,7 +120,7 @@ export async function deleteEventGeometry(geometryId: number): Promise<void> {
 /**
  * Parse les propriétés de style d'une géométrie (JSON)
  */
-export function parseStyleProperties(stylePropertiesJson?: string): Record<string, any> | null {
+export function parseStyleProperties(stylePropertiesJson?: string): Record<string, unknown> | null {
     if (!stylePropertiesJson) return null;
     
     try {
@@ -134,7 +134,7 @@ export function parseStyleProperties(stylePropertiesJson?: string): Record<strin
 /**
  * Stringify les propriétés de style pour la base de données
  */
-export function stringifyStyleProperties(styleProperties: Record<string, any>): string {
+export function stringifyStyleProperties(styleProperties: Record<string, unknown>): string {
     return JSON.stringify(styleProperties);
 }
 

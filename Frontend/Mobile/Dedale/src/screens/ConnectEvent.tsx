@@ -37,7 +37,6 @@ export default function ConnectEvent() {
 
   useEffect(() => {
     refreshEvents();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleEventSelect = (event: EventType | EventWithStatus) => {

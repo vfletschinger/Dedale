@@ -17,9 +17,8 @@ import React, { useCallback, useState } from "react";
 import { getDatabase } from "../../assets/migrations";
 import {
   PointDetailType,
-  CommentType,
   PictureType,
-  ObstacleType,
+  EquipementType,
   InterestPointsType,
 } from "../types/database";
 import {
@@ -30,22 +29,23 @@ import {
   deletePicture,
   addPicture,
   updatePointCoordinates,
-  addObstacle,
-  deleteObstacle,
+  addEquipement,
+  deleteEquipement,
   updateTimeStamp,
 } from "../services/databaseAcces";
 import { imageToBase64, pickImage } from "../services/ImageHelper";
+import { shortId } from "../services/Helper";
 import MapView, { Marker, MapPressEvent } from "react-native-maps";
 import CoordinatesDisplay from "../components/CoordinatesDisplay";
 import EditModal from "../components/EditModal";
 import ObstacleSelector from "../components/ObstacleSelector";
 
-type RouteParams = { pointId: number };
+type RouteParams = { pointId: string };
 
-type SelectedObstacle = {
+type SelectedEquipement = {
   type_id: number;
   name: string;
-  number: number;
+  quantity: number;
 };
 
 export default function PointDetails() {
@@ -58,9 +58,6 @@ export default function PointDetails() {
 
   // États pour modal de commentaire
   const [isCommentModalVisible, setIsCommentModalVisible] = useState(false);
-  const [currentComment, setCurrentComment] = useState<CommentType | null>(
-    null
-  );
   const [commentText, setCommentText] = useState("");
 
   // États pour modal de coordonnées
@@ -90,29 +87,23 @@ export default function PointDetails() {
         return;
       }
 
-      const comments = db.getAllSync<CommentType>(
-        "SELECT * FROM comment WHERE point_id = ?",
-        [pointId]
-      );
-
       const pictures = db.getAllSync<PictureType>(
         "SELECT * FROM picture WHERE point_id = ?",
         [pointId]
       );
 
-      const obstacles = db.getAllSync<ObstacleType>(
-        `SELECT o.*, ot.name, ot.description, ot.width, ot.length
-         FROM obstacle o
-         LEFT JOIN obstacle_type ot ON o.type_id = ot.id
-         WHERE o.point_id = ?`,
+      const equipements = db.getAllSync<EquipementType>(
+        `SELECT e.*, et.name, et.description, et.width, et.length
+         FROM equipement e
+         LEFT JOIN equipement_type et ON e.type_id = et.id
+         WHERE e.point_id = ?`,
         [pointId]
       );
 
       setPointData({
         point,
-        comments: comments || [],
         pictures: pictures || [],
-        obstacles: obstacles || [],
+        equipements: equipements || [],
       });
 
       setTempCoordinates({
@@ -157,14 +148,14 @@ export default function PointDetails() {
     );
   };
 
-  const handleDeleteComment = (commentId: number) => {
+  const handleDeleteComment = () => {
     Alert.alert("Confirmer", "Supprimer ce commentaire ?", [
       { text: "Annuler", style: "cancel" },
       {
         text: "Supprimer",
         style: "destructive",
         onPress: () => {
-          deleteComment(commentId, db);
+          deleteComment(pointId, db);
           updateTimeStamp(pointId, db);
           fetchPoint();
         },
@@ -172,14 +163,12 @@ export default function PointDetails() {
     ]);
   };
 
-  const handleEditComment = (comment: CommentType) => {
-    setCurrentComment(comment);
-    setCommentText(comment.value);
+  const handleEditComment = () => {
+    setCommentText(pointData?.point.comment || "");
     setIsCommentModalVisible(true);
   };
 
   const handleAddComment = () => {
-    setCurrentComment(null);
     setCommentText("");
     setIsCommentModalVisible(true);
   };
@@ -191,11 +180,7 @@ export default function PointDetails() {
     }
 
     try {
-      if (currentComment) {
-        updateComment(currentComment.id, commentText, db);
-      } else {
-        addComment(pointId, commentText, db);
-      }
+      addComment(pointId, commentText, db);
       updateTimeStamp(pointId, db);
       setIsCommentModalVisible(false);
       fetchPoint();
@@ -262,26 +247,29 @@ export default function PointDetails() {
     }
   };
 
-  const handleSaveObstacles = (obstacles: SelectedObstacle[]) => {
-    if (obstacles.length === 0) {
+  const handleSaveEquipements = (equipements: SelectedEquipement[]) => {
+    if (equipements.length === 0) {
       if (editingObstacles) {
-        // Mode édition : supprimer tous les obstacles existants
-        Alert.alert("Confirmer", "Supprimer tous les obstacles ?", [
+        // Mode édition : supprimer tous les équipements existants
+        Alert.alert("Confirmer", "Supprimer tous les équipements ?", [
           { text: "Annuler", style: "cancel" },
           {
             text: "Supprimer",
             style: "destructive",
             onPress: () => {
               try {
-                pointData?.obstacles.forEach((obstacle) => {
-                  deleteObstacle(obstacle.id, db);
+                pointData?.equipements.forEach((equipement) => {
+                  deleteEquipement(equipement.id, db);
                 });
                 updateTimeStamp(pointId, db);
                 fetchPoint();
-                Alert.alert("Succès", "Obstacles supprimés");
+                Alert.alert("Succès", "Équipements supprimés");
               } catch (error) {
                 console.error("Erreur:", error);
-                Alert.alert("Erreur", "Impossible de supprimer les obstacles");
+                Alert.alert(
+                  "Erreur",
+                  "Impossible de supprimer les équipements"
+                );
               }
             },
           },
@@ -292,27 +280,27 @@ export default function PointDetails() {
 
     try {
       if (editingObstacles) {
-        // Mode édition : supprimer les anciens obstacles
-        pointData?.obstacles.forEach((obstacle) => {
-          deleteObstacle(obstacle.id, db);
+        // Mode édition : supprimer les anciens équipements
+        pointData?.equipements.forEach((equipement) => {
+          deleteEquipement(equipement.id, db);
         });
       }
 
-      // Ajouter les nouveaux obstacles
-      for (const obstacle of obstacles) {
-        addObstacle(pointId, obstacle.type_id, obstacle.number, db);
+      // Ajouter les nouveaux équipements
+      for (const equipement of equipements) {
+        addEquipement(pointId, equipement.type_id, equipement.quantity, db);
       }
 
       updateTimeStamp(pointId, db);
       Alert.alert(
         "Succès",
-        editingObstacles ? "Obstacles mis à jour" : "Obstacles ajoutés"
+        editingObstacles ? "Équipements mis à jour" : "Équipements ajoutés"
       );
       fetchPoint();
       setEditingObstacles(false);
     } catch (error) {
       console.error("Erreur:", error);
-      Alert.alert("Erreur", "Impossible de sauvegarder les obstacles");
+      Alert.alert("Erreur", "Impossible de sauvegarder les équipements");
     }
   };
 
@@ -359,7 +347,7 @@ export default function PointDetails() {
 
         <View className="p-4">
           <Text className="text-3xl font-bold mb-4">
-            Point #{pointData.point.id}
+            Point #{shortId(pointData.point.id)}
           </Text>
 
           {/* Coordonnées */}
@@ -390,7 +378,7 @@ export default function PointDetails() {
                     latitude: pointData.point.y,
                     longitude: pointData.point.x,
                   }}
-                  title={`Point #${pointData.point.id}`}
+                  title={`Point #${shortId(pointData.point.id)}`}
                 />
               </MapView>
             </View>
@@ -413,43 +401,48 @@ export default function PointDetails() {
           {/* Commentaires */}
           <View className="section-box mt-4">
             <View className="section-header">
-              <Text className="text-section-title">
-                Commentaires ({pointData.comments.length})
-              </Text>
-              <Pressable onPress={handleAddComment} className="btn-add-small">
-                <Text className="btn-add-small-text">+ Ajouter</Text>
-              </Pressable>
+              <Text className="text-section-title">Commentaire</Text>
+              {pointData.point.comment ? (
+                <Pressable
+                  onPress={handleEditComment}
+                  className="btn-add-small"
+                >
+                  <Text className="btn-add-small-text">✏️ Modifier</Text>
+                </Pressable>
+              ) : (
+                <Pressable onPress={handleAddComment} className="btn-add-small">
+                  <Text className="btn-add-small-text">+ Ajouter</Text>
+                </Pressable>
+              )}
             </View>
-            {pointData.comments.length > 0 ? (
-              pointData.comments.map((comment) => (
-                <View key={comment.id} className="section-item">
-                  <Text className="mb-2">{comment.value}</Text>
-                  <View className="row-gap">
-                    <Pressable
-                      onPress={() => handleEditComment(comment)}
-                      className="action-btn-edit"
-                    >
-                      <Text className="action-btn-edit-text">Modifier</Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => handleDeleteComment(comment.id)}
-                      className="action-btn-delete"
-                    >
-                      <Text className="action-btn-delete-text">Supprimer</Text>
-                    </Pressable>
-                  </View>
+            {pointData.point.comment ? (
+              <View className="section-item">
+                <Text className="mb-2">{pointData.point.comment}</Text>
+                <View className="row-gap">
+                  <Pressable
+                    onPress={handleEditComment}
+                    className="action-btn-edit"
+                  >
+                    <Text className="action-btn-edit-text">Modifier</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={handleDeleteComment}
+                    className="action-btn-delete"
+                  >
+                    <Text className="action-btn-delete-text">Supprimer</Text>
+                  </Pressable>
                 </View>
-              ))
+              </View>
             ) : (
               <Text className="text-caption">Aucun commentaire</Text>
             )}
           </View>
 
-          {/* Obstacles */}
+          {/* Équipements */}
           <View className="section-box">
             <View className="section-header">
               <Text className="text-section-title">
-                Obstacles ({pointData.obstacles.length})
+                Équipements ({pointData.equipements.length})
               </Text>
               <View className="row-gap">
                 <Pressable
@@ -457,32 +450,34 @@ export default function PointDetails() {
                   className="btn-add-small"
                 >
                   <Text className="btn-add-small-text">
-                    {pointData.obstacles.length > 0
+                    {pointData.equipements.length > 0
                       ? "✏️ Modifier"
                       : "+ Ajouter"}
                   </Text>
                 </Pressable>
               </View>
             </View>
-            {pointData.obstacles.length > 0 ? (
-              pointData.obstacles.map((obstacle) => (
-                <View key={obstacle.id} className="section-item">
-                  <Text className="font-semibold">{obstacle.name}</Text>
-                  {obstacle.description && (
-                    <Text className="text-caption">{obstacle.description}</Text>
+            {pointData.equipements.length > 0 ? (
+              pointData.equipements.map((equipement) => (
+                <View key={equipement.id} className="section-item">
+                  <Text className="font-semibold">{equipement.name}</Text>
+                  {equipement.description && (
+                    <Text className="text-caption">
+                      {equipement.description}
+                    </Text>
                   )}
                   <Text className="text-sm mt-1">
-                    Nombre: {obstacle.number}
+                    Quantité: {equipement.quantity}
                   </Text>
-                  {(obstacle.length || obstacle.width) && (
+                  {(equipement.length || equipement.width) && (
                     <Text className="text-sm">
-                      Dimensions: {obstacle.length}m x {obstacle.width}m
+                      Dimensions: {equipement.length}m x {equipement.width}m
                     </Text>
                   )}
                 </View>
               ))
             ) : (
-              <Text className="text-caption">Aucun obstacle</Text>
+              <Text className="text-caption">Aucun équipement</Text>
             )}
           </View>
 
@@ -597,7 +592,9 @@ export default function PointDetails() {
       <EditModal
         visible={isCommentModalVisible}
         title={
-          currentComment ? "Modifier le commentaire" : "Ajouter un commentaire"
+          pointData?.point.comment
+            ? "Modifier le commentaire"
+            : "Ajouter un commentaire"
         }
         value={commentText}
         onChangeText={setCommentText}
@@ -608,20 +605,20 @@ export default function PointDetails() {
         numberOfLines={4}
       />
 
-      {/* Modal de sélection d'obstacles - Maintenant centré */}
+      {/* Modal de sélection d'équipements */}
       <ObstacleSelector
         visible={isObstacleSelectorVisible}
         onClose={() => {
           setIsObstacleSelectorVisible(false);
           setEditingObstacles(false);
         }}
-        onSave={handleSaveObstacles}
+        onSave={handleSaveEquipements}
         initialObstacles={
           editingObstacles
-            ? pointData?.obstacles.map((obstacle) => ({
-                type_id: obstacle.type_id,
-                name: obstacle.name ?? "Nom inconnu",
-                number: obstacle.number,
+            ? pointData?.equipements.map((equipement) => ({
+                type_id: equipement.type_id,
+                name: equipement.name ?? "Nom inconnu",
+                number: equipement.quantity,
               })) || []
             : []
         }

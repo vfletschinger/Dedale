@@ -6,9 +6,9 @@ use std::path::PathBuf;
 pub fn create_file_name(extension: String) -> (String, String) {
     let mut path: PathBuf = data_dir().expect("Impossible de récupérer data_dir");
     path.push("dedale");
-    let file_path = format!("{}", path.to_str().expect("Invalid PDF path"));
-    let base_name = format!("recap");
-    let mut name = format!("recap");
+    let file_path = path.to_str().expect("Invalid PDF path").to_string();
+    let base_name = "recap".to_string();
+    let mut name = "recap".to_string();
 
     let mut candidate = format!("{}/{}.{}", file_path, base_name, extension);
     let mut i = 1;
