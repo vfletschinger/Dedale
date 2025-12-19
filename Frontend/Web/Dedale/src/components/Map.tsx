@@ -477,12 +477,6 @@ function OfflineMapLibre({
     loadSelectedEvent();
   }, [selectedEventId]);
 
-  // Fonction pour changer d'événement
-  const handleEventChange = (eventId: string) => {
-    const event = events.find((e) => e.id === parseInt(eventId));
-    setSelectedEvent(event ?? null);
-  };
-
   // Fonction pour rafraîchir les géométries sur la carte
   const refreshGeometriesOnMap = (
     mapObj: maplibregl.Map,
@@ -1151,9 +1145,8 @@ function OfflineMapLibre({
               },
             })),
           };
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (map.getSource("db-points") as maplibregl.GeoJSONSource).setData(
-            geojson as any,
+            geojson as GeoJSON.FeatureCollection,
           );
         }
       } catch (err) {
@@ -1207,9 +1200,8 @@ function OfflineMapLibre({
                 },
               })),
             };
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (map.getSource("db-points") as maplibregl.GeoJSONSource).setData(
-              geojson as any,
+              geojson as GeoJSON.FeatureCollection,
             );
           }
         } catch (err) {
@@ -1347,9 +1339,8 @@ function OfflineMapLibre({
             },
           })),
         };
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (map.getSource("db-points") as maplibregl.GeoJSONSource).setData(
-          geojson as any,
+          geojson as GeoJSON.FeatureCollection,
         );
       }
     } catch (err) {
@@ -1454,6 +1445,29 @@ function OfflineMapLibre({
                 <span>Événement</span>
               </label>
             </div>
+            <select
+              value={selectedEvent?.id || ""}
+              onChange={(e) => {
+                const event = events.find(
+                  (ev) => ev.id === parseInt(e.target.value),
+                );
+                setSelectedEvent(event ?? null);
+              }}
+              className="min-w-[200px] px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-800 font-semibold transition-all duration-200 hover:bg-gray-50 hover:shadow-md cursor-pointer text-sm"
+            >
+              <option value="">Choisir un événement...</option>
+              {events.map((event) => (
+                <option key={event.id} value={event.id}>
+                  {event.event_type === "Marathon" && "🏃‍♂️"}
+                  {event.event_type === "Cyclisme" && "🚴‍♂️"}
+                  {event.event_type === "Trail" && "🥾"}
+                  {event.name || `Événement #${event.id}`}
+                  {event.status === "active" && " 🟢"}
+                  {event.status === "planned" && " 🔵"}
+                </option>
+              ))}
+            </select>
+
             {/* Barre de recherche d'adresses */}
             <div className="relative flex-1">
               <input
