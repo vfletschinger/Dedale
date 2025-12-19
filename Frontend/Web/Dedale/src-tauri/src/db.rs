@@ -1,5 +1,8 @@
 // On importe les dépendances nécessaires
+#![allow(dead_code)]
+
 use bcrypt::{hash, verify, DEFAULT_COST};
+use rand::Rng;
 use serde::Deserialize;
 use serde::Serialize;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
@@ -9,6 +12,176 @@ use sqlx::{Row, SqlitePool};
 use std::fs;
 use std::str::FromStr;
 use tauri::{AppHandle, Manager};
+
+/// Génère un UUID v4
+pub fn generate_uuid() -> String {
+    let mut rng = rand::rng();
+    let bytes: [u8; 16] = rng.random();
+    format!(
+        "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-4{:01x}{:02x}-{:01x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
+        bytes[0], bytes[1], bytes[2], bytes[3],
+        bytes[4], bytes[5],
+        bytes[6] & 0x0f, bytes[7],
+        (bytes[8] & 0x3f) | 0x80 >> 4, bytes[9],
+        bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]
+    )
+}
+
+/// Valide le format d'un UUID
+pub fn is_valid_uuid(uuid: &str) -> bool {
+    let parts: Vec<&str> = uuid.split('-').collect();
+    if parts.len() != 5 {
+        return false;
+    }
+    let expected_lengths = [8, 4, 4, 4, 12];
+    for (part, expected_len) in parts.iter().zip(expected_lengths.iter()) {
+        if part.len() != *expected_len {
+            return false;
+        }
+        if !part.chars().all(|c| c.is_ascii_hexdigit()) {
+            return false;
+        }
+    }
+    true
+}
+
+/// Valide un nom d'utilisateur
+pub fn is_valid_username(username: &str) -> bool {
+    !username.is_empty()
+        && username.len() >= 3
+        && username.len() <= 50
+        && username
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+}
+
+/// Valide un rôle utilisateur
+pub fn is_valid_role(role: &str) -> bool {
+    matches!(role, "admin" | "user" | "guest" | "moderator")
+}
+
+/// Formate un statut d'événement
+pub fn format_event_status(statut: &str) -> &'static str {
+    match statut.to_lowercase().as_str() {
+        "actif" | "active" | "en_cours" => "En cours",
+        "termine" | "finished" | "completed" => "Terminé",
+        "annule" | "cancelled" | "canceled" => "Annulé",
+        "planifie" | "planned" | "scheduled" => "Planifié",
+        _ => "Inconnu",
+    }
+}
+
+/// Valide une coordonnée de point
+pub fn is_valid_point_coordinate(x: f64, y: f64) -> bool {
+    x.is_finite() && y.is_finite() && (-180.0..=180.0).contains(&x) && (-90.0..=90.0).contains(&y)
+}
+
+/// Valide une date au format ISO
+pub fn is_valid_date_format(date: &str) -> bool {
+    // Format attendu: YYYY-MM-DD ou YYYY-MM-DDTHH:MM:SS
+    if date.len() < 10 {
+        return false;
+    }
+    let date_part = &date[..10];
+    let parts: Vec<&str> = date_part.split('-').collect();
+    if parts.len() != 3 {
+        return false;
+    }
+    let year: Result<i32, _> = parts[0].parse();
+    let month: Result<u32, _> = parts[1].parse();
+    let day: Result<u32, _> = parts[2].parse();
+
+    match (year, month, day) {
+        (Ok(y), Ok(m), Ok(d)) => {
+            (1900..=2100).contains(&y) && (1..=12).contains(&m) && (1..=31).contains(&d)
+        }
+        _ => false,
+    }
+}
+
+/// Génère un hash de mot de passe sécurisé
+pub fn hash_password(password: &str) -> Result<String, String> {
+    hash(password, DEFAULT_COST).map_err(|e| format!("Hash error: {}", e))
+}
+
+/// Vérifie un mot de passe contre son hash
+pub fn verify_password(password: &str, hash: &str) -> bool {
+    verify(password, hash).unwrap_or(false)
+}
+
+/// Valide la longueur d'un mot de passe
+pub fn is_valid_password_length(password: &str) -> bool {
+    password.len() >= 8 && password.len() <= 128
+}
+
+/// Construit une requête SQL pour les placeholders
+pub fn build_sql_placeholders(count: usize) -> String {
+    if count == 0 {
+        return String::new();
+    }
+    vec!["?"; count].join(", ")
+}
+
+/// Construit une clause WHERE IN
+pub fn build_where_in_clause(field: &str, count: usize) -> String {
+    if count == 0 {
+        return format!("{} IN ()", field);
+    }
+    format!("{} IN ({})", field, build_sql_placeholders(count))
+}
+
+/// Valide un email basique
+pub fn is_valid_email(email: &str) -> bool {
+    let at_count = email.chars().filter(|c| *c == '@').count();
+    if at_count != 1 {
+        return false;
+    }
+    let parts: Vec<&str> = email.split('@').collect();
+    if parts.len() != 2 {
+        return false;
+    }
+    let local = parts[0];
+    let domain = parts[1];
+    !local.is_empty() && !domain.is_empty() && domain.contains('.')
+}
+
+/// Valide un numéro de téléphone
+pub fn is_valid_phone_number(phone: &str) -> bool {
+    let digits: String = phone.chars().filter(|c| c.is_ascii_digit()).collect();
+    digits.len() >= 10 && digits.len() <= 15
+}
+
+/// Sanitize une chaîne pour éviter les injections SQL basiques
+pub fn sanitize_string(input: &str) -> String {
+    input
+        .replace('"', "\\\"")
+        .replace('\'', "''")
+        .replace('\\', "\\\\")
+}
+
+/// Tronque une chaîne à une longueur maximale
+pub fn truncate_string(s: &str, max_len: usize) -> String {
+    if s.len() <= max_len {
+        s.to_string()
+    } else {
+        format!("{}...", &s[..max_len.saturating_sub(3)])
+    }
+}
+
+/// Calcule le nombre total d'obstacles pour une liste de points
+pub fn count_total_obstacles(points: &[Point]) -> usize {
+    points.iter().map(|p| p.obstacles.len()).sum()
+}
+
+/// Calcule le nombre total de commentaires pour une liste de points
+pub fn count_total_comments(points: &[Point]) -> usize {
+    points.iter().map(|p| p.comments.len()).sum()
+}
+
+/// Calcule le nombre total de photos pour une liste de points
+pub fn count_total_pictures(points: &[Point]) -> usize {
+    points.iter().map(|p| p.pictures.len()).sum()
+}
 
 #[derive(sqlx::FromRow, Debug, Serialize, Deserialize)]
 pub struct User {
@@ -20,7 +193,7 @@ pub struct User {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Point {
-    pub id: i64,
+    pub id: String, // UUID
     pub x: f64,
     pub y: f64,
     #[serde(default)]
@@ -45,11 +218,11 @@ pub struct ObstacleType {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Obstacle {
-    pub id: i32,
+    pub id: String, // UUID
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     pub number: Option<i32>,
-    pub point_id: i64,
+    pub point_id: String, // UUID reference
     pub type_id: i64,
     pub description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -60,9 +233,9 @@ pub struct Obstacle {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PointSimple {
-    pub id: i32,
-    pub x: f64, // Coordonnée X (ou latitude)
-    pub y: f64, // Coordonnée Y (ou longitude)
+    pub id: String, // UUID
+    pub x: f64,     // Coordonnée X (ou latitude)
+    pub y: f64,     // Coordonnée Y (ou longitude)
     #[serde(default)]
     pub pose: Option<String>,
     #[serde(default)]
@@ -71,16 +244,16 @@ pub struct PointSimple {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Comment {
-    pub id: i32,       // Identifiant unique du commentaire
-    pub point_id: i32, // Lien vers le point auquel ce commentaire est attaché
-    pub value: String, // Le texte du commentaire
+    pub id: String,       // UUID
+    pub point_id: String, // UUID reference
+    pub value: String,    // Le texte du commentaire
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Picture {
-    pub id: i32,       // Identifiant unique de l'image
-    pub point_id: i32, // Lien vers le point auquel cette image est attachée
-    pub image: String, // Le chemin ou le contenu encodé de l'image (ex: base64, URL)
+    pub id: String,       // UUID
+    pub point_id: String, // UUID reference
+    pub image: String,    // Le chemin ou le contenu encodé de l'image (ex: base64, URL)
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -363,12 +536,135 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
     .await
     .map_err(|e| format!("Failed to create member table: {}", e))?;
 
+    // Migration: Convertir les tables point, comment, picture, obstacle pour accepter des UUIDs (TEXT)
+    // Vérifier si la migration est nécessaire en regardant le type de la colonne id dans point
+    let needs_uuid_migration = sqlx::query("SELECT typeof(id) as id_type FROM point LIMIT 1")
+        .fetch_optional(&pool)
+        .await
+        .map(|row| {
+            if let Some(r) = row {
+                let id_type: String = r.get("id_type");
+                id_type == "integer"
+            } else {
+                false // Table vide, pas besoin de migration
+            }
+        })
+        .unwrap_or(false);
+
+    if needs_uuid_migration {
+        println!("[DB] 🔄 Migration UUID détectée comme nécessaire, exécution...");
+
+        // Recréer la table point avec id TEXT
+        let _ = sqlx::query("ALTER TABLE point RENAME TO point_old")
+            .execute(&pool)
+            .await;
+        sqlx::query(
+            "CREATE TABLE point (
+                id TEXT PRIMARY KEY,
+                x REAL,
+                y REAL,
+                pose TEXT,
+                depose TEXT
+            )",
+        )
+        .execute(&pool)
+        .await
+        .map_err(|e| format!("Migration point: {}", e))?;
+        let _ = sqlx::query(
+            "INSERT INTO point SELECT CAST(id AS TEXT), x, y, pose, depose FROM point_old",
+        )
+        .execute(&pool)
+        .await;
+        let _ = sqlx::query("DROP TABLE point_old").execute(&pool).await;
+
+        // Recréer la table comment avec id TEXT et point_id TEXT
+        let _ = sqlx::query("ALTER TABLE comment RENAME TO comment_old")
+            .execute(&pool)
+            .await;
+        sqlx::query(
+            "CREATE TABLE comment (
+                id TEXT PRIMARY KEY,
+                point_id TEXT,
+                value TEXT,
+                FOREIGN KEY (point_id) REFERENCES point (id)
+            )",
+        )
+        .execute(&pool)
+        .await
+        .map_err(|e| format!("Migration comment: {}", e))?;
+        let _ = sqlx::query("INSERT INTO comment SELECT CAST(id AS TEXT), CAST(point_id AS TEXT), value FROM comment_old").execute(&pool).await;
+        let _ = sqlx::query("DROP TABLE comment_old").execute(&pool).await;
+
+        // Recréer la table picture avec id TEXT et point_id TEXT
+        let _ = sqlx::query("ALTER TABLE picture RENAME TO picture_old")
+            .execute(&pool)
+            .await;
+        sqlx::query(
+            "CREATE TABLE picture (
+                id TEXT PRIMARY KEY,
+                point_id TEXT,
+                image TEXT,
+                FOREIGN KEY (point_id) REFERENCES point (id)
+            )",
+        )
+        .execute(&pool)
+        .await
+        .map_err(|e| format!("Migration picture: {}", e))?;
+        let _ = sqlx::query("INSERT INTO picture SELECT CAST(id AS TEXT), CAST(point_id AS TEXT), image FROM picture_old").execute(&pool).await;
+        let _ = sqlx::query("DROP TABLE picture_old").execute(&pool).await;
+
+        // Recréer la table obstacle avec id TEXT et point_id TEXT
+        let _ = sqlx::query("ALTER TABLE obstacle RENAME TO obstacle_old")
+            .execute(&pool)
+            .await;
+        sqlx::query(
+            "CREATE TABLE obstacle (
+                id TEXT PRIMARY KEY,
+                point_id TEXT,
+                type_id INTEGER,
+                number INTEGER,
+                description TEXT,
+                FOREIGN KEY (point_id) REFERENCES point (id),
+                FOREIGN KEY (type_id) REFERENCES obstacle_type (id)
+            )",
+        )
+        .execute(&pool)
+        .await
+        .map_err(|e| format!("Migration obstacle: {}", e))?;
+        let _ = sqlx::query("INSERT INTO obstacle SELECT CAST(id AS TEXT), CAST(point_id AS TEXT), type_id, number, description FROM obstacle_old").execute(&pool).await;
+        let _ = sqlx::query("DROP TABLE obstacle_old").execute(&pool).await;
+
+        // Recréer la table point_event avec point_id TEXT
+        let _ = sqlx::query("ALTER TABLE point_event RENAME TO point_event_old")
+            .execute(&pool)
+            .await;
+        sqlx::query(
+            "CREATE TABLE point_event (
+                id INTEGER PRIMARY KEY,
+                point_id TEXT NOT NULL,
+                event_id INTEGER NOT NULL,
+                FOREIGN KEY (point_id) REFERENCES point(id) ON DELETE CASCADE,
+                FOREIGN KEY (event_id) REFERENCES event(id) ON DELETE CASCADE,
+                UNIQUE(point_id, event_id)
+            )",
+        )
+        .execute(&pool)
+        .await
+        .map_err(|e| format!("Migration point_event: {}", e))?;
+        let _ = sqlx::query("INSERT INTO point_event SELECT id, CAST(point_id AS TEXT), event_id FROM point_event_old").execute(&pool).await;
+        let _ = sqlx::query("DROP TABLE point_event_old")
+            .execute(&pool)
+            .await;
+
+        println!("[DB] ✅ Migration UUID terminée");
+    }
+
     println!("[DB] ✅ Toutes les tables sont prêtes");
 
     Ok(pool)
 }
 
-async fn fetch_comments(pool: &SqlitePool, point_id: i64) -> Result<Vec<Comment>, String> {
+async fn fetch_comments(pool: &SqlitePool, point_id: &str) -> Result<Vec<Comment>, String> {
     let rows = sqlx::query("SELECT id, value, point_id FROM comment WHERE point_id = ?")
         .bind(point_id)
         .fetch_all(pool)
@@ -387,7 +683,7 @@ async fn fetch_comments(pool: &SqlitePool, point_id: i64) -> Result<Vec<Comment>
     Ok(comments)
 }
 
-async fn fetch_pictures(pool: &SqlitePool, point_id: i64) -> Result<Vec<Picture>, String> {
+async fn fetch_pictures(pool: &SqlitePool, point_id: &str) -> Result<Vec<Picture>, String> {
     let rows = sqlx::query("SELECT id, image, point_id FROM picture WHERE point_id = ?")
         .bind(point_id)
         .fetch_all(pool)
@@ -406,7 +702,7 @@ async fn fetch_pictures(pool: &SqlitePool, point_id: i64) -> Result<Vec<Picture>
     Ok(pictures)
 }
 
-async fn fetch_obstacles(pool: &SqlitePool, point_id: i64) -> Result<Vec<Obstacle>, String> {
+async fn fetch_obstacles(pool: &SqlitePool, point_id: &str) -> Result<Vec<Obstacle>, String> {
     let query = r#"
         SELECT 
             o.id, 
@@ -445,7 +741,7 @@ async fn fetch_obstacles(pool: &SqlitePool, point_id: i64) -> Result<Vec<Obstacl
     Ok(obstacles)
 }
 
-async fn fetch_event_ids(pool: &SqlitePool, point_id: i64) -> Result<Vec<i64>, String> {
+async fn fetch_event_ids(pool: &SqlitePool, point_id: &str) -> Result<Vec<i64>, String> {
     let rows = sqlx::query("SELECT event_id FROM point_event WHERE point_id = ?")
         .bind(point_id)
         .fetch_all(pool)
@@ -483,7 +779,7 @@ pub async fn fetch_obstacle_types(app: AppHandle) -> Result<Vec<ObstacleType>, S
 #[tauri::command]
 pub async fn insert_obstacles(
     app: AppHandle,
-    point_id: i64,
+    point_id: String,
     obstacles: Vec<ObstacleInput>,
 ) -> Result<(), String> {
     let pool = get_db_pool(&app).await?;
@@ -509,7 +805,7 @@ pub async fn insert_obstacles(
         } else if obstacle.number > 0 {
             // Insérer seulement si le nombre est > 0
             sqlx::query("INSERT INTO obstacle (point_id, type_id, number) VALUES (?, ?, ?)")
-                .bind(point_id)
+                .bind(&point_id)
                 .bind(obstacle.type_id)
                 .bind(obstacle.number)
                 .execute(&pool)
@@ -564,12 +860,12 @@ pub async fn retrieve_data_by_event(
     let mut points: Vec<Point> = Vec::new();
 
     for row in base_rows {
-        let id: i64 = row.get("id");
+        let id: String = row.get("id");
 
-        let comments = fetch_comments(&pool, id).await?;
-        let pictures = fetch_pictures(&pool, id).await?;
-        let obstacles = fetch_obstacles(&pool, id).await?;
-        let event_ids = fetch_event_ids(&pool, id).await?;
+        let comments = fetch_comments(&pool, &id).await?;
+        let pictures = fetch_pictures(&pool, &id).await?;
+        let obstacles = fetch_obstacles(&pool, &id).await?;
+        let event_ids = fetch_event_ids(&pool, &id).await?;
 
         points.push(Point {
             id,
@@ -592,7 +888,7 @@ pub async fn retrieve_data_by_event(
 pub async fn insert_point_details(
     app: &AppHandle,
     details: Vec<PointDetail>,
-) -> Result<Vec<i64>, String> {
+) -> Result<Vec<String>, String> {
     let pool = get_db_pool(app).await?;
     let mut tx: Transaction<Sqlite> = pool
         .begin()
@@ -600,55 +896,49 @@ pub async fn insert_point_details(
         .map_err(|e| format!("Erreur au démarrage de la transaction : {}", e))?;
 
     // ÉTAPE 1: Insérer tous les points d'abord
-    // We need to keep track of assigned IDs when frontend sends id==0 for new points
-    let mut assigned_ids: Vec<i64> = Vec::with_capacity(details.len());
+    // We need to keep track of assigned IDs when frontend sends id=="" or "0" for new points
+    let mut assigned_ids: Vec<String> = Vec::with_capacity(details.len());
     for detail in &details {
-        if detail.point.id == 0 {
-            // Insert without specifying id so SQLite assigns a rowid
-            sqlx::query(r#"INSERT INTO point (x, y, pose, depose) VALUES (?, ?, ?, ?)"#)
-                .bind(detail.point.x)
-                .bind(detail.point.y)
-                .bind(&detail.point.pose)
-                .bind(&detail.point.depose)
-                .execute(&mut *tx)
-                .await
-                .map_err(|e| format!("Erreur INSERT point (auto-id) : {}", e))?;
-
-            // retrieve last inserted id for this transaction
-            let row = sqlx::query("SELECT last_insert_rowid() as id")
-                .fetch_one(&mut *tx)
-                .await
-                .map_err(|e| format!("Erreur récupération last_insert_rowid: {}", e))?;
-            let new_id: i64 = row.get("id");
-            assigned_ids.push(new_id);
+        let point_id = if detail.point.id.is_empty() || detail.point.id == "0" {
+            // Générer un nouvel UUID pour ce point
+            generate_uuid()
         } else {
-            // Respect provided id
-            sqlx::query(
-                r#"INSERT OR REPLACE INTO point (id, x, y, pose, depose) VALUES (?, ?, ?, ?, ?)"#,
-            )
-            .bind(detail.point.id)
-            .bind(detail.point.x)
-            .bind(detail.point.y)
-            .bind(&detail.point.pose)
-            .bind(&detail.point.depose)
-            .execute(&mut *tx)
-            .await
-            .map_err(|e| format!("Erreur INSERT/REPLACE point ID {} : {}", detail.point.id, e))?;
-            assigned_ids.push(detail.point.id as i64);
-        }
+            // Utiliser l'ID fourni
+            detail.point.id.clone()
+        };
+
+        // Insérer le point
+        sqlx::query(
+            r#"INSERT OR REPLACE INTO point (id, x, y, pose, depose) VALUES (?, ?, ?, ?, ?)"#,
+        )
+        .bind(&point_id)
+        .bind(detail.point.x)
+        .bind(detail.point.y)
+        .bind(&detail.point.pose)
+        .bind(&detail.point.depose)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| format!("Erreur INSERT/REPLACE point ID {} : {}", point_id, e))?;
+
+        assigned_ids.push(point_id);
     }
     // ÉTAPE 2: Insérer les données liées (commentaires)
     for (idx, detail) in details.iter().enumerate() {
-        let assigned_point_id = assigned_ids[idx];
+        let assigned_point_id = &assigned_ids[idx];
         for comment in &detail.comment {
-            let point_id_to_use = if comment.point_id == 0 {
-                assigned_point_id as i32
+            let comment_id = if comment.id.is_empty() || comment.id == "0" {
+                generate_uuid()
             } else {
-                comment.point_id
+                comment.id.clone()
+            };
+            let point_id_to_use = if comment.point_id.is_empty() || comment.point_id == "0" {
+                assigned_point_id.clone()
+            } else {
+                comment.point_id.clone()
             };
             sqlx::query(r#"INSERT OR REPLACE INTO comment (id, point_id, value) VALUES (?, ?, ?)"#)
-                .bind(comment.id)
-                .bind(point_id_to_use)
+                .bind(&comment_id)
+                .bind(&point_id_to_use)
                 .bind(&comment.value)
                 .execute(&mut *tx)
                 .await
@@ -657,30 +947,40 @@ pub async fn insert_point_details(
     }
     // images
     for (idx, detail) in details.iter().enumerate() {
-        let assigned_point_id = assigned_ids[idx] as i32;
+        let assigned_point_id = &assigned_ids[idx];
         for picture in &detail.picture {
-            let point_id_to_use = if picture.point_id == 0 {
-                assigned_point_id
+            let picture_id = if picture.id.is_empty() || picture.id == "0" {
+                generate_uuid()
             } else {
-                picture.point_id
+                picture.id.clone()
+            };
+            let point_id_to_use = if picture.point_id.is_empty() || picture.point_id == "0" {
+                assigned_point_id.clone()
+            } else {
+                picture.point_id.clone()
             };
             sqlx::query(r#"INSERT OR REPLACE INTO picture (id, point_id, image) VALUES (?, ?, ?)"#)
-                .bind(picture.id)
-                .bind(point_id_to_use)
+                .bind(&picture_id)
+                .bind(&point_id_to_use)
                 .bind(&picture.image)
                 .execute(&mut *tx)
                 .await
-                .map_err(|e| format!("Erreur INSERT/REPLACE picture ID {} : {}", picture.id, e))?;
+                .map_err(|e| format!("Erreur INSERT/REPLACE picture ID {} : {}", picture_id, e))?;
         }
     }
     // obstacles and types
     for (idx, detail) in details.iter().enumerate() {
-        let assigned_point_id = assigned_ids[idx];
+        let assigned_point_id = &assigned_ids[idx];
         for obstacle in &detail.obstacle {
-            let point_id_to_use = if obstacle.point_id == 0 {
-                assigned_point_id
+            let obstacle_id = if obstacle.id.is_empty() || obstacle.id == "0" {
+                generate_uuid()
             } else {
-                obstacle.point_id
+                obstacle.id.clone()
+            };
+            let point_id_to_use = if obstacle.point_id.is_empty() || obstacle.point_id == "0" {
+                assigned_point_id.clone()
+            } else {
+                obstacle.point_id.clone()
             };
 
             // Si l'obstacle a des données de type (name, description, width, length),
@@ -710,8 +1010,8 @@ pub async fn insert_point_details(
             }
             // Insérer l'obstacle lui-même
             sqlx::query(r#"INSERT OR REPLACE INTO obstacle (id, point_id, type_id, number) VALUES (?, ?, ?, ?)"#)
-                .bind(obstacle.id)
-                .bind(point_id_to_use)
+                .bind(&obstacle_id)
+                .bind(&point_id_to_use)
                 .bind(obstacle.type_id)
                 .bind(obstacle.number)
                 .execute(&mut *tx)
@@ -736,7 +1036,7 @@ pub async fn insert_point(
     app: tauri::AppHandle,
     details: Vec<PointDetail>,
     event_id: Option<i64>,
-) -> Result<Vec<i64>, String> {
+) -> Result<Vec<String>, String> {
     println!(
         "[DB] 📍 insert_point appelé avec {} point(s), event_id: {:?}",
         details.len(),
@@ -769,7 +1069,7 @@ pub async fn insert_point(
                     sqlx::query(
                         "INSERT OR IGNORE INTO point_event (point_id, event_id) VALUES (?, ?)",
                     )
-                    .bind(*point_id)
+                    .bind(point_id)
                     .bind(eid)
                     .execute(&pool)
                     .await
@@ -790,7 +1090,7 @@ pub async fn insert_point(
 #[tauri::command]
 pub async fn update_point_dates(
     app: AppHandle,
-    point_id: i64,
+    point_id: String,
     pose: Option<String>,
     depose: Option<String>,
 ) -> Result<(), String> {
@@ -799,7 +1099,7 @@ pub async fn update_point_dates(
     sqlx::query("UPDATE point SET pose = ?, depose = ? WHERE id = ?")
         .bind(&pose)
         .bind(&depose)
-        .bind(point_id)
+        .bind(&point_id)
         .execute(&pool)
         .await
         .map_err(|e| format!("Failed to update point dates: {}", e))?;
@@ -812,7 +1112,7 @@ pub async fn update_point_dates(
 }
 
 #[tauri::command]
-pub async fn delete_point(app: AppHandle, point_id: i64) -> Result<(), String> {
+pub async fn delete_point(app: AppHandle, point_id: String) -> Result<(), String> {
     let pool = get_db_pool(&app).await?;
 
     // Start a transaction and remove dependent rows first to keep DB consistent
@@ -822,25 +1122,25 @@ pub async fn delete_point(app: AppHandle, point_id: i64) -> Result<(), String> {
         .map_err(|e| format!("Failed to start transaction: {}", e))?;
 
     sqlx::query("DELETE FROM comment WHERE point_id = ?")
-        .bind(point_id)
+        .bind(&point_id)
         .execute(&mut *tx)
         .await
         .map_err(|e| format!("Failed to delete comments: {}", e))?;
 
     sqlx::query("DELETE FROM picture WHERE point_id = ?")
-        .bind(point_id)
+        .bind(&point_id)
         .execute(&mut *tx)
         .await
         .map_err(|e| format!("Failed to delete pictures: {}", e))?;
 
     sqlx::query("DELETE FROM obstacle WHERE point_id = ?")
-        .bind(point_id)
+        .bind(&point_id)
         .execute(&mut *tx)
         .await
         .map_err(|e| format!("Failed to delete obstacles: {}", e))?;
 
     sqlx::query("DELETE FROM point WHERE id = ?")
-        .bind(point_id)
+        .bind(&point_id)
         .execute(&mut *tx)
         .await
         .map_err(|e| format!("Failed to delete point: {}", e))?;
@@ -1280,14 +1580,14 @@ pub async fn insert_event(event: Event, app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub async fn link_point_to_event(
     app: AppHandle,
-    point_id: i64,
+    point_id: String,
     event_id: i64,
 ) -> Result<(), String> {
     println!("[DB] 🔗 Liaison point {} → event {}", point_id, event_id);
     let pool = get_db_pool(&app).await?;
 
     sqlx::query("INSERT OR IGNORE INTO point_event (point_id, event_id) VALUES (?, ?)")
-        .bind(point_id)
+        .bind(&point_id)
         .bind(event_id)
         .execute(&pool)
         .await
@@ -1300,14 +1600,14 @@ pub async fn link_point_to_event(
 #[tauri::command]
 pub async fn unlink_point_from_event(
     app: AppHandle,
-    point_id: i64,
+    point_id: String,
     event_id: i64,
 ) -> Result<(), String> {
     println!("[DB] 🔓 Déliaison point {} ← event {}", point_id, event_id);
     let pool = get_db_pool(&app).await?;
 
     sqlx::query("DELETE FROM point_event WHERE point_id = ? AND event_id = ?")
-        .bind(point_id)
+        .bind(&point_id)
         .bind(event_id)
         .execute(&pool)
         .await

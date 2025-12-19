@@ -1,6 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState, useCallback } from "react";
 
+// Fonction pour afficher un ID court (8 premiers caractères)
+const shortId = (id: string | number): string => {
+  const str = String(id);
+  return str.length > 8 ? str.substring(0, 8) : str;
+};
+
 export type Obstacle = {
   id: number;
   name?: string | null;
@@ -161,12 +167,13 @@ export default function PointDetails({
   async function handleDelete() {
     if (!point) return;
 
-    if (!confirm(`Supprimer le point #${point.id} ?`)) return;
+    if (!confirm(`Supprimer le point #${shortId(point.id)} ?`)) return;
 
     try {
       await invoke("delete_point", { pointId: point.id });
-      if (onRefresh) onRefresh();
+      // Fermer d'abord le panneau, puis rafraîchir
       if (onClose) onClose();
+      if (onRefresh) await onRefresh();
     } catch (error) {
       console.error("Failed to delete point:", error);
       alert("Erreur lors de la suppression du point.");
@@ -240,7 +247,7 @@ export default function PointDetails({
       <div className="p-4 bg-gradient-to-r from-indigo-500 to-purple-600 text-white">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-bold">Point #{point.id}</h2>
+            <h2 className="text-xl font-bold">Point #{shortId(point.id)}</h2>
             <div className="text-white/80 text-sm mt-1 flex items-center gap-2">
               <span>📍</span>
               <span>{point.x.toFixed(5)}, {point.y.toFixed(5)}</span>

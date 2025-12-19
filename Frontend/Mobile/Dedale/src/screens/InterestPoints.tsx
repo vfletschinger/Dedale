@@ -8,14 +8,15 @@ import {
   Alert,
 } from "react-native";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState } from "react";
 import { InterestPointsType } from "../types/database";
-import getDatabase from "../../assets/migrations";
+import { getDatabase } from "../../assets/migrations";
 
 import {
   calculateDistance,
   getAddressFromCoords,
   getUserLocation,
+  shortId,
 } from "../services/Helper";
 import { deletePoint } from "../services/databaseAcces";
 import InterestPointCard from "../components/PointCard";
@@ -47,7 +48,7 @@ function ModalPointItem({
       className={selected ? "modal-select-item-active" : "modal-select-item"}
     >
       <View className="flex-1 mr-2">
-        <Text className="font-medium">Point #{item.id}</Text>
+        <Text className="font-medium">Point #{shortId(item.id)}</Text>
         <Text className="text-xs text-gray-500" numberOfLines={2}>
           {address}
         </Text>
@@ -66,7 +67,7 @@ export default function InterestPointsScreen() {
   const [sortBy, setSortBy] = useState<"recent" | "distance">("recent");
   const db = getDatabase();
   const { selectedEventId } = useEvent();
-  const { pointsByEvent, loading: pointsLoading } = usePoints();
+  const { pointsByEvent, loading: pointsLoading, refreshPoints } = usePoints();
 
   const [location, setLocation] = useState<{
     latitude: number;
@@ -113,10 +114,8 @@ export default function InterestPointsScreen() {
           onPress: () => {
             const success = deletePoint(pointId, db);
             if (success) {
-              Alert.alert(
-                "Succès",
-                "Point supprimé avec succès. Veuillez relancer l'application."
-              );
+              refreshPoints(); // Rafraîchir la liste des points
+              Alert.alert("Succès", "Point supprimé avec succès.");
             } else {
               Alert.alert("Erreur", "Impossible de supprimer le point");
             }
@@ -129,7 +128,7 @@ export default function InterestPointsScreen() {
   useEffect(() => {
     let sorted = [...listPoint];
     if (sortBy === "recent") {
-      sorted.sort((a, b) => b.id - a.id);
+      sorted.sort((a, b) => b.id.localeCompare(a.id));
     } else if (sortBy === "distance" && location) {
       sorted.sort((a, b) => {
         const distA = calculateDistance(
@@ -190,7 +189,7 @@ export default function InterestPointsScreen() {
     <View className="flex-1 bg-gray-50">
       {/* Header */}
       <View className="header">
-        <Text className="header-title-lg mb-2">Points d'intérêt</Text>
+        <Text className="header-title-lg mb-2">Points d&apos;intérêt</Text>
         <Text className="header-subtitle">
           {sortedList.length}{" "}
           {sortedList.length > 1 ? "points enregistrés" : "point enregistré"}
@@ -233,9 +232,9 @@ export default function InterestPointsScreen() {
           <View className="empty-icon">
             <Text className="text-5xl">📍</Text>
           </View>
-          <Text className="empty-title">Aucun point d'intérêt</Text>
+          <Text className="empty-title">Aucun point d&apos;intérêt</Text>
           <Text className="empty-text">
-            Commencez par enregistrer votre premier point d'intérêt
+            Commencez par enregistrer votre premier point d&apos;intérêt
           </Text>
           <Pressable
             className="btn-add-point"

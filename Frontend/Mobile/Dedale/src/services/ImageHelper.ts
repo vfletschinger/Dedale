@@ -28,33 +28,33 @@ export const saveImageToBDD = async (file: string, pointId: string) => {
 }
 
 export const imageToBase64 = async (uri: string) => {
-    const base64 = await FileSystem.readAsStringAsync(uri , {
-        encoding: 'base64',
-    });
-    console.log('Image converted to base64');
+  const base64 = await FileSystem.readAsStringAsync(uri, {
+    encoding: "base64",
+  });
+  console.log("Image converted to base64");
 
   return base64;
-}
+};
 
- export const pickImage = async () => {
-    try {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission refusée', 'Autorisation caméra refusée.');
-        return;
-      }
-
-      const result: any = await ImagePicker.launchCameraAsync({
-        allowsEditing: true,
-        quality: 0.7,
-      });
-
-      const uri = result?.assets?.[0]?.uri ?? result?.uri;
-      if (uri) {
-        return uri;
-      }
-    } catch (error) {
-      console.error('Erreur lors de la prise de photo :', error);
-      Alert.alert('Erreur', "Impossible d'accéder à la caméra.");
+export const pickImage = async () => {
+  try {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission refusée", "Autorisation caméra refusée.");
+      return;
     }
-  };
+
+    const result: any = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      quality: 0.7,
+    });
+
+    const uri = result?.assets?.[0]?.uri ?? result?.uri;
+    if (uri) {
+      return uri;
+    }
+  } catch (error) {
+    console.error("Erreur lors de la prise de photo :", error);
+    Alert.alert("Erreur", "Impossible d'accéder à la caméra.");
+  }
+};

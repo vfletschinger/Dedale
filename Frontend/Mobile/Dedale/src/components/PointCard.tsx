@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, Pressable } from "react-native";
 import { InterestPointsType } from "../types/database";
-import { getAddressFromCoords } from "../services/Helper";
+import { getAddressFromCoords, shortId } from "../services/Helper";
 import CoordinatesDisplay from "./CoordinatesDisplay";
 
 interface PointCardProps {
@@ -31,7 +31,7 @@ export default function PointCard({
   displayNavigationArrow = true,
   displayKnob = true,
 }: PointCardProps) {
-  const [address, setAddress] = useState<string>("Chargement...");
+  const [, setAddress] = useState<string>("Chargement...");
 
   useEffect(() => {
     const fetchAddress = async () => {
@@ -76,12 +76,12 @@ export default function PointCard({
             <View className="flex-row items-center">
               <View className="bg-blue-500 rounded-full w-10 h-10 items-center justify-center mr-3">
                 <Text className="text-white font-bold text-base">
-                  #{item.id}
+                  #{shortId(item.id)}
                 </Text>
               </View>
               <View>
                 <Text className="text-gray-800 font-bold text-lg">
-                  Point #{item.id}
+                  Point #{shortId(item.id)}
                 </Text>
               </View>
             </View>

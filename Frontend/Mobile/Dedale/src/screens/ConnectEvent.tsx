@@ -7,17 +7,18 @@ import QRCodeScanner from "../components/QrCodeScanner";
 import { useState, useEffect } from "react";
 import { useNavigation } from "@react-navigation/native";
 import EventItem from "../components/EventItem";
-import Feather from "@expo/vector-icons/Feather";
+import { Feather } from "@expo/vector-icons";
 import { useEvent, EventWithStatus } from "../context/EventContext";
 
 export default function ConnectEvent() {
   const [scanQR, setScanQR] = useState(false);
   const navigation = useNavigation<any>();
-  const { events, loading, refreshEvents, setSelectedEventId } = useEvent();
+  const { events, refreshEvents, setSelectedEventId } = useEvent();
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
     refreshEvents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleEventSelect = (event: EventWithStatus) => {

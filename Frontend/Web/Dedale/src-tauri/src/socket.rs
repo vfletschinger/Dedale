@@ -1,6 +1,9 @@
+#![allow(dead_code)]
+
 use crate::db::{get_db_pool, insert_point_details, PointDetail};
 use base64::{engine::general_purpose, Engine as _};
-use image::Luma;
+use image::codecs::png::PngEncoder;
+use image::{ImageEncoder, Luma};
 use local_ip_address::local_ip;
 use once_cell::sync::Lazy;
 use qrcode::QrCode;
@@ -9,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::{Row, Sqlite, Transaction};
 use std::io::Cursor;
 use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -16,13 +20,142 @@ use tauri::{AppHandle, Emitter};
 use tungstenite::accept;
 use tungstenite::Message;
 
+// ==================== Fonctions helper publiques et testables ====================
+
+/// Génère un port aléatoire dans la plage valide (1025-65534)
+pub fn random_port() -> u16 {
+    let mut rng = rand::rng();
+    rng.random_range(1025..65535)
+}
+
+/// Génère des placeholders SQL pour une liste de valeurs (ex: "?, ?, ?")
+pub fn generate_sql_placeholders(count: usize) -> String {
+    if count == 0 {
+        return String::new();
+    }
+    vec!["?"; count].join(", ")
+}
+
+/// Construit une URI WebSocket
+pub fn build_websocket_uri(host: &str, port: u16, path: &str) -> String {
+    format!("ws://{}:{}{}", host, port, path)
+}
+
+/// Génère un QR code en base64 à partir d'une chaîne
+pub fn generate_qr_code_base64(data: &str) -> Result<String, String> {
+    let code =
+        QrCode::new(data.as_bytes()).map_err(|e| format!("Failed to create QR code: {}", e))?;
+
+    let img = code.render::<Luma<u8>>().build();
+
+    let mut buffer = Vec::new();
+    let encoder = PngEncoder::new(&mut buffer);
+
+    encoder
+        .write_image(
+            img.as_raw(),
+            img.width(),
+            img.height(),
+            image::ColorType::L8,
+        )
+        .map_err(|e| format!("Failed to encode QR code image: {}", e))?;
+
+    let base64_str = general_purpose::STANDARD.encode(&buffer);
+    Ok(format!("data:image/png;base64,{}", base64_str))
+}
+
+/// Crée une réponse d'accusé de réception
+pub fn create_ack_response(code: i32, message: &str) -> String {
+    let response = AckResponse {
+        code,
+        message: message.to_string(),
+    };
+    serde_json::to_string(&response)
+        .unwrap_or_else(|_| format!(r#"{{"code":{},"message":"{}"}}"#, code, message))
+}
+
+/// Parse un accusé de réception d'événement
+pub fn parse_event_ack(json_str: &str) -> Result<EventAck, String> {
+    serde_json::from_str(json_str).map_err(|e| format!("Failed to parse event ack: {}", e))
+}
+
+/// Sérialise une liste d'événements de transfert
+pub fn serialize_events(events: &[TransferEvent]) -> Result<String, String> {
+    serde_json::to_string(events).map_err(|e| format!("Failed to serialize events: {}", e))
+}
+
+/// Types de messages WebSocket
+#[derive(Debug, Clone, PartialEq)]
+pub enum WebSocketMessageType {
+    EventAck,
+    ExportData,
+    Action,
+    Unknown,
+}
+
+/// Identifie le type de message WebSocket
+pub fn identify_message_type(json_str: &str) -> WebSocketMessageType {
+    if json_str.contains("\"action\"") {
+        WebSocketMessageType::Action
+    } else if json_str.contains("\"event\"") && json_str.contains("\"points\"") {
+        WebSocketMessageType::ExportData
+    } else if json_str.contains("\"id\"") && json_str.contains("\"name\"") {
+        WebSocketMessageType::EventAck
+    } else {
+        WebSocketMessageType::Unknown
+    }
+}
+
+/// Crée un message d'erreur formaté
+pub fn create_error_message(code: i32, description: &str) -> String {
+    format!(
+        r#"{{"error":true,"code":{},"message":"{}"}}"#,
+        code, description
+    )
+}
+
+/// Crée une adresse socket à partir d'une IP et d'un port
+pub fn create_socket_addr(ip: IpAddr, port: u16) -> SocketAddr {
+    SocketAddr::new(ip, port)
+}
+
+/// Sérialise une réponse d'accusé de réception
+pub fn serialize_ack_response(code: i32, message: &str) -> String {
+    create_ack_response(code, message)
+}
+
+/// Construit une requête SQL pour récupérer des événements par IDs
+pub fn build_events_query(event_ids: &[i64]) -> String {
+    if event_ids.is_empty() {
+        return String::from("SELECT * FROM event WHERE 1=0");
+    }
+
+    let placeholders = generate_sql_placeholders(event_ids.len());
+    format!(
+        "SELECT id, name, description, date_debut, date_fin, statut, geometry FROM event WHERE id IN ({})",
+        placeholders
+    )
+}
+
+/// Vérifie si un port est dans la plage valide
+pub fn is_valid_port(port: u16) -> bool {
+    (1025..=65534).contains(&port)
+}
+
+/// Génère une adresse IP locale par défaut
+pub fn get_default_local_ip() -> IpAddr {
+    local_ip().unwrap_or(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)))
+}
+
+// ==================== Structures internes ====================
+
 /// Canal global pour envoyer des événements au thread WebSocket
 static EVENT_SENDER: Lazy<Mutex<Option<Sender<TransferEvent>>>> = Lazy::new(|| Mutex::new(None));
 
 /// Structure pour un event envoyé au mobile (avec noms camelCase pour compatibilité)
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
-struct TransferEvent {
+pub(crate) struct TransferEvent {
     id: i64,
     name: String,
     description: String,
@@ -35,7 +168,7 @@ struct TransferEvent {
 /// Structure pour un accusé de réception d'event du mobile
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct EventAck {
+pub(crate) struct EventAck {
     id: i64,
     name: String,
     #[serde(default)]
@@ -122,11 +255,6 @@ struct MobileExportEvent {
     geometry: Option<String>,
     #[serde(default)]
     calculated_status: Option<String>,
-}
-
-fn random_port() -> u16 {
-    let mut rng = rand::rng();
-    rng.random_range(1025..65535)
 }
 
 /// Insère les points au format mobile dans la base de données
@@ -399,6 +527,13 @@ async fn handle_websocket(
                             match insert_mobile_points(app, event_id, mobile_export.points).await {
                                 Ok(_) => {
                                     println!("✅ Points insérés avec succès !");
+                                    // Émettre un événement pour notifier le frontend
+                                    if let Err(e) = app.emit("points-updated", event_id) {
+                                        eprintln!(
+                                            "⚠️ Erreur émission événement points-updated: {}",
+                                            e
+                                        );
+                                    }
                                 }
                                 Err(e) => {
                                     eprintln!("❌ Erreur d'insertion des points: {}", e);
@@ -785,7 +920,9 @@ async fn handle_receive_websocket(
                         let _ = websocket.flush();
                     } else {
                         // Log l'erreur de parsing pour debug
-                        if let Err(e) = serde_json::from_str::<MobileExport>(&text) { println!("⚠️ Erreur parsing MobileExport: {}", e) }
+                        if let Err(e) = serde_json::from_str::<MobileExport>(&text) {
+                            println!("⚠️ Erreur parsing MobileExport: {}", e)
+                        }
                         println!("⚠️ Format de message non reconnu");
                     }
                 }

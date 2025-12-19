@@ -1,23 +1,25 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { View, Text, Pressable, Alert } from "react-native";
 import { useRoute, useNavigation } from "@react-navigation/native";
+import { shortId } from "../services/Helper";
 import MapView, {
   Marker,
   Polyline,
   Region,
-  UrlTile,
   PROVIDER_DEFAULT,
 } from "react-native-maps";
 import * as Location from "expo-location";
-import { InterestPointsType } from "../types/database";
 
 export default function RouteNavigation() {
   const route = useRoute();
   const navigation = useNavigation();
-  const points: InterestPointsType[] = (route.params as any)?.points ?? [];
+  const points = useMemo(
+    () => (route.params as any)?.points ?? [],
+    [route.params]
+  );
 
   const [currentRegion, setCurrentRegion] = useState<Region | undefined>();
-  const [currentLocation, setCurrentLocation] = useState<{
+  const [, setCurrentLocation] = useState<{
     latitude: number;
     longitude: number;
   } | null>(null);
@@ -145,7 +147,7 @@ export default function RouteNavigation() {
     return () => {
       watchLocation.then((subscription) => subscription.remove());
     };
-  }, []);
+  }, [points]);
 
   const goToNextPoint = () => {
     if (currentPointIndex < points.length - 1) {
@@ -242,7 +244,7 @@ export default function RouteNavigation() {
             key={point.id}
             coordinate={{ latitude: point.y, longitude: point.x }}
             pinColor={index === currentPointIndex ? "#3b82f6" : "#9ca3af"}
-            title={`Point #${point.id}`}
+            title={`Point #${shortId(point.id)}`}
             description={
               index === currentPointIndex
                 ? "Point actuel"
@@ -276,7 +278,7 @@ export default function RouteNavigation() {
             Point {currentPointIndex + 1} / {points.length}
           </Text>
           <Text className="nav-point-name">
-            Point #{points[currentPointIndex].id}
+            Point #{shortId(points[currentPointIndex].id)}
           </Text>
         </View>
 

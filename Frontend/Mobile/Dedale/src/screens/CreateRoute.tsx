@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { View, Text, Pressable, Alert } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import {
@@ -20,7 +20,10 @@ export default function CreateRouteScreen(_: CreateRouteProps) {
   };
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const route = useRoute();
-  const points: InterestPointsType[] = (route.params as any)?.points ?? [];
+  const points = useMemo(
+    () => (route.params as any)?.points ?? [],
+    [route.params]
+  );
   const [data, setData] = useState<InterestPointsType[]>(points);
 
   const validateRoute = () => {
@@ -45,7 +48,7 @@ export default function CreateRouteScreen(_: CreateRouteProps) {
           <Pressable onPress={() => navigation.goBack()} className="mr-3">
             <Text className="text-white text-2xl">←</Text>
           </Pressable>
-          <Text className="header-title">Ordonner l'itinéraire</Text>
+          <Text className="header-title">Ordonner l&apos;itinéraire</Text>
         </View>
       </View>
 
@@ -100,7 +103,7 @@ export default function CreateRouteScreen(_: CreateRouteProps) {
         </GestureHandlerRootView>
       ) : (
         <View className="center">
-          <Text className="text-gray-500">Aucun point d'intérêt</Text>
+          <Text className="text-gray-500">Aucun point d&apos;intérêt</Text>
         </View>
       )}
     </View>

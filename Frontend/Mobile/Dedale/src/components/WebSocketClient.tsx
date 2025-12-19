@@ -51,9 +51,7 @@ class WebSocketClient {
   /**
    * Tente d'établir la connexion WebSocket.
    */
-  public connect(
-    onMessage?: (events: EventType[]) => void
-  ): Promise<boolean> {
+  public connect(onMessage?: (events: EventType[]) => void): Promise<boolean> {
     this.onMessageCallback = onMessage;
 
     return new Promise((resolve, reject) => {
@@ -165,8 +163,8 @@ class WebSocketClient {
           } else {
             console.log("⚠️ Format de message non reconnu:", JSON.stringify(data).substring(0, 100));
           }
-        } catch (error) {
-          console.log("🤔 Message non-JSON reçu:", e.data);
+        } catch {
+          console.log("🤔 Message non reconnu:", e.data);
           if (this.isLoading) {
             console.log(
               "📝 Message reçu pendant le chargement, possiblement un écho"

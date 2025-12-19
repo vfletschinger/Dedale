@@ -14,7 +14,7 @@ import {
   useFocusEffect,
 } from "@react-navigation/native";
 import React, { useCallback, useState } from "react";
-import getDatabase from "../../assets/migrations";
+import { getDatabase } from "../../assets/migrations";
 import {
   PointDetailType,
   CommentType,
@@ -35,6 +35,7 @@ import {
   updateTimeStamp,
 } from "../services/databaseAcces";
 import { imageToBase64, pickImage } from "../services/ImageHelper";
+import { shortId } from "../services/Helper";
 import MapView, { Marker, MapPressEvent } from "react-native-maps";
 import CoordinatesDisplay from "../components/CoordinatesDisplay";
 import EditModal from "../components/EditModal";
@@ -130,6 +131,7 @@ export default function PointDetails() {
   useFocusEffect(
     useCallback(() => {
       fetchPoint();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pointId])
   );
 
@@ -315,11 +317,6 @@ export default function PointDetails() {
     }
   };
 
-  const handleAddObstacles = () => {
-    setEditingObstacles(false);
-    setIsObstacleSelectorVisible(true);
-  };
-
   const handleEditObstacles = () => {
     setEditingObstacles(true);
     setIsObstacleSelectorVisible(true);
@@ -363,7 +360,7 @@ export default function PointDetails() {
 
         <View className="p-4">
           <Text className="text-3xl font-bold mb-4">
-            Point #{pointData.point.id}
+            Point #{shortId(pointData.point.id)}
           </Text>
 
           {/* Coordonnées */}
@@ -394,7 +391,7 @@ export default function PointDetails() {
                     latitude: pointData.point.y,
                     longitude: pointData.point.x,
                   }}
-                  title={`Point #${pointData.point.id}`}
+                  title={`Point #${shortId(pointData.point.id)}`}
                 />
               </MapView>
             </View>
