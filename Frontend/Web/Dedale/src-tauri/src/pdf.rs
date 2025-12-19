@@ -1,8 +1,10 @@
 #![allow(dead_code)]
 
 use crate::db;
+use crate::map_static;
 use crate::utils;
 use base64::{engine::general_purpose, Engine as _};
+use sqlx::Row;
 use std::fmt::Write;
 use std::fs;
 use std::path::Path;
@@ -166,8 +168,8 @@ pub fn load_fonts_from_directory(fonts_dir: &Path) -> Result<Vec<Vec<u8>>, Strin
 // ==================== Commandes Tauri ====================
 
 #[tauri::command]
-pub async fn create_pdf(app: AppHandle) -> Result<(), String> {
-    let data = db::retrieve_data(&app).await?;
+pub async fn create_pdf(app: AppHandle, event_id: Option<i64>) -> Result<(), String> {
+    let data = db::retrieve_data_by_event(&app, event_id).await?;
 
     let temp_dir = std::env::temp_dir().join("my_app_pdf_gen");
     if temp_dir.exists() {
@@ -188,6 +190,83 @@ pub async fn create_pdf(app: AppHandle) -> Result<(), String> {
         #v(1cm)
         "#,
     );
+
+    if let Some(eid) = event_id {
+        let pool = db::get_db_pool(&app).await?;
+
+        let row = sqlx::query(
+            "SELECT name, description, date_debut, date_fin, statut FROM event WHERE id = ?",
+        )
+        .bind(eid)
+        .fetch_optional(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+        if let Some(r) = row {
+            let name: String = r.get("name");
+            let description: String = r.get("description");
+            let start: String = r.get("date_debut");
+            let end: String = r.get("date_fin");
+            let status: String = r.get("statut");
+
+            typst_src.push_str(&format!(
+                r#"
+                #block(fill: luma(240), inset: 8pt, radius: 4pt, width: 100%)[
+                  #text(14pt, weight: "bold")[{}] \
+                  #v(0.3em)
+                  *Statut :* {} \
+                  *Dates :* {} au {} \
+                  *Description :* {}
+                ]
+                #v(0.5cm)
+                "#,
+                name, status, start, end, description
+            ));
+        }
+    }
+
+    let map_res = map_static::generate_cropped_map(&temp_dir, &data);
+
+    if let Ok(map) = map_res {
+        typst_src.push_str("== Vue Carte\n#v(0.5em)\n");
+
+        let width_geo = map.bounds.max_x - map.bounds.min_x;
+        let height_geo = map.bounds.max_y - map.bounds.min_y;
+
+        typst_src.push_str(&format!(
+            r#"
+            #block(width: 100%, height: auto, clip: true, stroke: 1pt + gray)[
+              #image("{}", width: 100%)
+            "#,
+            map.image_path
+        ));
+
+        for p in &data {
+            let pct_x = (p.x - map.bounds.min_x) / width_geo;
+            let pct_y = (map.bounds.max_y - p.y) / height_geo;
+
+            if pct_x >= 0.0 && pct_x <= 1.0 && pct_y >= 0.0 && pct_y <= 1.0 {
+                typst_src.push_str(&format!(
+                    r#"
+                    #place(top + left, dx: {:.2}%, dy: {:.2}%)[
+                      #place(center + horizon)[
+                        #circle(radius: 4pt, fill: red, stroke: white)
+                        #rect(fill: white.transparentize(30%), inset: 1pt, radius: 2pt)[
+                           #text(size: 6pt, weight: "bold")[#{}]
+                        ]
+                      ]
+                    ]
+                    "#,
+                    pct_x * 100.0,
+                    pct_y * 100.0,
+                    p.id
+                ));
+            }
+        }
+        typst_src.push_str("]\n#v(1cm)\n");
+    } else if let Err(e) = map_res {
+        eprintln!("Erreur génération map statique : {}", e);
+    }
 
     for (point_index, p) in data.iter().enumerate() {
         let heading = format!("== Point {} (X: {}, Y: {})", p.id, p.x, p.y);
