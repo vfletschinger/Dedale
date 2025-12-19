@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::db::Point;
 use crate::utils;
 use rust_xlsxwriter::Workbook;

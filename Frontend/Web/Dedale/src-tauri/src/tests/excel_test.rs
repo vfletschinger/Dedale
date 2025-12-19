@@ -130,8 +130,8 @@ fn test_format_optional_number_negative() {
 
 #[test]
 fn test_format_optional_float_some() {
-    let result = format_optional_float(Some(3.14));
-    assert!((result - 3.14).abs() < 0.01);
+    let result = format_optional_float(Some(3.5));
+    assert!((result - 3.5).abs() < 0.01);
 }
 
 #[test]

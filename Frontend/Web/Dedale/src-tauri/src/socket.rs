@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::db::{get_db_pool, insert_point_details, PointDetail};
 use base64::{engine::general_purpose, Engine as _};
 use image::codecs::png::PngEncoder;
@@ -137,7 +139,7 @@ pub fn build_events_query(event_ids: &[i64]) -> String {
 
 /// Vérifie si un port est dans la plage valide
 pub fn is_valid_port(port: u16) -> bool {
-    port >= 1025 && port <= 65534
+    (1025..=65534).contains(&port)
 }
 
 /// Génère une adresse IP locale par défaut
@@ -153,7 +155,7 @@ static EVENT_SENDER: Lazy<Mutex<Option<Sender<TransferEvent>>>> = Lazy::new(|| M
 /// Structure pour un event envoyé au mobile (avec noms camelCase pour compatibilité)
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
-struct TransferEvent {
+pub(crate) struct TransferEvent {
     id: i64,
     name: String,
     description: String,
@@ -166,7 +168,7 @@ struct TransferEvent {
 /// Structure pour un accusé de réception d'event du mobile
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct EventAck {
+pub(crate) struct EventAck {
     id: i64,
     name: String,
     #[serde(default)]

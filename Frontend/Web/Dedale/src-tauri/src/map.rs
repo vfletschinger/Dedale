@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 // ==================== Fonctions helper publiques et testables ====================
 
 /// Convertit des coordonnées décimales en degrés, minutes, secondes
@@ -89,7 +91,7 @@ pub fn calculate_bbox(points: &[(f64, f64)]) -> Option<(f64, f64, f64, f64)> {
 
 /// Vérifie si des coordonnées sont valides (latitude: -90 à 90, longitude: -180 à 180)
 pub fn is_valid_coordinate(lat: f64, lon: f64) -> bool {
-    lat >= -90.0 && lat <= 90.0 && lon >= -180.0 && lon <= 180.0
+    (-90.0..=90.0).contains(&lat) && (-180.0..=180.0).contains(&lon)
 }
 
 /// Convertit des mètres en degrés approximatifs (à l'équateur)
@@ -137,7 +139,7 @@ pub fn calculate_bearing(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
 pub fn bearing_to_cardinal(bearing: f64) -> &'static str {
     let normalized = ((bearing % 360.0) + 360.0) % 360.0;
     match normalized {
-        b if b < 22.5 || b >= 337.5 => "N",
+        b if !(22.5..337.5).contains(&b) => "N",
         b if b < 67.5 => "NE",
         b if b < 112.5 => "E",
         b if b < 157.5 => "SE",

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::db;
 use crate::utils;
 use base64::{engine::general_purpose, Engine as _};
@@ -59,8 +61,7 @@ pub fn extract_base64_content(base64_str: &str) -> (Option<&str>, &str) {
         let content = &base64_str[index + 1..];
 
         // Extraire le type MIME du préfixe (ex: "data:image/png;base64")
-        let mime_type = if prefix.starts_with("data:") {
-            let type_part = &prefix[5..];
+        let mime_type = if let Some(type_part) = prefix.strip_prefix("data:") {
             type_part.split(';').next()
         } else {
             None

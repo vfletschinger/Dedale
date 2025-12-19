@@ -1,4 +1,6 @@
 // On importe les dépendances nécessaires
+#![allow(dead_code)]
+
 use bcrypt::{hash, verify, DEFAULT_COST};
 use rand::Rng;
 use serde::Deserialize;
@@ -71,7 +73,7 @@ pub fn format_event_status(statut: &str) -> &'static str {
 
 /// Valide une coordonnée de point
 pub fn is_valid_point_coordinate(x: f64, y: f64) -> bool {
-    x.is_finite() && y.is_finite() && x >= -180.0 && x <= 180.0 && y >= -90.0 && y <= 90.0
+    x.is_finite() && y.is_finite() && (-180.0..=180.0).contains(&x) && (-90.0..=90.0).contains(&y)
 }
 
 /// Valide une date au format ISO
@@ -90,7 +92,7 @@ pub fn is_valid_date_format(date: &str) -> bool {
     let day: Result<u32, _> = parts[2].parse();
 
     match (year, month, day) {
-        (Ok(y), Ok(m), Ok(d)) => y >= 1900 && y <= 2100 && m >= 1 && m <= 12 && d >= 1 && d <= 31,
+        (Ok(y), Ok(m), Ok(d)) => (1900..=2100).contains(&y) && (1..=12).contains(&m) && (1..=31).contains(&d),
         _ => false,
     }
 }
@@ -150,7 +152,7 @@ pub fn is_valid_phone_number(phone: &str) -> bool {
 /// Sanitize une chaîne pour éviter les injections SQL basiques
 pub fn sanitize_string(input: &str) -> String {
     input
-        .replace('"', "\"")
+        .replace('"', "\\\"")
         .replace('\'', "''")
         .replace('\\', "\\\\")
 }

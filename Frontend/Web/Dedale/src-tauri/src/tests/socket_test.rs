@@ -12,7 +12,7 @@ use std::net::{IpAddr, Ipv4Addr};
 fn test_random_port_range() {
     for _ in 0..100 {
         let port = random_port();
-        assert!(port >= 1025 && port <= 65534, "Port {} out of range", port);
+        assert!((1025..=65534).contains(&port), "Port {} out of range", port);
     }
 }
 
