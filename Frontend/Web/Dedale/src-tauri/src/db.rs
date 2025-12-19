@@ -546,11 +546,11 @@ async fn fetch_pictures(pool: &SqlitePool, point_id: &str) -> Result<Vec<Picture
 
 async fn fetch_obstacles(pool: &SqlitePool, point_id: &str) -> Result<Vec<Obstacle>, String> {
     let query = r#"
-        SELECT 
-            o.id, 
+        SELECT
+            o.id,
             o.point_id,
             o.type_id,
-            o.number, 
+            o.number,
             ot.name AS name,
             ot.description AS description,
             ot.width AS width,
@@ -834,7 +834,7 @@ pub async fn insert_point_details(
                 || obstacle.length.is_some()
             {
                 sqlx::query(
-                    r#"INSERT OR IGNORE INTO obstacle_type (id, name, description, width, length) 
+                    r#"INSERT OR IGNORE INTO obstacle_type (id, name, description, width, length)
                        VALUES (?, ?, ?, ?, ?)"#,
                 )
                 .bind(obstacle.type_id)
@@ -859,7 +859,7 @@ pub async fn insert_point_details(
                 .bind(obstacle.number)
                 .execute(&mut *tx)
                 .await
-                .map_err(|e| format!("Erreur INSERT/REPLACE obstacle ID {} (point_id: {}, type_id: {}) : {}", 
+                .map_err(|e| format!("Erreur INSERT/REPLACE obstacle ID {} (point_id: {}, type_id: {}) : {}",
                     obstacle.id, point_id_to_use, obstacle.type_id, e))?;
         }
     }
@@ -1064,7 +1064,7 @@ pub async fn fetch_teams(app: AppHandle) -> Result<Vec<Team>, String> {
     let pool = get_db_pool(&app).await?;
 
     let query = r#"
-        SELECT 
+        SELECT
             t.id,
             t.name,
             COUNT(DISTINCT m.person_id) as number,
@@ -1304,7 +1304,7 @@ pub async fn remove_member(app: AppHandle, team_id: i64, person_id: i64) -> Resu
 pub async fn fetch_person_teams(app: AppHandle, person_id: i64) -> Result<Vec<Team>, String> {
     let pool = get_db_pool(&app).await?;
     let query = r#"
-        SELECT t.id, t.name, 
+        SELECT t.id, t.name,
                (SELECT COUNT(*) FROM member m2 WHERE m2.team_id = t.id) as number
         FROM team t
         INNER JOIN member m ON t.id = m.team_id
@@ -1349,7 +1349,7 @@ pub async fn fetch_events(app: AppHandle) -> Result<Vec<Event>, String> {
     println!("[DB] ✅ Table 'event' existe.");
 
     let query = r#"
-        SELECT 
+        SELECT
             id,
             name,
             description,
