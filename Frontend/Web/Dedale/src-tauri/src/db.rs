@@ -1,13 +1,13 @@
 // On importe les dépendances nécessaires
 use bcrypt::{hash, verify, DEFAULT_COST};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
-use sqlx::{Sqlite, Transaction};
 use sqlx::{Row, SqlitePool};
+use sqlx::{Sqlite, Transaction};
 use std::fs;
 use std::str::FromStr;
+use tauri::State;
 use tauri::{AppHandle, Manager};
 use uuid::Uuid;
-use tauri::State;
 
 // Réexporter les types depuis le module types
 pub use crate::types::*;
@@ -244,9 +244,8 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
 #[tauri::command]
 pub async fn fetch_pictures(
     pool: State<'_, SqlitePool>,
-    point_id: String // 2. CORRECTION: String au lieu de &str
+    point_id: String, // 2. CORRECTION: String au lieu de &str
 ) -> Result<Vec<Picture>, String> {
-
     // Note:  que le nom de la colonne dans votre DB est bien 'image'
     // (dans votre script de création précédent, vous aviez mis 'image_data' ou 'image', soyez cohérent)
     let rows = sqlx::query("SELECT id, image, point_id FROM picture WHERE point_id = ?")
@@ -268,26 +267,17 @@ pub async fn fetch_pictures(
     Ok(pictures)
 }
 
-pub async fn fetch_equipement_coordinates(pool: &SqlitePool, equipement_id: &str) -> Result<Vec<EquipementCoordinate>, String> {
-    let rows = sqlx::query(
-        "SELECT id, equipement_id, x, y FROM equipement_coordinate WHERE equipement_id = ? ORDER BY id ASC"
+pub async fn fetch_equipement_coordinates(
+    pool: &SqlitePool,
+    equipement_id: &str,
+) -> Result<Vec<EquipementCoordinate>, String> {
+    sqlx::query_as::<_, EquipementCoordinate>(
+        "SELECT x, y, order_index FROM equipement_coordinate WHERE equipement_id = ? ORDER BY order_index ASC"
     )
     .bind(equipement_id)
     .fetch_all(pool)
     .await
-    .map_err(|e| format!("Erreur coordonnées: {}", e))?;
-
-    let coords = rows
-        .into_iter()
-        .map(|row| EquipementCoordinate {
-            id: row.get("id"),
-            equipement_id: row.get("equipement_id"),
-            x: row.get("x"),
-            y: row.get("y"),
-        })
-        .collect();
-
-    Ok(coords)
+    .map_err(|e| format!("Erreur coordonnées: {}", e))
 }
 
 #[tauri::command]
@@ -295,7 +285,6 @@ pub async fn fetch_equipement_details(
     pool: State<'_, SqlitePool>, // Utilisation de State au lieu de AppHandle
     equipement_id: String,       // String au lieu de &str
 ) -> Result<Option<EquipementComplet>, String> {
-
     let query = r#"
         SELECT
             e.id,
@@ -1162,16 +1151,14 @@ pub async fn insert_event(event: Event, app: AppHandle) -> Result<(), String> {
     // Générer un UUID pour l'id de l'événement
     let event_id = Uuid::new_v4().to_string();
 
-    sqlx::query(
-        "INSERT INTO event (id, name, start_date, end_date) VALUES (?, ?, ?, ?, ?, ?)",
-    )
-    .bind(&event_id)
-    .bind(&event.name)
-    .bind(&event.start_date)
-    .bind(&event.end_date)
-    .execute(&pool)
-    .await
-    .map_err(|e| format!("Failed to insert event: {}", e))?;
+    sqlx::query("INSERT INTO event (id, name, start_date, end_date) VALUES (?, ?, ?, ?, ?, ?)")
+        .bind(&event_id)
+        .bind(&event.name)
+        .bind(&event.start_date)
+        .bind(&event.end_date)
+        .execute(&pool)
+        .await
+        .map_err(|e| format!("Failed to insert event: {}", e))?;
 
     println!(
         "[DB] ✅ Événement '{:?}' créé avec succès (id: {})!",
