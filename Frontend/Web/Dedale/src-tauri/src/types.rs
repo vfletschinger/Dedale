@@ -52,6 +52,7 @@ pub struct Type {
     pub name: Option<String>,
     pub description: Option<String>,
     pub width: Option<f64>,
+    pub length: Option<f64>,
     pub height: Option<f64>,
 }
 
