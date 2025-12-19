@@ -1,16 +1,40 @@
-image: ivangabriele/tauri:debian-bookworm-22
-
 variables:
   PROJECT_PATH: "Frontend/Web/Dedale/src-tauri"
   WEB_PATH: "Frontend/Web/Dedale"
   CARGO_HOME: $CI_PROJECT_DIR/.cargo
   npm_config_cache: $CI_PROJECT_DIR/.npm
 
+image: $CI_REGISTRY_IMAGE:latest
+
 stages:
+  - build-image
   - quality
-  - build
   - test
   - release
+  - deploy
+
+# build l'image custom
+build_ci_image:
+  stage: build-image
+  image: docker:latest
+  services:
+    - name: docker:dind
+      command: ["--tls=false"]
+  rules:
+    - changes:
+        - Frontend/Web/Dedale/Dockerfile
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+    DOCKER_DRIVER: overlay2
+  before_script:
+    - until docker info; do sleep 1; done
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin $CI_REGISTRY
+  script:
+    - echo "Building image $CI_REGISTRY_IMAGE:latest"
+    - docker build -t $CI_REGISTRY_IMAGE:latest -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA -f $WEB_PATH/Dockerfile .
+    - docker push $CI_REGISTRY_IMAGE:latest
+    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
 
 .cache_cargo: &cache_cargo
   key: "${CI_COMMIT_REF_SLUG}-cargo"
@@ -28,18 +52,24 @@ stages:
     - $WEB_PATH/node_modules/
   policy: pull-push
 
-# Job de qualité Rust 
+# ===========================================
+# QUALITY JOBS
+# ===========================================
 check_rust_quality:
   stage: quality
+  rules:
+    - if: $CI_COMMIT_BRANCH != "main"
   cache:
     - <<: *cache_cargo
-  before_script:
-    - rustup component add rustfmt clippy
   script:
     - cd $PROJECT_PATH
     - mkdir -p reports
     - cargo fmt --all -- --check 2>&1 | tee reports/cargoFmt_report.txt
     - cargo clippy --all-targets --all-features -- -D warnings 2>&1 | tee reports/clippy_report.txt
+  after_script:
+    - cd $PROJECT_PATH
+    - rm -rf target/debug/incremental target/debug/.fingerprint
+    - find target -name "*.lock" -type f -delete 2>/dev/null || true
   artifacts:
     when: always
     paths:
@@ -47,10 +77,10 @@ check_rust_quality:
     expire_in: 1 week
   allow_failure: false
 
-# Job de lint frontend 
 lint_frontend:
   stage: quality
-  image: node:22-slim
+  rules:
+    - if: $CI_COMMIT_BRANCH != "main"
   cache:
     - <<: *cache_npm
   script:
@@ -58,7 +88,6 @@ lint_frontend:
     - npm ci --prefer-offline
     - mkdir -p $CI_PROJECT_DIR/$PROJECT_PATH/reports
     - npm run lint 2>&1 | tee $CI_PROJECT_DIR/$PROJECT_PATH/reports/lint_report.txt
-
   artifacts:
     when: always
     paths:
@@ -66,54 +95,38 @@ lint_frontend:
     expire_in: 1 week
   allow_failure: false
 
-# --- JOB 2 : BUILD LINUX (uniquement pour les tests E2E) ---
-build_for_tests:
-  stage: build
+# ===========================================
+# TEST JOBS
+# ===========================================
+test_e2e:
+  stage: test
   rules:
-    - if: $CI_COMMIT_BRANCH == "web" || $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "web" || $CI_COMMIT_BRANCH == "develop"
   needs:
     - job: check_rust_quality
     - job: lint_frontend
   cache:
-    - key: "${CI_COMMIT_REF_SLUG}-cargo-test"
-      paths:
-        - .cargo/registry/
-        - .cargo/git/
-        - $PROJECT_PATH/target/release/
-      policy: pull-push
     - <<: *cache_npm
-  script:
-    - cd $WEB_PATH
-    - npm ci --prefer-offline
-    # Génère uniquement l'exécutable pour les tests
-    - npm run tauri build -- --no-bundle --verbose
-    
-  artifacts:
-    paths:
-      - $PROJECT_PATH/target/release/dedale
-    expire_in: 1 day
-
-# --- JOB 3 : TESTS WEBDRIVER (E2E) ---
-test_e2e:
-  stage: test
-  rules:
-    - if: $CI_COMMIT_BRANCH == "web" || $CI_COMMIT_BRANCH == "main"
-  needs: ["build_for_tests"]
-  cache:
+    - <<: *cache_cargo
     - key: "${CI_COMMIT_REF_SLUG}-webdriver"
       paths:
         - $PROJECT_PATH/webdriver/webdriverio/node_modules/
       policy: pull-push
   script:
-    - cd $PROJECT_PATH
-    # Vérifier que tauri-driver est disponible
-    - which tauri-driver
-    - cd webdriver/webdriverio
+    # Build for E2E tests
+    - cd $WEB_PATH
+    - npm ci --prefer-offline
+    - npm run tauri build -- --no-bundle --verbose
+
+    # Run E2E tests
+    - cd $CI_PROJECT_DIR/$PROJECT_PATH/webdriver/webdriverio
     - npm ci --prefer-offline
     - mkdir -p reports screenshots logs
-    # Lancement des tests WebdriverIO avec xvfb-run (serveur d'affichage virtuel)
     - xvfb-run -a -s "-screen 0 1920x1080x24" npm run test
-
+  after_script:
+    - cd $PROJECT_PATH
+    - rm -rf target/debug/incremental target/debug/.fingerprint
+    - find target -name "*.lock" -type f -delete 2>/dev/null || true
   artifacts:
     when: always
     paths:
@@ -121,39 +134,127 @@ test_e2e:
       - $PROJECT_PATH/webdriver/webdriverio/screenshots/
       - $PROJECT_PATH/webdriver/webdriverio/logs/
     expire_in: 1 week
+  allow_failure: true
+
+test_front:
+  stage: test
+  rules:
+    - if: $CI_COMMIT_BRANCH == "web" || $CI_COMMIT_BRANCH == "develop"
+  cache:
+    - <<: *cache_npm
+  script:
+    - cd $WEB_PATH
+    - npm ci --prefer-offline
+    - npm test -- --ci --reporters=default --reporters=jest-junit
+  artifacts:
+    when: always
+    paths:
+      - $PROJECT_PATH/reports/
+    expire_in: 1 week
   allow_failure: false
 
-# --- JOB 4 : BUILD WINDOWS (cross-compilation depuis Linux) ---
+test_backend:
+  stage: test
+  rules:
+    - if: $CI_COMMIT_BRANCH == "web" || $CI_COMMIT_BRANCH == "develop"
+  cache:
+    - <<: *cache_cargo
+  script:
+    - cd $PROJECT_PATH
+    - mkdir -p reports
+    - cargo test --all --verbose 2>&1 | tee reports/cargoTest_report.txt
+  after_script:
+    - cd $PROJECT_PATH
+    - rm -rf target/debug/incremental target/debug/.fingerprint
+    - find target -name "*.lock" -type f -delete 2>/dev/null || true
+  artifacts:
+    when: always
+    paths:
+      - $PROJECT_PATH/reports/
+    expire_in: 1 week
+  allow_failure: false
+
+# ===========================================
+# RELEASE JOBS
+# ===========================================
 build_app_windows:
   stage: release
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
-  needs:
-    - job: test_e2e
   cache:
-    # Cache séparé pour Windows 
     - key: "${CI_COMMIT_REF_SLUG}-cargo-windows"
       paths:
-        - .cargo/registry/
-        - .cargo/git/
-        - $PROJECT_PATH/target/x86_64-pc-windows-msvc/
+        - .cargo/registry/index/
+        - .cargo/registry/cache/
+        - .cargo/git/db/
       policy: pull-push
     - <<: *cache_npm
-  before_script:
-    - apt-get update -qq && apt-get install -y --no-install-recommends nsis
-    - apt-get install -y --no-install-recommends lld llvm clang
-    - rustup target add x86_64-pc-windows-msvc
-    - cargo install --locked cargo-xwin
-    # Ajouter le chemin de cargo-xwin au PATH
-    - export PATH="$CARGO_HOME/bin:$PATH"
   script:
     - cd $WEB_PATH
-    - export PATH="$CARGO_HOME/bin:$PATH"
     - npm ci --prefer-offline
-    
     - npm run tauri build -- --runner cargo-xwin --target x86_64-pc-windows-msvc --verbose
-    
+  after_script:
+    - rm -rf $PROJECT_PATH/target/x86_64-pc-windows-msvc/release/incremental
+    - find $PROJECT_PATH/target -name "*.lock" -type f -delete 2>/dev/null || true
   artifacts:
     paths:
       - $PROJECT_PATH/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
-    expire_in: 1 week
+    expire_in: 4 weeks
+    name: "dedale-windows-installer-$CI_COMMIT_SHORT_SHA"
+
+# ===========================================
+# DEPLOY JOBS
+# ===========================================
+upload_package:
+  stage: deploy
+  image: curlimages/curl:latest
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  needs:
+    - job: build_app_windows
+      artifacts: true
+  script:
+    - |
+      INSTALLER_PATH=$(find $PROJECT_PATH/target/x86_64-pc-windows-msvc/release/bundle/nsis/ -name "*.exe" | head -n 1)
+      INSTALLER_NAME="dedale-installer-v1.0.$CI_PIPELINE_IID.exe"
+      echo "Uploading $INSTALLER_PATH as $INSTALLER_NAME"
+
+      curl --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+           --upload-file "$INSTALLER_PATH" \
+           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/dedale/1.0.$CI_PIPELINE_IID/$INSTALLER_NAME"
+
+# --- GITLAB RELEASE ---
+release_windows:
+  stage: deploy
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  needs:
+    - job: build_app_windows
+    - job: upload_package
+  script:
+    - echo "Creating release for build $CI_PIPELINE_IID"
+  release:
+    tag_name: "v1.0.$CI_PIPELINE_IID"
+    name: "Dedale v1.0.$CI_PIPELINE_IID"
+    description: |
+      ## 📦 Version 1.0.$CI_PIPELINE_IID
+
+      **Build:** $CI_PIPELINE_IID
+      **Commit:** $CI_COMMIT_SHORT_SHA
+      **Date:** $CI_COMMIT_TIMESTAMP
+
+      ### Téléchargement
+      Téléchargez l'installateur Windows ci-dessus.
+
+      ### Configuration requise
+      - Windows 10/11 (64-bit)
+
+      ### 📝 Dernières modifications
+          $CI_COMMIT_TITLE
+
+    assets:
+      links:
+        - name: "Dedale-Windows-Installer.exe"
+          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/dedale/1.0.$CI_PIPELINE_IID/dedale-installer-v1.0.$CI_PIPELINE_IID.exe"
+          link_type: "package"
