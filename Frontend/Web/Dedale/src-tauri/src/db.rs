@@ -92,7 +92,9 @@ pub fn is_valid_date_format(date: &str) -> bool {
     let day: Result<u32, _> = parts[2].parse();
 
     match (year, month, day) {
-        (Ok(y), Ok(m), Ok(d)) => (1900..=2100).contains(&y) && (1..=12).contains(&m) && (1..=31).contains(&d),
+        (Ok(y), Ok(m), Ok(d)) => {
+            (1900..=2100).contains(&y) && (1..=12).contains(&m) && (1..=31).contains(&d)
+        }
         _ => false,
     }
 }
