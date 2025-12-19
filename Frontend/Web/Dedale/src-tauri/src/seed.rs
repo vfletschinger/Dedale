@@ -636,7 +636,7 @@ pub async fn seed_database(pool: &SqlitePool) -> Result<(), String> {
     println!("👥 Insertion des personnes...");
     for person in &persons {
         sqlx::query(
-            r#"INSERT INTO person (id, firstname, lastname) 
+            r#"INSERT INTO person (id, firstname, lastname)
                VALUES (?, ?, ?)"#,
         )
         .bind(person.id)
@@ -656,7 +656,7 @@ pub async fn seed_database(pool: &SqlitePool) -> Result<(), String> {
     println!("👨‍💼 Insertion des équipes...");
     for team in &teams {
         sqlx::query(
-            r#"INSERT INTO team (id, name, number) 
+            r#"INSERT INTO team (id, name, number)
                VALUES (?, ?, ?)"#,
         )
         .bind(team.id)
@@ -671,7 +671,7 @@ pub async fn seed_database(pool: &SqlitePool) -> Result<(), String> {
     println!("🔗 Insertion des membres (relations team-person)...");
     for member in &members {
         sqlx::query(
-            r#"INSERT INTO member (team_id, person_id) 
+            r#"INSERT INTO member (team_id, person_id)
                VALUES (?, ?)"#,
         )
         .bind(member.team_id)

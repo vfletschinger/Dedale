@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::db;
 use crate::map_static;
 use crate::utils;
@@ -11,161 +9,6 @@ use std::path::Path;
 use tauri::AppHandle;
 use typst_as_lib::TypstEngine;
 use typst_pdf::PdfOptions;
-
-// ==================== Fonctions helper publiques et testables ====================
-
-/// Formate un obstacle pour l'affichage (ex: "Barrière (x5)")
-pub fn format_obstacle(name: Option<&str>, number: Option<i32>) -> String {
-    let name_str = name.unwrap_or("N/A");
-    let num = number.unwrap_or(0);
-    format!("{} (x{})", name_str, num)
-}
-
-/// Formate une liste d'obstacles pour l'affichage
-pub fn format_obstacles_list(obstacles: &[(Option<String>, Option<i32>)]) -> String {
-    if obstacles.is_empty() {
-        return "None".to_string();
-    }
-
-    obstacles
-        .iter()
-        .map(|(name, number)| format_obstacle(name.as_deref(), *number))
-        .collect::<Vec<String>>()
-        .join(", ")
-}
-
-/// Formate une liste de commentaires pour l'affichage
-pub fn format_comments_list(comments: &[String]) -> String {
-    if comments.is_empty() {
-        return "None".to_string();
-    }
-    comments.join(", ")
-}
-
-/// Génère le heading d'un point pour Typst
-pub fn generate_point_heading(id: &str, x: f64, y: f64) -> String {
-    format!("== Point {} (X: {}, Y: {})", id, x, y)
-}
-
-/// Nettoie une chaîne base64 en supprimant le préfixe data URI si présent
-pub fn clean_base64_string(base64_str: &str) -> &str {
-    if let Some(index) = base64_str.find(',') {
-        &base64_str[index + 1..]
-    } else {
-        base64_str
-    }
-}
-
-/// Extrait le type MIME d'une chaîne base64 avec préfixe data URI
-pub fn extract_base64_content(base64_str: &str) -> (Option<&str>, &str) {
-    if let Some(index) = base64_str.find(',') {
-        let prefix = &base64_str[..index];
-        let content = &base64_str[index + 1..];
-
-        // Extraire le type MIME du préfixe (ex: "data:image/png;base64")
-        let mime_type = if let Some(type_part) = prefix.strip_prefix("data:") {
-            type_part.split(';').next()
-        } else {
-            None
-        };
-
-        (mime_type, content)
-    } else {
-        (None, base64_str)
-    }
-}
-
-/// Décode une chaîne base64 en bytes
-pub fn decode_base64(base64_str: &str) -> Result<Vec<u8>, String> {
-    let clean = base64_str.replace(['\n', '\r', ' '], "");
-
-    general_purpose::STANDARD
-        .decode(&clean)
-        .or_else(|_| general_purpose::STANDARD_NO_PAD.decode(&clean))
-        .map_err(|e| format!("Failed to decode base64: {}", e))
-}
-
-/// Génère un nom de fichier pour une image
-pub fn generate_image_filename(point_index: usize, img_index: usize) -> String {
-    format!("img_{}_{}.png", point_index, img_index)
-}
-
-/// Vérifie si une extension de fichier est valide pour une police
-pub fn is_valid_font_extension(extension: &str) -> bool {
-    matches!(
-        extension.to_lowercase().as_str(),
-        "ttf" | "otf" | "woff" | "woff2"
-    )
-}
-
-/// Génère le header Typst pour le document PDF
-pub fn generate_typst_header() -> String {
-    r#"
-        #set page(paper: "a4", margin: 1cm)
-        #set text(font: "Liberation Sans", size: 11pt)
-
-        // Title
-        #align(center, text(17pt, weight: "bold")[Recap])
-        #v(1cm)
-        "#
-    .to_string()
-}
-
-/// Génère un séparateur Typst
-pub fn generate_typst_separator() -> String {
-    "#v(1cm)\n#line(length: 100%, stroke: gray)\n#v(1cm)\n".to_string()
-}
-
-/// Génère le début d'une grille d'images Typst
-pub fn generate_typst_image_grid_start() -> String {
-    "#v(0.5em)\n#grid(\n  columns: (1fr, 1fr, 1fr),\n  gutter: 5pt,\n".to_string()
-}
-
-/// Génère une entrée d'image pour la grille Typst
-pub fn generate_typst_image_entry(filename: &str) -> String {
-    format!("  image(\"{}\", width: 100%),", filename)
-}
-
-/// Charge les polices depuis un répertoire (version publique)
-pub fn load_fonts_from_directory(fonts_dir: &Path) -> Result<Vec<Vec<u8>>, String> {
-    let mut fonts = Vec::new();
-
-    if !fonts_dir.exists() {
-        return Err(format!("Fonts directory not found: {:?}", fonts_dir));
-    }
-
-    let entries = std::fs::read_dir(fonts_dir)
-        .map_err(|e| format!("Failed to read fonts directory: {}", e))?;
-
-    for entry in entries {
-        let entry = entry.map_err(|e| format!("Error reading directory entry: {}", e))?;
-        let path = entry.path();
-
-        if let Some(ext) = path.extension() {
-            if let Some(ext_str) = ext.to_str() {
-                if is_valid_font_extension(ext_str) {
-                    match std::fs::read(&path) {
-                        Ok(font_data) => {
-                            println!("✅ Loaded font: {}", path.display());
-                            fonts.push(font_data);
-                        }
-                        Err(e) => {
-                            eprintln!("⚠️  Failed to load font {}: {}", path.display(), e);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    if fonts.is_empty() {
-        return Err("No valid font files found in fonts directory".to_string());
-    }
-
-    Ok(fonts)
-}
-
-// ==================== Commandes Tauri ====================
 
 #[tauri::command]
 pub async fn create_pdf(app: AppHandle, event_id: Option<i64>) -> Result<(), String> {
@@ -382,4 +225,40 @@ pub async fn create_pdf(app: AppHandle, event_id: Option<i64>) -> Result<(), Str
     let _ = fs::remove_dir_all(&temp_dir);
 
     Ok(())
+}
+
+fn load_fonts_from_directory(fonts_dir: &Path) -> Result<Vec<Vec<u8>>, String> {
+    let mut fonts = Vec::new();
+
+    if !fonts_dir.exists() {
+        return Err(format!("Fonts directory not found: {:?}", fonts_dir));
+    }
+
+    let entries = std::fs::read_dir(fonts_dir)
+        .map_err(|e| format!("Failed to read fonts directory: {}", e))?;
+
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("Error reading directory entry: {}", e))?;
+        let path = entry.path();
+
+        if let Some(ext) = path.extension() {
+            if matches!(ext.to_str(), Some("ttf" | "otf" | "woff" | "woff2")) {
+                match std::fs::read(&path) {
+                    Ok(font_data) => {
+                        println!("✅ Loaded font: {}", path.display());
+                        fonts.push(font_data);
+                    }
+                    Err(e) => {
+                        eprintln!("⚠️  Failed to load font {}: {}", path.display(), e);
+                    }
+                }
+            }
+        }
+    }
+
+    if fonts.is_empty() {
+        return Err("No valid font files found in fonts directory".to_string());
+    }
+
+    Ok(fonts)
 }
