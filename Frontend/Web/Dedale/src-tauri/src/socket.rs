@@ -168,7 +168,8 @@ pub(crate) struct TransferEvent {
 /// Structure pour un accusé de réception d'event du mobile
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct EventAck {
+#[allow(dead_code)]
+struct EventAck {
     id: i64,
     name: String,
     #[serde(default)]
@@ -206,6 +207,7 @@ struct MobileExport {
 
 /// Structure pour un point dans l'export mobile (format différent du desktop)
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct MobilePointDetail {
     id: String, // UUID
     x: f64,
@@ -245,6 +247,7 @@ struct MobileObstacle {
 /// Structure pour l'event dans l'export mobile
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 struct MobileExportEvent {
     id: i64,
     name: String,
@@ -890,10 +893,12 @@ async fn handle_receive_websocket(
                                     println!("✅ Points insérés avec succès !");
 
                                     // Émettre un événement pour notifier le frontend
-                                    app.emit("points-received", points_count)
-                                        .unwrap_or_else(|e| {
-                                            eprintln!("⚠️ Erreur émission points-received: {}", e);
-                                        });
+                                    if let Err(e) = app.emit("points-updated", event_id) {
+                                        eprintln!(
+                                            "⚠️ Erreur émission événement points-updated: {}",
+                                            e
+                                        );
+                                    }
                                 }
                                 Err(e) => {
                                     eprintln!("❌ Erreur insertion: {}", e);

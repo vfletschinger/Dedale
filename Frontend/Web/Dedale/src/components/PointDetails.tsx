@@ -140,8 +140,8 @@ export default function PointDetails({
       if (point) {
         //Convert camelCase to snake_case for backend
         const obstaclesSnakeCase = mergedObstacles.map((o) => ({
-          type_id: o.typeId ?? o.type_id ?? null,
-          obstacle_id: o.obstacleId ?? o.obstacle_id ?? null,
+          type_id: o.typeId ?? null,
+          obstacle_id: o.obstacleId ?? null,
           number: o.number ?? null,
           width: o.width ?? null,
           length: o.length ?? null,
