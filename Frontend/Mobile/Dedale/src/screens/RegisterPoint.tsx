@@ -30,6 +30,55 @@ type SelectedObstacle = {
   number: number;
 };
 
+// Fonction utilitaire exportée pour les tests
+export async function savePointToDB(
+  db: any,
+  x: number,
+  y: number,
+  comment: string,
+  images: string[],
+  obstacles: { type_id: number; number: number }[],
+  eventId: number | null
+): Promise<number> {
+  // Insérer le point
+  const pointResult = db.runSync(
+    "INSERT INTO point (x, y) VALUES (?, ?)",
+    [x, y]
+  );
+  const pointId = pointResult.lastInsertRowId;
+
+  // Lier à l'événement
+  if (eventId) {
+    db.runSync(
+      "INSERT INTO point_event (point_id, event_id) VALUES (?, ?)",
+      [pointId, eventId]
+    );
+  }
+
+  // Insérer le commentaire
+  if (comment) {
+    db.runSync(
+      "INSERT INTO comment (point_id, value) VALUES (?, ?)",
+      [pointId, comment]
+    );
+  }
+
+  // Insérer les obstacles
+  for (const obstacle of obstacles) {
+    db.runSync(
+      "INSERT INTO obstacle (point_id, type_id, number) VALUES (?, ?, ?)",
+      [pointId, obstacle.type_id, obstacle.number]
+    );
+  }
+
+  // Insérer les images
+  for (const image of images) {
+    await ImageHelper.saveImageToBDD(image, pointId);
+  }
+
+  return pointId;
+}
+
 export default function RegisterPointScreen() {
   const { selectedEventId } = useEvent();
   const { refreshPoints } = usePoints();

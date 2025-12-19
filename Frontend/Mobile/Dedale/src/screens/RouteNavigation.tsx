@@ -9,6 +9,55 @@ import MapView, {
 } from "react-native-maps";
 import * as Location from "expo-location";
 
+// Fonction utilitaire exportée pour les tests
+export function checkPointVisibility(
+  point: { x: number; y: number },
+  region: Region
+): boolean {
+  const latMin = region.latitude - region.latitudeDelta / 2;
+  const latMax = region.latitude + region.latitudeDelta / 2;
+  const lngMin = region.longitude - region.longitudeDelta / 2;
+  const lngMax = region.longitude + region.longitudeDelta / 2;
+
+  return (
+    point.y >= latMin &&
+    point.y <= latMax &&
+    point.x >= lngMin &&
+    point.x <= lngMax
+  );
+}
+
+// Fonction utilitaire exportée pour les tests
+export async function fetchRouteCoordinates(
+  points: { x: number; y: number }[]
+): Promise<{ latitude: number; longitude: number }[]> {
+  if (points.length < 2) {
+    return points.map((p) => ({ latitude: p.y, longitude: p.x }));
+  }
+
+  try {
+    const coordinates = points.map((point) => `${point.x},${point.y}`).join(";");
+    const url = `https://router.project-osrm.org/route/v1/foot/${coordinates}?overview=full&geometries=geojson`;
+    
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (data.routes && data.routes.length > 0) {
+      return data.routes[0].geometry.coordinates.map(
+        (coord: [number, number]) => ({
+          latitude: coord[1],
+          longitude: coord[0],
+        })
+      );
+    }
+  } catch (error) {
+    console.error("Error fetching route:", error);
+  }
+
+  // Fallback: lignes droites entre les points
+  return points.map((p) => ({ latitude: p.y, longitude: p.x }));
+}
+
 export default function RouteNavigation() {
   const route = useRoute();
   const navigation = useNavigation();

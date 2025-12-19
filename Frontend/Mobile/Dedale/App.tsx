@@ -34,7 +34,7 @@ function TabNavigator() {
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarIcon: ({ color, size }) => {
-          let iconName: string;
+          let iconName: keyof typeof Feather.glyphMap;
 
           if (route.name === "Home") {
             iconName = "home";
