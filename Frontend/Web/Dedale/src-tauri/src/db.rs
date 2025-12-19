@@ -269,13 +269,25 @@ pub async fn fetch_pictures(
 }
 
 pub async fn fetch_equipement_coordinates(pool: &SqlitePool, equipement_id: &str) -> Result<Vec<EquipementCoordinate>, String> {
-    sqlx::query_as::<_, EquipementCoordinate>(
-        "SELECT x, y, order_index FROM equipement_coordinate WHERE equipement_id = ? ORDER BY order_index ASC"
+    let rows = sqlx::query(
+        "SELECT id, equipement_id, x, y FROM equipement_coordinate WHERE equipement_id = ? ORDER BY id ASC"
     )
     .bind(equipement_id)
     .fetch_all(pool)
     .await
-    .map_err(|e| format!("Erreur coordonnées: {}", e))
+    .map_err(|e| format!("Erreur coordonnées: {}", e))?;
+
+    let coords = rows
+        .into_iter()
+        .map(|row| EquipementCoordinate {
+            id: row.get("id"),
+            equipement_id: row.get("equipement_id"),
+            x: row.get("x"),
+            y: row.get("y"),
+        })
+        .collect();
+
+    Ok(coords)
 }
 
 #[tauri::command]

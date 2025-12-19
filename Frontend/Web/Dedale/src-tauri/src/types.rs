@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use sqlx::FromRow;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Event {
@@ -39,7 +38,7 @@ pub struct Equipement {
     pub hour_depose: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct EquipementCoordinate {
     pub id: String,
     pub equipement_id: String,
@@ -53,6 +52,7 @@ pub struct Type {
     pub name: Option<String>,
     pub description: Option<String>,
     pub width: Option<f64>,
+    pub length: Option<f64>,
     pub height: Option<f64>,
 }
 
