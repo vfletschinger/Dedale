@@ -1184,7 +1184,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
       
       const currentEventId = selectedEventIdRef.current;
       try {
-        const freshPoints = await invoke<any[]>("get_points", { eventId: currentEventId || null });
+        const freshPoints = await invoke<PointData[]>("get_points", { eventId: currentEventId || null });
         console.log(`📍 ${freshPoints.length} point(s) récupéré(s) après import`);
         pointsRef.current = freshPoints;
         setPoints(freshPoints);
@@ -1193,7 +1193,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
         if (currentMap.getSource("db-points")) {
           const geojson = {
             type: "FeatureCollection",
-            features: freshPoints.map((p: any) => ({
+            features: freshPoints.map((p: PointData) => ({
               type: "Feature",
               geometry: {
                 type: "Point",
@@ -1207,7 +1207,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: number | null }
               },
             })),
           };
-          (currentMap.getSource("db-points") as maplibregl.GeoJSONSource).setData(geojson as any);
+          (currentMap.getSource("db-points") as maplibregl.GeoJSONSource).setData(geojson as GeoJSON.GeoJSON);
           console.log("✅ Carte mise à jour avec les nouveaux points");
         }
       } catch (err) {

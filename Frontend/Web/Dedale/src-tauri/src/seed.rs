@@ -261,23 +261,23 @@ pub async fn seed_database(pool: &SqlitePool) -> Result<(), String> {
 
     let pictures_data = [
         PictureSeed {
-            point_idx: 0, 
+            point_idx: 0,
             image: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
         },
-        PictureSeed { 
-            point_idx: 0, 
+        PictureSeed {
+            point_idx: 0,
             image: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
         },
-        PictureSeed { 
-            point_idx: 1, 
+        PictureSeed {
+            point_idx: 1,
             image: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
         },
-        PictureSeed { 
-            point_idx: 2,  
+        PictureSeed {
+            point_idx: 2,
             image: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
         },
-        PictureSeed { 
-            point_idx: 4,  
+        PictureSeed {
+            point_idx: 4,
             image: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
         },
     ];
@@ -503,29 +503,29 @@ pub async fn seed_database(pool: &SqlitePool) -> Result<(), String> {
     // Géométries WKT liées aux événements
     let geometry_data = [
         // Festival de Strasbourg - Zone du festival (polygone)
-        GeometrySeed { 
-            event_idx: 0, 
-            geom: "POLYGON((7.7400 48.5800, 7.7500 48.5800, 7.7500 48.5900, 7.7400 48.5900, 7.7400 48.5800))" 
+        GeometrySeed {
+            event_idx: 0,
+            geom: "POLYGON((7.7400 48.5800, 7.7500 48.5800, 7.7500 48.5900, 7.7400 48.5900, 7.7400 48.5800))"
         },
         // Marché de Noël - Zone centrale (polygone)
-        GeometrySeed { 
-            event_idx: 1, 
-            geom: "POLYGON((7.7450 48.5830, 7.7480 48.5830, 7.7480 48.5860, 7.7450 48.5860, 7.7450 48.5830))" 
+        GeometrySeed {
+            event_idx: 1,
+            geom: "POLYGON((7.7450 48.5830, 7.7480 48.5830, 7.7480 48.5860, 7.7450 48.5860, 7.7450 48.5830))"
         },
         // Marathon - Parcours (ligne)
-        GeometrySeed { 
-            event_idx: 2, 
-            geom: "LINESTRING(7.7350 48.5750, 7.7400 48.5800, 7.7500 48.5850, 7.7600 48.5900, 7.7700 48.5950)" 
+        GeometrySeed {
+            event_idx: 2,
+            geom: "LINESTRING(7.7350 48.5750, 7.7400 48.5800, 7.7500 48.5850, 7.7600 48.5900, 7.7700 48.5950)"
         },
         // Concert - Point de scène
-        GeometrySeed { 
-            event_idx: 3, 
-            geom: "POINT(7.7812 48.5910)" 
+        GeometrySeed {
+            event_idx: 3,
+            geom: "POINT(7.7812 48.5910)"
         },
         // Festival - Zone secondaire (polygone)
-        GeometrySeed { 
-            event_idx: 0, 
-            geom: "POLYGON((7.7600 48.5820, 7.7650 48.5820, 7.7650 48.5870, 7.7600 48.5870, 7.7600 48.5820))" 
+        GeometrySeed {
+            event_idx: 0,
+            geom: "POLYGON((7.7600 48.5820, 7.7650 48.5820, 7.7650 48.5870, 7.7600 48.5870, 7.7600 48.5820))"
         },
     ];
 

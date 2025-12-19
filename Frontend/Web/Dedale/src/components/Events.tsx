@@ -49,7 +49,7 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
   
   // État pour le QR code de réception
   const [receiveQrCode, setReceiveQrCode] = useState<string | null>(null);
-  const [receivingEventId, setReceivingEventId] = useState<number | null>(null);
+  const [_receivingEventId, setReceivingEventId] = useState<number | null>(null);
   const [receiveStatus, setReceiveStatus] = useState<string>("En attente...");
   const [pointsReceived, setPointsReceived] = useState<number>(0);
 
@@ -130,10 +130,6 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
     setReceiveStatus('En attente...');
     setPointsReceived(0);
   };
-
-  const createEvent = async () => {
-    invoke("insert_event", { event: formData });
-  }
 
   const handleCreateEvent = async () => {
     try {
