@@ -837,7 +837,7 @@ function OfflineMapLibre({
 
     const mapInstance = new maplibregl.Map({
       container: mapContainer.current,
-      style: "http://localhost:8080/styles/basic-preview/style.json",
+      style: "http://localhost:8082/styles/basic-preview/style.json",
       center: [7.7635, 48.5465],
       zoom: 13,
     });

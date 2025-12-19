@@ -49,7 +49,7 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
 
   // État pour le QR code de réception
   const [receiveQrCode, setReceiveQrCode] = useState<string | null>(null);
-  const [receivingEventId, setReceivingEventId] = useState<number | null>(null);
+  const [_receivingEventId, setReceivingEventId] = useState<number | null>(null);
   const [receiveStatus, setReceiveStatus] = useState<string>("En attente...");
 
   const loadEvents = async () => {

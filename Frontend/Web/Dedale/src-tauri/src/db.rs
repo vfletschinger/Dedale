@@ -1,4 +1,6 @@
 // On importe les dépendances nécessaires
+#![allow(dead_code)]
+
 use bcrypt::{hash, verify, DEFAULT_COST};
 use rand::Rng;
 use serde::Deserialize;
@@ -12,7 +14,7 @@ use std::str::FromStr;
 use tauri::{AppHandle, Manager};
 
 /// Génère un UUID v4
-fn generate_uuid() -> String {
+pub fn generate_uuid() -> String {
     let mut rng = rand::rng();
     let bytes: [u8; 16] = rng.random();
     format!(
@@ -23,6 +25,162 @@ fn generate_uuid() -> String {
         (bytes[8] & 0x3f) | 0x80 >> 4, bytes[9],
         bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]
     )
+}
+
+/// Valide le format d'un UUID
+pub fn is_valid_uuid(uuid: &str) -> bool {
+    let parts: Vec<&str> = uuid.split('-').collect();
+    if parts.len() != 5 {
+        return false;
+    }
+    let expected_lengths = [8, 4, 4, 4, 12];
+    for (part, expected_len) in parts.iter().zip(expected_lengths.iter()) {
+        if part.len() != *expected_len {
+            return false;
+        }
+        if !part.chars().all(|c| c.is_ascii_hexdigit()) {
+            return false;
+        }
+    }
+    true
+}
+
+/// Valide un nom d'utilisateur
+pub fn is_valid_username(username: &str) -> bool {
+    !username.is_empty()
+        && username.len() >= 3
+        && username.len() <= 50
+        && username
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+}
+
+/// Valide un rôle utilisateur
+pub fn is_valid_role(role: &str) -> bool {
+    matches!(role, "admin" | "user" | "guest" | "moderator")
+}
+
+/// Formate un statut d'événement
+pub fn format_event_status(statut: &str) -> &'static str {
+    match statut.to_lowercase().as_str() {
+        "actif" | "active" | "en_cours" => "En cours",
+        "termine" | "finished" | "completed" => "Terminé",
+        "annule" | "cancelled" | "canceled" => "Annulé",
+        "planifie" | "planned" | "scheduled" => "Planifié",
+        _ => "Inconnu",
+    }
+}
+
+/// Valide une coordonnée de point
+pub fn is_valid_point_coordinate(x: f64, y: f64) -> bool {
+    x.is_finite() && y.is_finite() && (-180.0..=180.0).contains(&x) && (-90.0..=90.0).contains(&y)
+}
+
+/// Valide une date au format ISO
+pub fn is_valid_date_format(date: &str) -> bool {
+    // Format attendu: YYYY-MM-DD ou YYYY-MM-DDTHH:MM:SS
+    if date.len() < 10 {
+        return false;
+    }
+    let date_part = &date[..10];
+    let parts: Vec<&str> = date_part.split('-').collect();
+    if parts.len() != 3 {
+        return false;
+    }
+    let year: Result<i32, _> = parts[0].parse();
+    let month: Result<u32, _> = parts[1].parse();
+    let day: Result<u32, _> = parts[2].parse();
+
+    match (year, month, day) {
+        (Ok(y), Ok(m), Ok(d)) => {
+            (1900..=2100).contains(&y) && (1..=12).contains(&m) && (1..=31).contains(&d)
+        }
+        _ => false,
+    }
+}
+
+/// Génère un hash de mot de passe sécurisé
+pub fn hash_password(password: &str) -> Result<String, String> {
+    hash(password, DEFAULT_COST).map_err(|e| format!("Hash error: {}", e))
+}
+
+/// Vérifie un mot de passe contre son hash
+pub fn verify_password(password: &str, hash: &str) -> bool {
+    verify(password, hash).unwrap_or(false)
+}
+
+/// Valide la longueur d'un mot de passe
+pub fn is_valid_password_length(password: &str) -> bool {
+    password.len() >= 8 && password.len() <= 128
+}
+
+/// Construit une requête SQL pour les placeholders
+pub fn build_sql_placeholders(count: usize) -> String {
+    if count == 0 {
+        return String::new();
+    }
+    vec!["?"; count].join(", ")
+}
+
+/// Construit une clause WHERE IN
+pub fn build_where_in_clause(field: &str, count: usize) -> String {
+    if count == 0 {
+        return format!("{} IN ()", field);
+    }
+    format!("{} IN ({})", field, build_sql_placeholders(count))
+}
+
+/// Valide un email basique
+pub fn is_valid_email(email: &str) -> bool {
+    let at_count = email.chars().filter(|c| *c == '@').count();
+    if at_count != 1 {
+        return false;
+    }
+    let parts: Vec<&str> = email.split('@').collect();
+    if parts.len() != 2 {
+        return false;
+    }
+    let local = parts[0];
+    let domain = parts[1];
+    !local.is_empty() && !domain.is_empty() && domain.contains('.')
+}
+
+/// Valide un numéro de téléphone
+pub fn is_valid_phone_number(phone: &str) -> bool {
+    let digits: String = phone.chars().filter(|c| c.is_ascii_digit()).collect();
+    digits.len() >= 10 && digits.len() <= 15
+}
+
+/// Sanitize une chaîne pour éviter les injections SQL basiques
+pub fn sanitize_string(input: &str) -> String {
+    input
+        .replace('"', "\\\"")
+        .replace('\'', "''")
+        .replace('\\', "\\\\")
+}
+
+/// Tronque une chaîne à une longueur maximale
+pub fn truncate_string(s: &str, max_len: usize) -> String {
+    if s.len() <= max_len {
+        s.to_string()
+    } else {
+        format!("{}...", &s[..max_len.saturating_sub(3)])
+    }
+}
+
+/// Calcule le nombre total d'obstacles pour une liste de points
+pub fn count_total_obstacles(points: &[Point]) -> usize {
+    points.iter().map(|p| p.obstacles.len()).sum()
+}
+
+/// Calcule le nombre total de commentaires pour une liste de points
+pub fn count_total_comments(points: &[Point]) -> usize {
+    points.iter().map(|p| p.comments.len()).sum()
+}
+
+/// Calcule le nombre total de photos pour une liste de points
+pub fn count_total_pictures(points: &[Point]) -> usize {
+    points.iter().map(|p| p.pictures.len()).sum()
 }
 
 #[derive(sqlx::FromRow, Debug, Serialize, Deserialize)]
