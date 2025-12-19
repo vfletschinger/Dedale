@@ -9,6 +9,7 @@ mod map_static;
 mod pdf;
 mod seed;
 mod socket;
+mod types;
 mod utils;
 
 #[cfg(test)]

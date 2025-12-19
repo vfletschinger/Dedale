@@ -1,329 +1,19 @@
 // On importe les dépendances nécessaires
-#![allow(dead_code)]
-
 use bcrypt::{hash, verify, DEFAULT_COST};
-use rand::Rng;
-use serde::Deserialize;
-use serde::Serialize;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
-use sqlx::Sqlite;
-use sqlx::Transaction;
+use sqlx::{Sqlite, Transaction};
 use sqlx::{Row, SqlitePool};
 use std::fs;
 use std::str::FromStr;
 use tauri::{AppHandle, Manager};
+use uuid::Uuid;
+use tauri::State;
 
-/// Génère un UUID v4
-pub fn generate_uuid() -> String {
-    let mut rng = rand::rng();
-    let bytes: [u8; 16] = rng.random();
-    format!(
-        "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-4{:01x}{:02x}-{:01x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
-        bytes[0], bytes[1], bytes[2], bytes[3],
-        bytes[4], bytes[5],
-        bytes[6] & 0x0f, bytes[7],
-        (bytes[8] & 0x3f) | 0x80 >> 4, bytes[9],
-        bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]
-    )
-}
-
-/// Valide le format d'un UUID
-pub fn is_valid_uuid(uuid: &str) -> bool {
-    let parts: Vec<&str> = uuid.split('-').collect();
-    if parts.len() != 5 {
-        return false;
-    }
-    let expected_lengths = [8, 4, 4, 4, 12];
-    for (part, expected_len) in parts.iter().zip(expected_lengths.iter()) {
-        if part.len() != *expected_len {
-            return false;
-        }
-        if !part.chars().all(|c| c.is_ascii_hexdigit()) {
-            return false;
-        }
-    }
-    true
-}
-
-/// Valide un nom d'utilisateur
-pub fn is_valid_username(username: &str) -> bool {
-    !username.is_empty()
-        && username.len() >= 3
-        && username.len() <= 50
-        && username
-            .chars()
-            .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
-}
-
-/// Valide un rôle utilisateur
-pub fn is_valid_role(role: &str) -> bool {
-    matches!(role, "admin" | "user" | "guest" | "moderator")
-}
-
-/// Formate un statut d'événement
-pub fn format_event_status(statut: &str) -> &'static str {
-    match statut.to_lowercase().as_str() {
-        "actif" | "active" | "en_cours" => "En cours",
-        "termine" | "finished" | "completed" => "Terminé",
-        "annule" | "cancelled" | "canceled" => "Annulé",
-        "planifie" | "planned" | "scheduled" => "Planifié",
-        _ => "Inconnu",
-    }
-}
-
-/// Valide une coordonnée de point
-pub fn is_valid_point_coordinate(x: f64, y: f64) -> bool {
-    x.is_finite() && y.is_finite() && (-180.0..=180.0).contains(&x) && (-90.0..=90.0).contains(&y)
-}
-
-/// Valide une date au format ISO
-pub fn is_valid_date_format(date: &str) -> bool {
-    // Format attendu: YYYY-MM-DD ou YYYY-MM-DDTHH:MM:SS
-    if date.len() < 10 {
-        return false;
-    }
-    let date_part = &date[..10];
-    let parts: Vec<&str> = date_part.split('-').collect();
-    if parts.len() != 3 {
-        return false;
-    }
-    let year: Result<i32, _> = parts[0].parse();
-    let month: Result<u32, _> = parts[1].parse();
-    let day: Result<u32, _> = parts[2].parse();
-
-    match (year, month, day) {
-        (Ok(y), Ok(m), Ok(d)) => {
-            (1900..=2100).contains(&y) && (1..=12).contains(&m) && (1..=31).contains(&d)
-        }
-        _ => false,
-    }
-}
-
-/// Génère un hash de mot de passe sécurisé
-pub fn hash_password(password: &str) -> Result<String, String> {
-    hash(password, DEFAULT_COST).map_err(|e| format!("Hash error: {}", e))
-}
-
-/// Vérifie un mot de passe contre son hash
-pub fn verify_password(password: &str, hash: &str) -> bool {
-    verify(password, hash).unwrap_or(false)
-}
-
-/// Valide la longueur d'un mot de passe
-pub fn is_valid_password_length(password: &str) -> bool {
-    password.len() >= 8 && password.len() <= 128
-}
-
-/// Construit une requête SQL pour les placeholders
-pub fn build_sql_placeholders(count: usize) -> String {
-    if count == 0 {
-        return String::new();
-    }
-    vec!["?"; count].join(", ")
-}
-
-/// Construit une clause WHERE IN
-pub fn build_where_in_clause(field: &str, count: usize) -> String {
-    if count == 0 {
-        return format!("{} IN ()", field);
-    }
-    format!("{} IN ({})", field, build_sql_placeholders(count))
-}
-
-/// Valide un email basique
-pub fn is_valid_email(email: &str) -> bool {
-    let at_count = email.chars().filter(|c| *c == '@').count();
-    if at_count != 1 {
-        return false;
-    }
-    let parts: Vec<&str> = email.split('@').collect();
-    if parts.len() != 2 {
-        return false;
-    }
-    let local = parts[0];
-    let domain = parts[1];
-    !local.is_empty() && !domain.is_empty() && domain.contains('.')
-}
-
-/// Valide un numéro de téléphone
-pub fn is_valid_phone_number(phone: &str) -> bool {
-    let digits: String = phone.chars().filter(|c| c.is_ascii_digit()).collect();
-    digits.len() >= 10 && digits.len() <= 15
-}
-
-/// Sanitize une chaîne pour éviter les injections SQL basiques
-pub fn sanitize_string(input: &str) -> String {
-    input
-        .replace('"', "\\\"")
-        .replace('\'', "''")
-        .replace('\\', "\\\\")
-}
-
-/// Tronque une chaîne à une longueur maximale
-pub fn truncate_string(s: &str, max_len: usize) -> String {
-    if s.len() <= max_len {
-        s.to_string()
-    } else {
-        format!("{}...", &s[..max_len.saturating_sub(3)])
-    }
-}
-
-/// Calcule le nombre total d'obstacles pour une liste de points
-pub fn count_total_obstacles(points: &[Point]) -> usize {
-    points.iter().map(|p| p.obstacles.len()).sum()
-}
-
-/// Calcule le nombre total de commentaires pour une liste de points
-pub fn count_total_comments(points: &[Point]) -> usize {
-    points.iter().map(|p| p.comments.len()).sum()
-}
-
-/// Calcule le nombre total de photos pour une liste de points
-pub fn count_total_pictures(points: &[Point]) -> usize {
-    points.iter().map(|p| p.pictures.len()).sum()
-}
-
-#[derive(sqlx::FromRow, Debug, Serialize, Deserialize)]
-pub struct User {
-    pub id: i64,
-    pub username: String,
-    pub password_hash: String,
-    pub role: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Point {
-    pub id: String, // UUID
-    pub x: f64,
-    pub y: f64,
-    #[serde(default)]
-    pub pose: Option<String>,
-    #[serde(default)]
-    pub depose: Option<String>,
-    #[serde(default)]
-    pub event_ids: Vec<i64>,
-    pub obstacles: Vec<Obstacle>,
-    pub comments: Vec<Comment>,
-    pub pictures: Vec<Picture>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ObstacleType {
-    pub id: i64,
-    pub name: String,
-    pub description: String,
-    pub width: f64,
-    pub length: f64,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Obstacle {
-    pub id: String, // UUID
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-    pub number: Option<i32>,
-    pub point_id: String, // UUID reference
-    pub type_id: i64,
-    pub description: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub width: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub length: Option<f64>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct PointSimple {
-    pub id: String, // UUID
-    pub x: f64,     // Coordonnée X (ou latitude)
-    pub y: f64,     // Coordonnée Y (ou longitude)
-    #[serde(default)]
-    pub pose: Option<String>,
-    #[serde(default)]
-    pub depose: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Comment {
-    pub id: String,       // UUID
-    pub point_id: String, // UUID reference
-    pub value: String,    // Le texte du commentaire
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Picture {
-    pub id: String,       // UUID
-    pub point_id: String, // UUID reference
-    pub image: String,    // Le chemin ou le contenu encodé de l'image (ex: base64, URL)
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct PointDetail {
-    pub point: PointSimple, // Changed from Vec<PointSimple> to PointSimple
-    #[serde(rename = "comments")]
-    pub comment: Vec<Comment>,
-    #[serde(rename = "pictures")]
-    pub picture: Vec<Picture>,
-    #[serde(rename = "obstacles")]
-    pub obstacle: Vec<Obstacle>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ObstacleInput {
-    pub type_id: i64,
-    pub number: i32,
-    pub obstacle_id: Option<i64>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Event {
-    #[serde(default)]
-    pub id: i64,
-    pub name: String,
-    pub description: String,
-    #[serde(rename = "dateDebut", alias = "dateDebut")]
-    pub date_debut: String,
-    #[serde(rename = "dateFin", alias = "dateFin")]
-    pub date_fin: String,
-    pub statut: String,
-    pub geometry: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Team {
-    #[serde(default)]
-    pub id: i64,
-    pub name: String,
-    pub number: i64,
-    #[serde(default)]
-    pub event_ids: Vec<i64>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Geometry {
-    pub id: i64,
-    pub event_id: i64,
-    pub geom: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Person {
-    pub id: i64,
-    pub firstname: String,
-    pub lastname: String,
-    pub address: String,
-    pub email: String,
-    pub phone_number: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Member {
-    pub id: i64,
-    pub firstname: String,
-    pub lastname: String,
-    pub email: String,
-}
+// Réexporter les types depuis le module types
+pub use crate::types::*;
 
 pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
+    // 1. Configuration des chemins
     let app_data_dir = app
         .path()
         .app_data_dir()
@@ -340,6 +30,7 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
 
     let db_url = format!("sqlite:{}", db_path_str);
 
+    // 2. Connexion
     let connect_options = SqliteConnectOptions::from_str(&db_url)
         .map_err(|e| format!("Failed to parse DB URL: {}", e))?
         .create_if_missing(true);
@@ -349,88 +40,15 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
         .await
         .map_err(|e| format!("Failed to connect to database: {}", e))?;
 
-    // Activer les foreign keys
+    // 3. Activation des Foreign Keys (Crucial pour le respect du diagramme)
     sqlx::query("PRAGMA foreign_keys = ON;")
         .execute(&pool)
         .await
         .map_err(|e| format!("Failed to enable foreign keys: {}", e))?;
 
-    // Créer toutes les tables si elles n'existent pas
-    println!("[DB] 🔧 Création des tables...");
+    println!("[DB] Création/Mise à jour des tables selon le schéma ERD...");
 
-    sqlx::query(
-        "CREATE TABLE IF NOT EXISTS point (
-            id INTEGER PRIMARY KEY,
-            x REAL,
-            y REAL,
-            pose TEXT,
-            depose TEXT
-        )",
-    )
-    .execute(&pool)
-    .await
-    .map_err(|e| format!("Failed to create point table: {}", e))?;
-
-    // Migration: ajouter les colonnes pose et depose si elles n'existent pas
-    let _ = sqlx::query("ALTER TABLE point ADD COLUMN pose TEXT")
-        .execute(&pool)
-        .await;
-    let _ = sqlx::query("ALTER TABLE point ADD COLUMN depose TEXT")
-        .execute(&pool)
-        .await;
-
-    sqlx::query(
-        "CREATE TABLE IF NOT EXISTS obstacle_type (
-            id INTEGER PRIMARY KEY,
-            name TEXT,
-            description TEXT,
-            width REAL,
-            length REAL
-        )",
-    )
-    .execute(&pool)
-    .await
-    .map_err(|e| format!("Failed to create obstacle_type table: {}", e))?;
-
-    sqlx::query(
-        "CREATE TABLE IF NOT EXISTS comment (
-            id INTEGER PRIMARY KEY,
-            point_id INTEGER,
-            value TEXT,
-            FOREIGN KEY (point_id) REFERENCES point (id)
-        )",
-    )
-    .execute(&pool)
-    .await
-    .map_err(|e| format!("Failed to create comment table: {}", e))?;
-
-    sqlx::query(
-        "CREATE TABLE IF NOT EXISTS picture (
-            id INTEGER PRIMARY KEY,
-            point_id INTEGER,
-            image TEXT,
-            FOREIGN KEY (point_id) REFERENCES point (id)
-        )",
-    )
-    .execute(&pool)
-    .await
-    .map_err(|e| format!("Failed to create picture table: {}", e))?;
-
-    sqlx::query(
-        "CREATE TABLE IF NOT EXISTS obstacle (
-            id INTEGER PRIMARY KEY,
-            point_id INTEGER,
-            type_id INTEGER,
-            number INTEGER,
-            description TEXT,
-            FOREIGN KEY (point_id) REFERENCES point (id),
-            FOREIGN KEY (type_id) REFERENCES obstacle_type (id)
-        )",
-    )
-    .execute(&pool)
-    .await
-    .map_err(|e| format!("Failed to create obstacle table: {}", e))?;
-
+    // --- GESTION DES ACCÈS ---
     sqlx::query(
         "CREATE TABLE IF NOT EXISTS user (
             id INTEGER PRIMARY KEY,
@@ -441,78 +59,157 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
     )
     .execute(&pool)
     .await
-    .map_err(|e| format!("Failed to create user table: {}", e))?;
+    .map_err(|e| format!("Error creating user: {}", e))?;
 
+    // --- CŒUR DE L'ÉVÉNEMENT ---
     sqlx::query(
         "CREATE TABLE IF NOT EXISTS event (
-            id INTEGER PRIMARY KEY,
+            id CHAR(36) PRIMARY KEY,
             name TEXT,
-            description TEXT,
-            date_debut TEXT,
-            date_fin TEXT,
-            statut TEXT,
-            geometry TEXT
+            start_date DATETIME,
+            end_date DATETIME
         )",
     )
     .execute(&pool)
     .await
-    .map_err(|e| format!("Failed to create event table: {}", e))?;
+    .map_err(|e| format!("Error creating event: {}", e))?;
+
+    // --- GÉOMÉTRIE ET ZONES ---
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS parcours (
+            id CHAR(36) PRIMARY KEY,
+            event_id CHAR(36) NOT NULL,
+            name TEXT,
+            color TEXT,
+            start_time DATETIME,
+            speed_low REAL,
+            speed_high REAL,
+            geometry_json TEXT,
+            FOREIGN KEY (event_id) REFERENCES event (id) ON DELETE CASCADE
+        )",
+    )
+    .execute(&pool)
+    .await
+    .map_err(|e| format!("Error creating parcours: {}", e))?;
 
     sqlx::query(
-        "CREATE TABLE IF NOT EXISTS point_event (
-            id INTEGER PRIMARY KEY,
-            point_id INTEGER NOT NULL,
-            event_id INTEGER NOT NULL,
-            FOREIGN KEY (point_id) REFERENCES point(id) ON DELETE CASCADE,
-            FOREIGN KEY (event_id) REFERENCES event(id) ON DELETE CASCADE,
-            UNIQUE(point_id, event_id)
+        "CREATE TABLE IF NOT EXISTS zone (
+            id CHAR(36) PRIMARY KEY,
+            event_id CHAR(36) NOT NULL,
+            name TEXT,
+            color TEXT,
+            geometry_json TEXT,
+            FOREIGN KEY (event_id) REFERENCES event (id) ON DELETE CASCADE
         )",
     )
     .execute(&pool)
     .await
-    .map_err(|e| format!("Failed to create point_event table: {}", e))?;
+    .map_err(|e| format!("Error creating zone: {}", e))?;
+
+    // --- POINTS SÉCURITÉ ---
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS point (
+            id CHAR(36) PRIMARY KEY,
+            event_id CHAR(36) NOT NULL,
+            x REAL NOT NULL,
+            y REAL NOT NULL,
+            comment TEXT,
+            type TEXT,
+            status BOOLEAN,
+            FOREIGN KEY (event_id) REFERENCES event (id) ON DELETE CASCADE
+        )",
+    )
+    .execute(&pool)
+    .await
+    .map_err(|e| format!("Error creating point: {}", e))?;
 
     sqlx::query(
-        "CREATE TABLE IF NOT EXISTS geometry (
+        "CREATE TABLE IF NOT EXISTS picture (
             id INTEGER PRIMARY KEY,
-            event_id INTEGER NOT NULL,
-            geom TEXT,
-            FOREIGN KEY (event_id) REFERENCES event(id) ON DELETE CASCADE
+            point_id CHAR(36) NOT NULL,
+            image_data TEXT,
+            FOREIGN KEY (point_id) REFERENCES point (id) ON DELETE CASCADE
         )",
     )
     .execute(&pool)
     .await
-    .map_err(|e| format!("Failed to create geometry table: {}", e))?;
+    .map_err(|e| format!("Error creating picture: {}", e))?;
 
+    // --- LOGISTIQUE & ÉQUIPEMENTS ---
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS type (
+            id CHAR(36) PRIMARY KEY,
+            name TEXT,
+            description TEXT
+        )",
+    )
+    .execute(&pool)
+    .await
+    .map_err(|e| format!("Error creating type: {}", e))?;
+
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS equipement (
+            id CHAR(36) PRIMARY KEY,
+            event_id CHAR(36) NOT NULL,
+            type_id CHAR(36) NOT NULL,
+            quantity INTEGER,
+            length_per_unit INTEGER,
+            date_pose DATETIME,
+            date_depose DATETIME,
+            FOREIGN KEY (event_id) REFERENCES event (id) ON DELETE CASCADE,
+            FOREIGN KEY (type_id) REFERENCES type (id)
+        )",
+    )
+    .execute(&pool)
+    .await
+    .map_err(|e| format!("Error creating equipement: {}", e))?;
+
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS equipement_coordinate (
+            id CHAR(36) PRIMARY KEY,
+            equipement_id CHAR(36) NOT NULL,
+            x REAL NOT NULL,
+            y REAL NOT NULL,
+            order_index INTEGER,
+            FOREIGN KEY (equipement_id) REFERENCES equipement (id) ON DELETE CASCADE
+        )",
+    )
+    .execute(&pool)
+    .await
+    .map_err(|e| format!("Error creating equipement_coordinate: {}", e))?;
+
+    // --- RESSOURCES HUMAINES ---
+    // Note: Selon le schéma, Team est lié à Event (1 équipe = 1 événement)
     sqlx::query(
         "CREATE TABLE IF NOT EXISTS team (
-            id INTEGER PRIMARY KEY ,
-            name TEXT
+            id INTEGER PRIMARY KEY,
+            event_id CHAR(36) NOT NULL,
+            name TEXT,
+            FOREIGN KEY (event_id) REFERENCES event (id) ON DELETE CASCADE
         )",
     )
     .execute(&pool)
     .await
-    .map_err(|e| format!("Failed to create team table: {}", e))?;
+    .map_err(|e| format!("Error creating team: {}", e))?;
 
     sqlx::query(
         "CREATE TABLE IF NOT EXISTS person (
             id INTEGER PRIMARY KEY,
             firstname TEXT,
             lastname TEXT,
-            address TEXT,
             email TEXT,
             phone_number TEXT
         )",
     )
     .execute(&pool)
     .await
-    .map_err(|e| format!("Failed to create person table: {}", e))?;
+    .map_err(|e| format!("Error creating person: {}", e))?;
 
     sqlx::query(
         "CREATE TABLE IF NOT EXISTS member (
             id INTEGER PRIMARY KEY,
-            team_id INTEGER,
-            person_id INTEGER,
+            team_id INTEGER NOT NULL,
+            person_id INTEGER NOT NULL,
             FOREIGN KEY (team_id) REFERENCES team (id) ON DELETE CASCADE,
             FOREIGN KEY (person_id) REFERENCES person (id) ON DELETE CASCADE,
             UNIQUE(team_id, person_id)
@@ -520,179 +217,48 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
     )
     .execute(&pool)
     .await
-    .map_err(|e| format!("Failed to create member table: {}", e))?;
+    .map_err(|e| format!("Error creating member: {}", e))?;
 
+    // --- PLANNING (ACTIONS) ---
     sqlx::query(
-        "CREATE TABLE IF NOT EXISTS team_event (
+        "CREATE TABLE IF NOT EXISTS action (
             id INTEGER PRIMARY KEY,
             team_id INTEGER NOT NULL,
-            event_id INTEGER NOT NULL,
-            FOREIGN KEY (team_id) REFERENCES team(id) ON DELETE CASCADE,
-            FOREIGN KEY (event_id) REFERENCES event(id) ON DELETE CASCADE,
-            UNIQUE(team_id, event_id)
+            equipement_id CHAR(36) NOT NULL,
+            type TEXT,
+            scheduled_time DATETIME,
+            is_done BOOLEAN,
+            FOREIGN KEY (team_id) REFERENCES team (id) ON DELETE CASCADE,
+            FOREIGN KEY (equipement_id) REFERENCES equipement (id) ON DELETE CASCADE
         )",
     )
     .execute(&pool)
     .await
-    .map_err(|e| format!("Failed to create member table: {}", e))?;
+    .map_err(|e| format!("Error creating action: {}", e))?;
 
-    // Migration: Convertir les tables point, comment, picture, obstacle pour accepter des UUIDs (TEXT)
-    // Vérifier si la migration est nécessaire en regardant le type de la colonne id dans point
-    let needs_uuid_migration = sqlx::query("SELECT typeof(id) as id_type FROM point LIMIT 1")
-        .fetch_optional(&pool)
-        .await
-        .map(|row| {
-            if let Some(r) = row {
-                let id_type: String = r.get("id_type");
-                id_type == "integer"
-            } else {
-                false // Table vide, pas besoin de migration
-            }
-        })
-        .unwrap_or(false);
-
-    if needs_uuid_migration {
-        println!("[DB] 🔄 Migration UUID détectée comme nécessaire, exécution...");
-
-        // Recréer la table point avec id TEXT
-        let _ = sqlx::query("ALTER TABLE point RENAME TO point_old")
-            .execute(&pool)
-            .await;
-        sqlx::query(
-            "CREATE TABLE point (
-                id TEXT PRIMARY KEY,
-                x REAL,
-                y REAL,
-                pose TEXT,
-                depose TEXT
-            )",
-        )
-        .execute(&pool)
-        .await
-        .map_err(|e| format!("Migration point: {}", e))?;
-        let _ = sqlx::query(
-            "INSERT INTO point SELECT CAST(id AS TEXT), x, y, pose, depose FROM point_old",
-        )
-        .execute(&pool)
-        .await;
-        let _ = sqlx::query("DROP TABLE point_old").execute(&pool).await;
-
-        // Recréer la table comment avec id TEXT et point_id TEXT
-        let _ = sqlx::query("ALTER TABLE comment RENAME TO comment_old")
-            .execute(&pool)
-            .await;
-        sqlx::query(
-            "CREATE TABLE comment (
-                id TEXT PRIMARY KEY,
-                point_id TEXT,
-                value TEXT,
-                FOREIGN KEY (point_id) REFERENCES point (id)
-            )",
-        )
-        .execute(&pool)
-        .await
-        .map_err(|e| format!("Migration comment: {}", e))?;
-        let _ = sqlx::query("INSERT INTO comment SELECT CAST(id AS TEXT), CAST(point_id AS TEXT), value FROM comment_old").execute(&pool).await;
-        let _ = sqlx::query("DROP TABLE comment_old").execute(&pool).await;
-
-        // Recréer la table picture avec id TEXT et point_id TEXT
-        let _ = sqlx::query("ALTER TABLE picture RENAME TO picture_old")
-            .execute(&pool)
-            .await;
-        sqlx::query(
-            "CREATE TABLE picture (
-                id TEXT PRIMARY KEY,
-                point_id TEXT,
-                image TEXT,
-                FOREIGN KEY (point_id) REFERENCES point (id)
-            )",
-        )
-        .execute(&pool)
-        .await
-        .map_err(|e| format!("Migration picture: {}", e))?;
-        let _ = sqlx::query("INSERT INTO picture SELECT CAST(id AS TEXT), CAST(point_id AS TEXT), image FROM picture_old").execute(&pool).await;
-        let _ = sqlx::query("DROP TABLE picture_old").execute(&pool).await;
-
-        // Recréer la table obstacle avec id TEXT et point_id TEXT
-        let _ = sqlx::query("ALTER TABLE obstacle RENAME TO obstacle_old")
-            .execute(&pool)
-            .await;
-        sqlx::query(
-            "CREATE TABLE obstacle (
-                id TEXT PRIMARY KEY,
-                point_id TEXT,
-                type_id INTEGER,
-                number INTEGER,
-                description TEXT,
-                FOREIGN KEY (point_id) REFERENCES point (id),
-                FOREIGN KEY (type_id) REFERENCES obstacle_type (id)
-            )",
-        )
-        .execute(&pool)
-        .await
-        .map_err(|e| format!("Migration obstacle: {}", e))?;
-        let _ = sqlx::query("INSERT INTO obstacle SELECT CAST(id AS TEXT), CAST(point_id AS TEXT), type_id, number, description FROM obstacle_old").execute(&pool).await;
-        let _ = sqlx::query("DROP TABLE obstacle_old").execute(&pool).await;
-
-        // Recréer la table point_event avec point_id TEXT
-        let _ = sqlx::query("ALTER TABLE point_event RENAME TO point_event_old")
-            .execute(&pool)
-            .await;
-        sqlx::query(
-            "CREATE TABLE point_event (
-                id INTEGER PRIMARY KEY,
-                point_id TEXT NOT NULL,
-                event_id INTEGER NOT NULL,
-                FOREIGN KEY (point_id) REFERENCES point(id) ON DELETE CASCADE,
-                FOREIGN KEY (event_id) REFERENCES event(id) ON DELETE CASCADE,
-                UNIQUE(point_id, event_id)
-            )",
-        )
-        .execute(&pool)
-        .await
-        .map_err(|e| format!("Migration point_event: {}", e))?;
-        let _ = sqlx::query("INSERT INTO point_event SELECT id, CAST(point_id AS TEXT), event_id FROM point_event_old").execute(&pool).await;
-        let _ = sqlx::query("DROP TABLE point_event_old")
-            .execute(&pool)
-            .await;
-
-        println!("[DB] ✅ Migration UUID terminée");
-    }
-
-    println!("[DB] ✅ Toutes les tables sont prêtes");
+    println!("[DB] Toutes les tables ont été synchronisées avec le diagramme ER.");
 
     Ok(pool)
 }
 
-async fn fetch_comments(pool: &SqlitePool, point_id: &str) -> Result<Vec<Comment>, String> {
-    let rows = sqlx::query("SELECT id, value, point_id FROM comment WHERE point_id = ?")
-        .bind(point_id)
-        .fetch_all(pool)
-        .await
-        .map_err(|e| e.to_string())?;
+#[tauri::command]
+pub async fn fetch_pictures(
+    pool: State<'_, SqlitePool>,
+    point_id: String // 2. CORRECTION: String au lieu de &str
+) -> Result<Vec<Picture>, String> {
 
-    let comments = rows
-        .into_iter()
-        .map(|row| Comment {
-            id: row.get("id"),
-            point_id: row.get("point_id"),
-            value: row.get("value"),
-        })
-        .collect();
-
-    Ok(comments)
-}
-
-async fn fetch_pictures(pool: &SqlitePool, point_id: &str) -> Result<Vec<Picture>, String> {
+    // Note:  que le nom de la colonne dans votre DB est bien 'image'
+    // (dans votre script de création précédent, vous aviez mis 'image_data' ou 'image', soyez cohérent)
     let rows = sqlx::query("SELECT id, image, point_id FROM picture WHERE point_id = ?")
         .bind(point_id)
-        .fetch_all(pool)
+        .fetch_all(pool.inner()) // 3. CORRECTION: pool.inner() pour récupérer le SqlitePool
         .await
         .map_err(|e| e.to_string())?;
 
     let pictures = rows
         .into_iter()
         .map(|row| Picture {
+            // Assurez-vous que les types ici (i64, String) correspondent à votre struct Picture
             id: row.get("id"),
             image: row.get("image"),
             point_id: row.get("point_id"),
@@ -702,49 +268,78 @@ async fn fetch_pictures(pool: &SqlitePool, point_id: &str) -> Result<Vec<Picture
     Ok(pictures)
 }
 
-async fn fetch_obstacles(pool: &SqlitePool, point_id: &str) -> Result<Vec<Obstacle>, String> {
+pub async fn fetch_equipement_coordinates(pool: &SqlitePool, equipement_id: &str) -> Result<Vec<EquipementCoordinate>, String> {
+    sqlx::query_as::<_, EquipementCoordinate>(
+        "SELECT x, y, order_index FROM equipement_coordinate WHERE equipement_id = ? ORDER BY order_index ASC"
+    )
+    .bind(equipement_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| format!("Erreur coordonnées: {}", e))
+}
+
+#[tauri::command]
+pub async fn fetch_equipement_details(
+    pool: State<'_, SqlitePool>, // Utilisation de State au lieu de AppHandle
+    equipement_id: String,       // String au lieu de &str
+) -> Result<Option<EquipementComplet>, String> {
+
     let query = r#"
         SELECT
-            o.id,
-            o.point_id,
-            o.type_id,
-            o.number,
-            ot.name AS name,
-            ot.description AS description,
-            ot.width AS width,
-            ot.length AS length
-        FROM obstacle o
-        JOIN obstacle_type ot ON o.type_id = ot.id
-        WHERE o.point_id = ?
+            e.id,
+            e.type_id,
+            e.length,
+            e.date_pose,
+            e.hour_pose,
+            e.date_depose,
+            e.hour_depose,
+            t.name AS type_name,
+            t.description AS type_description
+        FROM equipement e
+        LEFT JOIN type t ON e.type_id = t.id
+        WHERE e.id = ?
     "#;
 
-    let rows = sqlx::query(query)
-        .bind(point_id)
-        .fetch_all(pool)
+    // On récupère une ligne optionnelle (fetch_optional)
+    let row_opt = sqlx::query(query)
+        .bind(&equipement_id)
+        .fetch_optional(pool.inner())
         .await
         .map_err(|e| e.to_string())?;
 
-    let obstacles = rows
-        .into_iter()
-        .map(|row| Obstacle {
-            id: row.get("id"),
-            point_id: row.get("point_id"),
-            type_id: row.get("type_id"),
-            number: row.get("number"),
-            name: row.get("name"),
-            description: row.get("description"),
-            width: row.get("width"),
-            length: row.get("length"),
-        })
-        .collect();
+    match row_opt {
+        Some(row) => {
+            // Si l'équipement existe, on récupère ses coordonnées
+            // Note: On passe pool.inner() qui est &SqlitePool
+            let coordinates = fetch_equipement_coordinates(pool.inner(), &equipement_id).await?;
 
-    Ok(obstacles)
+            let equipement = EquipementComplet {
+                id: row.get("id"),
+                type_id: row.get("type_id"),
+                type_name: row.get("type_name"),
+                type_description: row.get("type_description"),
+                length: row.get("length"),
+                // Attention aux types de dates:
+                // Si stocké en TEXT (ISO 8601), .get::<String, _> fonctionne.
+                // Si vous utilisez chrono, utilisez .get::<NaiveDate, _>
+                date_pose: row.get("date_pose"),
+                hour_pose: row.get("hour_pose"),
+                date_depose: row.get("date_depose"),
+                hour_depose: row.get("hour_depose"),
+                coordinates,
+            };
+
+            Ok(Some(equipement))
+        }
+        None => Ok(None), // L'ID n'existe pas
+    }
 }
+async fn fetch_event_ids(app: AppHandle, point_id: &str) -> Result<Vec<i64>, String> {
+    let pool = get_db_pool(&app).await?;
 
-async fn fetch_event_ids(pool: &SqlitePool, point_id: &str) -> Result<Vec<i64>, String> {
     let rows = sqlx::query("SELECT event_id FROM point_event WHERE point_id = ?")
         .bind(point_id)
-        .fetch_all(pool)
+        .fetch_all(&pool)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -777,40 +372,50 @@ pub async fn fetch_obstacle_types(app: AppHandle) -> Result<Vec<ObstacleType>, S
 }
 
 #[tauri::command]
-pub async fn insert_obstacles(
+pub async fn insert_equipements(
     app: AppHandle,
-    point_id: String,
-    obstacles: Vec<ObstacleInput>,
+    equipements: Vec<Equipement>,
 ) -> Result<(), String> {
     let pool = get_db_pool(&app).await?;
 
-    for obstacle in obstacles {
-        if let Some(id) = obstacle.obstacle_id {
-            if obstacle.number == 0 {
-                // Supprimer l'obstacle si le nombre est 0
-                sqlx::query("DELETE FROM obstacle WHERE id = ?")
-                    .bind(id)
-                    .execute(&pool)
-                    .await
-                    .map_err(|e| format!("Failed to delete obstacle: {}", e))?;
-            } else {
-                // Mettre à jour le nombre
-                sqlx::query("UPDATE obstacle SET number = ? WHERE id = ?")
-                    .bind(obstacle.number)
-                    .bind(id)
-                    .execute(&pool)
-                    .await
-                    .map_err(|e| format!("Failed to update obstacle: {}", e))?;
-            }
-        } else if obstacle.number > 0 {
-            // Insérer seulement si le nombre est > 0
-            sqlx::query("INSERT INTO obstacle (point_id, type_id, number) VALUES (?, ?, ?)")
-                .bind(&point_id)
-                .bind(obstacle.type_id)
-                .bind(obstacle.number)
-                .execute(&pool)
-                .await
-                .map_err(|e| format!("Failed to insert obstacle: {}", e))?;
+    for equipement in equipements {
+        // Vérifier si l'équipement existe déjà
+        let existing = sqlx::query("SELECT id FROM equipement WHERE id = ?")
+            .bind(&equipement.id)
+            .fetch_optional(&pool)
+            .await
+            .map_err(|e| format!("Failed to check existing equipement: {}", e))?;
+
+        if existing.is_some() {
+            // Mettre à jour l'équipement existant
+            sqlx::query(
+                "UPDATE equipement SET type_id = ?, length = ?, date_pose = ?, hour_pose = ?, date_depose = ?, hour_depose = ? WHERE id = ?",
+            )
+            .bind(&equipement.type_id)
+            .bind(equipement.length)
+            .bind(&equipement.date_pose)
+            .bind(&equipement.hour_pose)
+            .bind(&equipement.date_depose)
+            .bind(&equipement.hour_depose)
+            .bind(&equipement.id)
+            .execute(&pool)
+            .await
+            .map_err(|e| format!("Failed to update equipement: {}", e))?;
+        } else {
+            // Insérer un nouvel équipement
+            sqlx::query(
+                "INSERT INTO equipement (id, type_id, length, date_pose, hour_pose, date_depose, hour_depose) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            )
+            .bind(&equipement.id)
+            .bind(&equipement.type_id)
+            .bind(equipement.length)
+            .bind(&equipement.date_pose)
+            .bind(&equipement.hour_pose)
+            .bind(&equipement.date_depose)
+            .bind(&equipement.hour_depose)
+            .execute(&pool)
+            .await
+            .map_err(|e| format!("Failed to insert equipement: {}", e))?;
         }
     }
     Ok(())
@@ -822,7 +427,7 @@ pub async fn retrieve_data(app: &AppHandle) -> Result<Vec<Point>, String> {
     retrieve_data_by_event(app, None).await
 }
 
-// Récupère les points filtrés par event_id (None = tous les points)
+// Récupère les points filtrés par event_id
 pub async fn retrieve_data_by_event(
     app: &AppHandle,
     event_id: Option<i64>,
@@ -830,10 +435,10 @@ pub async fn retrieve_data_by_event(
     let pool = get_db_pool(app).await?;
 
     let base_rows = if let Some(eid) = event_id {
-        println!("[DB] 🔍 Récupération des points pour l'event_id: {}", eid);
+        println!("[DB] Récupération des points pour l'event_id: {}", eid);
         sqlx::query(
             r#"
-            SELECT DISTINCT p.id, p.x, p.y, p.pose, p.depose
+            SELECT DISTINCT p.id, p.x, p.y, p.comment, p.type, p.status, pe.event_id
             FROM point p
             INNER JOIN point_event pe ON p.id = pe.point_id
             WHERE pe.event_id = ?
@@ -845,11 +450,12 @@ pub async fn retrieve_data_by_event(
         .await
         .map_err(|e| e.to_string())?
     } else {
-        println!("[DB] 🔍 Récupération de tous les points");
+        println!("[DB]  Récupération de tous les points");
         sqlx::query(
             r#"
-            SELECT p.id, p.x, p.y, p.pose, p.depose
+            SELECT p.id, p.x, p.y, p.comment, p.type, p.status, pe.event_id
             FROM point p
+            LEFT JOIN point_event pe ON p.id = pe.point_id
             ORDER BY p.id
         "#,
         )
@@ -863,25 +469,18 @@ pub async fn retrieve_data_by_event(
     for row in base_rows {
         let id: String = row.get("id");
 
-        let comments = fetch_comments(&pool, &id).await?;
-        let pictures = fetch_pictures(&pool, &id).await?;
-        let obstacles = fetch_obstacles(&pool, &id).await?;
-        let event_ids = fetch_event_ids(&pool, &id).await?;
-
         points.push(Point {
             id,
             x: row.get("x"),
             y: row.get("y"),
-            pose: row.get("pose"),
-            depose: row.get("depose"),
-            event_ids,
-            obstacles,
-            comments,
-            pictures,
+            comment: row.get("comment"),
+            r#type: row.get("type"),
+            status: row.get("status"),
+            event_id: row.get("event_id"),
         });
     }
 
-    println!("[DB] ✅ {} point(s) récupéré(s)", points.len());
+    println!("[DB]  {} point(s) récupéré(s)", points.len());
     Ok(points)
 }
 
@@ -902,7 +501,7 @@ pub async fn insert_point_details(
     for detail in &details {
         let point_id = if detail.point.id.is_empty() || detail.point.id == "0" {
             // Générer un nouvel UUID pour ce point
-            generate_uuid()
+            Uuid::new_v4().to_string()
         } else {
             // Utiliser l'ID fourni
             detail.point.id.clone()
@@ -910,13 +509,14 @@ pub async fn insert_point_details(
 
         // Insérer le point
         sqlx::query(
-            r#"INSERT OR REPLACE INTO point (id, x, y, pose, depose) VALUES (?, ?, ?, ?, ?)"#,
+            r#"INSERT OR REPLACE INTO point (id, x, y, comment, type, status) VALUES (?, ?, ?, ?, ?, ?)"#,
         )
         .bind(&point_id)
         .bind(detail.point.x)
         .bind(detail.point.y)
-        .bind(&detail.point.pose)
-        .bind(&detail.point.depose)
+        .bind(&detail.point.comment)
+        .bind(&detail.point.r#type)
+        .bind(&detail.point.status)
         .execute(&mut *tx)
         .await
         .map_err(|e| format!("Erreur INSERT/REPLACE point ID {} : {}", point_id, e))?;
@@ -925,10 +525,10 @@ pub async fn insert_point_details(
     }
     // ÉTAPE 2: Insérer les données liées (commentaires)
     for (idx, detail) in details.iter().enumerate() {
-        let assigned_point_id = &assigned_ids[idx];
+        let assigned_point_id: &String = &assigned_ids[idx];
         for comment in &detail.comment {
             let comment_id = if comment.id.is_empty() || comment.id == "0" {
-                generate_uuid()
+                Uuid::new_v4().to_string()
             } else {
                 comment.id.clone()
             };
@@ -948,10 +548,10 @@ pub async fn insert_point_details(
     }
     // images
     for (idx, detail) in details.iter().enumerate() {
-        let assigned_point_id = &assigned_ids[idx];
+        let assigned_point_id: &String = &assigned_ids[idx];
         for picture in &detail.picture {
             let picture_id = if picture.id.is_empty() || picture.id == "0" {
-                generate_uuid()
+                Uuid::new_v4().to_string()
             } else {
                 picture.id.clone()
             };
@@ -971,10 +571,10 @@ pub async fn insert_point_details(
     }
     // obstacles and types
     for (idx, detail) in details.iter().enumerate() {
-        let assigned_point_id = &assigned_ids[idx];
+        let assigned_point_id: &String = &assigned_ids[idx];
         for obstacle in &detail.obstacle {
             let obstacle_id = if obstacle.id.is_empty() || obstacle.id == "0" {
-                generate_uuid()
+                Uuid::new_v4().to_string()
             } else {
                 obstacle.id.clone()
             };
@@ -984,8 +584,6 @@ pub async fn insert_point_details(
                 obstacle.point_id.clone()
             };
 
-            // Si l'obstacle a des données de type (name, description, width, length),
-            // on l'insère dans obstacle_type
             if obstacle.name.is_some()
                 || obstacle.description.is_some()
                 || obstacle.width.is_some()
@@ -1009,7 +607,6 @@ pub async fn insert_point_details(
                     )
                 })?;
             }
-            // Insérer l'obstacle lui-même
             sqlx::query(r#"INSERT OR REPLACE INTO obstacle (id, point_id, type_id, number) VALUES (?, ?, ?, ?)"#)
                 .bind(&obstacle_id)
                 .bind(&point_id_to_use)
@@ -1083,7 +680,7 @@ pub async fn insert_point(
                 );
             }
         }
-        Err(e) => println!("[DB] ❌ Erreur insertion: {}", e),
+        Err(e) => println!("[DB]  Erreur insertion: {}", e),
     }
     result
 }
@@ -1159,9 +756,8 @@ pub async fn fetch_team_members(app: AppHandle, team_id: i64) -> Result<Vec<Memb
     let pool = get_db_pool(&app).await?;
 
     let query = r#"
-        SELECT p.id, p.firstname, p.lastname, p.email
-        FROM person p
-        INNER JOIN member m ON p.id = m.person_id
+        SELECT m.id, m.team_id, m.person_id
+        FROM member m
         WHERE m.team_id = ?
     "#;
 
@@ -1175,9 +771,8 @@ pub async fn fetch_team_members(app: AppHandle, team_id: i64) -> Result<Vec<Memb
         .into_iter()
         .map(|row| Member {
             id: row.get("id"),
-            firstname: row.get("firstname"),
-            lastname: row.get("lastname"),
-            email: row.get("email"),
+            team_id: row.get("team_id"),
+            person_id: row.get("person_id"),
         })
         .collect();
 
@@ -1189,7 +784,7 @@ pub async fn fetch_team_events(app: AppHandle, team_id: i64) -> Result<Vec<Event
     let pool = get_db_pool(&app).await?;
 
     let query = r#"
-        SELECT e.*
+        SELECT e.id, e.name, e.start_date, e.end_date
         FROM event e
         INNER JOIN team_event te ON e.id = te.event_id
         WHERE te.team_id = ?
@@ -1206,11 +801,10 @@ pub async fn fetch_team_events(app: AppHandle, team_id: i64) -> Result<Vec<Event
         .map(|row| Event {
             id: row.get("id"),
             name: row.get("name"),
-            description: row.get("description"),
-            date_debut: row.get("date_debut"),
-            date_fin: row.get("date_fin"),
-            statut: row.get("statut"),
-            geometry: row.get("geometry"),
+            start_date: row.get("start_date"),
+            end_date: row.get("end_date"),
+            zone: row.get("zone"),
+            parcours: row.get("parcours"),
         })
         .collect();
 
@@ -1253,7 +847,6 @@ pub async fn fetch_teams(app: AppHandle) -> Result<Vec<Team>, String> {
             Team {
                 id: row.get("id"),
                 name: row.get("name"),
-                number: row.get("number"),
                 event_ids,
             }
         })
@@ -1276,8 +869,7 @@ pub async fn create_team(app: AppHandle, name: String) -> Result<Team, String> {
 
     Ok(Team {
         id: new_id,
-        name,
-        number: 0,
+        name: Some(name),
         event_ids: Vec::new(),
     })
 }
@@ -1384,11 +976,11 @@ pub async fn create_person(
 
     Ok(Person {
         id: new_id,
-        firstname,
-        lastname,
-        email,
-        address,
-        phone_number,
+        firstname: Some(firstname),
+        lastname: Some(lastname),
+        email: Some(email),
+        address: Some(address),
+        phone_number: Some(phone_number),
     })
 }
 
@@ -1480,7 +1072,6 @@ pub async fn fetch_person_teams(app: AppHandle, person_id: i64) -> Result<Vec<Te
         .map(|row| Team {
             id: row.get("id"),
             name: row.get("name"),
-            number: row.get("number"),
             event_ids: Vec::new(),
         })
         .collect();
@@ -1510,11 +1101,8 @@ pub async fn fetch_events(app: AppHandle) -> Result<Vec<Event>, String> {
         SELECT
             id,
             name,
-            description,
-            date_debut,
-            date_fin,
-            statut,
-            geometry
+            start_date,
+            end_date
         FROM event
     "#;
 
@@ -1531,7 +1119,7 @@ pub async fn fetch_events(app: AppHandle) -> Result<Vec<Event>, String> {
     let mut events: Vec<Event> = Vec::new();
 
     for row in rows {
-        let event_id: i64 = row.get("id");
+        let event_id: String = row.get("id");
         println!("[DB]   → Traitement de l'événement ID: {}", event_id);
 
         // Récupérer les géométries pour cet événement
@@ -1539,11 +1127,10 @@ pub async fn fetch_events(app: AppHandle) -> Result<Vec<Event>, String> {
         events.push(Event {
             id: event_id,
             name: row.get("name"),
-            description: row.get("description"),
-            date_debut: row.get("date_debut"),
-            date_fin: row.get("date_fin"),
-            statut: row.get("statut"),
-            geometry: row.get("geometry"),
+            start_date: row.get("start_date"),
+            end_date: row.get("end_date"),
+            zone: row.get("zone"),
+            parcours: row.get("parcours"),
         });
     }
 
@@ -1556,24 +1143,28 @@ pub async fn fetch_events(app: AppHandle) -> Result<Vec<Event>, String> {
 
 #[tauri::command]
 pub async fn insert_event(event: Event, app: AppHandle) -> Result<(), String> {
-    println!("[DB] 🎉 Insertion d'un événement: {:?}", event);
+    println!("Insertion d'un événement: {:?}", event);
 
     let pool = get_db_pool(&app).await?;
 
-    sqlx::query(
-            "INSERT INTO event (name, description, date_debut, date_fin, statut, geometry) VALUES (?, ?, ?, ?, ?, ?)"
-        )
-        .bind(&event.name)
-        .bind(&event.description)
-        .bind(&event.date_debut)
-        .bind(&event.date_fin)
-        .bind(&event.statut)
-        .bind(&event.geometry)
-        .execute(&pool)
-        .await
-        .map_err(|e| format!("Failed to insert event: {}", e))?;
+    // Générer un UUID pour l'id de l'événement
+    let event_id = Uuid::new_v4().to_string();
 
-    println!("[DB] ✅ Événement '{}' créé avec succès !", event.name);
+    sqlx::query(
+        "INSERT INTO event (id, name, start_date, end_date) VALUES (?, ?, ?, ?, ?, ?)",
+    )
+    .bind(&event_id)
+    .bind(&event.name)
+    .bind(&event.start_date)
+    .bind(&event.end_date)
+    .execute(&pool)
+    .await
+    .map_err(|e| format!("Failed to insert event: {}", e))?;
+
+    println!(
+        "[DB] ✅ Événement '{:?}' créé avec succès (id: {})!",
+        event.name, event_id
+    );
 
     Ok(())
 }
@@ -1604,7 +1195,7 @@ pub async fn unlink_point_from_event(
     point_id: String,
     event_id: i64,
 ) -> Result<(), String> {
-    println!("[DB] 🔓 Déliaison point {} ← event {}", point_id, event_id);
+    println!("[DB]  Déliaison point {} ← event {}", point_id, event_id);
     let pool = get_db_pool(&app).await?;
 
     sqlx::query("DELETE FROM point_event WHERE point_id = ? AND event_id = ?")
@@ -1682,7 +1273,7 @@ pub async fn create_geometry(
 
     let id = result.last_insert_rowid();
     println!(
-        "[DB] 📐 Géométrie créée avec id={} pour l'événement {}",
+        "[DB]  Géométrie créée avec id={} pour l'événement {}",
         id, event_id
     );
 
@@ -1727,7 +1318,7 @@ pub async fn update_geometry(
         .await
         .map_err(|e| e.to_string())?;
 
-    println!("[DB] ✏️ Géométrie {} mise à jour", geometry_id);
+    println!("[DB] Géométrie {} mise à jour", geometry_id);
 
     Ok(Geometry {
         id: geometry_id,
@@ -1737,17 +1328,17 @@ pub async fn update_geometry(
 }
 
 #[tauri::command]
-pub async fn delete_event(app: AppHandle, event_id: i64) -> Result<(), String> {
+pub async fn delete_event(app: AppHandle, event_id: String) -> Result<(), String> {
     let pool = get_db_pool(&app).await?;
 
     // Les liaisons point_event seront supprimées automatiquement grâce à ON DELETE CASCADE
     sqlx::query("DELETE FROM event WHERE id = ?")
-        .bind(event_id)
+        .bind(&event_id)
         .execute(&pool)
         .await
         .map_err(|e| e.to_string())?;
 
-    println!("[DB] ✅ Événement {} supprimé", event_id);
+    println!("[DB]  Événement {} supprimé", event_id);
     Ok(())
 }
 
@@ -1789,116 +1380,6 @@ pub async fn get_user_by_username(pool: &SqlitePool, username: &str) -> sqlx::Re
     Ok(user)
 }
 
-/// Ensure the core database schema exists (idempotent).
-pub async fn ensure_schema(pool: &SqlitePool) -> Result<(), String> {
-    // CREATE TABLE IF NOT EXISTS for all required tables
-    let stmts = vec![
-        r#"CREATE TABLE IF NOT EXISTS point (
-            id INTEGER PRIMARY KEY,
-            x REAL,
-            y REAL,
-            pose TEXT,
-            depose TEXT
-        );"#,
-        r#"CREATE TABLE IF NOT EXISTS obstacle_type (
-            id INTEGER PRIMARY KEY,
-            name TEXT,
-            description TEXT,
-            width REAL,
-            length REAL
-        );"#,
-        r#"CREATE TABLE IF NOT EXISTS comment (
-            id INTEGER PRIMARY KEY,
-            point_id INTEGER,
-            value TEXT,
-            FOREIGN KEY (point_id) REFERENCES point (id)
-        );"#,
-        r#"CREATE TABLE IF NOT EXISTS picture (
-            id INTEGER PRIMARY KEY,
-            point_id INTEGER,
-            image TEXT,
-            FOREIGN KEY (point_id) REFERENCES point (id)
-        );"#,
-        r#"CREATE TABLE IF NOT EXISTS obstacle (
-            id INTEGER PRIMARY KEY,
-            point_id INTEGER,
-            type_id INTEGER,
-            number INTEGER,
-            description TEXT,
-            FOREIGN KEY (point_id) REFERENCES point (id),
-            FOREIGN KEY (type_id) REFERENCES obstacle_type (id)
-        );"#,
-        r#"CREATE TABLE IF NOT EXISTS user (
-            id INTEGER PRIMARY KEY,
-            username TEXT,
-            password_hash TEXT,
-            role TEXT
-        );"#,
-        r#"CREATE TABLE IF NOT EXISTS event (
-            id INTEGER PRIMARY KEY,
-            name TEXT,
-            description TEXT,
-            date_debut TEXT,
-            date_fin TEXT,
-            statut TEXT,
-            geometry TEXT
-        );"#,
-        r#"CREATE TABLE IF NOT EXISTS point_event (
-            id INTEGER PRIMARY KEY,
-            point_id INTEGER NOT NULL,
-            event_id INTEGER NOT NULL,
-            FOREIGN KEY (point_id) REFERENCES point(id) ON DELETE CASCADE,
-            FOREIGN KEY (event_id) REFERENCES event(id) ON DELETE CASCADE,
-            UNIQUE(point_id, event_id)
-        );"#,
-        r#"CREATE TABLE IF NOT EXISTS team (
-            id INTEGER PRIMARY KEY ,
-            name TEXT,
-            number INTEGER
-        );"#,
-        r#"CREATE TABLE IF NOT EXISTS person (
-            id INTEGER PRIMARY KEY,
-            firstname TEXT,
-            lastname TEXT,
-            address TEXT,
-            email TEXT,
-            phone_number TEXT
-        );"#,
-        r#"CREATE TABLE IF NOT EXISTS member (
-            id INTEGER PRIMARY KEY,
-            team_id INTEGER,
-            person_id INTEGER,
-            FOREIGN KEY (team_id) REFERENCES team (id) ON DELETE CASCADE,
-            FOREIGN KEY (person_id) REFERENCES person (id) ON DELETE CASCADE,
-            UNIQUE(team_id, person_id)
-        );"#,
-        r#"
-        CREATE TABLE IF NOT EXISTS team_event (
-            id INTEGER PRIMARY KEY,
-            team_id INTEGER NOT NULL,
-            event_id INTEGER NOT NULL,
-            FOREIGN KEY (team_id) REFERENCES team(id) ON DELETE CASCADE,
-            FOREIGN KEY (event_id) REFERENCES event(id) ON DELETE CASCADE,
-            UNIQUE(team_id, event_id)
-        );"#,
-        r#"CREATE TABLE IF NOT EXISTS geometry (
-            id INTEGER PRIMARY KEY,
-            event_id INTEGER NOT NULL,
-            geom TEXT,
-            FOREIGN KEY (event_id) REFERENCES event(id) ON DELETE CASCADE
-        );"#,
-    ];
-
-    for s in stmts {
-        sqlx::query(s)
-            .execute(pool)
-            .await
-            .map_err(|e| format!("Failed to ensure schema: {}", e))?;
-    }
-
-    Ok(())
-}
-
 // --- Tauri command wrappers for frontend ---
 #[tauri::command]
 pub async fn is_first_launch_cmd(app: AppHandle) -> Result<bool, String> {
@@ -1929,7 +1410,10 @@ pub async fn verify_credentials_cmd(
         .await
         .map_err(|e| e.to_string())?
     {
-        Some(user) => Ok(verify(&password, &user.password_hash).unwrap_or(false)),
+        Some(user) => match &user.password_hash {
+            Some(hash) => Ok(verify(&password, hash).unwrap_or(false)),
+            None => Ok(false),
+        },
         None => Ok(false),
     }
 }
