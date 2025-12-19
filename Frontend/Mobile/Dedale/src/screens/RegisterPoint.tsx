@@ -23,61 +23,13 @@ import { getDatabase } from "../../assets/migrations";
 import * as ImageHelper from "../services/ImageHelper";
 import { useEvent } from "../context/EventContext";
 import { usePoints } from "../context/PointsContext";
+import { generateUUID } from "../services/Helper";
 
 type SelectedObstacle = {
   type_id: number;
   name: string;
   number: number;
 };
-
-// Fonction utilitaire exportée pour les tests
-export async function savePointToDB(
-  db: any,
-  x: number,
-  y: number,
-  comment: string,
-  images: string[],
-  obstacles: { type_id: number; number: number }[],
-  eventId: number | null
-): Promise<number> {
-  // Insérer le point
-  const pointResult = db.runSync(
-    "INSERT INTO point (x, y) VALUES (?, ?)",
-    [x, y]
-  );
-  const pointId = pointResult.lastInsertRowId;
-
-  // Lier à l'événement
-  if (eventId) {
-    db.runSync(
-      "INSERT INTO point_event (point_id, event_id) VALUES (?, ?)",
-      [pointId, eventId]
-    );
-  }
-
-  // Insérer le commentaire
-  if (comment) {
-    db.runSync(
-      "INSERT INTO comment (point_id, value) VALUES (?, ?)",
-      [pointId, comment]
-    );
-  }
-
-  // Insérer les obstacles
-  for (const obstacle of obstacles) {
-    db.runSync(
-      "INSERT INTO obstacle (point_id, type_id, number) VALUES (?, ?, ?)",
-      [pointId, obstacle.type_id, obstacle.number]
-    );
-  }
-
-  // Insérer les images
-  for (const image of images) {
-    await ImageHelper.saveImageToBDD(image, pointId);
-  }
-
-  return pointId;
-}
 
 export default function RegisterPointScreen() {
   const { selectedEventId } = useEvent();
@@ -177,31 +129,20 @@ export default function RegisterPointScreen() {
     commentValue: string = ""
   ) => {
     try {
-      const pointResult: any = db.runSync(
-        "INSERT INTO point (x, y) VALUES (?, ?)",
-        [x, y]
+      // Générer un UUID pour le point
+      const pointId = generateUUID();
+
+      // Insérer le point avec event_id direct et le commentaire
+      db.runSync(
+        "INSERT INTO point (id, event_id, x, y, comment) VALUES (?, ?, ?, ?, ?)",
+        [pointId, selectedEventId, x, y, commentValue.trim() || null]
       );
-
-      const insertedPointId = pointResult.lastInsertRowId as number;
-      if (!insertedPointId || insertedPointId === 0) {
-        throw new Error(
-          "Impossible de récupérer l'ID du point qui vient d'être créé."
-        );
-      }
-
-      // Associate point with current event via junction table
-      if (selectedEventId) {
-        db.runSync(
-          "INSERT INTO point_event (point_id, event_id) VALUES (?, ?)",
-          [insertedPointId, selectedEventId]
-        );
-      }
 
       // Sauvegarder les images
       if (selectedImages.length > 0) {
         for (const imageUri of selectedImages) {
           try {
-            await ImageHelper.saveImageToBDD(imageUri, insertedPointId);
+            await ImageHelper.saveImageToBDD(imageUri, pointId);
           } catch (imgErr) {
             console.error(
               `Erreur lors de la sauvegarde de l'image ${imageUri} :`,
@@ -217,36 +158,29 @@ export default function RegisterPointScreen() {
         }
       }
 
-      // Sauvegarder le commentaire
-      if (commentValue.trim()) {
-        db.runSync("INSERT INTO comment (point_id, value) VALUES (?, ?)", [
-          insertedPointId,
-          commentValue,
-        ]);
-      }
-
-      // Sauvegarder les obstacles
+      // Sauvegarder les équipements (anciennement obstacles)
       if (selectedObstacles.length > 0) {
         for (const obstacle of selectedObstacles) {
           try {
+            const equipementId = generateUUID();
             db.runSync(
-              "INSERT INTO obstacle (point_id, type_id, number) VALUES (?, ?, ?)",
-              [insertedPointId, obstacle.type_id, obstacle.number]
+              "INSERT INTO equipement (id, point_id, type_id, quantity) VALUES (?, ?, ?, ?)",
+              [equipementId, pointId, obstacle.type_id, obstacle.number]
             );
-          } catch (obstErr) {
+          } catch (equipErr) {
             console.error(
-              "Erreur lors de la sauvegarde de l'obstacle:",
-              obstErr
+              "Erreur lors de la sauvegarde de l'équipement:",
+              equipErr
             );
             Alert.alert(
               "Attention",
-              `Le point a été enregistré mais un obstacle n'a pas pu être ajouté.`
+              `Le point a été enregistré mais un équipement n'a pas pu être ajouté.`
             );
           }
         }
       }
 
-      return insertedPointId;
+      return pointId;
     } catch (error: any) {
       console.error(
         "Erreur lors de la sauvegarde du point/commentaire :",
