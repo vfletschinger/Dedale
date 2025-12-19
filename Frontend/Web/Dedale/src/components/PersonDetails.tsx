@@ -56,9 +56,9 @@ export default function PersonDetails({ person, onClose, onDelete, onUpdate, onT
     const startAddingTeam = async () => {
         setIsAddingTeam(true);
         try {
-            const allTeams = await invoke<any[]>("fetch_teams");
+            const allTeams = await invoke<Team[]>("fetch_teams");
             const existingIds = new Set(teams.map(t => t.id));
-            setAvailableTeams(allTeams.filter((t: any) => !existingIds.has(t.id)));
+            setAvailableTeams(allTeams.filter((t) => !existingIds.has(t.id)));
         } catch (e) { console.error(e); }
     };
 
@@ -102,7 +102,7 @@ export default function PersonDetails({ person, onClose, onDelete, onUpdate, onT
         <div className="bg-white w-full max-w-sm h-[500px] flex flex-col rounded-xl shadow-2xl overflow-hidden relative">
 
             {/* HEADER AVEC MODE ÉDITION */}
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 text-center border-b border-blue-100 relative flex-shrink-0">
+            <div className="bg-linear-to-r from-blue-50 to-indigo-50 p-6 text-center border-b border-blue-100 relative shrink-0">
                 <div className="w-16 h-16 bg-white rounded-full mx-auto flex items-center justify-center text-2xl shadow-sm mb-3 text-blue-600 font-bold border border-blue-100">
                     {person.firstname[0]}{person.lastname[0]}
                 </div>
@@ -142,7 +142,7 @@ export default function PersonDetails({ person, onClose, onDelete, onUpdate, onT
             </div>
 
             {/* TAB NAVIGATION */}
-            <div className="flex border-t border-gray-200 border-b flex-shrink-0">
+            <div className="flex border-t border-gray-200 border-b shrink-0">
                 <button onClick={() => isEditing ? "" : setActiveTab('infos')} className={`flex-1 py-2 text-xs font-medium ${activeTab === 'infos' ? 'bg-white text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:bg-gray-100'}`}>Informations</button>
                 <button onClick={() => isEditing ? "" : setActiveTab('teams')} className={`flex-1 py-2 text-xs font-medium ${activeTab === 'teams' ? 'bg-white text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:bg-gray-100'}`}>Équipes ({teams.length})</button>
             </div>
@@ -171,37 +171,37 @@ export default function PersonDetails({ person, onClose, onDelete, onUpdate, onT
                         {teams.map(team => (
                             <div
                                 key={team.id}
-                                onClick={() => isEditing ? "" : onTeamClick(team)}
+                                onClick={() => { if (!isEditing) onTeamClick(team); }}
                                 className="flex justify-between items-center p-2 bg-white border border-gray-100 rounded-lg shadow-sm hover:border-blue-300 cursor-pointer group transition-all"
                             >
                                 <span className="text-sm font-medium text-gray-700">{team.name}</span>
-                                <button onClick={(e) => { isEditing ? "" : e.stopPropagation(); isEditing ? "" : handleRemoveFromTeam(team.id); }} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all p-1">
+                                <button onClick={(e) => { if (!isEditing) { e.stopPropagation(); handleRemoveFromTeam(team.id); } }} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all p-1">
                                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
                             </div>
                         ))}
-                        {isEditing ? "" : isAddingTeam ? (
+                        {!isEditing && (isAddingTeam ? (
                             <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100 animate-in fade-in slide-in-from-top-2">
                                 <div className="flex gap-2">
                                     <select value={selectedTeamId} onChange={(e) => setSelectedTeamId(e.target.value)} className="flex-1 text-sm border border-blue-200 rounded px-2 py-1 outline-none">
                                         <option value="">Choisir...</option>
                                         {availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                                     </select>
-                                    <button onClick={() => { isEditing ? "" : confirmAddTeam() }} disabled={!selectedTeamId} className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">OK</button>
-                                    <button onClick={() => isEditing ? "" : setIsAddingTeam(false)} className="text-gray-500 px-2">✕</button>
+                                    <button onClick={() => confirmAddTeam()} disabled={!selectedTeamId} className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">OK</button>
+                                    <button onClick={() => setIsAddingTeam(false)} className="text-gray-500 px-2">✕</button>
                                 </div>
                             </div>
                         ) : (
                             <button onClick={startAddingTeam} className="w-full py-2 mt-4 border border-dashed border-gray-300 rounded-lg text-gray-500 text-xs hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all flex items-center justify-center gap-1">
                                 <span>+</span> Rejoindre une équipe
                             </button>
-                        )}
+                        ))}
                     </div>
                 )}
             </div>
 
             {/* FOOTER */}
-            <div className="bg-gray-50 p-4 flex justify-between items-center border-t border-gray-100 mt-auto flex-shrink-0">
+            <div className="bg-gray-50 p-4 flex justify-between items-center border-t border-gray-100 mt-auto shrink-0">
                 {isEditing ? (
                     <div className="flex gap-2 w-full">
                         <button onClick={() => { setIsEditing(false); setEditData({ ...person }); }} className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded text-sm text-gray-700">Annuler</button>

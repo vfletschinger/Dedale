@@ -1,5 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+
+// Fonction pour afficher un ID court (8 premiers caractères)
+const shortId = (id: string | number): string => {
+  const str = String(id);
+  return str.length > 8 ? str.substring(0, 8) : str;
+};
 
 export type Obstacle = {
   id: number;
@@ -39,6 +45,16 @@ export type ObstacleType = {
   length: number;
 };
 
+interface MergedObstacle {
+  typeId: number;
+  name: string;
+  description: string;
+  width: number;
+  length: number;
+  number: number;
+  obstacleId: number | null;
+}
+
 // Resolve image src helper (support data:image or base64 string)
 function resolveImageSrc(image: string) {
   if (!image) return "";
@@ -57,33 +73,19 @@ export default function PointDetails({
 }) {
   const [showObstaclesPopup, setShowObstaclesPopup] = useState(false);
   const [showDatesPopup, setShowDatesPopup] = useState(false);
-  const [_, setObstacleTypes] = useState<ObstacleType[]>([]);
-  const [mergedObstacles, setMergedObstacles] = useState<any[]>([]);
+  const [mergedObstacles, setMergedObstacles] = useState<MergedObstacle[]>([]);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [editPose, setEditPose] = useState<string>("");
   const [editDepose, setEditDepose] = useState<string>("");
 
-  useEffect(() => {
-    if (showDatesPopup && point) {
-      setEditPose(point.pose || "");
-      setEditDepose(point.depose || "");
-    }
-  }, [showDatesPopup, point]);
-
-  useEffect(() => {
-    if (showObstaclesPopup && point) {
-      fetchTypes();
-    }
-  }, [showObstaclesPopup, point]);
-
   // Fetch and merge obstacle types with the point's obstacles
-  async function fetchTypes() {
+  const fetchTypes = useCallback(async () => {
+    if (!point) return;
     try {
       const types: ObstacleType[] = await invoke("fetch_obstacle_types");
-      setObstacleTypes(types);
 
       const merged = types.map((type) => {
-        const existing = point?.obstacles.find((o) => o.name === type.name);
+        const existing = point.obstacles.find((o) => o.name === type.name);
         return {
           typeId: type.id,
           name: type.name,
@@ -98,7 +100,24 @@ export default function PointDetails({
     } catch (error) {
       console.error("Failed to fetch obstacle types:", error);
     }
-  }
+  }, [point]);
+
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (showDatesPopup && point) {
+      setEditPose(point.pose || "");
+      setEditDepose(point.depose || "");
+    }
+  }, [showDatesPopup, point]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (showObstaclesPopup && point) {
+      fetchTypes();
+    }
+  }, [showObstaclesPopup, point, fetchTypes]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   function incrementObstacle(typeId: number) {
     setMergedObstacles((prev) =>
@@ -121,8 +140,8 @@ export default function PointDetails({
       if (point) {
         //Convert camelCase to snake_case for backend
         const obstaclesSnakeCase = mergedObstacles.map((o) => ({
-          type_id: o.typeId ?? o.type_id ?? null,
-          obstacle_id: o.obstacleId ?? o.obstacle_id ?? null,
+          type_id: o.typeId ?? null,
+          obstacle_id: o.obstacleId ?? null,
           number: o.number ?? null,
           width: o.width ?? null,
           length: o.length ?? null,
@@ -148,12 +167,13 @@ export default function PointDetails({
   async function handleDelete() {
     if (!point) return;
 
-    if (!confirm(`Supprimer le point #${point.id} ?`)) return;
+    if (!confirm(`Supprimer le point #${shortId(point.id)} ?`)) return;
 
     try {
       await invoke("delete_point", { pointId: point.id });
-      if (onRefresh) onRefresh();
+      // Fermer d'abord le panneau, puis rafraîchir
       if (onClose) onClose();
+      if (onRefresh) await onRefresh();
     } catch (error) {
       console.error("Failed to delete point:", error);
       alert("Erreur lors de la suppression du point.");
@@ -227,7 +247,7 @@ export default function PointDetails({
       <div className="p-4 bg-gradient-to-r from-indigo-500 to-purple-600 text-white">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-bold">Point #{point.id}</h2>
+            <h2 className="text-xl font-bold">Point #{shortId(point.id)}</h2>
             <div className="text-white/80 text-sm mt-1 flex items-center gap-2">
               <span>📍</span>
               <span>{point.x.toFixed(5)}, {point.y.toFixed(5)}</span>

@@ -43,9 +43,9 @@ export function PointsProvider({ children }: { children: ReactNode }) {
           groupedPoints[point.event_id].push(point);
         }
       }
-      // sort each event's points
+      // sort each event's points (by UUID string comparison, most recent first)
       for (const eventId in groupedPoints) {
-        groupedPoints[eventId].sort((a, b) => b.id - a.id);
+        groupedPoints[eventId].sort((a, b) => b.id.localeCompare(a.id));
       }
 
       setPointsByEvent(groupedPoints);
