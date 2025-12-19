@@ -9,6 +9,25 @@ import { useNavigation } from "@react-navigation/native";
 import EventItem from "../components/EventItem";
 import { Feather } from "@expo/vector-icons";
 import { useEvent, EventWithStatus } from "../context/EventContext";
+import { EventType } from "../types/database";
+
+// Fonction utilitaire exportée pour les tests
+export function sortEventsByStatus(events: (EventType | EventWithStatus)[]): (EventType | EventWithStatus)[] {
+  const statusPriority: Record<string, number> = {
+    'actif': 0,
+    'planifié': 1,
+    'passé': 2,
+  };
+  
+  return [...events].sort((a, b) => {
+    // Support both 'status' and 'statut' properties
+    const statusA = ((a as any).status || (a as any).statut || '').toLowerCase();
+    const statusB = ((b as any).status || (b as any).statut || '').toLowerCase();
+    const priorityA = statusPriority[statusA] ?? 999;
+    const priorityB = statusPriority[statusB] ?? 999;
+    return priorityA - priorityB;
+  });
+}
 
 export default function ConnectEvent() {
   const [scanQR, setScanQR] = useState(false);
@@ -18,10 +37,9 @@ export default function ConnectEvent() {
 
   useEffect(() => {
     refreshEvents();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleEventSelect = (event: EventWithStatus) => {
+  const handleEventSelect = (event: EventType | EventWithStatus) => {
     console.log("Événement sélectionné:", event);
     setSelectedEventId(event.id);
     navigation.navigate("Tabs");
