@@ -9,6 +9,7 @@ use tauri::State;
 use tauri::{AppHandle, Manager};
 use uuid::Uuid;
 
+
 // Réexporter les types depuis le module types
 pub use crate::types::*;
 
@@ -46,7 +47,6 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
         .await
         .map_err(|e| format!("Failed to enable foreign keys: {}", e))?;
 
-    println!("[DB] Création/Mise à jour des tables selon le schéma ERD...");
 
     // --- GESTION DES ACCÈS ---
     sqlx::query(
@@ -272,7 +272,7 @@ pub async fn fetch_equipement_coordinates(
     equipement_id: &str,
 ) -> Result<Vec<EquipementCoordinate>, String> {
     sqlx::query_as::<_, EquipementCoordinate>(
-        "SELECT x, y, order_index FROM equipement_coordinate WHERE equipement_id = ? ORDER BY order_index ASC"
+        "SELECT id, equipement_id, x, y, order_index FROM equipement_coordinate WHERE equipement_id = ? ORDER BY order_index ASC"
     )
     .bind(equipement_id)
     .fetch_all(pool)
@@ -1082,22 +1082,10 @@ pub async fn fetch_person_teams(app: AppHandle, person_id: i64) -> Result<Vec<Te
 
 #[tauri::command]
 pub async fn fetch_events(app: AppHandle) -> Result<Vec<Event>, String> {
-    println!("[DB] 🚀 Début de la récupération des événements depuis la base de données.");
+    println!("[DB] 🚀 Début de la récupération des événements...");
     let pool = get_db_pool(&app).await?;
 
-    // Vérifier si la table existe
-    let table_check =
-        sqlx::query("SELECT name FROM sqlite_master WHERE type='table' AND name='event';")
-            .fetch_optional(&pool)
-            .await
-            .map_err(|e| format!("Erreur lors de la vérification de table: {}", e))?;
-
-    if table_check.is_none() {
-        return Err("La table 'event' n'existe pas. Veuillez redémarrer l'application pour exécuter les migrations.".to_string());
-    }
-
-    println!("[DB] ✅ Table 'event' existe.");
-
+    // 1. La requête ne sélectionne QUE ce qui existe dans la table 'event'
     let query = r#"
         SELECT
             id,
@@ -1108,37 +1096,30 @@ pub async fn fetch_events(app: AppHandle) -> Result<Vec<Event>, String> {
     "#;
 
     let rows = sqlx::query(query).fetch_all(&pool).await.map_err(|e| {
-        println!("[DB] ❌ Erreur lors de la requête SQL: {}", e);
+        println!("[DB] ❌ Erreur SQL: {}", e);
         e.to_string()
     })?;
-
-    println!(
-        "[DB] 📊 Récupéré {} événements de la base de données.",
-        rows.len()
-    );
 
     let mut events: Vec<Event> = Vec::new();
 
     for row in rows {
         let event_id: String = row.get("id");
-        println!("[DB]   → Traitement de l'événement ID: {}", event_id);
-
-        // Récupérer les géométries pour cet événement
 
         events.push(Event {
             id: event_id,
             name: row.get("name"),
             start_date: row.get("start_date"),
             end_date: row.get("end_date"),
-            zone: row.get("zone"),
-            parcours: row.get("parcours"),
+            
+            // --- CORRECTION ICI ---
+            // Ne fais PAS row.get("zone") car la colonne n'existe pas !
+            // Zone et Parcours sont des tables séparées, donc pour l'instant on met None.
+            zone: None,      
+            parcours: None,  
         });
     }
 
-    println!(
-        "[DB] ✅ Récupération terminée avec succès. {} événements traités.",
-        events.len()
-    );
+    println!("[DB] ✅ Récupération terminée. {} événements.", events.len());
     Ok(events)
 }
 
@@ -1151,7 +1132,7 @@ pub async fn insert_event(event: Event, app: AppHandle) -> Result<(), String> {
     // Générer un UUID pour l'id de l'événement
     let event_id = Uuid::new_v4().to_string();
 
-    sqlx::query("INSERT INTO event (id, name, start_date, end_date) VALUES (?, ?, ?, ?, ?, ?)")
+    sqlx::query("INSERT INTO event (id, name, start_date, end_date) VALUES (?, ?, ?, ?)")
         .bind(&event_id)
         .bind(&event.name)
         .bind(&event.start_date)
@@ -1164,7 +1145,6 @@ pub async fn insert_event(event: Event, app: AppHandle) -> Result<(), String> {
         "[DB] ✅ Événement '{:?}' créé avec succès (id: {})!",
         event.name, event_id
     );
-
     Ok(())
 }
 

@@ -38,13 +38,14 @@ pub struct Equipement {
     pub hour_depose: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(sqlx::FromRow, Debug, Clone, Serialize, Deserialize)]
 pub struct EquipementCoordinate {
     pub id: String,
     pub equipement_id: String,
     pub x: f64,
     pub y: f64,
-}
+    pub order_index: Option<i64>,
+} 
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Type {

@@ -4,17 +4,14 @@ import { useState, useEffect } from "react";
 
 // Types
 interface Event {
-  id: number;
+  id: string;
   name: string;
-  description: string;
   dateDebut: string;
   dateFin: string;
-  statut: string;
-  geometry: string;
 }
 
 interface EventsProps {
-  onEventClick?: (eventId: number) => void;
+  onEventClick?: (eventId: string) => void;
   onEventsLoaded?: (events: Event[]) => void;
 }
 
@@ -39,11 +36,8 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
-    description: "",
     dateDebut: "",
     dateFin: "",
-    statut: "planned",
-    geometry: "",
   });
 
   // État pour le QR code de réception
@@ -151,23 +145,20 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
         return;
       }
 
-      const newEvent = {
-        ...formData,
-        timestamp: new Date().toISOString(),
-      };
+    const newEvent = {
+      name: formData.name.trim(),
+      start_date: formData.dateDebut, // <--- Renommé pour matcher Rust
+      end_date: formData.dateFin,
+    };
 
       console.log(" Création d'un nouvel événement...", newEvent);
       await invoke("insert_event", { event: newEvent });
       console.log(" Événement créé avec succès");
 
-      // Réinitialiser le formulaire
       setFormData({
         name: "",
-        description: "",
         dateDebut: "",
-        dateFin: "",
-        statut: "planned",
-        geometry: "",
+        dateFin: ""
       });
       setShowCreateForm(false);
       loadEvents();
@@ -256,21 +247,6 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Statut
-              </label>
-              <select
-                name="statut"
-                value={formData.statut}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="planned">Planifié</option>
-                <option value="active">Actif</option>
-                <option value="completed">Terminé</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
                 Date de début *
               </label>
               <input
@@ -291,32 +267,6 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
                 value={formData.dateFin}
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Description
-              </label>
-              <textarea
-                name="description"
-                value={formData.description}
-                onChange={handleInputChange}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Description de l'événement"
-              />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Géométrie (GeoJSON)
-              </label>
-              <textarea
-                name="geometry"
-                value={formData.geometry}
-                onChange={handleInputChange}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder='Exemple: {"type": "Point", "coordinates": [7.75, 48.58]}'
               />
             </div>
           </div>
@@ -358,25 +308,12 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
                   <h3 className="text-lg font-semibold text-gray-800">
                     {event.name}
                   </h3>
-                  {event.description && (
-                    <p className="text-gray-600 mt-1">{event.description}</p>
-                  )}
                   <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
                     <span>
                       Sélectionné Du {formatDate(event.dateDebut)} au{" "}
                       {formatDate(event.dateFin)}
                     </span>
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs ${
-                        event.statut === "active"
-                          ? "bg-green-100 text-green-800"
-                          : event.statut === "planned"
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-gray-100 text-gray-800"
-                      }`}
-                    >
-                      {event.statut}
-                    </span>
+                   
                   </div>
                 </div>
                 <div className="ml-4 flex gap-2">
