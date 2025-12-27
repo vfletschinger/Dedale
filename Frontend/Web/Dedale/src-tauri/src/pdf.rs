@@ -1,7 +1,6 @@
 use crate::db;
 use crate::map_static;
 use crate::utils;
-use base64::{engine::general_purpose, Engine as _};
 use sqlx::Row;
 use std::fmt::Write;
 use std::fs;
@@ -11,8 +10,8 @@ use typst_as_lib::TypstEngine;
 use typst_pdf::PdfOptions;
 
 #[tauri::command]
-pub async fn create_pdf(app: AppHandle, event_id: Option<i64>) -> Result<(), String> {
-    let data = db::retrieve_data_by_event(&app, event_id).await?;
+pub async fn create_pdf(app: AppHandle, event_id: Option<String>) -> Result<(), String> {
+    let data = db::retrieve_data_by_event(&app, &event_id).await?;
 
     let temp_dir = std::env::temp_dir().join("my_app_pdf_gen");
     if temp_dir.exists() {

@@ -5,11 +5,11 @@ use sqlx::Row;
 use tauri::AppHandle;
 
 #[tauri::command]
-pub async fn export_points_excel(app: AppHandle, event_id: Option<i64>) -> Result<(), String> {
-    let points: Vec<Point> = db::retrieve_data_by_event(&app, event_id).await?;
+pub async fn export_points_excel(app: AppHandle, event_id: Option<String>) -> Result<(), String> {
+    let points: Vec<Point> = db::retrieve_data_by_event(&app, &event_id).await?;
     println!("📊 Export Excel : {} points récupérés", points.len());
 
-    let event_name = if let Some(eid) = event_id {
+    let event_name = if let Some(eid) = &event_id {
         let pool = db::get_db_pool(&app).await?;
         let row = sqlx::query("SELECT name FROM event WHERE id = ?")
             .bind(eid)
