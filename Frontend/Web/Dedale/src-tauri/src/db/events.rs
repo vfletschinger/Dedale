@@ -4,7 +4,7 @@ use uuid::Uuid;
 use crate::db::get_db_pool;
 use crate::types::*;
 
-pub async fn fetch_event_ids(app: AppHandle, point_id: &str) -> Result<Vec<i64>, String> {
+pub async fn fetch_event_ids(app: AppHandle, point_id: &str) -> Result<Vec<String>, String> {
     let pool = get_db_pool(&app).await?;
 
     let rows = sqlx::query("SELECT event_id FROM point_event WHERE point_id = ?")
@@ -91,14 +91,14 @@ pub async fn insert_event(event: Event, app: AppHandle) -> Result<(), String> {
 pub async fn link_point_to_event(
     app: AppHandle,
     point_id: String,
-    event_id: i64,
+    event_id: String,
 ) -> Result<(), String> {
     println!("[DB] 🔗 Liaison point {} → event {}", point_id, event_id);
     let pool = get_db_pool(&app).await?;
 
     sqlx::query("INSERT OR IGNORE INTO point_event (point_id, event_id) VALUES (?, ?)")
         .bind(&point_id)
-        .bind(event_id)
+        .bind(&event_id)
         .execute(&pool)
         .await
         .map_err(|e| format!("Failed to link point to event: {}", e))?;
@@ -111,27 +111,24 @@ pub async fn link_point_to_event(
 pub async fn unlink_point_from_event(
     app: AppHandle,
     point_id: String,
-    event_id: i64,
+    event_id: String,
 ) -> Result<(), String> {
     println!("[DB]  Déliaison point {} ← event {}", point_id, event_id);
     let pool = get_db_pool(&app).await?;
 
     sqlx::query("DELETE FROM point_event WHERE point_id = ? AND event_id = ?")
         .bind(&point_id)
-        .bind(event_id)
+        .bind(&event_id)
         .execute(&pool)
         .await
         .map_err(|e| format!("Failed to unlink point from event: {}", e))?;
 
-    println!(
-        "[DB] ✅ Point {} délié de l'événement {}",
-        point_id, event_id
-    );
+   
     Ok(())
 }
 
 #[tauri::command]
-pub async fn get_points_for_event(app: AppHandle, event_id: i64) -> Result<Vec<i64>, String> {
+pub async fn get_points_for_event(app: AppHandle, event_id: String) -> Result<Vec<String>, String> {
     let pool = get_db_pool(&app).await?;
 
     let rows = sqlx::query("SELECT point_id FROM point_event WHERE event_id = ?")
@@ -140,7 +137,7 @@ pub async fn get_points_for_event(app: AppHandle, event_id: i64) -> Result<Vec<i
         .await
         .map_err(|e| e.to_string())?;
 
-    let point_ids: Vec<i64> = rows.into_iter().map(|row| row.get("point_id")).collect();
+    let point_ids: Vec<String> = rows.into_iter().map(|row| row.get("point_id")).collect();
     Ok(point_ids)
 }
 

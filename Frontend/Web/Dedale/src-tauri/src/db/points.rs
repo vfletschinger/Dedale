@@ -253,7 +253,9 @@ pub async fn insert_point_details(
 
         // Insérer le point
         sqlx::query(
-            r#"INSERT OR REPLACE INTO point (id, x, y, comment, type, status) VALUES (?, ?, ?, ?, ?, ?)"#,
+            r#"INSERT OR REPLACE INTO point 
+            (id, x, y, comment, type, status, event_id) 
+            VALUES (?, ?, ?, ?, ?, ?, ?)"#,
         )
         .bind(&point_id)
         .bind(detail.point.x)
@@ -261,9 +263,11 @@ pub async fn insert_point_details(
         .bind(&detail.point.comment)
         .bind(&detail.point.r#type)
         .bind(&detail.point.status)
+        .bind(&detail.point.event_id) // <-- Indispensable pour éviter le NOT NULL
+
         .execute(&mut *tx)
         .await
-        .map_err(|e| format!("Erreur INSERT/REPLACE point ID {} : {}", point_id, e))?;
+        .map_err(|e| format!("Erreur INSERT point ID {} : {}", point_id, e))?;
 
         assigned_ids.push(point_id);
     }
@@ -337,7 +341,6 @@ pub async fn insert_point_details(
                     r#"INSERT OR IGNORE INTO obstacle_type (id, name, description, width, length)
                        VALUES (?, ?, ?, ?, ?)"#,
                 )
-                .bind(obstacle.type_id)
                 .bind(obstacle.name.as_ref().unwrap_or(&"Unknown".to_string()))
                 .bind(obstacle.description.as_ref().unwrap_or(&"".to_string()))
                 .bind(obstacle.width.unwrap_or(0.0))
@@ -354,7 +357,6 @@ pub async fn insert_point_details(
             sqlx::query(r#"INSERT OR REPLACE INTO obstacle (id, point_id, type_id, number) VALUES (?, ?, ?, ?)"#)
                 .bind(&obstacle_id)
                 .bind(&point_id_to_use)
-                .bind(obstacle.type_id)
                 .bind(obstacle.number)
                 .execute(&mut *tx)
                 .await

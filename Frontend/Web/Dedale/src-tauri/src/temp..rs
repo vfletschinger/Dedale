@@ -85,7 +85,7 @@ pub struct Point {
     pub comment: Option<String>,
     pub r#type: Option<String>,
     pub status: Option<bool>,
-    pub event_id: Option<i64>,
+    pub event_id: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
