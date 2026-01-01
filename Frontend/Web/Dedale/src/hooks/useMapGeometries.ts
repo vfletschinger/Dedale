@@ -3,18 +3,23 @@ import maplibregl from "maplibre-gl";
 import MapboxDraw from "@mapbox/mapbox-gl-draw";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
 import { invoke } from "@tauri-apps/api/core";
-import { geoJSONtoWKT, parseWKTtoGeoJSON } from "../utils/maputils"; // Vérifiez la casse du fichier (mapUtils vs maputils)
-import { GeometryData } from "../types/map"; // Vérifiez le chemin
-
+import { geoJSONtoWKT, parseWKTtoGeoJSON } from "../utils/maputils";
+import { GeometryData } from "../types/map";
 export function useMapGeometries(
   map: maplibregl.Map | null,
-  selectedEventId: number | null
+  selectedEventId: number | null,
 ) {
   // --- ÉTATS ---
   const [geometries, setGeometries] = useState<GeometryData[]>([]);
-  const [drawingMode, setDrawingMode] = useState<"none" | "polygon" | "line">("none");
-  const [selectedGeometryId, setSelectedGeometryId] = useState<number | null>(null);
-  const [editingGeometryId, setEditingGeometryId] = useState<number | null>(null);
+  const [drawingMode, setDrawingMode] = useState<"none" | "polygon" | "line">(
+    "none",
+  );
+  const [selectedGeometryId, setSelectedGeometryId] = useState<number | null>(
+    null,
+  );
+  const [editingGeometryId, setEditingGeometryId] = useState<number | null>(
+    null,
+  );
   const [isGeometryListOpen, setIsGeometryListOpen] = useState(false);
 
   // --- REFS ---
@@ -30,10 +35,14 @@ export function useMapGeometries(
   const refreshGeometriesOnMap = useCallback(
     (mapObj: maplibregl.Map, geoms: GeometryData[]) => {
       // Nettoyage des anciennes couches
-      if (mapObj.getLayer("event-geometries-fill")) mapObj.removeLayer("event-geometries-fill");
-      if (mapObj.getLayer("event-geometries-line")) mapObj.removeLayer("event-geometries-line");
-      if (mapObj.getLayer("event-geometries-point")) mapObj.removeLayer("event-geometries-point");
-      if (mapObj.getSource("event-geometries")) mapObj.removeSource("event-geometries");
+      if (mapObj.getLayer("event-geometries-fill"))
+        mapObj.removeLayer("event-geometries-fill");
+      if (mapObj.getLayer("event-geometries-line"))
+        mapObj.removeLayer("event-geometries-line");
+      if (mapObj.getLayer("event-geometries-point"))
+        mapObj.removeLayer("event-geometries-point");
+      if (mapObj.getSource("event-geometries"))
+        mapObj.removeSource("event-geometries");
 
       if (geoms.length === 0) return;
 
@@ -75,8 +84,16 @@ export function useMapGeometries(
         id: "event-geometries-line",
         type: "line",
         source: "event-geometries",
-        filter: ["any", ["==", ["geometry-type"], "LineString"], ["==", ["geometry-type"], "Polygon"]],
-        paint: { "line-color": "#4f46e5", "line-width": 3, "line-opacity": 0.8 },
+        filter: [
+          "any",
+          ["==", ["geometry-type"], "LineString"],
+          ["==", ["geometry-type"], "Polygon"],
+        ],
+        paint: {
+          "line-color": "#4f46e5",
+          "line-width": 3,
+          "line-opacity": 0.8,
+        },
       });
 
       // Style Points
@@ -94,7 +111,7 @@ export function useMapGeometries(
         },
       });
     },
-    []
+    [],
   );
 
   // --- FONCTION : Charger les géométries depuis la DB ---
@@ -107,7 +124,10 @@ export function useMapGeometries(
     }
 
     try {
-      console.log("📐 Chargement des géométries pour event_id:", selectedEventId);
+      console.log(
+        "📐 Chargement des géométries pour event_id:",
+        selectedEventId,
+      );
       const geoms = await invoke<GeometryData[]>("fetch_geometries_for_event", {
         eventId: selectedEventId,
       });
@@ -138,14 +158,23 @@ export function useMapGeometries(
         {
           id: "gl-draw-line",
           type: "line",
-          filter: ["all", ["==", "$type", "LineString"], ["!=", "mode", "static"]],
+          filter: [
+            "all",
+            ["==", "$type", "LineString"],
+            ["!=", "mode", "static"],
+          ],
           paint: { "line-color": "#22c55e", "line-width": 4 },
         },
         {
           id: "gl-draw-point-active",
           type: "circle",
           filter: ["all", ["==", "$type", "Point"], ["!=", "mode", "static"]],
-          paint: { "circle-radius": 6, "circle-color": "#fff", "circle-stroke-color": "#4f46e5", "circle-stroke-width": 2 },
+          paint: {
+            "circle-radius": 6,
+            "circle-color": "#fff",
+            "circle-stroke-color": "#4f46e5",
+            "circle-stroke-width": 2,
+          },
         },
       ],
     });
@@ -170,7 +199,7 @@ export function useMapGeometries(
         const wkt = geoJSONtoWKT(feature.geometry);
         await invoke("create_geometry", { eventId: currentEventId, geom: wkt });
         console.log("✅ Géométrie sauvegardée");
-        
+
         draw.delete(feature.id); // On retire du draw pour laisser la couche 'event-geometries' l'afficher
         loadGeometries(); // Recharger depuis la DB
       } catch (err) {
@@ -179,7 +208,6 @@ export function useMapGeometries(
         draw.delete(feature.id);
       }
     });
-
   }, [map, loadGeometries]);
 
   // --- ACTIONS ---
@@ -214,9 +242,12 @@ export function useMapGeometries(
   const highlightGeometry = (geom: GeometryData | null) => {
     if (!map) return;
     // Nettoyage highlight
-    if (map.getLayer("highlight-geometry-fill")) map.removeLayer("highlight-geometry-fill");
-    if (map.getLayer("highlight-geometry-line")) map.removeLayer("highlight-geometry-line");
-    if (map.getSource("highlight-geometry")) map.removeSource("highlight-geometry");
+    if (map.getLayer("highlight-geometry-fill"))
+      map.removeLayer("highlight-geometry-fill");
+    if (map.getLayer("highlight-geometry-line"))
+      map.removeLayer("highlight-geometry-line");
+    if (map.getSource("highlight-geometry"))
+      map.removeSource("highlight-geometry");
 
     if (!geom) {
       setSelectedGeometryId(null);
@@ -229,7 +260,10 @@ export function useMapGeometries(
 
     map.addSource("highlight-geometry", {
       type: "geojson",
-      data: { type: "FeatureCollection", features: [{ type: "Feature", geometry, properties: {} }] },
+      data: {
+        type: "FeatureCollection",
+        features: [{ type: "Feature", geometry, properties: {} }],
+      },
     });
 
     if (geometry.type === "Polygon") {
@@ -245,11 +279,12 @@ export function useMapGeometries(
       id: "highlight-geometry-line",
       type: "line",
       source: "highlight-geometry",
-      paint: { "line-color": "#f59e0b", "line-width": 5, "line-dasharray": [2, 2] },
+      paint: {
+        "line-color": "#f59e0b",
+        "line-width": 5,
+        "line-dasharray": [2, 2],
+      },
     });
-    
-    // Zoom sur la géométrie (simplifié)
-    // ... code de fitBounds si nécessaire ...
   };
 
   const startEditGeometry = (geom: GeometryData) => {
@@ -261,13 +296,29 @@ export function useMapGeometries(
     if (!geometry) return;
 
     drawRef.current.deleteAll();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    drawRef.current.add({ type: "Feature", id: `edit-${geom.id}`, geometry, properties: {} } as any);
-    drawRef.current.changeMode("direct_select", { featureId: `edit-${geom.id}` });
+    drawRef.current.add({
+      type: "Feature",
+      id: `edit-${geom.id}`,
+      geometry,
+      properties: {},
+    } as any);
+    drawRef.current.changeMode("direct_select", {
+      featureId: `edit-${geom.id}`,
+    });
 
     // Masquer l'originale
-    if (map.getLayer("event-geometries-fill")) map.setFilter("event-geometries-fill", ["!=", ["get", "id"], geom.id]);
-    if (map.getLayer("event-geometries-line")) map.setFilter("event-geometries-line", ["all", ["any", ["==", ["geometry-type"], "LineString"], ["==", ["geometry-type"], "Polygon"]], ["!=", ["get", "id"], geom.id]]);
+    if (map.getLayer("event-geometries-fill"))
+      map.setFilter("event-geometries-fill", ["!=", ["get", "id"], geom.id]);
+    if (map.getLayer("event-geometries-line"))
+      map.setFilter("event-geometries-line", [
+        "all",
+        [
+          "any",
+          ["==", ["geometry-type"], "LineString"],
+          ["==", ["geometry-type"], "Polygon"],
+        ],
+        ["!=", ["get", "id"], geom.id],
+      ]);
   };
 
   const cancelEditGeometry = () => {
@@ -277,8 +328,18 @@ export function useMapGeometries(
     setEditingGeometryId(null);
 
     // Restaurer filtres
-    if (map.getLayer("event-geometries-fill")) map.setFilter("event-geometries-fill", ["==", ["geometry-type"], "Polygon"]);
-    if (map.getLayer("event-geometries-line")) map.setFilter("event-geometries-line", ["any", ["==", ["geometry-type"], "LineString"], ["==", ["geometry-type"], "Polygon"]]);
+    if (map.getLayer("event-geometries-fill"))
+      map.setFilter("event-geometries-fill", [
+        "==",
+        ["geometry-type"],
+        "Polygon",
+      ]);
+    if (map.getLayer("event-geometries-line"))
+      map.setFilter("event-geometries-line", [
+        "any",
+        ["==", ["geometry-type"], "LineString"],
+        ["==", ["geometry-type"], "Polygon"],
+      ]);
   };
 
   const saveEditGeometry = async () => {
@@ -287,8 +348,13 @@ export function useMapGeometries(
     if (features.features.length === 0) return;
 
     try {
-      const wkt = geoJSONtoWKT(features.features[0].geometry as GeoJSON.Geometry);
-      await invoke("update_geometry", { geometryId: editingGeometryId, geom: wkt });
+      const wkt = geoJSONtoWKT(
+        features.features[0].geometry as GeoJSON.Geometry,
+      );
+      await invoke("update_geometry", {
+        geometryId: editingGeometryId,
+        geom: wkt,
+      });
       console.log("✅ Géométrie mise à jour");
       loadGeometries();
       cancelEditGeometry();
