@@ -103,7 +103,12 @@ export default function AddPointForm({
   }
 
   async function handleSave() {
-    // Validation : dépose ne peut pas être antérieure à pose
+
+    if (!eventId) {
+      alert("Erreur : Impossible d'enregistrer. Aucun événement n'est sélectionné.");
+      console.error("Tentative d'enregistrement sans eventId");
+      return;
+    }
     if (pose && depose) {
       const poseDate = new Date(pose);
       const deposeDate = new Date(depose);
@@ -139,6 +144,7 @@ export default function AddPointForm({
       const detail = {
         point: {
           id: "",
+          event_id: eventId,
           x: Number(x),
           y: Number(y),
           pose: pose || null,
@@ -153,7 +159,7 @@ export default function AddPointForm({
       console.log("🎯 Event ID:", eventId);
       const insertedIds = await invoke<string[]>("insert_point", { 
         details: [detail], 
-        eventId: eventId || null 
+        event_id: eventId || null 
       });
       console.log("✅ Point inséré avec succès, IDs:", insertedIds);
 

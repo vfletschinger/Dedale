@@ -85,7 +85,13 @@ pub fn run() {
             db::create_geometry,
             db::delete_geometry,
             db::update_geometry,
-            db::update_point_dates
+            db::update_point_dates,
+            db::update_parcours,
+            db::update_zone,
+            db::create_zone,
+            db::create_parcours,
+            db::delete_zone,
+            db::delete_parcours,
         ])
         .run(tauri::generate_context!())
         .expect("Erreur lors de l'exécution de l'application Tauri");

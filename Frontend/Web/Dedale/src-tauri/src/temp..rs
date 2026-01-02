@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use tauri::webview::cookie::time::convert::Hour;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Event {
@@ -12,31 +11,6 @@ pub struct Event {
     pub parcours: Option<String>,
 }
 
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Zone {
-    #[serde(default)]
-    pub id: String,
-    pub event_id: String,
-    pub name: Option<String>,
-    pub color: Option<String>,
-    pub geometry_json: Option<String>,
-    
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Parcours {
-    #[serde(default)]
-    pub id: String,
-    pub event_id: String,
-    pub name: Option<String>,
-    pub color: Option<String>,
-    pub start_time : Option<f64>,
-    pub speed_low: Option<f64>,
-    pub speed_high: Option<f64>,
-    pub geometry_json: Option<String>,
-    
-}
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Team {
     #[serde(default)]
@@ -151,7 +125,7 @@ pub struct ObstacleType {
 pub struct Obstacle {
     pub id: String,
     pub point_id: String,
-    pub type_id: String,
+    pub type_id: i64,
     pub number: Option<i32>,
     pub name: Option<String>,
     pub description: Option<String>,
