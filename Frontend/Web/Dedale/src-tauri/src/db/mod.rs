@@ -118,6 +118,7 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
             event_id CHAR(36) NOT NULL,
             x REAL NOT NULL,
             y REAL NOT NULL,
+            name TEXT DEFAULT 'Nouveau point',
             comment TEXT,
             type TEXT,
             status BOOLEAN,
@@ -127,6 +128,12 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
     .execute(&pool)
     .await
     .map_err(|e| format!("Error creating point: {}", e))?;
+
+    // Migration: Ajouter la colonne name si elle n'existe pas
+    sqlx::query("ALTER TABLE point ADD COLUMN name TEXT DEFAULT 'Nouveau point'")
+        .execute(&pool)
+        .await
+        .ok(); // Ignorer l'erreur si la colonne existe déjà
 
     sqlx::query(
         "CREATE TABLE IF NOT EXISTS picture (

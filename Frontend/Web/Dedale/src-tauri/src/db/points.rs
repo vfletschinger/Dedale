@@ -185,7 +185,7 @@ pub async fn retrieve_data_by_event(
         println!("[DB] Récupération des points pour l'event_id: {}", eid);
         sqlx::query(
             r#"
-            SELECT DISTINCT p.id, p.x, p.y, p.comment, p.type, p.status, p.event_id
+            SELECT DISTINCT p.id, p.x, p.y, p.name, p.comment, p.type, p.status, p.event_id
             FROM point p
             WHERE p.event_id = ?
             ORDER BY p.id
@@ -199,7 +199,7 @@ pub async fn retrieve_data_by_event(
         println!("[DB]  Récupération de tous les points");
         sqlx::query(
             r#"
-            SELECT p.id, p.x, p.y, p.comment, p.type, p.status, p.event_id
+            SELECT p.id, p.x, p.y, p.name, p.comment, p.type, p.status, p.event_id
             FROM point p
             ORDER BY p.id
         "#,
@@ -218,6 +218,7 @@ pub async fn retrieve_data_by_event(
             id,
             x: row.get("x"),
             y: row.get("y"),
+            name: row.get("name"),
             comment: row.get("comment"),
             r#type: row.get("type"),
             status: row.get("status"),
@@ -255,12 +256,13 @@ pub async fn insert_point_details(
         // Insérer le point
         sqlx::query(
             r#"INSERT OR REPLACE INTO point 
-            (id, x, y, comment, type, status, event_id) 
-            VALUES (?, ?, ?, ?, ?, ?, ?)"#,
+            (id, x, y, name, comment, type, status, event_id) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)"#,
         )
         .bind(&point_id)
         .bind(detail.point.x)
         .bind(detail.point.y)
+        .bind(&detail.point.name)
         .bind(&detail.point.comment)
         .bind(&detail.point.r#type)
         .bind(&detail.point.status)

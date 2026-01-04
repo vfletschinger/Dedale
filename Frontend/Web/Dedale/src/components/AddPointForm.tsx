@@ -32,6 +32,7 @@ export default function AddPointForm({
 }) {
   const [x, setX] = useState<number>(initialCoords.lng);
   const [y, setY] = useState<number>(initialCoords.lat);
+  const [name, setName] = useState<string>("Nouveau point");
   const [comment, setComment] = useState<string>("");
   const [mergedObstacles, setMergedObstacles] = useState<MergedObstacle[]>([]);
   const [pictures, setPictures] = useState<string[]>([]);
@@ -147,6 +148,7 @@ export default function AddPointForm({
           event_id: eventId,
           x: Number(x),
           y: Number(y),
+          name: name || "Nouveau point",
           pose: pose || null,
           depose: depose || null,
         },
@@ -195,6 +197,23 @@ export default function AddPointForm({
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* Nom du point Section */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-4 py-3 bg-linear-to-r from-emerald-50 to-teal-50 border-b border-emerald-100 flex items-center gap-2">
+            <span className="text-xl">🏷️</span>
+            <span className="font-semibold text-gray-800">Nom du point</span>
+          </div>
+          <div className="p-4">
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Nouveau point"
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-gray-50 transition-all"
+            />
+          </div>
+        </div>
+
         {/* Coordonnées Section */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-4 py-3 bg-linear-to-r from-indigo-50 to-blue-50 border-b border-indigo-100 flex items-center gap-2">

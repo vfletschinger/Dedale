@@ -110,6 +110,7 @@ pub struct Point {
     pub id: String,
     pub x: f64,
     pub y: f64,
+    pub name: Option<String>,
     pub comment: Option<String>,
     pub r#type: Option<String>,
     pub status: Option<bool>,

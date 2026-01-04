@@ -30,6 +30,7 @@ export type Point = {
   id: number;
   x: number;
   y: number;
+  name?: string | null;
   pose?: string | null;
   depose?: string | null;
   obstacles: Obstacle[];
@@ -247,7 +248,7 @@ export default function PointDetails({
       <div className="p-4 bg-gradient-to-r from-indigo-500 to-purple-600 text-white">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-bold">Point #{shortId(point.id)}</h2>
+            <h2 className="text-xl font-bold">{point.name || `Point #${shortId(point.id)}`}</h2>
             <div className="text-white/80 text-sm mt-1 flex items-center gap-2">
               <span>📍</span>
               <span>{point.x.toFixed(5)}, {point.y.toFixed(5)}</span>

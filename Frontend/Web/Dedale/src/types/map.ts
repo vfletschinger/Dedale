@@ -21,6 +21,7 @@ export interface MapPoint {
   id: number;
   x: number;
   y: number;
+  name?: string | null;
   pose?: string | null;
   depose?: string | null;
   obstacles?: Obstacle[];

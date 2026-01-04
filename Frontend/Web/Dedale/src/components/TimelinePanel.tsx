@@ -209,8 +209,8 @@ export default function TimelinePanel({
                   style={{ height: "44px" }}
                 >
                   {/* Label du point */}
-                  <div className="w-24 shrink-0 px-2 flex items-center text-xs font-semibold text-gray-700 border-r border-gray-200 bg-gray-50">
-                    Point #{point.id}
+                  <div className="w-24 shrink-0 px-2 flex items-center text-xs font-semibold text-gray-700 border-r border-gray-200 bg-gray-50 truncate" title={point.name || `Point #${point.id}`}>
+                    {point.name || `Point #${point.id}`}
                   </div>
 
                   {/* Barre de temps */}
@@ -235,11 +235,11 @@ export default function TimelinePanel({
                           "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
                         minWidth: "24px",
                       }}
-                      title={`Point #${point.id}\nPose: ${formatTime(new Date(point.pose!).getTime())}\nDépose: ${formatTime(new Date(point.depose!).getTime())}`}
+                      title={`${point.name || `Point #${point.id}`}\nPose: ${formatTime(new Date(point.pose!).getTime())}\nDépose: ${formatTime(new Date(point.depose!).getTime())}`}
                     >
                       <div className="h-full flex items-center justify-center px-1.5 overflow-hidden">
                         <span className="text-[10px] text-white font-bold truncate drop-shadow-sm group-hover:scale-110 transition-transform">
-                          #{point.id}
+                          {point.name ? point.name.substring(0, 10) : `#${point.id}`}
                         </span>
                       </div>
                     </div>

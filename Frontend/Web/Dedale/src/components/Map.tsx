@@ -275,6 +275,7 @@ function OfflineMapLibre({
                 <PointDetails
                   point={{
                     ...selectedPoint,
+                    name: selectedPoint.name,
                     obstacles: (selectedPoint.obstacles || []).map(o => ({ ...o, id: o.id ?? 0 })),
                     comments: selectedPoint.comments || [],
                     pictures: selectedPoint.pictures || [],
@@ -301,7 +302,7 @@ function OfflineMapLibre({
                     >
                       <div className="flex justify-between items-center mb-1">
                         <span className="font-bold text-gray-800 text-sm flex gap-2">
-                          <span>📍</span> Point #{p.id}
+                          <span>📍</span> {p.name || `Point #${p.id}`}
                         </span>
                         <button className="text-blue-600 text-xs font-semibold px-2 py-1 rounded hover:bg-blue-50">
                           Voir →
