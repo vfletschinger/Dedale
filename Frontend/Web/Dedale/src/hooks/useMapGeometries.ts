@@ -3,23 +3,30 @@ import maplibregl from "maplibre-gl";
 import MapboxDraw from "@mapbox/mapbox-gl-draw";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
 import { invoke } from "@tauri-apps/api/core";
-import { geoJSONtoWKT, parseWKTtoGeoJSON } from "../utils/maputils"; // Vérifiez la casse du fichier (mapUtils vs maputils)
-import { GeometryData } from "../types/map"; // Vérifiez le chemin
+import { geoJSONtoWKT, parseWKTtoGeoJSON } from "../utils/maputils";
+import { Zone, Parcours } from "../types/map";
+
+// Type utilitaire pour manipuler indifféremment une Zone ou un Parcours dans l'UI
+export type GeometryItem = (Zone | Parcours) & { type: "zone" | "parcours" };
 
 export function useMapGeometries(
   map: maplibregl.Map | null,
-  selectedEventId: number | null
+  selectedEventId: number | null // Si vos Event IDs sont aussi des strings, changez ici en string | null
 ) {
   // --- ÉTATS ---
-  const [geometries, setGeometries] = useState<GeometryData[]>([]);
-  const [drawingMode, setDrawingMode] = useState<"none" | "polygon" | "line">("none");
-  const [selectedGeometryId, setSelectedGeometryId] = useState<number | null>(null);
-  const [editingGeometryId, setEditingGeometryId] = useState<number | null>(null);
+  const [zones, setZones] = useState<Zone[]>([]);
+  const [parcours, setParcours] = useState<Parcours[]>([]);
+  const [drawingMode, setDrawingMode] = useState<"none" | "zone" | "parcours">("none");
+  const [pendingParcoursGeometry, setPendingParcoursGeometry] = useState<string | null>(null);
+  
+  // Changement : On stocke l'ID (string) ET le type pour savoir ce qu'on manipule
+  const [selectedGeometry, setSelectedGeometry] = useState<{ id: string; type: "zone" | "parcours" } | null>(null);
+  const [editingGeometry, setEditingGeometry] = useState<{ id: string; type: "zone" | "parcours" } | null>(null);
+  
   const [isGeometryListOpen, setIsGeometryListOpen] = useState(false);
 
   // --- REFS ---
   const drawRef = useRef<MapboxDraw | null>(null);
-  // Ref pour accéder à l'ID dans les event listeners sans déclencher de re-render
   const selectedEventIdRef = useRef<number | null>(selectedEventId);
 
   useEffect(() => {
@@ -28,107 +35,106 @@ export function useMapGeometries(
 
   // --- FONCTION : Rafraîchir l'affichage sur la carte ---
   const refreshGeometriesOnMap = useCallback(
-    (mapObj: maplibregl.Map, geoms: GeometryData[]) => {
-      // Nettoyage des anciennes couches
-      if (mapObj.getLayer("event-geometries-fill")) mapObj.removeLayer("event-geometries-fill");
-      if (mapObj.getLayer("event-geometries-line")) mapObj.removeLayer("event-geometries-line");
-      if (mapObj.getLayer("event-geometries-point")) mapObj.removeLayer("event-geometries-point");
+    (mapObj: maplibregl.Map, currentZones: Zone[], currentParcours: Parcours[]) => {
+      // Nettoyage
+      const layersToRemove = ["event-geometries-fill", "event-geometries-line", "event-geometries-point"];
+      layersToRemove.forEach((layer) => {
+        if (mapObj.getLayer(layer)) mapObj.removeLayer(layer);
+      });
       if (mapObj.getSource("event-geometries")) mapObj.removeSource("event-geometries");
 
-      if (geoms.length === 0) return;
+      if (currentZones.length === 0 && currentParcours.length === 0) return;
 
-      // Conversion WKT -> GeoJSON
-      const features = geoms
-        .map((g) => {
-          const geometry = parseWKTtoGeoJSON(g.geom);
+      // Conversion Zones -> GeoJSON
+      const zoneFeatures = currentZones
+        .map((z) => {
+          const geometry = parseWKTtoGeoJSON(z.geometry_json);
           if (!geometry) return null;
           return {
             type: "Feature",
             geometry,
-            properties: {
-              id: g.id,
-              event_id: g.event_id,
-              geom_type: geometry.type,
-            },
+            properties: { id: z.id, type: "zone", event_id: z.event_id },
           } as GeoJSON.Feature;
         })
         .filter((f): f is GeoJSON.Feature => f !== null);
 
-      if (features.length === 0) return;
+      // Conversion Parcours -> GeoJSON
+      const parcoursFeatures = currentParcours
+        .map((p) => {
+          const geometry = parseWKTtoGeoJSON(p.geometry_json);
+          if (!geometry) return null;
+          return {
+            type: "Feature",
+            geometry,
+            properties: { id: p.id, type: "parcours", event_id: p.event_id },
+          } as GeoJSON.Feature;
+        })
+        .filter((f): f is GeoJSON.Feature => f !== null);
+
+      const allFeatures = [...zoneFeatures, ...parcoursFeatures];
+      if (allFeatures.length === 0) return;
 
       mapObj.addSource("event-geometries", {
         type: "geojson",
-        data: { type: "FeatureCollection", features },
+        data: { type: "FeatureCollection", features: allFeatures },
       });
 
-      // Style Polygones (Remplissage)
+      // Styles
       mapObj.addLayer({
         id: "event-geometries-fill",
         type: "fill",
         source: "event-geometries",
         filter: ["==", ["geometry-type"], "Polygon"],
-        paint: { "fill-color": "#6366f1", "fill-opacity": 0.3 },
+        paint: { "fill-color":"#6366f1", "fill-opacity": 0.3 },
       });
 
-      // Style Lignes et Contours
       mapObj.addLayer({
         id: "event-geometries-line",
         type: "line",
         source: "event-geometries",
         filter: ["any", ["==", ["geometry-type"], "LineString"], ["==", ["geometry-type"], "Polygon"]],
-        paint: { "line-color": "#4f46e5", "line-width": 3, "line-opacity": 0.8 },
-      });
-
-      // Style Points
-      mapObj.addLayer({
-        id: "event-geometries-point",
-        type: "circle",
-        source: "event-geometries",
-        filter: ["==", ["geometry-type"], "Point"],
         paint: {
-          "circle-radius": 10,
-          "circle-color": "#8b5cf6",
-          "circle-stroke-color": "#4f46e5",
-          "circle-stroke-width": 3,
-          "circle-opacity": 0.8,
+          "line-color": [
+            "case",
+            ["==", ["get", "type"], "parcours"], "#ef4444", // Rouge Parcours
+            "#4f46e5" // Bleu Zones
+          ],
+          "line-width": 3
         },
       });
     },
     []
   );
 
-  // --- FONCTION : Charger les géométries depuis la DB ---
+  // --- Chargement des données ---
   const loadGeometries = useCallback(async () => {
-    // On utilise selectedEventId directement ici car loadGeometries est dans les dépendances de l'effet
     if (!map || !selectedEventId) {
-      setGeometries([]);
-      if (map) refreshGeometriesOnMap(map, []);
+      setZones([]);
+      setParcours([]);
       return;
     }
-
     try {
-      console.log("📐 Chargement des géométries pour event_id:", selectedEventId);
-      const geoms = await invoke<GeometryData[]>("fetch_geometries_for_event", {
-        eventId: selectedEventId,
-      });
-      setGeometries(geoms);
-      refreshGeometriesOnMap(map, geoms);
+      const [fetchedZones, fetchedParcours] = await Promise.all([
+        invoke<Zone[]>("fetch_zones_for_event", { eventId: selectedEventId }),
+        invoke<Parcours[]>("fetch_parcours_for_event", { eventId: selectedEventId }),
+      ]);
+      setZones(fetchedZones);
+      setParcours(fetchedParcours);
+      refreshGeometriesOnMap(map, fetchedZones, fetchedParcours);
     } catch (err) {
-      console.error("Erreur chargement géométries:", err);
+      console.error("Erreur chargement données:", err);
     }
   }, [map, selectedEventId, refreshGeometriesOnMap]);
 
-  // --- EFFET : Initialisation de MapboxDraw et Listeners ---
+  // --- Initialisation Draw & Listeners ---
   useEffect(() => {
     if (!map) return;
-    if (drawRef.current) return; // Déjà initialisé
+    if (drawRef.current) return;
 
-    // Initialisation de l'instance Draw
     const draw = new MapboxDraw({
       displayControlsDefault: false,
       defaultMode: "simple_select",
       styles: [
-        // Styles par défaut pour le dessin (simplifiés pour la lisibilité)
         {
           id: "gl-draw-polygon-fill",
           type: "fill",
@@ -142,10 +148,10 @@ export function useMapGeometries(
           paint: { "line-color": "#22c55e", "line-width": 4 },
         },
         {
-          id: "gl-draw-point-active",
-          type: "circle",
-          filter: ["all", ["==", "$type", "Point"], ["!=", "mode", "static"]],
-          paint: { "circle-radius": 6, "circle-color": "#fff", "circle-stroke-color": "#4f46e5", "circle-stroke-width": 2 },
+            id: "gl-draw-point-active",
+            type: "circle",
+            filter: ["all", ["==", "$type", "Point"], ["!=", "mode", "static"]],
+            paint: { "circle-radius": 6, "circle-color": "#fff", "circle-stroke-color": "#4f46e5", "circle-stroke-width": 2 },
         },
       ],
     });
@@ -153,30 +159,33 @@ export function useMapGeometries(
     map.addControl(draw as unknown as maplibregl.IControl, "top-right");
     drawRef.current = draw;
 
-    // Listener pour la CRÉATION (Sauvegarde)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // EVENT: CRÉATION
     map.on("draw.create", async (e: any) => {
       const feature = e.features[0];
       if (!feature) return;
 
       const currentEventId = selectedEventIdRef.current;
-      if (!currentEventId) {
-        alert("⚠️ Veuillez sélectionner un événement avant de dessiner.");
-        draw.delete(feature.id);
-        return;
-      }
+      if (!currentEventId) return;
 
       try {
         const wkt = geoJSONtoWKT(feature.geometry);
-        await invoke("create_geometry", { eventId: currentEventId, geom: wkt });
-        console.log("✅ Géométrie sauvegardée");
-        
-        draw.delete(feature.id); // On retire du draw pour laisser la couche 'event-geometries' l'afficher
-        loadGeometries(); // Recharger depuis la DB
+        const geomType = feature.geometry.type;
+
+        if (geomType === "Polygon") {
+          await invoke("create_zone", { eventId: String(currentEventId), geom: wkt, name: "Nouvelle Zone", color: "#6366f1" });
+          draw.deleteAll();
+          draw.changeMode("simple_select");
+          await loadGeometries();
+          setDrawingMode("none");
+        } else if (geomType === "LineString") {
+          // Pour les parcours, on stocke la géométrie et on attend le formulaire
+          setPendingParcoursGeometry(wkt);
+          draw.deleteAll();
+          draw.changeMode("simple_select");
+        }
       } catch (err) {
-        console.error("Erreur sauvegarde géométrie:", err);
-        alert("Erreur lors de la sauvegarde");
-        draw.delete(feature.id);
+        console.error("Erreur save:", err);
+        draw.changeMode("simple_select");
       }
     });
 
@@ -185,22 +194,14 @@ export function useMapGeometries(
   // --- ACTIONS ---
 
   const startDrawPolygon = () => {
-    if (!drawRef.current) return;
-    if (!selectedEventId) {
-      alert("⚠️ Veuillez sélectionner un événement.");
-      return;
-    }
-    setDrawingMode("polygon");
+    if (!drawRef.current || !selectedEventId) return alert("⚠️ Sélectionnez un événement.");
+    setDrawingMode("zone");
     drawRef.current.changeMode("draw_polygon");
   };
 
   const startDrawLine = () => {
-    if (!drawRef.current) return;
-    if (!selectedEventId) {
-      alert("⚠️ Veuillez sélectionner un événement.");
-      return;
-    }
-    setDrawingMode("line");
+    if (!drawRef.current || !selectedEventId) return alert("⚠️ Sélectionnez un événement.");
+    setDrawingMode("parcours");
     drawRef.current.changeMode("draw_line_string");
   };
 
@@ -211,20 +212,24 @@ export function useMapGeometries(
     drawRef.current.deleteAll();
   };
 
-  const highlightGeometry = (geom: GeometryData | null) => {
+  // --- HIGHLIGHT ---
+  const highlightGeometry = (item: GeometryItem | null) => {
     if (!map) return;
-    // Nettoyage highlight
+
+    // Nettoyage
     if (map.getLayer("highlight-geometry-fill")) map.removeLayer("highlight-geometry-fill");
     if (map.getLayer("highlight-geometry-line")) map.removeLayer("highlight-geometry-line");
     if (map.getSource("highlight-geometry")) map.removeSource("highlight-geometry");
 
-    if (!geom) {
-      setSelectedGeometryId(null);
+    if (!item) {
+      setSelectedGeometry(null);
       return;
     }
 
-    setSelectedGeometryId(geom.id);
-    const geometry = parseWKTtoGeoJSON(geom.geom);
+    // Mise à jour state : ID + Type
+    setSelectedGeometry({ id: item.id, type: item.type });
+
+    const geometry = parseWKTtoGeoJSON(item.geometry_json);
     if (!geometry) return;
 
     map.addSource("highlight-geometry", {
@@ -247,34 +252,39 @@ export function useMapGeometries(
       source: "highlight-geometry",
       paint: { "line-color": "#f59e0b", "line-width": 5, "line-dasharray": [2, 2] },
     });
-    
-    // Zoom sur la géométrie (simplifié)
-    // ... code de fitBounds si nécessaire ...
   };
 
-  const startEditGeometry = (geom: GeometryData) => {
+  // --- EDIT ---
+  const startEditGeometry = (item: GeometryItem) => {
     if (!drawRef.current || !map) return;
-    setEditingGeometryId(geom.id);
+    
+    // On sauvegarde l'ID ET le type pour savoir quelle fonction appeler au Save
+    setEditingGeometry({ id: item.id, type: item.type });
     highlightGeometry(null);
 
-    const geometry = parseWKTtoGeoJSON(geom.geom);
+    const geometry = parseWKTtoGeoJSON(item.geometry_json); // Utilisation du bon champ
     if (!geometry) return;
 
     drawRef.current.deleteAll();
+    // On utilise l'ID tel quel (string UUID)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    drawRef.current.add({ type: "Feature", id: `edit-${geom.id}`, geometry, properties: {} } as any);
-    drawRef.current.changeMode("direct_select", { featureId: `edit-${geom.id}` });
+    drawRef.current.add({ type: "Feature", id: item.id, geometry, properties: {} } as any);
+    
+    drawRef.current.changeMode("direct_select", { featureId: item.id });
 
-    // Masquer l'originale
-    if (map.getLayer("event-geometries-fill")) map.setFilter("event-geometries-fill", ["!=", ["get", "id"], geom.id]);
-    if (map.getLayer("event-geometries-line")) map.setFilter("event-geometries-line", ["all", ["any", ["==", ["geometry-type"], "LineString"], ["==", ["geometry-type"], "Polygon"]], ["!=", ["get", "id"], geom.id]]);
+    // Masquer l'originale sur la carte principale
+    if (map.getLayer("event-geometries-fill")) map.setFilter("event-geometries-fill", ["!=", ["get", "id"], item.id]);
+    if (map.getLayer("event-geometries-line")) map.setFilter("event-geometries-line", ["all", 
+        ["any", ["==", ["geometry-type"], "LineString"], ["==", ["geometry-type"], "Polygon"]], 
+        ["!=", ["get", "id"], item.id]
+    ]);
   };
 
   const cancelEditGeometry = () => {
     if (!drawRef.current || !map) return;
     drawRef.current.deleteAll();
     drawRef.current.changeMode("simple_select");
-    setEditingGeometryId(null);
+    setEditingGeometry(null);
 
     // Restaurer filtres
     if (map.getLayer("event-geometries-fill")) map.setFilter("event-geometries-fill", ["==", ["geometry-type"], "Polygon"]);
@@ -282,37 +292,91 @@ export function useMapGeometries(
   };
 
   const saveEditGeometry = async () => {
-    if (!drawRef.current || !editingGeometryId) return;
+    if (!drawRef.current || !editingGeometry) return;
     const features = drawRef.current.getAll();
     if (features.features.length === 0) return;
 
     try {
       const wkt = geoJSONtoWKT(features.features[0].geometry as GeoJSON.Geometry);
-      await invoke("update_geometry", { geometryId: editingGeometryId, geom: wkt });
+      
+      // On redirige vers la bonne commande Rust selon le type
+      if (editingGeometry.type === "zone") {
+        await invoke("update_zone", { geometry_id: editingGeometry.id, geom: wkt, name: "Zone", color: "#6366f1" });
+      } else {
+        await invoke("update_parcours", { geometry_id: editingGeometry.id, geom: wkt, name: "Parcours", color: "#ef4444", start_time: null, speed_low: null, speed_high: null });
+      }
+
       console.log("✅ Géométrie mise à jour");
       loadGeometries();
       cancelEditGeometry();
     } catch (err) {
       console.error("Erreur update:", err);
+      alert("Erreur lors de la mise à jour");
     }
   };
 
-  const handleDeleteGeometry = async (geometryId: number) => {
+  // --- DELETE ---
+  // Correction de la signature : on prend l'ID et le TYPE
+  const handleDeleteGeometry = async (id: string, type: "zone" | "parcours") => {
     if (!confirm("Supprimer cette géométrie ?")) return;
     try {
-      await invoke("delete_geometry", { geometryId });
-      if (selectedGeometryId === geometryId) highlightGeometry(null);
+      if (type === "zone") {
+        await invoke("delete_zone", { geometryId: id });
+      } else {
+        await invoke("delete_parcours", { geometryId: id });
+      }
+
+      if (selectedGeometry?.id === id) highlightGeometry(null);
       loadGeometries();
     } catch (err) {
       console.error(err);
     }
   };
 
+  // Fonction pour sauvegarder le parcours avec les détails du formulaire
+  const saveParcoursWithDetails = async (data: {
+    name: string;
+    color: string;
+    start_time: string;
+    speed_low: number;
+    speed_high: number;
+  }) => {
+    if (!pendingParcoursGeometry || !selectedEventId) return;
+
+    try {
+      // Convertir la date/heure en timestamp (millisecondes)
+      const timestamp = data.start_time ? new Date(data.start_time).getTime() : null;
+
+      await invoke("create_parcours", {
+        eventId: String(selectedEventId),
+        geom: pendingParcoursGeometry,
+        name: data.name,
+        color: data.color,
+        startTime: timestamp,
+        speedLow: data.speed_low,
+        speedHigh: data.speed_high,
+      });
+
+      setPendingParcoursGeometry(null);
+      setDrawingMode("none");
+      loadGeometries();
+    } catch (err) {
+      console.error("Erreur création parcours:", err);
+      alert("Erreur lors de la création du parcours");
+    }
+  };
+
+  const cancelParcoursForm = () => {
+    setPendingParcoursGeometry(null);
+    setDrawingMode("none");
+  };
+
   return {
-    geometries,
+    zones,
+    parcours,
     drawingMode,
-    selectedGeometryId,
-    editingGeometryId,
+    selectedGeometry, // Renvoie l'objet {id, type}
+    editingGeometry,  // Renvoie l'objet {id, type}
     isGeometryListOpen,
     setIsGeometryListOpen,
     startDrawPolygon,
@@ -323,5 +387,8 @@ export function useMapGeometries(
     startEditGeometry,
     cancelEditGeometry,
     highlightGeometry,
+    pendingParcoursGeometry,
+    saveParcoursWithDetails,
+    cancelParcoursForm,
   };
 }

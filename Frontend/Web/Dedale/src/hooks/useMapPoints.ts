@@ -34,8 +34,8 @@ export function useMapPoints(
         },
         properties: {
           id: p.id,
-          obstacles: p.obstacles,
-          comments: p.comments,
+          status: p.status,
+          comment: p.comment,
           pictures: p.pictures,
         },
       })),
@@ -47,23 +47,38 @@ export function useMapPoints(
   const refreshPoints = useCallback(async () => {
     try {
       console.log("🔄 Chargement des points pour event_id:", selectedEventId);
-      const freshPoints = await invoke<MapPoint[]>("get_points", {
-        eventId: selectedEventId || null,
+      const freshPoints = await invoke<MapPoint[]>("fetch_points", {
+        eventId: selectedEventId ? String(selectedEventId) : null,
       });
       
       console.log(`${freshPoints.length} point(s) récupéré(s)`);
       pointsRef.current = freshPoints;
       setPoints(freshPoints);
-      updateMapSource(freshPoints);
-
-      if (selectedPoint) {
-        const updated = freshPoints.find((p) => p.id === selectedPoint.id);
-        setSelectedPoint(updated || null);
+      
+      // Mettre à jour la source de la carte directement
+      if (map && map.getSource("db-points")) {
+        const geojson: GeoJSON.FeatureCollection<GeoJSON.Point> = {
+          type: "FeatureCollection",
+          features: freshPoints.map((p) => ({
+            type: "Feature",
+            geometry: {
+              type: "Point",
+              coordinates: [Number(p.x), Number(p.y)],
+            },
+            properties: {
+              id: p.id,
+              status: p.status,
+              comment: p.comment,
+              pictures: p.pictures,
+            },
+          })),
+        };
+        (map.getSource("db-points") as maplibregl.GeoJSONSource).setData(geojson);
       }
     } catch (err) {
       console.error("Erreur chargement points:", err);
     }
-  }, [selectedEventId, selectedPoint, updateMapSource]);
+  }, [selectedEventId, map]);
 
   const openPopupForPoint = (point: MapPoint) => {
     if (!map) return;
@@ -119,7 +134,7 @@ export function useMapPoints(
 
   // --- EFFETS ---
 
-  // 1. Initialisation des sources et layers (LA CORRECTION EST ICI)
+  // 1. Initialisation des sources et layers
   useEffect(() => {
     if (!map) return;
 
@@ -182,8 +197,37 @@ export function useMapPoints(
           setAddingPointCoords({ lng: e.lngLat.lng, lat: e.lngLat.lat });
         });
 
-        // Une fois tout initialisé, on charge les données initiales
-        refreshPoints();
+        // Charger les points immédiatement après la création de la source
+        if (selectedEventId) {
+          console.log("🔄 Chargement initial des points pour event_id:", selectedEventId);
+          invoke<MapPoint[]>("fetch_points", {
+            eventId: String(selectedEventId),
+          })
+            .then((freshPoints) => {
+              console.log(`${freshPoints.length} point(s) récupéré(s)`);
+              pointsRef.current = freshPoints;
+              setPoints(freshPoints);
+              
+              const geojson: GeoJSON.FeatureCollection<GeoJSON.Point> = {
+                type: "FeatureCollection",
+                features: freshPoints.map((p) => ({
+                  type: "Feature",
+                  geometry: {
+                    type: "Point",
+                    coordinates: [Number(p.x), Number(p.y)],
+                  },
+                  properties: {
+                    id: p.id,
+                    status: p.status,
+                    comment: p.comment,
+                    pictures: p.pictures,
+                  },
+                })),
+              };
+              (map.getSource("db-points") as maplibregl.GeoJSONSource).setData(geojson);
+            })
+            .catch((err) => console.error("Erreur chargement initial points:", err));
+        }
 
       } catch (error) {
         console.error("Erreur lors de l'initialisation des layers map:", error);
@@ -202,9 +246,53 @@ export function useMapPoints(
       map.off('style.load', initializeMapResources);
     };
 
-  }, [map, refreshPoints]); // On a retiré refreshPoints des deps ici pour éviter boucle infinie, on l'appelle dans initializeMapResources
+  }, [map, selectedEventId]); // Ajouter selectedEventId aux dépendances
 
-  // 2. Gestion du curseur "crosshair" pour l'ajout
+  // 2. Charger les points quand l'événement change ou la source est prête
+  useEffect(() => {
+    if (!map || !map.getSource("db-points")) return;
+    
+    // Charger les points directement ici pour éviter le warning
+    const loadPoints = async () => {
+      try {
+        console.log("🔄 Chargement des points pour event_id:", selectedEventId);
+        const freshPoints = await invoke<MapPoint[]>("fetch_points", {
+          eventId: selectedEventId ? String(selectedEventId) : null,
+        });
+        
+        console.log(`${freshPoints.length} point(s) récupéré(s)`);
+        pointsRef.current = freshPoints;
+        setPoints(freshPoints);
+        
+        // Mettre à jour la source de la carte
+        if (map && map.getSource("db-points")) {
+          const geojson: GeoJSON.FeatureCollection<GeoJSON.Point> = {
+            type: "FeatureCollection",
+            features: freshPoints.map((p) => ({
+              type: "Feature",
+              geometry: {
+                type: "Point",
+                coordinates: [Number(p.x), Number(p.y)],
+              },
+              properties: {
+                id: p.id,
+                status: p.status,
+                comment: p.comment,
+                pictures: p.pictures,
+              },
+            })),
+          };
+          (map.getSource("db-points") as maplibregl.GeoJSONSource).setData(geojson);
+        }
+      } catch (err) {
+        console.error("Erreur chargement points:", err);
+      }
+    };
+    
+    loadPoints();
+  }, [selectedEventId, map]); // Seulement selectedEventId et map, pas selectedPoint ni updateMapSource
+
+  // 3. Gestion du curseur "crosshair" pour l'ajout
   useEffect(() => {
     if (!map) return;
     map.getCanvas().style.cursor = awaitingMapClick ? "crosshair" : "";
@@ -214,7 +302,7 @@ export function useMapPoints(
     };
   }, [awaitingMapClick, map]);
 
-  // 3. (J'ai renommé 4 en 3) Écoute des mises à jour temps réel
+  // 4. Écoute des mises à jour temps réel
   useEffect(() => {
     const unlisten = listen<number>("points-updated", (event) => {
       console.log("📥 Points mis à jour via socket, event_id:", event.payload);

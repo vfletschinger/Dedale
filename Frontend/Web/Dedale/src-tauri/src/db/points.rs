@@ -7,6 +7,86 @@ use crate::types::*;
 use crate::db::get_db_pool;
 
 #[tauri::command]
+pub async fn fetch_points(
+    app: AppHandle,
+    event_id: Option<String>,
+) -> Result<Vec<PointWithDetails>, String> {
+    let pool = get_db_pool(&app).await?;
+    
+    let rows = if let Some(eid) = event_id {
+        println!("[DB] Récupération des points pour event_id: {}", eid);
+        sqlx::query("SELECT id, x, y, event_id, comment, status, type FROM point WHERE event_id = ?")
+            .bind(eid)
+            .fetch_all(&pool)
+            .await
+            .map_err(|e| e.to_string())?
+    } else {
+        println!("[DB] Récupération de tous les points");
+        sqlx::query("SELECT id, x, y, event_id, comment, status, type FROM point")
+            .fetch_all(&pool)
+            .await
+            .map_err(|e| e.to_string())?
+    };
+    
+    let mut points_with_details: Vec<PointWithDetails> = Vec::new();
+    
+    for row in rows {
+        let point_id: String = row.get("id");
+        
+        // Récupérer les photos pour ce point
+        let pictures = sqlx::query(
+            r#"SELECT id, point_id, image_data FROM picture WHERE point_id = ?"#
+        )
+        .bind(&point_id)
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| e.to_string())?
+        .into_iter()
+        .map(|pic_row| Picture {
+            id: pic_row.get("id"),
+            point_id: pic_row.get("point_id"),
+            image: pic_row.get("image_data"),
+        })
+        .collect();
+        
+        points_with_details.push(PointWithDetails {
+            id: point_id,
+            x: row.get("x"),
+            y: row.get("y"),
+            event_id: row.get("event_id"),
+            status: row.get("status"),
+            comment: row.get("comment"),
+            r#type: row.get("type"),
+            pictures,
+        });
+    }
+        
+    println!("[DB]  {} point(s) récupéré(s)", points_with_details.len());
+
+    Ok(points_with_details)
+}
+
+#[tauri::command]
+pub async fn update_point(
+    app: AppHandle,
+    point: Point, 
+) -> Result<Point, String> {
+    let pool = get_db_pool(&app).await?;
+    sqlx::query("UPDATE point SET x = ?, y = ?, comment = ?, type = ?, status = ?, event_id = ? WHERE id = ?")
+        .bind(point.x)
+        .bind(point.y)
+        .bind(&point.comment)
+        .bind(&point.r#type)
+        .bind(point.status)
+        .bind(&point.event_id)
+        .bind(&point.id)
+        .execute(&pool) 
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(point)
+}
+#[tauri::command]
 pub async fn fetch_pictures(
     pool: State<'_, SqlitePool>,
     point_id: String, 
@@ -176,7 +256,7 @@ pub async fn insert_equipements(
 pub async fn retrieve_data_by_event(
     app: &AppHandle,
     event_id: &Option<String>,
-) -> Result<Vec<Point>, String> {
+) -> Result<Vec<PointWithDetails>, String> {
     let pool = get_db_pool(app).await?;
     let base_rows = if let Some(eid) = event_id {
         println!("[DB] Récupération des points pour l'event_id: {}", eid);
@@ -208,19 +288,36 @@ pub async fn retrieve_data_by_event(
         .map_err(|e| e.to_string())?
     };
 
-    let mut points: Vec<Point> = Vec::new();
+    let mut points: Vec<PointWithDetails> = Vec::new();
 
     for row in base_rows {
         let id: String = row.get("id");
 
-        points.push(Point {
+        // Récupérer les photos pour ce point
+        let pictures = sqlx::query(
+            r#"SELECT id, point_id, image FROM picture WHERE point_id = ?"#
+        )
+        .bind(&id)
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| e.to_string())?
+        .into_iter()
+        .map(|pic_row| Picture {
+            id: pic_row.get("id"),
+            point_id: pic_row.get("point_id"),
+            image: pic_row.get("image"),
+        })
+        .collect();
+
+        points.push(PointWithDetails {
             id,
             x: row.get("x"),
             y: row.get("y"),
             comment: row.get("comment"),
-            r#type: row.get("type"),
             status: row.get("status"),
             event_id: row.get("event_id"),
+            r#type: row.get("type"),
+            pictures,
         });
     }
 

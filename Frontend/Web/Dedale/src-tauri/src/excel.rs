@@ -3,10 +3,11 @@ use crate::utils;
 use rust_xlsxwriter::{Color, Format, Workbook};
 use sqlx::Row;
 use tauri::AppHandle;
+use crate::types::PointWithDetails;
 
 #[tauri::command]
 pub async fn export_points_excel(app: AppHandle, event_id: Option<String>) -> Result<(), String> {
-    let points: Vec<Point> = db::retrieve_data_by_event(&app, &event_id).await?;
+    let points: Vec<PointWithDetails> = db::retrieve_data_by_event(&app, &event_id).await?;
     println!("📊 Export Excel : {} points récupérés", points.len());
 
     let event_name = if let Some(eid) = &event_id {
