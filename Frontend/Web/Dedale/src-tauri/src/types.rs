@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use tauri::webview::cookie::time::convert::Hour;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Event {
@@ -53,6 +52,7 @@ pub struct Member {
     pub person_id: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Equipement {
     pub id: String,
@@ -73,6 +73,7 @@ pub struct EquipementCoordinate {
     pub order_index: Option<i64>,
 } 
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Type {
     pub id: String,
@@ -83,6 +84,7 @@ pub struct Type {
     pub height: Option<f64>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Course {
     pub id: String,
@@ -164,6 +166,7 @@ pub struct Geometry {
     pub id: String,
     pub event_id: String,
     pub geom: String,
+    pub geom_type: String, // "point", "parcours", ou "zone"
 }
 
 #[derive(Debug, Serialize, Deserialize)]

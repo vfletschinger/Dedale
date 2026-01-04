@@ -44,18 +44,18 @@ function PageWrapper({
 }
 
 interface AppEvent {
-  id: number;
+  id: string;
   name: string;
   statut: string;
 }
 
 function App() {
   const { currentPage, navigate, goBack, canGoBack, hasVisited } = useNavigation("event");
-  const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [events, setEvents] = useState<AppEvent[]>([]);
   const [firstLaunch, setFirstLaunch] = useState(false);
 
-  const handleEventClick = (eventId: number) => {
+  const handleEventClick = (eventId: string) => {
     setSelectedEventId(eventId);
     navigate("map");
   };

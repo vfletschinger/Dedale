@@ -1,8 +1,9 @@
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useCallback } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 
 // Composants
 import PointDetails, { type Point } from "./PointDetails";
@@ -32,7 +33,7 @@ const getGeometryTypeLabel = (
 function OfflineMapLibre({
   selectedEventId,
 }: {
-  selectedEventId: number | null;
+  selectedEventId: string | null;
 }) {
   // --- ÉTATS GLOBAUX DU COMPOSANT ---
   const mapContainer = useRef<HTMLDivElement | null>(null);
@@ -85,13 +86,26 @@ function OfflineMapLibre({
 
   // --- EFFETS (Chargement initial) ---
 
+  // Fonction pour charger les événements
+  const loadAllEvents = useCallback(async () => {
+    try {
+      const allEvents = await invoke<MapEvent[]>("fetch_events");
+      setEvents(allEvents);
+      console.log("📋 Événements chargés:", allEvents.length);
+      return allEvents;
+    } catch (err) {
+      console.error("Erreur chargement événements:", err);
+      return [];
+    }
+  }, []);
+
   // 1. Initialisation de la carte MapLibre
   useEffect(() => {
     if (map || !mapContainer.current) return;
 
     const mapInstance = new maplibregl.Map({
       container: mapContainer.current,
-      style: "http://localhost:8080/styles/basic-preview/style.json",
+      style: "http://localhost:8082/styles/basic-preview/style.json",
       center: [7.7635, 48.5465],
       zoom: 13,
     });
@@ -113,22 +127,36 @@ function OfflineMapLibre({
 
   // 2. Charger la liste des événements pour le menu déroulant
   useEffect(() => {
-    const loadAllEvents = async () => {
-      try {
-        const allEvents = await invoke<MapEvent[]>("fetch_events");
-        setEvents(allEvents);
-        
-        // Si un ID est passé en props, on sélectionne l'événement correspondant
-        if (selectedEventId) {
-            const ev = allEvents.find(e => e.id === selectedEventId);
-            if (ev) setSelectedEvent(ev);
-        }
-      } catch (err) {
-        console.error("Erreur chargement événements:", err);
+    const initEvents = async () => {
+      const allEvents = await loadAllEvents();
+      
+      // Si un ID est passé en props, on sélectionne l'événement correspondant
+      if (selectedEventId) {
+        const ev = allEvents.find(e => e.id === selectedEventId);
+        if (ev) setSelectedEvent(ev);
+      } else if (allEvents.length > 0 && !selectedEvent) {
+        // Sinon, sélectionner automatiquement le premier événement
+        setSelectedEvent(allEvents[0]);
       }
     };
-    loadAllEvents();
-  }, [selectedEventId]);
+    initEvents();
+  }, [selectedEventId, loadAllEvents]);
+
+  // 3. Écouter les événements Tauri pour rafraîchir la liste dynamiquement
+  useEffect(() => {
+    const unlisten = listen("events-updated", async () => {
+      console.log("🔄 Événement 'events-updated' reçu, rechargement...");
+      const allEvents = await loadAllEvents();
+      // Si l'événement sélectionné n'existe plus, désélectionner
+      if (selectedEvent && !allEvents.find(e => e.id === selectedEvent.id)) {
+        setSelectedEvent(allEvents[0] || null);
+      }
+    });
+
+    return () => {
+      unlisten.then(f => f());
+    };
+  }, [loadAllEvents, selectedEvent]);
 
   // --- GESTIONNAIRES D'INTERFACE ---
 
@@ -165,12 +193,11 @@ function OfflineMapLibre({
               <select
                 value={selectedEvent?.id || ""}
                 onChange={(e) => {
-                  const event = events.find((ev) => ev.id === parseInt(e.target.value));
+                  const event = events.find((ev) => ev.id === e.target.value);
                   setSelectedEvent(event ?? null);
                 }}
                 className="min-w-[200px] px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-semibold cursor-pointer"
               >
-                <option value="">Choisir un événement...</option>
                 {events.map((event) => (
                   <option key={event.id} value={event.id}>
                     {event.event_type === "Marathon" && "🏃‍♂️"}

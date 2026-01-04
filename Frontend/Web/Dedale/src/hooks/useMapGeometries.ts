@@ -7,17 +7,17 @@ import { geoJSONtoWKT, parseWKTtoGeoJSON } from "../utils/maputils";
 import { GeometryData } from "../types/map";
 export function useMapGeometries(
   map: maplibregl.Map | null,
-  selectedEventId: number | null,
+  selectedEventId: string | number | null,
 ) {
   // --- ÉTATS ---
   const [geometries, setGeometries] = useState<GeometryData[]>([]);
   const [drawingMode, setDrawingMode] = useState<"none" | "polygon" | "line">(
     "none",
   );
-  const [selectedGeometryId, setSelectedGeometryId] = useState<number | null>(
+  const [selectedGeometryId, setSelectedGeometryId] = useState<string | null>(
     null,
   );
-  const [editingGeometryId, setEditingGeometryId] = useState<number | null>(
+  const [editingGeometryId, setEditingGeometryId] = useState<string | null>(
     null,
   );
   const [isGeometryListOpen, setIsGeometryListOpen] = useState(false);
@@ -25,7 +25,7 @@ export function useMapGeometries(
   // --- REFS ---
   const drawRef = useRef<MapboxDraw | null>(null);
   // Ref pour accéder à l'ID dans les event listeners sans déclencher de re-render
-  const selectedEventIdRef = useRef<number | null>(selectedEventId);
+  const selectedEventIdRef = useRef<string | number | null>(selectedEventId);
 
   useEffect(() => {
     selectedEventIdRef.current = selectedEventId;
@@ -128,8 +128,10 @@ export function useMapGeometries(
         "📐 Chargement des géométries pour event_id:",
         selectedEventId,
       );
+      // Convertir en string si c'est un number
+      const eventIdStr = String(selectedEventId);
       const geoms = await invoke<GeometryData[]>("fetch_geometries_for_event", {
-        eventId: selectedEventId,
+        eventId: eventIdStr,
       });
       setGeometries(geoms);
       refreshGeometriesOnMap(map, geoms);
@@ -197,7 +199,9 @@ export function useMapGeometries(
 
       try {
         const wkt = geoJSONtoWKT(feature.geometry);
-        await invoke("create_geometry", { eventId: currentEventId, geom: wkt });
+        // Convertir en string si c'est un number
+        const eventIdStr = String(currentEventId);
+        await invoke("create_geometry", { eventId: eventIdStr, geom: wkt });
         console.log("✅ Géométrie sauvegardée");
 
         draw.delete(feature.id); // On retire du draw pour laisser la couche 'event-geometries' l'afficher
@@ -209,6 +213,14 @@ export function useMapGeometries(
       }
     });
   }, [map, loadGeometries]);
+
+  // --- EFFET : Recharger les géométries quand l'événement change ---
+  useEffect(() => {
+    if (map && map.getSource("event-geometries") !== undefined) {
+      console.log("🔄 Changement d'événement, rechargement des géométries...");
+      loadGeometries();
+    }
+  }, [selectedEventId, map, loadGeometries]);
 
   // --- ACTIONS ---
 
@@ -352,7 +364,7 @@ export function useMapGeometries(
         features.features[0].geometry as GeoJSON.Geometry,
       );
       await invoke("update_geometry", {
-        geometryId: editingGeometryId,
+        geometryId: String(editingGeometryId),
         geom: wkt,
       });
       console.log("✅ Géométrie mise à jour");
@@ -363,10 +375,10 @@ export function useMapGeometries(
     }
   };
 
-  const handleDeleteGeometry = async (geometryId: number) => {
+  const handleDeleteGeometry = async (geometryId: string) => {
     if (!confirm("Supprimer cette géométrie ?")) return;
     try {
-      await invoke("delete_geometry", { geometryId });
+      await invoke("delete_geometry", { geometryId: String(geometryId) });
       if (selectedGeometryId === geometryId) highlightGeometry(null);
       loadGeometries();
     } catch (err) {

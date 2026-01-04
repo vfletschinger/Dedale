@@ -1,8 +1,9 @@
 // Type pour les géométries de la DB
 export interface GeometryData {
-  id: number;
-  event_id: number;
+  id: string;
+  event_id: string;
   geom: string;
+  geom_type: "point" | "parcours" | "zone"; // Type de la géométrie
 }
 
 // Type pour les obstacles
@@ -29,7 +30,7 @@ export interface MapPoint {
 
 // Type pour les événements
 export interface MapEvent {
-  id: number;
+  id: string;
   name?: string;
   event_type?: string;
   status?: string;

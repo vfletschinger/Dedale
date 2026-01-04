@@ -169,7 +169,7 @@ pub(crate) struct TransferEvent {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[allow(dead_code)]
-struct EventAck {
+pub struct EventAck {
     id: i64,
     name: String,
     #[serde(default)]

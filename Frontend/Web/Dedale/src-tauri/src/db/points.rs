@@ -6,6 +6,7 @@ use uuid::Uuid;
 use crate::types::*;
 use crate::db::get_db_pool;
 
+#[allow(dead_code)]
 #[tauri::command]
 pub async fn fetch_pictures(
     pool: State<'_, SqlitePool>,
@@ -29,7 +30,7 @@ pub async fn fetch_pictures(
     Ok(pictures)
 }
 
-
+#[allow(dead_code)]
 pub async fn fetch_equipement_coordinates(
     pool: &SqlitePool,
     equipement_id: &str,
@@ -43,6 +44,7 @@ pub async fn fetch_equipement_coordinates(
     .map_err(|e| format!("Erreur coordonnées: {}", e))
 }
 
+#[allow(dead_code)]
 #[tauri::command]
 pub async fn fetch_equipement_details(
     pool: State<'_, SqlitePool>, // Utilisation de State au lieu de AppHandle
@@ -123,6 +125,7 @@ pub async fn fetch_obstacle_types(app: AppHandle) -> Result<Vec<ObstacleType>, S
     Ok(obstacles)
 }
 
+#[allow(dead_code)]
 #[tauri::command]
 pub async fn insert_equipements(
     app: AppHandle,
@@ -182,10 +185,9 @@ pub async fn retrieve_data_by_event(
         println!("[DB] Récupération des points pour l'event_id: {}", eid);
         sqlx::query(
             r#"
-            SELECT DISTINCT p.id, p.x, p.y, p.comment, p.type, p.status, pe.event_id
+            SELECT DISTINCT p.id, p.x, p.y, p.comment, p.type, p.status, p.event_id
             FROM point p
-            INNER JOIN point_event pe ON p.id = pe.point_id
-            WHERE pe.event_id = ?
+            WHERE p.event_id = ?
             ORDER BY p.id
         "#,
         )
@@ -197,9 +199,8 @@ pub async fn retrieve_data_by_event(
         println!("[DB]  Récupération de tous les points");
         sqlx::query(
             r#"
-            SELECT p.id, p.x, p.y, p.comment, p.type, p.status, pe.event_id
+            SELECT p.id, p.x, p.y, p.comment, p.type, p.status, p.event_id
             FROM point p
-            LEFT JOIN point_event pe ON p.id = pe.point_id
             ORDER BY p.id
         "#,
         )
@@ -402,16 +403,7 @@ pub async fn insert_point(
     match &result {
         Ok(ids) => {
             println!("[DB] ✅ Point(s) inséré(s) avec succès, IDs: {:?}", ids);
-                let pool = get_db_pool(&app).await?;
-                for point_id in ids {
-                    sqlx::query(
-                        "INSERT OR IGNORE INTO point_event (point_id, event_id) VALUES (?, ?)",
-                    )
-                    .bind(point_id)
-                    .execute(&pool)
-                    .await
-                    .map_err(|e| format!("Failed to link point to event: {}", e))?;
-            }
+            // Le point est déjà lié à l'événement via le champ event_id lors de l'insertion
         }
         Err(e) => println!("[DB]  Erreur insertion: {}", e),
     }

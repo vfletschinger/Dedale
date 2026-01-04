@@ -6,7 +6,7 @@ import { MapPoint } from "../types/map";
 
 export function useMapPoints(
   map: maplibregl.Map | null,
-  selectedEventId: number | null
+  selectedEventId: string | number | null
 ) {
   // --- ÉTATS ---
   const [points, setPoints] = useState<MapPoint[]>([]);
@@ -226,6 +226,14 @@ export function useMapPoints(
     return () => {
       unlisten.then((f) => f());
     };
+  }, [selectedEventId, map, refreshPoints]);
+
+  // 4. Recharger les points quand l'événement sélectionné change
+  useEffect(() => {
+    if (map && map.getSource("db-points")) {
+      console.log("🔄 Changement d'événement, rechargement des points...");
+      refreshPoints();
+    }
   }, [selectedEventId, map, refreshPoints]);
 
   return {

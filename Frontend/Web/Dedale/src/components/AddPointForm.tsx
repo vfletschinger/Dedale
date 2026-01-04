@@ -28,7 +28,7 @@ export default function AddPointForm({
   initialCoords: { lng: number; lat: number };
   onClose?: () => void;
   onSaved?: () => void;
-  eventId?: number | null;
+  eventId?: string | number | null;
 }) {
   const [x, setX] = useState<number>(initialCoords.lng);
   const [y, setY] = useState<number>(initialCoords.lat);
