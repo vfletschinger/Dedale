@@ -26,6 +26,8 @@ export function useMapGeometries(
   const drawRef = useRef<MapboxDraw | null>(null);
   // Ref pour accéder à l'ID dans les event listeners sans déclencher de re-render
   const selectedEventIdRef = useRef<string | number | null>(selectedEventId);
+  // Ref pour accéder à loadGeometries dans les event listeners
+  const loadGeometriesRef = useRef<() => Promise<void>>(() => Promise.resolve());
 
   useEffect(() => {
     selectedEventIdRef.current = selectedEventId;
@@ -140,6 +142,11 @@ export function useMapGeometries(
     }
   }, [map, selectedEventId, refreshGeometriesOnMap]);
 
+  // Mettre à jour la ref après chaque changement de loadGeometries
+  useEffect(() => {
+    loadGeometriesRef.current = loadGeometries;
+  }, [loadGeometries]);
+
   // --- EFFET : Initialisation de MapboxDraw et Listeners ---
   useEffect(() => {
     if (!map) return;
@@ -205,20 +212,33 @@ export function useMapGeometries(
         console.log("✅ Géométrie sauvegardée");
 
         draw.delete(feature.id); // On retire du draw pour laisser la couche 'event-geometries' l'afficher
-        loadGeometries(); // Recharger depuis la DB
+        loadGeometriesRef.current(); // Recharger depuis la DB (utilise la ref pour avoir la dernière version)
       } catch (err) {
         console.error("Erreur sauvegarde géométrie:", err);
         alert("Erreur lors de la sauvegarde");
         draw.delete(feature.id);
       }
     });
-  }, [map, loadGeometries]);
+  }, [map]); // Retirer loadGeometries des dépendances car on utilise la ref
 
   // --- EFFET : Recharger les géométries quand l'événement change ---
   useEffect(() => {
-    if (map && map.getSource("event-geometries") !== undefined) {
-      console.log("🔄 Changement d'événement, rechargement des géométries...");
+    if (!map || !selectedEventId) return;
+
+    const doLoad = () => {
+      console.log("🔄 Chargement des géométries...");
       loadGeometries();
+    };
+
+    // Vérifier si la map est complètement chargée
+    if (map.loaded() && map.isStyleLoaded()) {
+      doLoad();
+    } else {
+      // Attendre que la map soit complètement chargée
+      map.once('load', doLoad);
+      return () => {
+        map.off('load', doLoad);
+      };
     }
   }, [selectedEventId, map, loadGeometries]);
 

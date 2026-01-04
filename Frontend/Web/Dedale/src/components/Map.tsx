@@ -19,17 +19,6 @@ import { useMapGeometries } from "../hooks/useMapGeometries";
 import { MapEvent, SearchResult } from "../types/map";
 import { formatDateShort } from "../utils/maputils";
 
-// Helper pour l'affichage des icônes de géométrie dans la liste
-const getGeometryTypeLabel = (
-  wkt: string
-): { label: string; icon: string } => {
-  const upper = wkt.toUpperCase();
-  if (upper.startsWith("POLYGON")) return { label: "Polygone", icon: "⬡" };
-  if (upper.startsWith("LINESTRING")) return { label: "Ligne", icon: "╱" };
-  if (upper.startsWith("POINT")) return { label: "Point", icon: "●" };
-  return { label: "Inconnu", icon: "?" };
-};
-
 function OfflineMapLibre({
   selectedEventId,
 }: {
@@ -68,20 +57,10 @@ function OfflineMapLibre({
 
   // Toute la logique des géométries est ici
   const {
-    geometries,
     drawingMode,
-    selectedGeometryId,
-    editingGeometryId,
-    isGeometryListOpen,
-    setIsGeometryListOpen,
     startDrawPolygon,
     startDrawLine,
     cancelDrawing,
-    saveEditGeometry,
-    handleDeleteGeometry,
-    startEditGeometry,
-    cancelEditGeometry,
-    highlightGeometry,
   } = useMapGeometries(map, activeEventId);
 
   // --- EFFETS (Chargement initial) ---
@@ -398,51 +377,6 @@ function OfflineMapLibre({
                   </button>
                 )}
               </div>
-
-              {/* Liste des géométries (Dropdown) */}
-              {geometries.length > 0 && (
-                <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden max-w-sm mt-2">
-                  <button
-                    onClick={() => setIsGeometryListOpen(!isGeometryListOpen)}
-                    className="w-full px-4 py-2 flex justify-between items-center text-sm font-semibold hover:bg-gray-50"
-                  >
-                    <span>📐 {geometries.length} géométrie(s)</span>
-                    <span className={`transform transition-transform ${isGeometryListOpen ? "rotate-180" : ""}`}>▼</span>
-                  </button>
-
-                  {isGeometryListOpen && (
-                    <div className="max-h-60 overflow-y-auto bg-gray-50 border-t border-gray-200">
-                      {geometries.map((geom) => {
-                        const { label, icon } = getGeometryTypeLabel(geom.geom);
-                        const isSelected = selectedGeometryId === geom.id;
-                        const isEditing = editingGeometryId === geom.id;
-
-                        return (
-                          <div key={geom.id} className={`p-2 border-b border-gray-200 last:border-0 ${isSelected ? "bg-blue-50" : isEditing ? "bg-amber-50" : ""}`}>
-                            <div className="flex items-center justify-between">
-                                <button onClick={() => highlightGeometry(isSelected ? null : geom)} className="text-left flex-1 text-xs font-medium truncate">
-                                    <span className="mr-2 text-base">{icon}</span> {label} #{geom.id}
-                                </button>
-                                {!isEditing && (
-                                    <div className="flex gap-1">
-                                        <button onClick={() => startEditGeometry(geom)} className="p-1 text-blue-600 hover:bg-blue-100 rounded">✏️</button>
-                                        <button onClick={() => handleDeleteGeometry(geom.id)} className="p-1 text-red-600 hover:bg-red-100 rounded">🗑️</button>
-                                    </div>
-                                )}
-                            </div>
-                            {isEditing && (
-                                <div className="flex gap-2 mt-2">
-                                    <button onClick={saveEditGeometry} className="flex-1 bg-green-600 text-white text-xs py-1 rounded">Sauver</button>
-                                    <button onClick={cancelEditGeometry} className="flex-1 bg-gray-500 text-white text-xs py-1 rounded">Annuler</button>
-                                </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           )}
         </div>

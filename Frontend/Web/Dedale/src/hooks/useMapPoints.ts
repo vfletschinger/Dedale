@@ -56,14 +56,18 @@ export function useMapPoints(
       setPoints(freshPoints);
       updateMapSource(freshPoints);
 
-      if (selectedPoint) {
-        const updated = freshPoints.find((p) => p.id === selectedPoint.id);
-        setSelectedPoint(updated || null);
-      }
+      // Utiliser une ref pour éviter la boucle infinie
+      setSelectedPoint((currentSelected) => {
+        if (currentSelected) {
+          const updated = freshPoints.find((p) => p.id === currentSelected.id);
+          return updated || null;
+        }
+        return null;
+      });
     } catch (err) {
       console.error("Erreur chargement points:", err);
     }
-  }, [selectedEventId, selectedPoint, updateMapSource]);
+  }, [selectedEventId, updateMapSource]);
 
   const openPopupForPoint = (point: MapPoint) => {
     if (!map) return;
