@@ -3,6 +3,7 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
 import { invoke } from "@tauri-apps/api/core";
+import { Protocol } from "pmtiles";
 
 // Composants
 import PointDetails from "./PointDetails";
@@ -36,7 +37,7 @@ function OfflineMapLibre({
 
   // Gestion du marqueur d'adresse (Recherche)
   const [currentMarker, setCurrentMarker] = useState<maplibregl.Marker | null>(
-    null
+    null,
   );
 
   // Calcul de l'ID actif (soit celui sélectionné dans la liste, soit celui passé en props)
@@ -85,9 +86,166 @@ function OfflineMapLibre({
   useEffect(() => {
     if (map || !mapContainer.current) return;
 
+    // Enregistrer le protocole PMTiles
+    const protocol = new Protocol();
+    maplibregl.addProtocol("pmtiles", protocol.tile);
+
     const mapInstance = new maplibregl.Map({
       container: mapContainer.current,
-      style: "http://localhost:8080/styles/basic-preview/style.json",
+      style: {
+        version: 8,
+        sources: {
+          openmaptiles: {
+            type: "vector",
+            url: "pmtiles://tiles-test.pmtiles", // Chemin relatif depuis public/
+          },
+        },
+        layers: [
+          // Fond
+          {
+            id: "background",
+            type: "background",
+            paint: { "background-color": "#f8f4f0" },
+          },
+          // Eau
+          {
+            id: "water",
+            type: "fill",
+            source: "openmaptiles",
+            "source-layer": "water",
+            paint: { "fill-color": "#a0c8f0" },
+          },
+          // Parcs
+          {
+            id: "landcover_grass",
+            type: "fill",
+            source: "openmaptiles",
+            "source-layer": "landcover",
+            filter: ["==", ["get", "class"], "grass"],
+            paint: { "fill-color": "#d8e8c8", "fill-opacity": 0.7 },
+          },
+          // Bâtiments
+          {
+            id: "building",
+            type: "fill",
+            source: "openmaptiles",
+            "source-layer": "building",
+            paint: {
+              "fill-color": "#e0e0e0",
+              "fill-opacity": 0.7,
+            },
+          },
+          // Routes - autoroutes
+          {
+            id: "road_motorway",
+            type: "line",
+            source: "openmaptiles",
+            "source-layer": "transportation",
+            filter: ["==", ["get", "class"], "motorway"],
+            paint: {
+              "line-color": "#fc8",
+              "line-width": [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                5,
+                0.5,
+                12,
+                3,
+                18,
+                16,
+              ],
+            },
+          },
+          // Routes - principales
+          {
+            id: "road_major",
+            type: "line",
+            source: "openmaptiles",
+            "source-layer": "transportation",
+            filter: [
+              "in",
+              ["get", "class"],
+              ["literal", ["primary", "secondary", "tertiary"]],
+            ],
+            paint: {
+              "line-color": "#fea",
+              "line-width": [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                10,
+                1,
+                18,
+                10,
+              ],
+            },
+          },
+          // Routes - mineures
+          {
+            id: "road_minor",
+            type: "line",
+            source: "openmaptiles",
+            "source-layer": "transportation",
+            filter: ["in", ["get", "class"], ["literal", ["minor", "service"]]],
+            paint: {
+              "line-color": "#fff",
+              "line-width": [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                13,
+                0.5,
+                18,
+                8,
+              ],
+            },
+          },
+          // Noms de rues
+          {
+            id: "road_label",
+            type: "symbol",
+            source: "openmaptiles",
+            "source-layer": "transportation_name",
+            layout: {
+              "text-field": ["get", "name"],
+              "text-font": ["Noto Sans Regular"],
+              "text-size": 12,
+              "symbol-placement": "line",
+            },
+            paint: {
+              "text-color": "#666",
+              "text-halo-color": "#fff",
+              "text-halo-width": 2,
+            },
+          },
+          // Noms de lieux
+          {
+            id: "place_label",
+            type: "symbol",
+            source: "openmaptiles",
+            "source-layer": "place",
+            layout: {
+              "text-field": ["get", "name"],
+              "text-font": ["Noto Sans Bold"],
+              "text-size": [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                10,
+                10,
+                14,
+                16,
+              ],
+            },
+            paint: {
+              "text-color": "#333",
+              "text-halo-color": "#fff",
+              "text-halo-width": 2,
+            },
+          },
+        ],
+      },
       center: [7.7635, 48.5465],
       zoom: 13,
     });
@@ -101,6 +259,7 @@ function OfflineMapLibre({
     setMap(mapInstance);
 
     return () => {
+      maplibregl.removeProtocol("pmtiles");
       mapInstance.remove();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -278,7 +437,6 @@ function OfflineMapLibre({
           {/* OUTILS FLOTTANTS (Sur la carte) */}
           {activeEventId && (
             <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
-              
               {/* Message d'aide */}
               {(drawingMode !== "none" || awaitingMapClick) && (
                 <div className="bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-medium animate-fade-in">
@@ -333,7 +491,7 @@ function OfflineMapLibre({
                       if (awaitingMapClick) {
                         setAddingPointCoords(null);
                         // Hack pour forcer l'annulation si le state awaitingMapClick n'est pas exposé directement
-                        window.dispatchEvent(new Event("cancel-map-action")); 
+                        window.dispatchEvent(new Event("cancel-map-action"));
                       }
                     }}
                     className="px-4 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg shadow-lg font-semibold flex items-center gap-2"
@@ -350,9 +508,7 @@ function OfflineMapLibre({
                     onClick={() => setIsGeometryListOpen(!isGeometryListOpen)}
                     className="w-full px-4 py-2 flex justify-between items-center text-sm font-semibold hover:bg-gray-50"
                   >
-                    <span>
-                      📐 {zones.length + parcours.length} élément(s)
-                    </span>
+                    <span>📐 {zones.length + parcours.length} élément(s)</span>
                     <span
                       className={`transform transition-transform ${
                         isGeometryListOpen ? "rotate-180" : ""
@@ -364,7 +520,6 @@ function OfflineMapLibre({
 
                   {isGeometryListOpen && (
                     <div className="max-h-60 overflow-y-auto bg-gray-50 border-t border-gray-200">
-                      
                       {/* --- SECTION ZONES --- */}
                       {zones.length > 0 && (
                         <div>
@@ -373,8 +528,12 @@ function OfflineMapLibre({
                           </div>
                           {zones.map((zone) => {
                             const itemData = { ...zone, type: "zone" as const };
-                            const isSelected = selectedGeometry?.id === zone.id && selectedGeometry?.type === "zone";
-                            const isEditing = editingGeometry?.id === zone.id && editingGeometry?.type === "zone";
+                            const isSelected =
+                              selectedGeometry?.id === zone.id &&
+                              selectedGeometry?.type === "zone";
+                            const isEditing =
+                              editingGeometry?.id === zone.id &&
+                              editingGeometry?.type === "zone";
 
                             return (
                               <div
@@ -383,8 +542,8 @@ function OfflineMapLibre({
                                   isSelected
                                     ? "bg-blue-50"
                                     : isEditing
-                                    ? "bg-amber-50"
-                                    : ""
+                                      ? "bg-amber-50"
+                                      : ""
                                 }`}
                               >
                                 <div className="flex items-center justify-between">
@@ -392,7 +551,7 @@ function OfflineMapLibre({
                                     // On passe itemData qui contient type: 'zone'
                                     onClick={() =>
                                       highlightGeometry(
-                                        isSelected ? null : itemData
+                                        isSelected ? null : itemData,
                                       )
                                     }
                                     className="text-left flex-1 text-xs font-medium truncate"
@@ -455,9 +614,16 @@ function OfflineMapLibre({
                             Parcours
                           </div>
                           {parcours.map((p) => {
-                            const itemData = { ...p, type: "parcours" as const };
-                            const isSelected = selectedGeometry?.id === p.id && selectedGeometry?.type === "parcours";
-                            const isEditing = editingGeometry?.id === p.id && editingGeometry?.type === "parcours";
+                            const itemData = {
+                              ...p,
+                              type: "parcours" as const,
+                            };
+                            const isSelected =
+                              selectedGeometry?.id === p.id &&
+                              selectedGeometry?.type === "parcours";
+                            const isEditing =
+                              editingGeometry?.id === p.id &&
+                              editingGeometry?.type === "parcours";
 
                             return (
                               <div
@@ -466,15 +632,15 @@ function OfflineMapLibre({
                                   isSelected
                                     ? "bg-blue-50"
                                     : isEditing
-                                    ? "bg-amber-50"
-                                    : ""
+                                      ? "bg-amber-50"
+                                      : ""
                                 }`}
                               >
                                 <div className="flex items-center justify-between">
                                   <button
                                     onClick={() =>
                                       highlightGeometry(
-                                        isSelected ? null : itemData
+                                        isSelected ? null : itemData,
                                       )
                                     }
                                     className="text-left flex-1"
@@ -485,19 +651,29 @@ function OfflineMapLibre({
                                         <div className="text-xs font-medium truncate">
                                           {p.name || `Parcours #${p.id}`}
                                         </div>
-                                        {(p.start_time || p.speed_low || p.speed_high) && (
+                                        {(p.start_time ||
+                                          p.speed_low ||
+                                          p.speed_high) && (
                                           <div className="text-[10px] text-gray-500 mt-0.5">
                                             {p.start_time && (
-                                              <div>📅 {new Date(p.start_time).toLocaleString('fr-FR', { 
-                                                day: '2-digit', 
-                                                month: '2-digit', 
-                                                year: 'numeric',
-                                                hour: '2-digit',
-                                                minute: '2-digit'
-                                              })}</div>
+                                              <div>
+                                                📅{" "}
+                                                {new Date(
+                                                  p.start_time,
+                                                ).toLocaleString("fr-FR", {
+                                                  day: "2-digit",
+                                                  month: "2-digit",
+                                                  year: "numeric",
+                                                  hour: "2-digit",
+                                                  minute: "2-digit",
+                                                })}
+                                              </div>
                                             )}
                                             {(p.speed_low || p.speed_high) && (
-                                              <div>🏃 {p.speed_low || 0} - {p.speed_high || 0} km/h</div>
+                                              <div>
+                                                🏃 {p.speed_low || 0} -{" "}
+                                                {p.speed_high || 0} km/h
+                                              </div>
                                             )}
                                           </div>
                                         )}
