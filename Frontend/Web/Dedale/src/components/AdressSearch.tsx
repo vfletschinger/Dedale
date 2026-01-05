@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-// On garde juste le type, pas toute la librairie maplibre ici
-import { SearchResult } from "../types/map"; // Assurez-vous que le chemin est bon
+import { SearchResult } from "../types/map";
 
 interface AddressSearchProps {
   onSelect: (result: SearchResult) => void;
@@ -17,13 +16,12 @@ export default function AddressSearch({ onSelect }: AddressSearchProps) {
   };
 
   useEffect(() => {
-
     const timeout = setTimeout(async () => {
       try {
         const response = await fetch(
           `http://localhost:8081/search?q=${encodeURIComponent(
-            query
-          )}&format=json&limit=5`
+            query,
+          )}&format=json&limit=5`,
         );
         const data = await response.json();
         setResults(data);

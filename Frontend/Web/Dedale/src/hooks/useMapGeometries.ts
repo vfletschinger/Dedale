@@ -103,7 +103,7 @@ export function useMapGeometries(
         },
       });
     },
-    []
+    [],
   );
 
   // --- Chargement des données ---
@@ -144,7 +144,11 @@ export function useMapGeometries(
         {
           id: "gl-draw-line",
           type: "line",
-          filter: ["all", ["==", "$type", "LineString"], ["!=", "mode", "static"]],
+          filter: [
+            "all",
+            ["==", "$type", "LineString"],
+            ["!=", "mode", "static"],
+          ],
           paint: { "line-color": "#22c55e", "line-width": 4 },
         },
         {
@@ -188,7 +192,6 @@ export function useMapGeometries(
         draw.changeMode("simple_select");
       }
     });
-
   }, [map, loadGeometries]);
 
   // --- ACTIONS ---
@@ -234,7 +237,10 @@ export function useMapGeometries(
 
     map.addSource("highlight-geometry", {
       type: "geojson",
-      data: { type: "FeatureCollection", features: [{ type: "Feature", geometry, properties: {} }] },
+      data: {
+        type: "FeatureCollection",
+        features: [{ type: "Feature", geometry, properties: {} }],
+      },
     });
 
     if (geometry.type === "Polygon") {
@@ -250,7 +256,11 @@ export function useMapGeometries(
       id: "highlight-geometry-line",
       type: "line",
       source: "highlight-geometry",
-      paint: { "line-color": "#f59e0b", "line-width": 5, "line-dasharray": [2, 2] },
+      paint: {
+        "line-color": "#f59e0b",
+        "line-width": 5,
+        "line-dasharray": [2, 2],
+      },
     });
   };
 
@@ -287,8 +297,18 @@ export function useMapGeometries(
     setEditingGeometry(null);
 
     // Restaurer filtres
-    if (map.getLayer("event-geometries-fill")) map.setFilter("event-geometries-fill", ["==", ["geometry-type"], "Polygon"]);
-    if (map.getLayer("event-geometries-line")) map.setFilter("event-geometries-line", ["any", ["==", ["geometry-type"], "LineString"], ["==", ["geometry-type"], "Polygon"]]);
+    if (map.getLayer("event-geometries-fill"))
+      map.setFilter("event-geometries-fill", [
+        "==",
+        ["geometry-type"],
+        "Polygon",
+      ]);
+    if (map.getLayer("event-geometries-line"))
+      map.setFilter("event-geometries-line", [
+        "any",
+        ["==", ["geometry-type"], "LineString"],
+        ["==", ["geometry-type"], "Polygon"],
+      ]);
   };
 
   const saveEditGeometry = async () => {
