@@ -7,6 +7,7 @@ import { listen } from "@tauri-apps/api/event";
 
 // Composants
 import PointDetails, { type Point } from "./PointDetails";
+import GeometryDetails from "./GeometryDetails";
 import AddPointForm from "./AddPointForm";
 import TimelinePanel from "./TimelinePanel";
 import AddressSearch from "./AdressSearch";
@@ -58,10 +59,29 @@ function OfflineMapLibre({
   // Toute la logique des géométries est ici
   const {
     drawingMode,
+    selectedGeometry,
+    setSelectedGeometry,
     startDrawPolygon,
     startDrawLine,
     cancelDrawing,
+    loadGeometries,
   } = useMapGeometries(map, activeEventId);
+
+  // --- EFFETS (Synchronisation des sélections) ---
+  
+  // Quand on sélectionne un point, désélectionner la géométrie
+  useEffect(() => {
+    if (selectedPoint) {
+      setSelectedGeometry(null);
+    }
+  }, [selectedPoint, setSelectedGeometry]);
+
+  // Quand on sélectionne une géométrie, désélectionner le point
+  useEffect(() => {
+    if (selectedGeometry) {
+      setSelectedPoint(null);
+    }
+  }, [selectedGeometry, setSelectedPoint]);
 
   // --- EFFETS (Chargement initial) ---
 
@@ -263,6 +283,15 @@ function OfflineMapLibre({
                   onRefresh={refreshPoints}
                 />
               </div>
+            ) : selectedGeometry ? (
+              // Mode: Détails d'une géométrie sélectionnée (zone ou ligne)
+              <div className="flex-1 overflow-y-auto">
+                <GeometryDetails
+                  geometry={selectedGeometry}
+                  onClose={() => setSelectedGeometry(null)}
+                  onRefresh={loadGeometries}
+                />
+              </div>
             ) : (
               // Mode: Liste des points
               <div className="flex-1 overflow-y-auto p-2 space-y-2">
@@ -288,10 +317,7 @@ function OfflineMapLibre({
                         </button>
                       </div>
                       <div className="flex gap-2 text-xs">
-                         {/* Badges pour obstacles, photos, etc. */}
-                         <span className="bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded border border-orange-200">
-                           🚧 {p.obstacles?.length || 0}
-                         </span>
+                         {/* Badge pour commentaires */}
                          <span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200">
                            💬 {p.comments?.length || 0}
                          </span>
@@ -358,7 +384,7 @@ function OfflineMapLibre({
                   className={`px-4 py-3 rounded-lg shadow-lg flex items-center justify-center transition-all ${
                     drawingMode === "line" ? "bg-green-600 text-white" : "bg-white hover:bg-gray-50 text-gray-700"
                   }`}
-                  title="Parcours (Ligne)"
+                  title="Parcours"
                 >
                   <span className="text-xl">╱</span>
                 </button>

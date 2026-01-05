@@ -31,11 +31,12 @@ pub async fn fetch_geometries_for_event(
             event_id: row.get("event_id"),
             geom: wkt,
             geom_type: "point".to_string(),
+            name: None,
         });
     }
 
     // 2. Récupérer les parcours (géométrie LINESTRING)
-    let parcours_rows = sqlx::query("SELECT id, event_id, geometry_json FROM parcours WHERE event_id = ?")
+    let parcours_rows = sqlx::query("SELECT id, event_id, name, geometry_json FROM parcours WHERE event_id = ?")
         .bind(&event_id)
         .fetch_all(&pool)
         .await
@@ -50,12 +51,13 @@ pub async fn fetch_geometries_for_event(
                 event_id: row.get("event_id"),
                 geom,
                 geom_type: "parcours".to_string(),
+                name: row.get("name"),
             });
         }
     }
 
     // 3. Récupérer les zones (géométrie POLYGON)
-    let zone_rows = sqlx::query("SELECT id, event_id, geometry_json FROM zone WHERE event_id = ?")
+    let zone_rows = sqlx::query("SELECT id, event_id, name, geometry_json FROM zone WHERE event_id = ?")
         .bind(&event_id)
         .fetch_all(&pool)
         .await
@@ -70,6 +72,7 @@ pub async fn fetch_geometries_for_event(
                 event_id: row.get("event_id"),
                 geom,
                 geom_type: "zone".to_string(),
+                name: row.get("name"),
             });
         }
     }
@@ -268,7 +271,7 @@ pub async fn create_geometry(
             .map_err(|e| e.to_string())?;
 
         println!("[DB] ✅ Point créé: {}", uuid);
-        Ok(Geometry { id: uuid, event_id, geom, geom_type: "point".to_string() })
+        Ok(Geometry { id: uuid, event_id, geom, geom_type: "point".to_string(), name: None })
     } else if geom_upper.starts_with("LINESTRING") {
         // Stocker dans parcours avec valeurs par défaut
         sqlx::query("INSERT INTO parcours (id, event_id, geometry_json, name, color) VALUES (?, ?, ?, ?, ?)")
@@ -282,7 +285,7 @@ pub async fn create_geometry(
             .map_err(|e| e.to_string())?;
 
         println!("[DB] ✅ Parcours créé: {}", uuid);
-        Ok(Geometry { id: uuid, event_id, geom, geom_type: "parcours".to_string() })
+        Ok(Geometry { id: uuid, event_id, geom, geom_type: "parcours".to_string(), name: Some("Nouveau parcours".to_string()) })
     } else if geom_upper.starts_with("POLYGON") {
         // Stocker dans zone avec valeurs par défaut
         sqlx::query("INSERT INTO zone (id, event_id, geometry_json, name, color) VALUES (?, ?, ?, ?, ?)")
@@ -296,7 +299,7 @@ pub async fn create_geometry(
             .map_err(|e| e.to_string())?;
 
         println!("[DB] ✅ Zone créée: {}", uuid);
-        Ok(Geometry { id: uuid, event_id, geom, geom_type: "zone".to_string() })
+        Ok(Geometry { id: uuid, event_id, geom, geom_type: "zone".to_string(), name: Some("Nouvelle zone".to_string()) })
     } else {
         Err(format!("Type de géométrie non supporté: {}", geom))
     }
@@ -379,7 +382,7 @@ pub async fn update_geometry(
         }
         
         println!("[DB] ✏️ Point {} mis à jour", geometry_id);
-        return Ok(Geometry { id: geometry_id, event_id, geom, geom_type: "point".to_string() });
+        return Ok(Geometry { id: geometry_id, event_id, geom, geom_type: "point".to_string(), name: None });
     }
 
     // 2. Chercher dans parcours
@@ -400,7 +403,7 @@ pub async fn update_geometry(
             .map_err(|e| e.to_string())?;
         
         println!("[DB] ✏️ Parcours {} mis à jour", geometry_id);
-        return Ok(Geometry { id: geometry_id, event_id, geom, geom_type: "parcours".to_string() });
+        return Ok(Geometry { id: geometry_id, event_id, geom, geom_type: "parcours".to_string(), name: None });
     }
 
     // 3. Chercher dans zone
@@ -421,7 +424,7 @@ pub async fn update_geometry(
             .map_err(|e| e.to_string())?;
         
         println!("[DB] ✏️ Zone {} mise à jour", geometry_id);
-        return Ok(Geometry { id: geometry_id, event_id, geom, geom_type: "zone".to_string() });
+        return Ok(Geometry { id: geometry_id, event_id, geom, geom_type: "zone".to_string(), name: None });
     }
 
     Err(format!("Géométrie {} non trouvée", geometry_id))
@@ -512,4 +515,44 @@ pub async fn update_parcours(
         speed_high,
         geometry_json: Some(geom),
     })
+}
+
+/// Met à jour le nom d'une géométrie (zone ou parcours)
+#[tauri::command]
+pub async fn update_geometry_name(
+    app: AppHandle,
+    geometry_id: String,
+    name: String,
+) -> Result<(), String> {
+    let pool = get_db_pool(&app).await?;
+
+    // Essayer de mettre à jour dans parcours
+    let parcours_result = sqlx::query("UPDATE parcours SET name = ? WHERE id = ?")
+        .bind(&name)
+        .bind(&geometry_id)
+        .execute(&pool)
+        .await;
+
+    if let Ok(result) = parcours_result {
+        if result.rows_affected() > 0 {
+            println!("[DB] ✏️ Nom du parcours {} mis à jour: {}", geometry_id, name);
+            return Ok(());
+        }
+    }
+
+    // Essayer de mettre à jour dans zone
+    let zone_result = sqlx::query("UPDATE zone SET name = ? WHERE id = ?")
+        .bind(&name)
+        .bind(&geometry_id)
+        .execute(&pool)
+        .await;
+
+    if let Ok(result) = zone_result {
+        if result.rows_affected() > 0 {
+            println!("[DB] ✏️ Nom de la zone {} mis à jour: {}", geometry_id, name);
+            return Ok(());
+        }
+    }
+
+    Err(format!("Géométrie {} non trouvée", geometry_id))
 }

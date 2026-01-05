@@ -4,6 +4,7 @@ export interface GeometryData {
   event_id: string;
   geom: string;
   geom_type: "point" | "parcours" | "zone"; // Type de la géométrie
+  name?: string | null;
 }
 
 // Type pour les obstacles

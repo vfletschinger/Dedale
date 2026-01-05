@@ -85,6 +85,7 @@ pub fn run() {
             db::create_geometry,
             db::delete_geometry,
             db::update_geometry,
+            db::update_geometry_name,
             db::update_point_dates,
             db::update_parcours,
             db::update_zone,

@@ -14,7 +14,6 @@ import {
 } from "react-native";
 import React, { useState, useRef } from "react";
 import CustomButton from "../components/CustomButton";
-import ObstacleSelector from "../components/ObstacleSelector";
 import Map from "../components/Map";
 import MapView, { Marker } from "react-native-maps";
 import * as Location from "expo-location";
@@ -24,12 +23,6 @@ import * as ImageHelper from "../services/ImageHelper";
 import { useEvent } from "../context/EventContext";
 import { usePoints } from "../context/PointsContext";
 import { generateUUID } from "../services/Helper";
-
-type SelectedObstacle = {
-  type_id: number;
-  name: string;
-  number: number;
-};
 
 export default function RegisterPointScreen() {
   const { selectedEventId } = useEvent();
@@ -45,13 +38,8 @@ export default function RegisterPointScreen() {
   const mapRef = useRef<MapView | null>(null);
   const db: any = getDatabase();
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [isObstacleSelectorVisible, setIsObstacleSelectorVisible] =
-    useState(false);
   const [pointComment, setPointComment] = useState("");
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
-  const [selectedObstacles, setSelectedObstacles] = useState<
-    SelectedObstacle[]
-  >([]);
 
   React.useEffect(() => {
     requestLocation();
@@ -175,28 +163,6 @@ export default function RegisterPointScreen() {
         ]);
       }
 
-      // Sauvegarder les obstacles
-      if (selectedObstacles.length > 0) {
-        for (const obstacle of selectedObstacles) {
-          try {
-            const obstacleId = generateUUID();
-            db.runSync(
-              "INSERT INTO obstacle (id, point_id, type_id, number) VALUES (?, ?, ?, ?)",
-              [obstacleId, pointId, obstacle.type_id, obstacle.number]
-            );
-          } catch (obstErr) {
-            console.error(
-              "Erreur lors de la sauvegarde de l'obstacle:",
-              obstErr
-            );
-            Alert.alert(
-              "Attention",
-              `Le point a été enregistré mais un obstacle n'a pas pu être ajouté.`
-            );
-          }
-        }
-      }
-
       return pointId;
     } catch (error: any) {
       console.error(
@@ -209,10 +175,6 @@ export default function RegisterPointScreen() {
       );
       return null;
     }
-  };
-
-  const handleSaveObstacles = (obstacles: SelectedObstacle[]) => {
-    setSelectedObstacles(obstacles);
   };
 
   return (
@@ -327,30 +289,6 @@ export default function RegisterPointScreen() {
                 multiline
               />
 
-              {/* Bouton pour ajouter des obstacles */}
-              <CustomButton
-                title={`Ajouter des obstacles ${selectedObstacles.length > 0 ? `(${selectedObstacles.length})` : ""}`}
-                onPress={() => setIsObstacleSelectorVisible(true)}
-              />
-
-              {/* Affichage des obstacles sélectionnés */}
-              {selectedObstacles.length > 0 && (
-                <View className="my-2">
-                  <Text className="font-semibold mb-1">
-                    Obstacles sélectionnés :
-                  </Text>
-                  <View className="flex-row flex-wrap gap-2">
-                    {selectedObstacles.map((obs, idx) => (
-                      <View key={idx} className="obstacle-tag">
-                        <Text className="obstacle-tag-text">
-                          {obs.name} ({obs.number})
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-              )}
-
               {/* Bouton pour prendre une photo */}
               <CustomButton title="Prendre une photo" onPress={pickImage} />
 
@@ -394,7 +332,6 @@ export default function RegisterPointScreen() {
                       setIsModalVisible(false);
                       setPointComment("");
                       setSelectedImages([]);
-                      setSelectedObstacles([]);
                       setLocation(null);
                     }
                   } else {
@@ -410,21 +347,12 @@ export default function RegisterPointScreen() {
                   setIsModalVisible(false);
                   setPointComment("");
                   setSelectedImages([]);
-                  setSelectedObstacles([]);
                 }}
               />
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </Modal>
-
-      {/* Composant ObstacleSelector */}
-      <ObstacleSelector
-        visible={isObstacleSelectorVisible}
-        onClose={() => setIsObstacleSelectorVisible(false)}
-        onSave={handleSaveObstacles}
-        initialObstacles={selectedObstacles}
-      />
     </View>
   );
 }

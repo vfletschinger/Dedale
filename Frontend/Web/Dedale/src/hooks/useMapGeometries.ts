@@ -17,6 +17,9 @@ export function useMapGeometries(
   const [selectedGeometryId, setSelectedGeometryId] = useState<string | null>(
     null,
   );
+  const [selectedGeometry, setSelectedGeometry] = useState<GeometryData | null>(
+    null,
+  );
   const [editingGeometryId, setEditingGeometryId] = useState<string | null>(
     null,
   );
@@ -28,10 +31,16 @@ export function useMapGeometries(
   const selectedEventIdRef = useRef<string | number | null>(selectedEventId);
   // Ref pour accéder à loadGeometries dans les event listeners
   const loadGeometriesRef = useRef<() => Promise<void>>(() => Promise.resolve());
+  // Ref pour accéder aux géométries dans les event listeners
+  const geometriesRef = useRef<GeometryData[]>([]);
 
   useEffect(() => {
     selectedEventIdRef.current = selectedEventId;
   }, [selectedEventId]);
+
+  useEffect(() => {
+    geometriesRef.current = geometries;
+  }, [geometries]);
 
   // --- FONCTION : Rafraîchir l'affichage sur la carte ---
   const refreshGeometriesOnMap = useCallback(
@@ -121,6 +130,7 @@ export function useMapGeometries(
     // On utilise selectedEventId directement ici car loadGeometries est dans les dépendances de l'effet
     if (!map || !selectedEventId) {
       setGeometries([]);
+      setSelectedGeometry(null);
       if (map) refreshGeometriesOnMap(map, []);
       return;
     }
@@ -137,6 +147,15 @@ export function useMapGeometries(
       });
       setGeometries(geoms);
       refreshGeometriesOnMap(map, geoms);
+      
+      // Mettre à jour selectedGeometry si elle existe avec les nouvelles données
+      setSelectedGeometry((current) => {
+        if (current) {
+          const updated = geoms.find((g) => g.id === current.id);
+          return updated || null;
+        }
+        return null;
+      });
     } catch (err) {
       console.error("Erreur chargement géométries:", err);
     }
@@ -190,6 +209,50 @@ export function useMapGeometries(
 
     map.addControl(draw as unknown as maplibregl.IControl, "top-right");
     drawRef.current = draw;
+
+    // --- Gestionnaires de clic sur les géométries ---
+    
+    // Curseur pointer pour les géométries
+    map.on("mouseenter", "event-geometries-fill", () => {
+      map.getCanvas().style.cursor = "pointer";
+    });
+    map.on("mouseleave", "event-geometries-fill", () => {
+      map.getCanvas().style.cursor = "";
+    });
+    map.on("mouseenter", "event-geometries-line", () => {
+      map.getCanvas().style.cursor = "pointer";
+    });
+    map.on("mouseleave", "event-geometries-line", () => {
+      map.getCanvas().style.cursor = "";
+    });
+
+    // Clic sur un polygone (zone)
+    map.on("click", "event-geometries-fill", (e) => {
+      const f = e.features?.[0];
+      if (!f) return;
+      const geomId = f.properties?.id;
+      const clicked = geometriesRef.current.find((g) => String(g.id) === String(geomId));
+      if (clicked) {
+        setSelectedGeometry(clicked);
+        setSelectedGeometryId(clicked.id);
+      }
+      // Empêcher la propagation pour éviter de déclencher d'autres clics
+      e.preventDefault();
+    });
+
+    // Clic sur une ligne (parcours)
+    map.on("click", "event-geometries-line", (e) => {
+      const f = e.features?.[0];
+      if (!f) return;
+      const geomId = f.properties?.id;
+      const clicked = geometriesRef.current.find((g) => String(g.id) === String(geomId));
+      if (clicked) {
+        setSelectedGeometry(clicked);
+        setSelectedGeometryId(clicked.id);
+      }
+      // Empêcher la propagation
+      e.preventDefault();
+    });
 
     // Listener pour la CRÉATION (Sauvegarde)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -410,6 +473,8 @@ export function useMapGeometries(
     geometries,
     drawingMode,
     selectedGeometryId,
+    selectedGeometry,
+    setSelectedGeometry,
     editingGeometryId,
     isGeometryListOpen,
     setIsGeometryListOpen,
@@ -421,5 +486,6 @@ export function useMapGeometries(
     startEditGeometry,
     cancelEditGeometry,
     highlightGeometry,
+    loadGeometries,
   };
 }

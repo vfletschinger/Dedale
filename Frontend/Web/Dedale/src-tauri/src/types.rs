@@ -168,6 +168,7 @@ pub struct Geometry {
     pub event_id: String,
     pub geom: String,
     pub geom_type: String, // "point", "parcours", ou "zone"
+    pub name: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

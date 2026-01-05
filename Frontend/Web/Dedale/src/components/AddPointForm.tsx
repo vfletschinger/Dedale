@@ -1,24 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
-interface MergedObstacle {
-  typeId: number;
-  name: string;
-  description: string;
-  width: number;
-  length: number;
-  number: number;
-  obstacleId: number | null;
-}
-
-interface ObstacleType {
-  id: number;
-  name: string;
-  description: string;
-  width: number;
-  length: number;
-}
-
 export default function AddPointForm({
   initialCoords,
   onClose,
@@ -34,48 +16,12 @@ export default function AddPointForm({
   const [y, setY] = useState<number>(initialCoords.lat);
   const [name, setName] = useState<string>("Nouveau point");
   const [comment, setComment] = useState<string>("");
-  const [mergedObstacles, setMergedObstacles] = useState<MergedObstacle[]>([]);
   const [pictures, setPictures] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
-  const [pose, setPose] = useState<string>("");
-  const [depose, setDepose] = useState<string>("");
 
   useEffect(() => {
-    // initially fetch obstacle types to let user add obstacles
-    fetchTypes();
+    // Component mounted
   }, []);
-
-  async function fetchTypes() {
-    try {
-      const types: ObstacleType[] = await invoke("fetch_obstacle_types");
-
-      const merged = types.map((type) => ({
-        typeId: type.id,
-        name: type.name,
-        description: type.description,
-        width: type.width,
-        length: type.length,
-        number: 0,
-        obstacleId: null,
-      }));
-
-      setMergedObstacles(merged);
-    } catch (err) {
-      console.error("fetchTypes error", err);
-    }
-  }
-
-  function incrementObstacle(typeId: number) {
-    setMergedObstacles((prev) =>
-      prev.map((o) => (o.typeId === typeId ? { ...o, number: o.number + 1 } : o))
-    );
-  }
-
-  function decrementObstacle(typeId: number) {
-    setMergedObstacles((prev) =>
-      prev.map((o) => (o.typeId === typeId ? { ...o, number: Math.max(0, o.number - 1) } : o))
-    );
-  }
 
   async function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
@@ -110,31 +56,9 @@ export default function AddPointForm({
       console.error("Tentative d'enregistrement sans eventId");
       return;
     }
-    if (pose && depose) {
-      const poseDate = new Date(pose);
-      const deposeDate = new Date(depose);
-      if (deposeDate < poseDate) {
-        alert("⚠️ La date de dépose ne peut pas être antérieure à la date de pose.");
-        return;
-      }
-    }
     
     setSaving(true);
     try {
-      // Prepare obstacles in backend-friendly shape (snake_case -> full Obstacle shape expected by insert_point_details)
-      const obstaclesSnake = mergedObstacles
-        .filter((o) => o.number && o.number > 0)
-        .map((o) => ({
-          id: "",
-          point_id: "",
-          type_id: Number(o.typeId),
-          number: Number(o.number),
-          name: o.name ?? null,
-          description: o.description ?? null,
-          width: o.width ?? null,
-          length: o.length ?? null,
-        }));
-
       const comments = comment
         ? [{ id: "", point_id: "", value: comment }]
         : [];
@@ -149,12 +73,12 @@ export default function AddPointForm({
           x: Number(x),
           y: Number(y),
           name: name || "Nouveau point",
-          pose: pose || null,
-          depose: depose || null,
+          pose: null,
+          depose: null,
         },
         comments: comments,
         pictures: picturesPayload,
-        obstacles: obstaclesSnake,
+        obstacles: [],
       };
 
       console.log("📍 Envoi du point:", JSON.stringify(detail, null, 2));
@@ -246,42 +170,6 @@ export default function AddPointForm({
           </div>
         </div>
 
-        {/* Dates Pose/Dépose Section */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-4 py-3 bg-linear-to-r from-purple-50 to-pink-50 border-b border-purple-100 flex items-center gap-2">
-            <span className="text-xl">🕐</span>
-            <span className="font-semibold text-gray-800">Dates Pose / Dépose</span>
-          </div>
-          <div className="p-4 space-y-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Date et heure de pose</label>
-              <input
-                type="datetime-local"
-                value={pose}
-                onChange={(e) => setPose(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-gray-50 transition-all"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Date et heure de dépose</label>
-              <input
-                type="datetime-local"
-                value={depose}
-                onChange={(e) => setDepose(e.target.value)}
-                min={pose || undefined}
-                className={`w-full px-3 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-gray-50 transition-all ${
-                  pose && depose && new Date(depose) < new Date(pose)
-                    ? 'border-red-400 bg-red-50'
-                    : 'border-gray-200'
-                }`}
-              />
-              {pose && depose && new Date(depose) < new Date(pose) && (
-                <p className="text-red-500 text-xs mt-1">⚠️ La dépose doit être après la pose</p>
-              )}
-            </div>
-          </div>
-        </div>
-
         {/* Commentaire Section */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-4 py-3 bg-linear-to-r from-blue-50 to-indigo-50 border-b border-blue-100 flex items-center gap-2">
@@ -296,49 +184,6 @@ export default function AddPointForm({
               rows={3}
               className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 resize-none transition-all"
             />
-          </div>
-        </div>
-
-        {/* Obstacles Section */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-4 py-3 bg-linear-to-r from-orange-50 to-amber-50 border-b border-orange-100 flex items-center gap-2">
-            <span className="text-xl">🚧</span>
-            <span className="font-semibold text-gray-800">Obstacles</span>
-            <span className="px-2 py-0.5 bg-orange-200 text-orange-800 text-xs font-medium rounded-full">
-              {mergedObstacles.filter(o => o.number > 0).length} sélectionné(s)
-            </span>
-          </div>
-          <div className="max-h-56 overflow-y-auto divide-y divide-gray-50">
-            {mergedObstacles.map((o) => (
-              <div 
-                key={o.typeId} 
-                className={`p-3 transition-colors ${o.number > 0 ? 'bg-orange-50/50' : 'hover:bg-gray-50'}`}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-gray-800 truncate">{o.name}</div>
-                    <div className="text-xs text-gray-500 truncate">{o.description}</div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => decrementObstacle(o.typeId)}
-                      className="w-8 h-8 flex items-center justify-center bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-lg transition-colors"
-                    >
-                      −
-                    </button>
-                    <div className={`w-8 text-center font-bold text-lg ${o.number > 0 ? 'text-orange-600' : 'text-gray-400'}`}>
-                      {o.number}
-                    </div>
-                    <button
-                      onClick={() => incrementObstacle(o.typeId)}
-                      className="w-8 h-8 flex items-center justify-center bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-lg transition-colors"
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
 
