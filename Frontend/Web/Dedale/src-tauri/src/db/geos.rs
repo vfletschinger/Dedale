@@ -37,7 +37,7 @@ pub async fn fetch_geometries_for_event(
 }
 
 #[tauri::command]
-pub async fn fetch_zones(
+pub async fn fetch_zones_for_event(
     app: AppHandle,
     event_id: String,
 ) -> Result<Vec<Zone>, String> {
@@ -68,7 +68,7 @@ pub async fn fetch_zones(
 }
 
 #[tauri::command]
-pub async fn fetch_parcours(
+pub async fn fetch_parcours_for_event(
     app: AppHandle,
     event_id: String,
 ) -> Result<Vec<Parcours>, String> {
@@ -130,13 +130,14 @@ pub async fn create_parcours(
     geom: String,
     name: String,
     color: String,
-    start_time: Option<f64>,
+    start_time: Option<i64>,
     speed_low: Option<f64>,
     speed_high: Option<f64>,
 ) -> Result<Parcours, String> {
     let pool = get_db_pool(&app).await?;
     let uuid = Uuid::new_v4().to_string();
-    let _result = sqlx::query("INSERT INTO parcours (id, event_id, geometry_json,name,color,start_time,speed_low,speed_high) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+    
+    sqlx::query("INSERT INTO parcours (id, event_id, geometry_json, name, color, start_time, speed_low, speed_high) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
         .bind(&uuid)
         .bind(&event_id)
         .bind(&geom)
@@ -149,7 +150,18 @@ pub async fn create_parcours(
         .await
         .map_err(|e| e.to_string())?;
 
-    Ok(Parcours { id: uuid, event_id, name: Some(name), color: Some(color), start_time, speed_low, speed_high, geometry_json: Some(geom) })
+    println!("[DB] ✅ Parcours {} créé avec succès", name);
+    
+    Ok(Parcours { 
+        id: uuid, 
+        event_id, 
+        name: Some(name), 
+        color: Some(color), 
+        start_time, 
+        speed_low, 
+        speed_high, 
+        geometry_json: Some(geom) 
+    })
 }
 
 #[tauri::command]
@@ -288,7 +300,7 @@ pub async fn update_parcours(
     geom: String,
     name: String,
     color: String,
-    start_time: Option<f64>,
+    start_time: Option<i64>,
     speed_low: Option<f64>,
     speed_high: Option<f64>,
 ) -> Result<Parcours, String> {

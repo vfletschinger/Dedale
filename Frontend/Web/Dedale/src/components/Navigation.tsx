@@ -6,6 +6,7 @@ interface NavigationProps {
   onNavigate: (page: PageKey) => void;
   canGoBack?: boolean;
   onGoBack?: () => void;
+  selectedEventId?: number | null;
 }
 
 const NAV_ITEMS: { key: PageKey; label: string }[] = [
@@ -21,6 +22,7 @@ export default function Navigation({
   onNavigate,
   canGoBack,
   onGoBack,
+  selectedEventId,
 }: NavigationProps) {
   return (
     <nav className="sticky top-0 z-[100] w-full border-b border-gray-200 bg-slate-700 shadow-lg">
@@ -81,16 +83,23 @@ export default function Navigation({
           <div className="flex items-center gap-2 px-2 py-1.5 bg-slate-800 rounded-lg border border-slate-600 shadow-md">
             {NAV_ITEMS.map(({ key, label }) => {
               const isActive = currentPage === key;
+              const requiresEvent = key !== "event";
+              const isDisabled = requiresEvent && !selectedEventId;
+              
               return (
                 <button
                   key={key}
                   onClick={() => onNavigate(key)}
+                  disabled={isDisabled}
                   className={`relative px-4 py-2 text-[11px] font-semibold tracking-wide uppercase transition-all duration-200 rounded-md
                     ${
                       isActive
                         ? "text-white bg-blue-600 shadow-md"
+                        : isDisabled
+                        ? "text-slate-500 bg-slate-800 cursor-not-allowed opacity-50"
                         : "text-slate-300 hover:text-white hover:bg-slate-700"
                     }`}
+                  title={isDisabled ? "Sélectionnez d'abord un événement" : ""}
                 >
                   <span className="relative z-10">{label}</span>
                   {isActive && (

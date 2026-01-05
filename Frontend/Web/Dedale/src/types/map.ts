@@ -4,6 +4,24 @@ export interface GeometryData {
   event_id: number;
   geom: string;
 }
+export interface Zone {
+  id: string;
+  name: string;
+  event_id: string,
+  color: string,
+  geometry_json: string,
+}
+
+export interface Parcours {
+  id: string;
+  event_id: string;
+  name: string;
+  color: string;
+  start_time: string;
+  speed_low: number;
+  speed_high: number;
+  geometry_json: string;
+}
 
 // Type pour les obstacles
 export interface Obstacle {
@@ -17,14 +35,17 @@ export interface Obstacle {
 
 // Type pour les points de la carte
 export interface MapPoint {
-  id: number;
+  id: string;
   x: number;
   y: number;
-  pose?: string | null;
-  depose?: string | null;
-  obstacles?: Obstacle[];
-  comments?: { id: number; value: string }[];
-  pictures?: { id: number; image: string }[];
+  event_id: string | null;
+  status?: boolean;
+  comment?: string;
+  pictures?: Array<{
+    id: string;
+    point_id: string;
+    image?: string;
+  }>;
 }
 
 // Type pour les événements

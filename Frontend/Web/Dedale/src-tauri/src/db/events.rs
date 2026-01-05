@@ -122,7 +122,6 @@ pub async fn unlink_point_from_event(
         .execute(&pool)
         .await
         .map_err(|e| format!("Failed to unlink point from event: {}", e))?;
-
    
     Ok(())
 }
