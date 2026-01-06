@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import maplibregl from "maplibre-gl";
-import { MapPoint } from "../types/map";
+import { MapInterest, MapPoint } from "../types/map";
 
 export function useMapPoints(
   map: maplibregl.Map | null,
@@ -77,6 +77,38 @@ export function useMapPoints(
       }
     } catch (err) {
       console.error("Erreur chargement points:", err);
+    }
+  }, [selectedEventId, map]);
+
+  const refreshInterest = useCallback(async () => {
+    try {
+      console.log("🔄 Chargement des points d'intérêt pour event_id:", selectedEventId);
+      const freshInterests = await invoke<MapInterest[]>("fetch_interest_points", {
+        eventId: selectedEventId ? String(selectedEventId) : null,
+      });
+      
+      console.log(`${freshInterests.length} point(s) d'intérêt récupéré(s)`);
+      
+      // Mettre à jour la source de la carte directement
+      if (map && map.getSource("db-interests")) {
+        const geojson: GeoJSON.FeatureCollection<GeoJSON.Point> = {
+          type: "FeatureCollection",
+          features: freshInterests.map((p) => ({
+            type: "Feature",
+            geometry: {
+              type: "Point",
+              coordinates: [Number(p.x), Number(p.y)],
+            },
+            properties: {
+              id: p.id,
+              description: p.description,
+            },
+          })),
+        };
+        (map.getSource("db-interests") as maplibregl.GeoJSONSource).setData(geojson);
+      }
+    } catch (err) {
+      console.error("Erreur chargement points d'intérêt:", err);
     }
   }, [selectedEventId, map]);
 
@@ -165,6 +197,36 @@ export function useMapPoints(
           },
         });
 
+        // Ajouter la source pour les points d'intérêt
+        if (!map.getSource("db-interests")) {
+          map.addSource("db-interests", {
+            type: "geojson",
+            data: { type: "FeatureCollection", features: [] },
+          });
+
+          // Ajouter le layer pour les points d'intérêt
+          map.addLayer({
+            id: "db-interests-layer",
+            type: "symbol",
+            source: "db-interests",
+            layout: {
+              "text-field": "?",
+              "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
+              "text-size": 18,
+              "text-anchor": "center",
+            },
+            paint: {
+              "text-color": "#9c27b0",
+              "text-halo-color": "#fff",
+              "text-halo-width": 2,
+            },
+          });
+
+          // Interactions pour les points d'intérêt
+          map.on("mouseenter", "db-interests-layer", () => (map.getCanvas().style.cursor = "pointer"));
+          map.on("mouseleave", "db-interests-layer", () => (map.getCanvas().style.cursor = ""));
+        }
+
         // --- Gestionnaires d'événements liés aux layers ---
         
         // Curseur pointer
@@ -185,7 +247,7 @@ export function useMapPoints(
           if (!awaitingMapClickRef.current) return;
 
           // Vérifier qu'on n'a pas cliqué sur un point existant
-          const features = map.queryRenderedFeatures(e.point, { layers: ["db-points-layer"] });
+          const features = map.queryRenderedFeatures(e.point, { layers: ["db-points-layer", "db-interests-layer"] });
           if (features.length > 0) return;
 
           // Désactiver le mode ajout
@@ -292,6 +354,12 @@ export function useMapPoints(
     loadPoints();
   }, [selectedEventId, map]); // Seulement selectedEventId et map, pas selectedPoint ni updateMapSource
 
+  // 2b. Charger les points d'intérêt
+  useEffect(() => {
+    if (!map || !map.getSource("db-interests")) return;
+    refreshInterest();
+  }, [selectedEventId, map, refreshInterest]);
+
   // 3. Gestion du curseur "crosshair" pour l'ajout
   useEffect(() => {
     if (!map) return;
@@ -325,6 +393,7 @@ export function useMapPoints(
     awaitingMapClick,
     handleAddPointClick,
     refreshPoints,
+    refreshInterest,
     openPopupForPoint,
     addPoint,
   };

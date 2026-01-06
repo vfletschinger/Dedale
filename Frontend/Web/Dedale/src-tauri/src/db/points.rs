@@ -8,10 +8,10 @@ use crate::db::get_db_pool;
 
 #[tauri::command]
 pub async fn fetch_points(
-    app: State<'_, AppHandle>,
+    app: AppHandle,
     event_id: Option<String>,
 ) -> Result<Vec<PointWithDetails>, String> {
-    let pool = get_db_pool(app.inner()).await?;
+    let pool = get_db_pool(&app).await?;
     
     let rows = if let Some(eid) = event_id {
         println!("[DB] Récupération des points pour event_id: {}", eid);
@@ -68,10 +68,10 @@ pub async fn fetch_points(
 
 #[tauri::command]
 pub async fn update_point(
-    app: State<'_, AppHandle>,
+    app: AppHandle,
     point: Point, 
 ) -> Result<Point, String> {
-    let pool = get_db_pool(app.inner()).await?;
+    let pool = get_db_pool(&app).await?;
     sqlx::query("UPDATE point SET x = ?, y = ?, comment = ?, type = ?, status = ?, event_id = ? WHERE id = ?")
         .bind(point.x)
         .bind(point.y)
@@ -88,12 +88,12 @@ pub async fn update_point(
 }
 #[tauri::command]
 pub async fn fetch_pictures(
-    pool: State<'_, SqlitePool>,
+    app: AppHandle,
     point_id: String, 
 ) -> Result<Vec<Picture>, String> {
     let rows = sqlx::query("SELECT id, image, point_id FROM picture WHERE point_id = ?")
         .bind(point_id)
-        .fetch_all(pool.inner()) 
+        .fetch_all(&get_db_pool(&app).await?) 
         .await
         .map_err(|e| e.to_string())?;
 
@@ -181,8 +181,8 @@ pub async fn fetch_equipement_details(
 
 
 #[tauri::command]
-pub async fn fetch_obstacle_types(app: State<'_, AppHandle>) -> Result<Vec<ObstacleType>, String> {
-    let pool = get_db_pool(app.inner()).await?;
+pub async fn fetch_obstacle_types(app: AppHandle) -> Result<Vec<ObstacleType>, String> {
+    let pool = get_db_pool(&app).await?;
 
     let rows = sqlx::query("SELECT id, name, description, width, length FROM obstacle_type")
         .fetch_all(&pool)
@@ -540,8 +540,8 @@ pub async fn update_point_dates(
 }
 
 #[tauri::command]
-pub async fn delete_point(app: State<'_, AppHandle>, point_id: String) -> Result<(), String> {
-    let pool = get_db_pool(app.inner()).await?;
+pub async fn delete_point(app: AppHandle, point_id: String) -> Result<(), String> {
+    let pool = get_db_pool(&app).await?;
 
     // Start a transaction and remove dependent rows first to keep DB consistent
     let mut tx: Transaction<Sqlite> = pool
@@ -583,13 +583,13 @@ pub async fn delete_point(app: State<'_, AppHandle>, point_id: String) -> Result
 
 #[tauri::command]
 pub async fn create_interest_point(
-    app: State<'_, AppHandle>,
+    app: AppHandle,
     x: f64,
     y: f64,
     description: &str,
     event_id: &str,
 ) -> Result<String, String> {
-    let pool = get_db_pool(app.inner()).await?;
+    let pool = get_db_pool(&app).await?;
 
     let point_id = Uuid::new_v4().to_string();
 
@@ -615,10 +615,10 @@ pub async fn create_interest_point(
 }
 #[tauri::command]
 pub async fn delete_interest_point(
-    app: State<'_, AppHandle>,
+    app: AppHandle,
     point_id: &str,
 ) -> Result<(), String> {
-    let pool = get_db_pool(app.inner()).await?;
+    let pool = get_db_pool(&app).await?;
 
     sqlx::query("DELETE FROM interest WHERE id = ?")
         .bind(point_id)
@@ -632,13 +632,13 @@ pub async fn delete_interest_point(
 
 #[tauri::command]
 pub async fn update_interest_point(
-    app: State<'_, AppHandle>,
+    app: AppHandle,
     point_id: &str,
     x: f64,
     y: f64,
     description: &str,
 ) -> Result<(), String> {
-    let pool = get_db_pool(app.inner()).await?;
+    let pool = get_db_pool(&app).await?;
 
     sqlx::query(
         r#"UPDATE interest 
@@ -664,10 +664,10 @@ pub async fn update_interest_point(
 
 #[tauri::command]
 pub async fn fetch_interest_points(
-    app: State<'_, AppHandle>,
+    app: AppHandle,
     event_id: Option<String>,
 ) -> Result<Vec<Interest>, String> {
-    let pool = get_db_pool(app.inner()).await?;
+    let pool = get_db_pool(&app).await?;
 
     let rows = if let Some(eid) = event_id {
         println!("[DB] Récupération des points d'intérêt pour event_id: {}", eid);

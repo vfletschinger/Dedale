@@ -16,7 +16,7 @@ export function useMapGeometries(
   // --- ÉTATS ---
   const [zones, setZones] = useState<Zone[]>([]);
   const [parcours, setParcours] = useState<Parcours[]>([]);
-  const [drawingMode, setDrawingMode] = useState<"none" | "zone" | "parcours">("none");
+  const [drawingMode, setDrawingMode] = useState<"none" | "zone" | "parcours" | "interest">("none");
   const [pendingParcoursGeometry, setPendingParcoursGeometry] = useState<string | null>(null);
   const [pendingInterestGeometry, setPendingInterestGeometry] = useState<string | null>(null);
 
@@ -188,6 +188,12 @@ export function useMapGeometries(
           setPendingParcoursGeometry(wkt);
           draw.deleteAll();
           draw.changeMode("simple_select");
+        } else if (geomType === "Point") {
+          // Pour les points d'intérêt, on stocke la géométrie et on attend le formulaire
+          setPendingInterestGeometry(wkt);
+          draw.deleteAll();
+          draw.changeMode("simple_select");
+          setDrawingMode("none");
         }
       } catch (err) {
         console.error("Erreur save:", err);
@@ -208,6 +214,12 @@ export function useMapGeometries(
     if (!drawRef.current || !selectedEventId) return alert("⚠️ Sélectionnez un événement.");
     setDrawingMode("parcours");
     drawRef.current.changeMode("draw_line_string");
+  };
+
+  const startDrawInterest = () => {
+    if (!drawRef.current || !selectedEventId) return alert("⚠️ Sélectionnez un événement.");
+    setDrawingMode("interest");
+    drawRef.current.changeMode("draw_point");
   };
 
   const cancelDrawing = () => {
@@ -359,9 +371,19 @@ export function useMapGeometries(
   }) => {
     if (!pendingInterestGeometry || !selectedEventId) return;
     try {
+      // Extraire les coordonnées du WKT Point (format: "POINT(x y)")
+      const match = pendingInterestGeometry.match(/POINT\(([^ ]+)\s+([^ ]+)\)/);
+      if (!match) {
+        alert("Erreur: coordonnées invalides");
+        return;
+      }
+      const x = parseFloat(match[1]);
+      const y = parseFloat(match[2]);
+
       await invoke("create_interest_point", {
         eventId: String(selectedEventId),
-        geom: pendingInterestGeometry,
+        x,
+        y,
         description: data.description,
       });
       setPendingInterestGeometry(null);
@@ -411,6 +433,10 @@ export function useMapGeometries(
     setPendingParcoursGeometry(null);
     setDrawingMode("none");
   };
+  const cancelInterestForm = () => {
+    setPendingInterestGeometry(null);
+    setDrawingMode("none");
+  }
 
   return {
     zones,
@@ -422,6 +448,7 @@ export function useMapGeometries(
     setIsGeometryListOpen,
     startDrawPolygon,
     startDrawLine,
+    startDrawInterest,
     cancelDrawing,
     saveEditGeometry,
     handleDeleteGeometry,
@@ -432,6 +459,7 @@ export function useMapGeometries(
     pendingInterestGeometry,
     saveParcoursWithDetails,
     saveInterestWithDetails,
+    cancelInterestForm,
     cancelParcoursForm,
   };
 }

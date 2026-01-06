@@ -69,6 +69,7 @@ function OfflineMapLibre({
     setIsGeometryListOpen,
     startDrawPolygon,
     startDrawLine,
+    startDrawInterest,
     cancelDrawing,
     saveEditGeometry,
     handleDeleteGeometry,
@@ -78,7 +79,9 @@ function OfflineMapLibre({
     pendingParcoursGeometry,
     pendingInterestGeometry,
     saveParcoursWithDetails,
+    saveInterestWithDetails,
     cancelParcoursForm,
+    cancelInterestForm,
   } = useMapGeometries(map, activeEventId);
 
   // --- EFFETS (Chargement initial) ---
@@ -327,7 +330,17 @@ function OfflineMapLibre({
                 >
                   <span className="text-base">╱</span>
                 </button>
-
+                <button
+                  onClick={startDrawInterest}
+                  className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${
+                    drawingMode === "interest"
+                      ? "bg-purple-600 text-white"
+                      : "bg-black/30 hover:bg-black/40 backdrop-blur-sm text-white"
+                  }`}
+                  title="Point d'intérêt"
+                >
+                  <span className="text-base font-bold">?</span>
+                </button>
                 {(drawingMode !== "none" || awaitingMapClick) && (
                   <button
                     onClick={() => {
@@ -554,6 +567,7 @@ function OfflineMapLibre({
                   )}
                 </div>
               )}
+
             </div>
           )}
         </div>

@@ -48,6 +48,14 @@ export interface MapPoint {
   }>;
 }
 
+export interface MapInterest {
+  id: string;
+  x: number;
+  y: number;
+  description: string;
+  event_id: string | null;
+}
+
 // Type pour les événements
 export interface MapEvent {
   id: number;
