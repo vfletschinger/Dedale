@@ -7,9 +7,9 @@ export interface GeometryData {
 export interface Zone {
   id: string;
   name: string;
-  event_id: string,
-  color: string,
-  geometry_json: string,
+  event_id: string;
+  color: string;
+  geometry_json: string;
 }
 
 export interface Parcours {
@@ -62,4 +62,32 @@ export interface SearchResult {
   lon: string;
   lat: string;
   display_name: string;
+}
+
+// Types pour les équipements
+export interface EquipementType {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+export interface EquipementCoordinate {
+  id: string;
+  equipement_id: string;
+  x: number;
+  y: number;
+  order_index?: number;
+}
+
+export interface Equipement {
+  id: string;
+  type_id?: string;
+  type_name?: string;
+  type_description?: string;
+  length?: number;
+  date_pose?: string;
+  hour_pose?: string;
+  date_depose?: string;
+  hour_depose?: string;
+  coordinates: EquipementCoordinate[];
 }
