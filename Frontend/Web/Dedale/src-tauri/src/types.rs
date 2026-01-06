@@ -115,6 +115,16 @@ pub struct Point {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Interest {
+    pub id: String,
+    pub x: f64,
+    pub y: f64,
+    pub description: Option<String>,
+    pub event_id: Option<String>,
+}
+
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PointWithDetails {
     pub id: String,
     pub x: f64,

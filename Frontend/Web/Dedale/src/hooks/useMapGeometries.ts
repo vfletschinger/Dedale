@@ -18,6 +18,8 @@ export function useMapGeometries(
   const [parcours, setParcours] = useState<Parcours[]>([]);
   const [drawingMode, setDrawingMode] = useState<"none" | "zone" | "parcours">("none");
   const [pendingParcoursGeometry, setPendingParcoursGeometry] = useState<string | null>(null);
+  const [pendingInterestGeometry, setPendingInterestGeometry] = useState<string | null>(null);
+
   
   // Changement : On stocke l'ID (string) ET le type pour savoir ce qu'on manipule
   const [selectedGeometry, setSelectedGeometry] = useState<{ id: string; type: "zone" | "parcours" } | null>(null);
@@ -352,6 +354,25 @@ export function useMapGeometries(
       console.error(err);
     }
   };
+  const saveInterestWithDetails = async (data: {
+    description: string;
+  }) => {
+    if (!pendingInterestGeometry || !selectedEventId) return;
+    try {
+      await invoke("create_interest_point", {
+        eventId: String(selectedEventId),
+        geom: pendingInterestGeometry,
+        description: data.description,
+      });
+      setPendingInterestGeometry(null);
+      setDrawingMode("none");
+      loadGeometries();
+    } catch (err) {
+      console.error("Erreur création point d'intérêt:", err);
+      alert("Erreur lors de la création du point d'intérêt");
+    }
+  
+  }
 
   // Fonction pour sauvegarder le parcours avec les détails du formulaire
   const saveParcoursWithDetails = async (data: {
@@ -408,7 +429,9 @@ export function useMapGeometries(
     cancelEditGeometry,
     highlightGeometry,
     pendingParcoursGeometry,
+    pendingInterestGeometry,
     saveParcoursWithDetails,
+    saveInterestWithDetails,
     cancelParcoursForm,
   };
 }

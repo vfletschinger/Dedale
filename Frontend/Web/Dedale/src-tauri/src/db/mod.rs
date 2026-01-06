@@ -128,6 +128,21 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
     .await
     .map_err(|e| format!("Error creating point: {}", e))?;
 
+    // --- POINTS D'INTÉRÊT ---
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS interest (
+            id CHAR(36) PRIMARY KEY,
+            event_id CHAR(36) NOT NULL,
+            x REAL NOT NULL,
+            y REAL NOT NULL,
+            description TEXT,
+            FOREIGN KEY (event_id) REFERENCES event (id) ON DELETE CASCADE
+        )",
+    )
+    .execute(&pool)
+    .await
+    .map_err(|e| format!("Error creating point: {}", e))?;
+
     sqlx::query(
         "CREATE TABLE IF NOT EXISTS picture (
             id INTEGER PRIMARY KEY,

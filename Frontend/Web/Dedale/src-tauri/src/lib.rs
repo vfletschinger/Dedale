@@ -96,6 +96,10 @@ pub fn run() {
             db::update_point,
             db::fetch_zones_for_event,
             db::fetch_parcours_for_event,
+            db::create_interest_point,
+            db::update_interest_point,
+            db::delete_interest_point,
+            db::fetch_interest_points,
         ])
         .run(tauri::generate_context!())
         .expect("Erreur lors de l'exécution de l'application Tauri");

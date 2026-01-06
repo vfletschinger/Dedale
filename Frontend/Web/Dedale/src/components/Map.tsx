@@ -10,6 +10,7 @@ import AddPointForm from "./AddPointForm";
 import TimelinePanel from "./TimelinePanel";
 import AddressSearch from "./AdressSearch";
 import ParcoursForm from "./ParcoursForm";
+import InterestForm from "./InterestForm";
 
 // Hooks personnalisés
 import { useMapPoints } from "../hooks/useMapPoints";
@@ -75,6 +76,7 @@ function OfflineMapLibre({
     cancelEditGeometry,
     highlightGeometry,
     pendingParcoursGeometry,
+    pendingInterestGeometry,
     saveParcoursWithDetails,
     cancelParcoursForm,
   } = useMapGeometries(map, activeEventId);
@@ -292,38 +294,38 @@ function OfflineMapLibre({
               <div className="flex gap-2">
                 <button
                   onClick={handleAddPointClick}
-                  className={`px-4 py-3 rounded-lg shadow-lg flex items-center justify-center transition-all ${
+                  className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${
                     awaitingMapClick
                       ? "bg-amber-500 text-white animate-pulse"
                       : "bg-white hover:bg-gray-50 text-gray-700"
                   }`}
                   title="Ajouter un point"
                 >
-                  <span className="text-xl">📍</span>
+                  <span className="text-base">📍</span>
                 </button>
 
                 <button
                   onClick={startDrawPolygon}
-                  className={`px-4 py-3 rounded-lg shadow-lg flex items-center justify-center transition-all ${
+                  className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${
                     drawingMode === "zone"
                       ? "bg-blue-600 text-white"
                       : "bg-white hover:bg-gray-50 text-gray-700"
                   }`}
                   title="Zone (Polygone)"
                 >
-                  <span className="text-xl">⬡</span>
+                  <span className="text-base">⬡</span>
                 </button>
 
                 <button
                   onClick={startDrawLine}
-                  className={`px-4 py-3 rounded-lg shadow-lg flex items-center justify-center transition-all ${
+                  className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${
                     drawingMode === "parcours"
                       ? "bg-green-600 text-white"
                       : "bg-white hover:bg-gray-50 text-gray-700"
                   }`}
                   title="Parcours (Ligne)"
                 >
-                  <span className="text-xl">╱</span>
+                  <span className="text-base">╱</span>
                 </button>
 
                 {(drawingMode !== "none" || awaitingMapClick) && (
@@ -336,7 +338,7 @@ function OfflineMapLibre({
                         window.dispatchEvent(new Event("cancel-map-action")); 
                       }
                     }}
-                    className="px-4 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg shadow-lg font-semibold flex items-center gap-2"
+                    className="px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg shadow-lg text-sm font-semibold flex items-center gap-1"
                   >
                     <span>✕ Annuler</span>
                   </button>
@@ -562,6 +564,13 @@ function OfflineMapLibre({
         <ParcoursForm
           onSubmit={saveParcoursWithDetails}
           onCancel={cancelParcoursForm}
+        />
+      )}
+      {/* Formulaire de création de point d'intérêt */}
+      {pendingInterestGeometry && (
+        <InterestForm
+          onSubmit={saveInterestWithDetails}
+          onCancel={cancelInterestForm}
         />
       )}
     </div>
