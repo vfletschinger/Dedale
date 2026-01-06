@@ -10,6 +10,7 @@ import AddPointForm from "./AddPointForm";
 import TimelinePanel from "./TimelinePanel";
 import AddressSearch from "./AdressSearch";
 import ParcoursForm from "./ParcoursForm";
+import EquipementForm from "./EquipementForm";
 
 // Hooks personnalisés
 import { useMapPoints } from "../hooks/useMapPoints";
@@ -61,6 +62,7 @@ function OfflineMapLibre({
   const {
     zones,
     parcours,
+    equipements,
     drawingMode,
     selectedGeometry,
     editingGeometry,
@@ -68,6 +70,7 @@ function OfflineMapLibre({
     setIsGeometryListOpen,
     startDrawPolygon,
     startDrawLine,
+    startDrawEquipment,
     cancelDrawing,
     saveEditGeometry,
     handleDeleteGeometry,
@@ -77,6 +80,10 @@ function OfflineMapLibre({
     pendingParcoursGeometry,
     saveParcoursWithDetails,
     cancelParcoursForm,
+    pendingEquipmentData,
+    saveEquipmentWithDetails,
+    cancelEquipmentForm,
+    handleDeleteEquipement,
   } = useMapGeometries(map, activeEventId);
 
   // --- EFFETS (Chargement initial) ---
@@ -87,7 +94,7 @@ function OfflineMapLibre({
 
     const mapInstance = new maplibregl.Map({
       container: mapContainer.current,
-      style: "http://localhost:8080/styles/basic-preview/style.json",
+      style: "http://localhost:8082/styles/basic-preview/style.json",
       center: [7.7635, 48.5465],
       zoom: 13,
     });
@@ -278,7 +285,6 @@ function OfflineMapLibre({
           {/* OUTILS FLOTTANTS (Sur la carte) */}
           {activeEventId && (
             <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
-              
               {/* Message d'aide */}
               {(drawingMode !== "none" || awaitingMapClick) && (
                 <div className="bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-medium animate-fade-in">
@@ -326,6 +332,17 @@ function OfflineMapLibre({
                   <span className="text-xl">╱</span>
                 </button>
 
+                <button
+                  onClick={startDrawEquipment}
+                  className={`px-4 py-3 rounded-lg shadow-lg flex items-center justify-center transition-all ${
+                    drawingMode === "equipment"
+                      ? "bg-green-600 text-white"
+                      : "bg-white hover:bg-gray-50 text-gray-700"
+                  }`}
+                >
+                  <span className="text-xl">🚧</span>
+                </button>
+
                 {(drawingMode !== "none" || awaitingMapClick) && (
                   <button
                     onClick={() => {
@@ -333,7 +350,7 @@ function OfflineMapLibre({
                       if (awaitingMapClick) {
                         setAddingPointCoords(null);
                         // Hack pour forcer l'annulation si le state awaitingMapClick n'est pas exposé directement
-                        window.dispatchEvent(new Event("cancel-map-action")); 
+                        window.dispatchEvent(new Event("cancel-map-action"));
                       }
                     }}
                     className="px-4 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg shadow-lg font-semibold flex items-center gap-2"
@@ -344,15 +361,13 @@ function OfflineMapLibre({
               </div>
 
               {/* Liste des Zones et Parcours (Dropdown) */}
-              {(zones.length > 0 || parcours.length > 0) && (
+              {(zones.length > 0 || parcours.length > 0 || equipements.length > 0) && (
                 <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden max-w-sm mt-2">
                   <button
                     onClick={() => setIsGeometryListOpen(!isGeometryListOpen)}
                     className="w-full px-4 py-2 flex justify-between items-center text-sm font-semibold hover:bg-gray-50"
                   >
-                    <span>
-                      📐 {zones.length + parcours.length} élément(s)
-                    </span>
+                    <span>📐 {zones.length + parcours.length + equipements.length} élément(s)</span>
                     <span
                       className={`transform transition-transform ${
                         isGeometryListOpen ? "rotate-180" : ""
@@ -364,7 +379,6 @@ function OfflineMapLibre({
 
                   {isGeometryListOpen && (
                     <div className="max-h-60 overflow-y-auto bg-gray-50 border-t border-gray-200">
-                      
                       {/* --- SECTION ZONES --- */}
                       {zones.length > 0 && (
                         <div>
@@ -373,8 +387,12 @@ function OfflineMapLibre({
                           </div>
                           {zones.map((zone) => {
                             const itemData = { ...zone, type: "zone" as const };
-                            const isSelected = selectedGeometry?.id === zone.id && selectedGeometry?.type === "zone";
-                            const isEditing = editingGeometry?.id === zone.id && editingGeometry?.type === "zone";
+                            const isSelected =
+                              selectedGeometry?.id === zone.id &&
+                              selectedGeometry?.type === "zone";
+                            const isEditing =
+                              editingGeometry?.id === zone.id &&
+                              editingGeometry?.type === "zone";
 
                             return (
                               <div
@@ -455,9 +473,16 @@ function OfflineMapLibre({
                             Parcours
                           </div>
                           {parcours.map((p) => {
-                            const itemData = { ...p, type: "parcours" as const };
-                            const isSelected = selectedGeometry?.id === p.id && selectedGeometry?.type === "parcours";
-                            const isEditing = editingGeometry?.id === p.id && editingGeometry?.type === "parcours";
+                            const itemData = {
+                              ...p,
+                              type: "parcours" as const,
+                            };
+                            const isSelected =
+                              selectedGeometry?.id === p.id &&
+                              selectedGeometry?.type === "parcours";
+                            const isEditing =
+                              editingGeometry?.id === p.id &&
+                              editingGeometry?.type === "parcours";
 
                             return (
                               <div
@@ -485,19 +510,29 @@ function OfflineMapLibre({
                                         <div className="text-xs font-medium truncate">
                                           {p.name || `Parcours #${p.id}`}
                                         </div>
-                                        {(p.start_time || p.speed_low || p.speed_high) && (
+                                        {(p.start_time ||
+                                          p.speed_low ||
+                                          p.speed_high) && (
                                           <div className="text-[10px] text-gray-500 mt-0.5">
                                             {p.start_time && (
-                                              <div>📅 {new Date(p.start_time).toLocaleString('fr-FR', { 
-                                                day: '2-digit', 
-                                                month: '2-digit', 
-                                                year: 'numeric',
-                                                hour: '2-digit',
-                                                minute: '2-digit'
-                                              })}</div>
+                                              <div>
+                                                📅{" "}
+                                                {new Date(
+                                                  p.start_time
+                                                ).toLocaleString("fr-FR", {
+                                                  day: "2-digit",
+                                                  month: "2-digit",
+                                                  year: "numeric",
+                                                  hour: "2-digit",
+                                                  minute: "2-digit",
+                                                })}
+                                              </div>
                                             )}
                                             {(p.speed_low || p.speed_high) && (
-                                              <div>🏃 {p.speed_low || 0} - {p.speed_high || 0} km/h</div>
+                                              <div>
+                                                🏃 {p.speed_low || 0} -{" "}
+                                                {p.speed_high || 0} km/h
+                                              </div>
                                             )}
                                           </div>
                                         )}
@@ -548,6 +583,39 @@ function OfflineMapLibre({
                           })}
                         </div>
                       )}
+
+                      {/* --- SECTION ÉQUIPEMENTS --- */}
+                      {equipements.length > 0 && (
+                        <div>
+                          <div className="px-3 py-1 bg-orange-100 text-xs font-bold text-orange-700 uppercase tracking-wider">
+                            🚧 Équipements
+                          </div>
+                          {equipements.map((eq) => (
+                            <div
+                              key={`equipement-${eq.id}`}
+                              className="p-2 border-b border-gray-200 last:border-0 hover:bg-orange-50"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <span className="text-sm font-medium text-gray-700">
+                                    {eq.type_name || "Équipement"}
+                                  </span>
+                                  <div className="text-xs text-gray-500 mt-0.5">
+                                    {eq.length}m/unité • {eq.coordinates?.length || 0} points
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => handleDeleteEquipement(eq.id)}
+                                  className="p-1 text-red-600 hover:bg-red-100 rounded"
+                                  title="Supprimer"
+                                >
+                                  🗑️
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -562,6 +630,15 @@ function OfflineMapLibre({
         <ParcoursForm
           onSubmit={saveParcoursWithDetails}
           onCancel={cancelParcoursForm}
+        />
+      )}
+
+      {/* Formulaire de création d'équipement */}
+      {pendingEquipmentData && (
+        <EquipementForm
+          lineLength={pendingEquipmentData.lineLength}
+          onSubmit={saveEquipmentWithDetails}
+          onCancel={cancelEquipmentForm}
         />
       )}
     </div>
