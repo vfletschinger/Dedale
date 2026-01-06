@@ -3,20 +3,26 @@ import { useState } from "react";
 interface InterestFormProps {
   onSubmit: (data: {
     description: string;
-  }) => void;
+  }) => Promise<void>;
   onCancel: () => void;
 }
 
 export default function InterestForm({ onSubmit, onCancel }: InterestFormProps) {
   const [description, setDescription] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    
-    onSubmit({
-      description,
-    });
+    setSaving(true);
+    try {
+      await onSubmit({
+        description,
+      });
+    } catch (err) {
+      console.error("Erreur création point d'intérêt:", err);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -44,14 +50,16 @@ export default function InterestForm({ onSubmit, onCancel }: InterestFormProps) 
             <div className="flex gap-2 pt-2">
                 <button
                 type="submit"
-                className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg font-medium transition-colors"
+                disabled={saving}
+                className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg font-medium transition-colors disabled:opacity-50"
                 >
-                Créer
+                {saving ? "⏳ Ajout..." : "✓ Créer"}
                 </button>
                 <button
                 type="button"
                 onClick={onCancel}
-                className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 py-2 rounded-lg font-medium transition-colors"
+                disabled={saving}
+                className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 py-2 rounded-lg font-medium transition-colors disabled:opacity-50"
                 >
                 Annuler
                 </button>

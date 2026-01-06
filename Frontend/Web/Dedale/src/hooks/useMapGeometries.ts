@@ -30,6 +30,7 @@ export function useMapGeometries(
   // --- REFS ---
   const drawRef = useRef<MapboxDraw | null>(null);
   const selectedEventIdRef = useRef<number | null>(selectedEventId);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
     selectedEventIdRef.current = selectedEventId;
@@ -68,7 +69,7 @@ export function useMapGeometries(
           return {
             type: "Feature",
             geometry,
-            properties: { id: p.id, type: "parcours", event_id: p.event_id },
+            properties: { id: p.id, type: "parcours", event_id: p.event_id, color: p.color || "#ef4444" },
           } as GeoJSON.Feature;
         })
         .filter((f): f is GeoJSON.Feature => f !== null);
@@ -98,7 +99,7 @@ export function useMapGeometries(
         paint: {
           "line-color": [
             "case",
-            ["==", ["get", "type"], "parcours"], "#ef4444", // Rouge Parcours
+            ["==", ["get", "type"], "parcours"], ["get", "color"],
             "#4f46e5" // Bleu Zones
           ],
           "line-width": 3
@@ -120,13 +121,21 @@ export function useMapGeometries(
         invoke<Zone[]>("fetch_zones_for_event", { eventId: selectedEventId }),
         invoke<Parcours[]>("fetch_parcours_for_event", { eventId: selectedEventId }),
       ]);
-      setZones(fetchedZones);
-      setParcours(fetchedParcours);
-      refreshGeometriesOnMap(map, fetchedZones, fetchedParcours);
+      if (mountedRef.current) {
+        setZones(fetchedZones);
+        setParcours(fetchedParcours);
+        refreshGeometriesOnMap(map, fetchedZones, fetchedParcours);
+      }
     } catch (err) {
       console.error("Erreur chargement données:", err);
     }
   }, [map, selectedEventId, refreshGeometriesOnMap]);
+
+  // ✅ CHARGE les géométries au démarrage ou quand l'événement change
+  useEffect(() => {
+    if (!map || !selectedEventId) return;
+    loadGeometries();
+  }, [map, selectedEventId]);
 
   // --- Initialisation Draw & Listeners ---
   useEffect(() => {
@@ -151,7 +160,7 @@ export function useMapGeometries(
             ["==", "$type", "LineString"],
             ["!=", "mode", "static"],
           ],
-          paint: { "line-color": "#22c55e", "line-width": 4 },
+          paint: { "line-color": "#ef4444", "line-width": 4 },
         },
         {
             id: "gl-draw-point-active",
@@ -388,7 +397,7 @@ export function useMapGeometries(
       });
       setPendingInterestGeometry(null);
       setDrawingMode("none");
-      loadGeometries();
+      // ✅ Appeler refreshInterest au lieu de loadGeometries
     } catch (err) {
       console.error("Erreur création point d'intérêt:", err);
       alert("Erreur lors de la création du point d'intérêt");
@@ -462,4 +471,11 @@ export function useMapGeometries(
     cancelInterestForm,
     cancelParcoursForm,
   };
+
+  // Cleanup du mounted ref au unmount
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 }

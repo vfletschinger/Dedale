@@ -55,6 +55,7 @@ function OfflineMapLibre({
     awaitingMapClick,
     handleAddPointClick,
     refreshPoints,
+    refreshInterest,
     openPopupForPoint,
   } = useMapPoints(map, activeEventId);
 
@@ -323,7 +324,7 @@ function OfflineMapLibre({
                   onClick={startDrawLine}
                   className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${
                     drawingMode === "parcours"
-                      ? "bg-green-600 text-white"
+                      ? "bg-red-500 text-white"
                       : "bg-white hover:bg-gray-50 text-gray-700"
                   }`}
                   title="Parcours (Ligne)"
@@ -583,7 +584,10 @@ function OfflineMapLibre({
       {/* Formulaire de création de point d'intérêt */}
       {pendingInterestGeometry && (
         <InterestForm
-          onSubmit={saveInterestWithDetails}
+          onSubmit={async (data) => {
+            await saveInterestWithDetails(data);
+            await refreshInterest();
+          }}
           onCancel={cancelInterestForm}
         />
       )}

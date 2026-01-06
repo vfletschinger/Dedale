@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use crate::db::{get_db_pool, insert_point_details, PointDetail};
+use crate::db::{PointDetail, PointWithDetails, get_db_pool, insert_point};
 use base64::{engine::general_purpose, Engine as _};
 use image::codecs::png::PngEncoder;
 use image::{ImageEncoder, Luma};
@@ -570,7 +570,7 @@ async fn handle_websocket(
                     }
 
                     // Sinon, essayer de parser comme un tableau de PointDetail
-                    match serde_json::from_str::<Vec<PointDetail>>(&text) {
+                    match serde_json::from_str::<Vec<PointWithDetails>>(&text) {
                         Ok(point_details_vec) => {
                             println!(
                                 "🔄 Désérialisation réussie. Nombre de points reçus : {}",
@@ -578,7 +578,14 @@ async fn handle_websocket(
                             );
 
                             println!("🚀 Début de l'insertion en base de données...");
-                            match insert_point_details(app, point_details_vec).await {
+                            let mut insert_result = Ok(());
+                            for point in point_details_vec {
+                                if let Err(e) = insert_point(app.clone(), point).await {
+                                    insert_result = Err(e);
+                                    break;
+                                }
+                            }
+                            match insert_result {
                                 Ok(_) => {
                                     println!("✅ Insertion terminée avec succès ! Envoi du message 'fini'...");
 
