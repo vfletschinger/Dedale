@@ -251,5 +251,6 @@ export function useMapPoints(
     refreshPoints,
     openPopupForPoint,
     addPoint,
+    updateMapSource, // Exposé pour permettre le filtrage externe
   };
 }

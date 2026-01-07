@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
@@ -9,8 +9,8 @@ import { listen } from "@tauri-apps/api/event";
 import PointDetails, { type Point } from "./PointDetails";
 import GeometryDetails from "./GeometryDetails";
 import AddPointForm from "./AddPointForm";
-import TimelinePanel from "./TimelinePanel";
 import AddressSearch from "./AdressSearch";
+import TimelineBar from "./TimelineBar";
 
 // Hooks personnalisés
 import { useMapPoints } from "../hooks/useMapPoints";
@@ -33,11 +33,12 @@ function OfflineMapLibre({
   const [events, setEvents] = useState<MapEvent[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<MapEvent | null>(null);
   
-  // Gestion de l'affichage (Vue Carte vs Timeline)
-  const [viewMode, setViewMode] = useState<"points" | "timeline">("points");
-  
   // Gestion du marqueur d'adresse (Recherche)
   const [currentMarker, setCurrentMarker] = useState<maplibregl.Marker | null>(null);
+  
+  // Gestion de la timeline
+  const [showTimeline, setShowTimeline] = useState(false);
+  const [filterDate, setFilterDate] = useState<Date | null>(null);
 
   // Calcul de l'ID actif (soit celui sélectionné dans la liste, soit celui passé en props)
   const activeEventId = selectedEvent?.id ?? selectedEventId;
@@ -54,6 +55,7 @@ function OfflineMapLibre({
     handleAddPointClick,
     refreshPoints,
     openPopupForPoint,
+    updateMapSource,
   } = useMapPoints(map, activeEventId);
 
   // Toute la logique des géométries est ici
@@ -66,6 +68,36 @@ function OfflineMapLibre({
     cancelDrawing,
     loadGeometries,
   } = useMapGeometries(map, activeEventId);
+
+  // --- FILTRAGE DES POINTS SELON LA DATE DU SLIDER ---
+  // Un équipement est "présent" si : pose <= filterDate ET (depose > filterDate OU pas de dépose)
+  const filteredPoints = useMemo(() => {
+    if (!filterDate) return points; // Pas de filtre actif = tous les points
+    
+    return points.filter((p) => {
+      // Si pas de date de pose, on ne peut pas déterminer si l'équipement est présent
+      if (!p.pose) return false;
+      
+      const poseDate = new Date(p.pose);
+      
+      // L'équipement doit être posé avant ou à la date du slider
+      if (poseDate > filterDate) return false;
+      
+      // Si pas de dépose, l'équipement reste présent indéfiniment après la pose
+      if (!p.depose) return true;
+      
+      // Sinon, vérifier que la dépose n'a pas encore eu lieu
+      const deposeDate = new Date(p.depose);
+      return deposeDate > filterDate;
+    });
+  }, [points, filterDate]);
+
+  // Mettre à jour la carte quand les points filtrés changent
+  useEffect(() => {
+    if (map) {
+      updateMapSource(filteredPoints);
+    }
+  }, [filteredPoints, map, updateMapSource]);
 
   // --- EFFETS (Synchronisation des sélections) ---
   
@@ -214,47 +246,13 @@ function OfflineMapLibre({
             <AddressSearch onSelect={handleAddressSelect} />
           </div>
         </div>
-
-        {/* Onglets Navigation (Carte / Timeline) */}
-        <div className="flex items-center gap-2 px-4 mt-3 border-t border-slate-600">
-          <button
-            onClick={() => setViewMode("points")}
-            className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
-              viewMode === "points"
-                ? "text-white border-blue-400"
-                : "text-slate-400 border-transparent hover:text-slate-200"
-            }`}
-          >
-            <span className="flex items-center gap-2">
-              <span>📋</span>
-              <span>Liste des points</span>
-              <span className="text-xs bg-slate-600 px-2 py-0.5 rounded-full">
-                {points.length}
-              </span>
-            </span>
-          </button>
-          <button
-            onClick={() => setViewMode("timeline")}
-            className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
-              viewMode === "timeline"
-                ? "text-white border-blue-400"
-                : "text-slate-400 border-transparent hover:text-slate-200"
-            }`}
-          >
-            <span className="flex items-center gap-2">
-              <span>📅</span>
-              <span>Frise chronologique</span>
-            </span>
-          </button>
-        </div>
       </div>
 
       {/* --- CONTENU PRINCIPAL --- */}
       <div className="flex-1 flex overflow-hidden">
         
         {/* PANNEAU LATÉRAL (Gauche) */}
-        {viewMode === "points" && (
-          <div className="w-96 bg-white border-r border-gray-200 shadow-lg flex flex-col z-20">
+        <div className="w-96 bg-white border-r border-gray-200 shadow-lg flex flex-col z-20">
             {addingPointCoords ? (
               // Mode: Ajout d'un point
               <div className="flex-1 overflow-y-auto">
@@ -294,57 +292,83 @@ function OfflineMapLibre({
               </div>
             ) : (
               // Mode: Liste des points
-              <div className="flex-1 overflow-y-auto p-2 space-y-2">
-                {points.length === 0 ? (
-                  <div className="text-center text-gray-500 py-8">
-                    <p className="text-5xl mb-3">📭</p>
-                    <p className="font-semibold text-gray-700">Aucun point</p>
-                    <p className="text-sm mt-2">Sélectionnez un événement et ajoutez des points sur la carte.</p>
-                  </div>
-                ) : (
-                  points.map((p) => (
-                    <div
-                      key={p.id}
-                      onClick={() => openPopupForPoint(p)}
-                      className="p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-400 hover:shadow-md cursor-pointer group"
-                    >
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="font-bold text-gray-800 text-sm flex gap-2">
-                          <span>📍</span> {p.name || `Point #${p.id}`}
-                        </span>
-                        <button className="text-blue-600 text-xs font-semibold px-2 py-1 rounded hover:bg-blue-50">
-                          Voir →
-                        </button>
-                      </div>
-                      <div className="flex gap-2 text-xs">
-                         {/* Badge pour commentaires */}
-                         <span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200">
-                           💬 {p.comments?.length || 0}
-                         </span>
-                      </div>
-                      {(p.pose || p.depose) && (
-                        <div className="text-xs text-gray-500 mt-2">
-                           {p.pose ? formatDateShort(p.pose) : '...'} → {p.depose ? formatDateShort(p.depose) : '...'}
-                        </div>
-                      )}
+              <>
+                <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                  {points.length === 0 ? (
+                    <div className="text-center text-gray-500 py-8">
+                      <p className="text-5xl mb-3">📭</p>
+                      <p className="font-semibold text-gray-700">Aucun point</p>
+                      <p className="text-sm mt-2">Sélectionnez un événement et ajoutez des points sur la carte.</p>
                     </div>
-                  ))
+                  ) : (
+                    points.map((p) => (
+                      <div
+                        key={p.id}
+                        onClick={() => openPopupForPoint(p)}
+                        className="p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-400 hover:shadow-md cursor-pointer group"
+                      >
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="font-bold text-gray-800 text-sm flex gap-2">
+                            <span>📍</span> {p.name || `Point #${p.id}`}
+                          </span>
+                          <button className="text-blue-600 text-xs font-semibold px-2 py-1 rounded hover:bg-blue-50">
+                            Voir →
+                          </button>
+                        </div>
+                        <div className="flex gap-2 text-xs">
+                           {/* Badge pour commentaires */}
+                           <span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200">
+                             💬 {p.comments?.length || 0}
+                           </span>
+                        </div>
+                        {(p.pose || p.depose) && (
+                          <div className="text-xs text-gray-500 mt-2">
+                             {p.pose ? formatDateShort(p.pose) : '...'} → {p.depose ? formatDateShort(p.depose) : '...'}
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+                
+                {/* Bouton Timeline en bas du panneau */}
+                {selectedEvent && (selectedEvent.start_date || selectedEvent.end_date) && (
+                  <div className="p-3 border-t border-gray-200 bg-gray-50">
+                    <button
+                      onClick={() => setShowTimeline(!showTimeline)}
+                      className={`w-full py-2.5 px-4 rounded-lg font-semibold text-sm flex items-center justify-center gap-2 transition-all ${
+                        showTimeline
+                          ? "bg-blue-600 text-white hover:bg-blue-700"
+                          : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-100 hover:border-blue-400"
+                      }`}
+                    >
+                      <span>📅</span>
+                      <span>{showTimeline ? "Masquer la timeline" : "Afficher la timeline"}</span>
+                    </button>
+                  </div>
                 )}
-              </div>
+              </>
             )}
           </div>
-        )}
 
-        {/* TIMELINE (50% largeur) */}
-        {viewMode === "timeline" && (
-          <div className="w-1/2 bg-white border-r border-gray-200 shadow-lg flex flex-col z-20">
-             <TimelinePanel points={points} onPointClick={openPopupForPoint} />
-          </div>
-        )}
 
         {/* CARTE (Reste de l'espace) */}
         <div className="flex-1 flex flex-col overflow-hidden relative">
           <div ref={mapContainer} className="flex-1 h-full" />
+          
+          {/* Timeline en bas de la carte */}
+          {showTimeline && selectedEvent && (
+            <TimelineBar
+              event={selectedEvent}
+              points={points}
+              onPointClick={openPopupForPoint}
+              onClose={() => {
+                setShowTimeline(false);
+                setFilterDate(null); // Réinitialiser le filtre quand on ferme
+              }}
+              onDateChange={setFilterDate}
+            />
+          )}
 
           {/* OUTILS FLOTTANTS (Sur la carte) */}
           {activeEventId && (

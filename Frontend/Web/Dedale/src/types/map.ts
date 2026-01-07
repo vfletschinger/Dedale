@@ -37,6 +37,8 @@ export interface MapEvent {
   event_type?: string;
   status?: string;
   statut?: string;
+  start_date?: string;
+  end_date?: string;
 }
 
 // Type pour les résultats de recherche Nominatim
