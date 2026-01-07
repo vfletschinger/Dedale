@@ -42,7 +42,7 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
 
   // État pour le QR code de réception
   const [receiveQrCode, setReceiveQrCode] = useState<string | null>(null);
-  const [_receivingEventId, setReceivingEventId] = useState<number | null>(
+  const [, setReceivingEventId] = useState<number | null>(
     null,
   );
   const [receiveStatus, setReceiveStatus] = useState<string>("En attente...");
@@ -100,7 +100,6 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
       if (unlistenConnectedFn) unlistenConnectedFn();
       if (unlistenPointsUpdatedFn) unlistenPointsUpdatedFn();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Fonction pour démarrer la réception depuis le mobile

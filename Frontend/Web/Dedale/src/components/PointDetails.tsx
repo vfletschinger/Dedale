@@ -72,23 +72,6 @@ export default function PointDetails({
     }
   }
 
-  // Helper pour formater les dates pour l'affichage
-  function formatDateTime(dateStr: string | null | undefined): string {
-    if (!dateStr) return "Non défini";
-    try {
-      const date = new Date(dateStr);
-      return date.toLocaleString("fr-FR", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch {
-      return dateStr;
-    }
-  }
-
   if (!point) {
     return (
       <div className="p-6 text-center">

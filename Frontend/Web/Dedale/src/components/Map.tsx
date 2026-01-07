@@ -171,15 +171,16 @@ function OfflineMapLibre({
       }
     };
     initEvents();
-  }, [selectedEventId, loadAllEvents]);
+  }, [selectedEventId, loadAllEvents, selectedEvent]);
 
   // 3. Écouter les événements Tauri pour rafraîchir la liste dynamiquement
   useEffect(() => {
+    const currentSelectedEvent = selectedEvent;
     const unlisten = listen("events-updated", async () => {
       console.log("🔄 Événement 'events-updated' reçu, rechargement...");
       const allEvents = await loadAllEvents();
       // Si l'événement sélectionné n'existe plus, désélectionner
-      if (selectedEvent && !allEvents.find(e => e.id === selectedEvent.id)) {
+      if (currentSelectedEvent && !allEvents.find(e => e.id === currentSelectedEvent.id)) {
         setSelectedEvent(allEvents[0] || null);
       }
     });

@@ -236,7 +236,11 @@ export function useMapPoints(
   useEffect(() => {
     if (map && map.getSource("db-points")) {
       console.log("🔄 Changement d'événement, rechargement des points...");
-      refreshPoints();
+      // Defer the refresh to avoid synchronous setState in effect
+      const timeoutId = setTimeout(() => {
+        refreshPoints();
+      }, 0);
+      return () => clearTimeout(timeoutId);
     }
   }, [selectedEventId, map, refreshPoints]);
 

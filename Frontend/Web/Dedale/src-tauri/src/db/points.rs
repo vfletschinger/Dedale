@@ -1,20 +1,20 @@
+use crate::db::get_db_pool;
+use crate::types::*;
 use sqlx::{Row, SqlitePool};
 use sqlx::{Sqlite, Transaction};
+use tauri::AppHandle;
 use tauri::State;
-use tauri::{AppHandle};
 use uuid::Uuid;
-use crate::types::*;
-use crate::db::get_db_pool;
 
 #[allow(dead_code)]
 #[tauri::command]
 pub async fn fetch_pictures(
     pool: State<'_, SqlitePool>,
-    point_id: String, 
+    point_id: String,
 ) -> Result<Vec<Picture>, String> {
     let rows = sqlx::query("SELECT id, image, point_id FROM picture WHERE point_id = ?")
         .bind(point_id)
-        .fetch_all(pool.inner()) 
+        .fetch_all(pool.inner())
         .await
         .map_err(|e| e.to_string())?;
 
@@ -100,7 +100,6 @@ pub async fn fetch_equipement_details(
         None => Ok(None), // L'ID n'existe pas
     }
 }
-
 
 #[tauri::command]
 pub async fn fetch_obstacle_types(app: AppHandle) -> Result<Vec<ObstacleType>, String> {
@@ -267,7 +266,6 @@ pub async fn insert_point_details(
         .bind(&detail.point.r#type)
         .bind(&detail.point.status)
         .bind(&detail.point.event_id) // <-- Indispensable pour éviter le NOT NULL
-
         .execute(&mut *tx)
         .await
         .map_err(|e| format!("Erreur INSERT point ID {} : {}", point_id, e))?;

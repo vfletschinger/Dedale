@@ -396,7 +396,7 @@ export function useMapGeometries(
       id: `edit-${geom.id}`,
       geometry,
       properties: {},
-    } as any);
+    } as GeoJSON.Feature);
     drawRef.current.changeMode("direct_select", {
       featureId: `edit-${geom.id}`,
     });

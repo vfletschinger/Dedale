@@ -1,6 +1,6 @@
-use sqlx::{Row};
-use tauri::{AppHandle};
 use crate::types::*;
+use sqlx::Row;
+use tauri::AppHandle;
 
 use crate::db::get_db_pool;
 
@@ -90,10 +90,7 @@ pub async fn fetch_teams(app: AppHandle) -> Result<Vec<Team>, String> {
         .map(|row| {
             let event_ids_str: Option<String> = row.get("event_ids_str");
             let event_ids: Vec<String> = match event_ids_str {
-                Some(s) => s
-                    .split(',')
-                    .map(|id| id.to_string())
-                    .collect(),
+                Some(s) => s.split(',').map(|id| id.to_string()).collect(),
                 None => Vec::new(),
             };
 
@@ -113,14 +110,12 @@ pub async fn create_team(app: AppHandle, name: String) -> Result<Team, String> {
     let pool = get_db_pool(&app).await?;
     let new_id = uuid::Uuid::new_v4().to_string();
 
-
     let _result = sqlx::query("INSERT INTO team (id, name) VALUES (?, ?)")
         .bind(&new_id)
         .bind(&name)
         .execute(&pool)
         .await
         .map_err(|e| e.to_string())?;
-    
 
     Ok(Team {
         id: new_id,
@@ -157,7 +152,11 @@ pub async fn update_team(app: AppHandle, id: String, name: String) -> Result<(),
 }
 
 #[tauri::command]
-pub async fn add_team_event(app: AppHandle, team_id: String, event_id: String) -> Result<(), String> {
+pub async fn add_team_event(
+    app: AppHandle,
+    team_id: String,
+    event_id: String,
+) -> Result<(), String> {
     let pool = get_db_pool(&app).await?;
     sqlx::query("INSERT OR IGNORE INTO team_event (team_id, event_id) VALUES (?, ?)")
         .bind(team_id)
@@ -169,7 +168,11 @@ pub async fn add_team_event(app: AppHandle, team_id: String, event_id: String) -
 }
 
 #[tauri::command]
-pub async fn remove_team_event(app: AppHandle, team_id: String, event_id: String) -> Result<(), String> {
+pub async fn remove_team_event(
+    app: AppHandle,
+    team_id: String,
+    event_id: String,
+) -> Result<(), String> {
     let pool = get_db_pool(&app).await?;
     sqlx::query("DELETE FROM team_event WHERE team_id = ? AND event_id = ?")
         .bind(team_id)
@@ -193,7 +196,11 @@ pub async fn add_member(app: AppHandle, team_id: String, person_id: String) -> R
 }
 
 #[tauri::command]
-pub async fn remove_member(app: AppHandle, team_id: String, person_id: String) -> Result<(), String> {
+pub async fn remove_member(
+    app: AppHandle,
+    team_id: String,
+    person_id: String,
+) -> Result<(), String> {
     let pool = get_db_pool(&app).await?;
     sqlx::query("DELETE FROM member WHERE team_id = ? AND person_id = ?")
         .bind(team_id)
