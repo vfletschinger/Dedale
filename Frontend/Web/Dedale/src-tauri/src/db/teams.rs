@@ -97,7 +97,7 @@ pub async fn fetch_teams(app: AppHandle) -> Result<Vec<Team>, String> {
             Team {
                 id: row.get("id"),
                 name: row.get("name"),
-                event_ids: event_ids,
+                event_ids,
             }
         })
         .collect();

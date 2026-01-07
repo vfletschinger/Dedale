@@ -183,6 +183,7 @@ pub async fn create_zone(
     })
 }
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn create_parcours(
     app: AppHandle,
     event_id: String,
@@ -201,9 +202,9 @@ pub async fn create_parcours(
         .bind(&geom)
         .bind(&name)
         .bind(&color)
-        .bind(&start_time)
-        .bind(&speed_low)
-        .bind(&speed_high)
+        .bind(start_time)
+        .bind(speed_low)
+        .bind(speed_high)
         .execute(&pool)
         .await
         .map_err(|e| e.to_string())?;
@@ -521,6 +522,7 @@ pub async fn update_zone(
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn update_parcours(
     app: AppHandle,
     geometry_id: String,
@@ -547,9 +549,9 @@ pub async fn update_parcours(
         .bind(&geom)
         .bind(&name)
         .bind(&color)
-        .bind(&start_time)
-        .bind(&speed_low)
-        .bind(&speed_high)
+        .bind(start_time)
+        .bind(speed_low)
+        .bind(speed_high)
         .bind(&geometry_id)
         .execute(&pool)
         .await

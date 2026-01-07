@@ -264,7 +264,7 @@ pub async fn insert_point_details(
         .bind(&detail.point.name)
         .bind(&detail.point.comment)
         .bind(&detail.point.r#type)
-        .bind(&detail.point.status)
+        .bind(detail.point.status)
         .bind(&detail.point.event_id) // <-- Indispensable pour éviter le NOT NULL
         .execute(&mut *tx)
         .await
