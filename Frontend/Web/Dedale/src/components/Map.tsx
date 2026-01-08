@@ -6,7 +6,7 @@ import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
 // Composants
 import PointDetails from "./PointDetails";
 import AddPointForm from "./AddPointForm";
-import TimelinePanel from "./TimelinePanel";
+import TimelineBar from "./TimelineBar";
 import AddressSearch from "./AdressSearch";
 import ParcoursForm from "./ParcoursForm";
 import InterestForm from "./InterestForm";
@@ -15,9 +15,10 @@ import EquipementForm from "./EquipementForm";
 // Hooks personnalisés
 import { useMapPoints } from "../hooks/useMapPoints";
 import { useMapGeometries } from "../hooks/useMapGeometries";
+import { useEvents } from "../hooks/useEvents";
 
 // Types et Utils
-import { SearchResult } from "../types/map";
+import { SearchResult, MapEvent } from "../types/map";
 
 function OfflineMapLibre({
   selectedEventId,
@@ -28,9 +29,11 @@ function OfflineMapLibre({
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
 
-
   // Gestion de l'affichage (Vue Carte vs Timeline)
   const [viewMode, setViewMode] = useState<"points" | "timeline">("points");
+
+  // État pour le filtre spatial (limites visibles de la carte)
+  const [mapBounds, setMapBounds] = useState<{ north: number; south: number; east: number; west: number } | null>(null);
 
   // Gestion du marqueur d'adresse (Recherche)
   const [currentMarker, setCurrentMarker] = useState<maplibregl.Marker | null>(
@@ -84,6 +87,12 @@ function OfflineMapLibre({
     handleDeleteEquipement,
   } = useMapGeometries(map, selectedEventId);
 
+  // 3. Logique des ÉVÉNEMENTS
+  const { events } = useEvents();
+  const currentEvent: MapEvent | undefined = events.find(
+    (e) => String(e.id) === String(selectedEventId)
+  );
+
   // --- EFFETS (Chargement initial) ---
 
   // Initialisation de la carte MapLibre
@@ -110,6 +119,47 @@ function OfflineMapLibre({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Mise à jour des limites visibles de la carte quand elle est déplacée/zoomée
+  useEffect(() => {
+    if (!map) return;
+
+    const updateBounds = () => {
+      const bounds = map.getBounds();
+      setMapBounds({
+        north: bounds.getNorth(),
+        south: bounds.getSouth(),
+        east: bounds.getEast(),
+        west: bounds.getWest(),
+      });
+    };
+
+    // Mettre à jour au chargement
+    updateBounds();
+
+    // Ajouter les listeners pour les mouvements de la carte
+    map.on("moveend", updateBounds);
+    map.on("zoomend", updateBounds);
+    map.on("resize", updateBounds);
+
+    return () => {
+      map.off("moveend", updateBounds);
+      map.off("zoomend", updateBounds);
+      map.off("resize", updateBounds);
+    };
+  }, [map]);
+
+  // Forcer le recalcul des bounds quand la vue change (timeline ouverte/fermée)
+  useEffect(() => {
+    if (!map) return;
+    
+    // Attendre que le DOM soit mis à jour puis forcer le resize de la carte
+    const timeout = setTimeout(() => {
+      map.resize();
+    }, 100);
+    
+    return () => clearTimeout(timeout);
+  }, [map, viewMode]);
 
   // --- GESTIONNAIRES D'INTERFACE ---
 
@@ -253,8 +303,28 @@ function OfflineMapLibre({
 
         {/* TIMELINE */}
         {viewMode === "timeline" && (
-          <div className="w-1/2 bg-white border-r border-gray-200 shadow-lg flex flex-col z-20">
-            <TimelinePanel points={points} onPointClick={openPopupForPoint} />
+          <div className="w-1/2 h-full bg-white border-r border-gray-200 shadow-lg flex flex-col z-20 overflow-hidden">
+            {currentEvent ? (
+              <TimelineBar
+                event={currentEvent}
+                points={points}
+                equipements={equipements}
+                onPointClick={openPopupForPoint}
+                onClose={() => setViewMode("points")}
+                onDateChange={() => {}}
+                mapBounds={mapBounds}
+              />
+            ) : (
+              <div className="p-4 bg-gray-100 text-center flex items-center justify-center h-full">
+                <div>
+                  <p className="text-5xl mb-3">📅</p>
+                  <p className="font-semibold text-gray-700">Aucun événement sélectionné</p>
+                  <p className="text-sm mt-2 text-gray-500">
+                    Sélectionnez un événement pour voir la frise chronologique
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -389,63 +459,39 @@ function OfflineMapLibre({
                             return (
                               <div
                                 key={`zone-${zone.id}`}
-                                className={`p-2 border-b border-gray-200 last:border-0 ${
+                                className={`p-2 border-b border-gray-200 last:border-0 hover:bg-blue-50 cursor-pointer transition-colors ${
                                   isSelected
-                                    ? "bg-blue-50"
+                                    ? "bg-blue-100 border-l-4 border-l-blue-500"
                                     : isEditing
                                     ? "bg-amber-50"
                                     : ""
                                 }`}
+                                onClick={() =>
+                                  highlightGeometry(
+                                    isSelected ? null : itemData
+                                  )
+                                }
                               >
-                                <div className="flex items-center justify-between">
-                                  <button
-                                    // On passe itemData qui contient type: 'zone'
-                                    onClick={() =>
-                                      highlightGeometry(
-                                        isSelected ? null : itemData
-                                      )
-                                    }
-                                    className="text-left flex-1 text-xs font-medium truncate"
-                                  >
-                                    <span className="mr-2 text-base">🟦</span>{" "}
-                                    {zone.name || `Zone #${zone.id}`}
-                                  </button>
-
-                                  {!isEditing && (
-                                    <div className="flex gap-1">
-                                      <button
-                                        onClick={() =>
-                                          startEditGeometry(itemData)
-                                        }
-                                        className="p-1 text-blue-600 hover:bg-blue-100 rounded"
-                                        title="Modifier"
-                                      >
-                                        ✏️
-                                      </button>
-                                      <button
-                                        // On passe le type 'zone' explicitement
-                                        onClick={() =>
-                                          handleDeleteGeometry(zone.id, "zone")
-                                        }
-                                        className="p-1 text-red-600 hover:bg-red-100 rounded"
-                                        title="Supprimer"
-                                      >
-                                        🗑️
-                                      </button>
-                                    </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-base">🟦</span>
+                                  <span className="text-xs font-medium truncate flex-1">
+                                    {zone.name || `Zone #${zone.id.slice(0, 8)}`}
+                                  </span>
+                                  {isSelected && (
+                                    <span className="text-blue-500 text-xs">👁️</span>
                                   )}
                                 </div>
 
                                 {isEditing && (
                                   <div className="flex gap-2 mt-2">
                                     <button
-                                      onClick={saveEditGeometry}
+                                      onClick={(e) => { e.stopPropagation(); saveEditGeometry(); }}
                                       className="flex-1 bg-green-600 text-white text-xs py-1 rounded"
                                     >
                                       Sauver
                                     </button>
                                     <button
-                                      onClick={cancelEditGeometry}
+                                      onClick={(e) => { e.stopPropagation(); cancelEditGeometry(); }}
                                       className="flex-1 bg-gray-500 text-white text-xs py-1 rounded"
                                     >
                                       Annuler
@@ -479,91 +525,39 @@ function OfflineMapLibre({
                             return (
                               <div
                                 key={`parcours-${p.id}`}
-                                className={`p-2 border-b border-gray-200 last:border-0 ${
+                                className={`p-2 border-b border-gray-200 last:border-0 hover:bg-blue-50 cursor-pointer transition-colors ${
                                   isSelected
-                                    ? "bg-blue-50"
+                                    ? "bg-blue-100 border-l-4 border-l-green-500"
                                     : isEditing
                                     ? "bg-amber-50"
                                     : ""
                                 }`}
+                                onClick={() =>
+                                  highlightGeometry(
+                                    isSelected ? null : itemData
+                                  )
+                                }
                               >
-                                <div className="flex items-center justify-between">
-                                  <button
-                                    onClick={() =>
-                                      highlightGeometry(
-                                        isSelected ? null : itemData
-                                      )
-                                    }
-                                    className="text-left flex-1"
-                                  >
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-base">〰️</span>
-                                      <div className="flex-1">
-                                        <div className="text-xs font-medium truncate">
-                                          {p.name || `Parcours #${p.id}`}
-                                        </div>
-                                        {(p.start_time ||
-                                          p.speed_low ||
-                                          p.speed_high) && (
-                                          <div className="text-[10px] text-gray-500 mt-0.5">
-                                            {p.start_time && (
-                                              <div>
-                                                📅{" "}
-                                                {new Date(
-                                                  p.start_time
-                                                ).toLocaleString("fr-FR", {
-                                                  day: "2-digit",
-                                                  month: "2-digit",
-                                                  year: "numeric",
-                                                  hour: "2-digit",
-                                                  minute: "2-digit",
-                                                })}
-                                              </div>
-                                            )}
-                                            {(p.speed_low || p.speed_high) && (
-                                              <div>
-                                                🏃 {p.speed_low || 0} -{" "}
-                                                {p.speed_high || 0} km/h
-                                              </div>
-                                            )}
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </button>
-
-                                  {!isEditing && (
-                                    <div className="flex gap-1">
-                                      <button
-                                        onClick={() =>
-                                          startEditGeometry(itemData)
-                                        }
-                                        className="p-1 text-blue-600 hover:bg-blue-100 rounded"
-                                      >
-                                        ✏️
-                                      </button>
-                                      <button
-                                        onClick={() =>
-                                          handleDeleteGeometry(p.id, "parcours")
-                                        }
-                                        className="p-1 text-red-600 hover:bg-red-100 rounded"
-                                      >
-                                        🗑️
-                                      </button>
-                                    </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-base">〰️</span>
+                                  <span className="text-xs font-medium truncate flex-1">
+                                    {p.name || `Parcours #${p.id.slice(0, 8)}`}
+                                  </span>
+                                  {isSelected && (
+                                    <span className="text-green-500 text-xs">👁️</span>
                                   )}
                                 </div>
 
                                 {isEditing && (
                                   <div className="flex gap-2 mt-2">
                                     <button
-                                      onClick={saveEditGeometry}
+                                      onClick={(e) => { e.stopPropagation(); saveEditGeometry(); }}
                                       className="flex-1 bg-green-600 text-white text-xs py-1 rounded"
                                     >
                                       Sauver
                                     </button>
                                     <button
-                                      onClick={cancelEditGeometry}
+                                      onClick={(e) => { e.stopPropagation(); cancelEditGeometry(); }}
                                       className="flex-1 bg-gray-500 text-white text-xs py-1 rounded"
                                     >
                                       Annuler
@@ -649,4 +643,4 @@ function OfflineMapLibre({
   );
 }
 
-export default OfflineMapLibre;
+export default OfflineMapLibre;

@@ -89,7 +89,7 @@ pub async fn insert_event(event: Event, app: AppHandle) -> Result<(), String> {
     );
 
     // Émettre un événement pour notifier le frontend
-    let _ = app.emit("events-updated", ());
+    //let _ = app.emit("events-updated", ());
 
     Ok(())
 }
@@ -160,7 +160,7 @@ pub async fn delete_event(app: AppHandle, event_id: String) -> Result<(), String
     println!("[DB]  Événement {} supprimé", event_id);
 
     // Émettre un événement pour notifier le frontend
-    let _ = app.emit("events-updated", ());
+   // let _ = app.emit("events-updated", ());
 
     Ok(())
 }

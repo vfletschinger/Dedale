@@ -6,8 +6,12 @@ import { invoke } from "@tauri-apps/api/core";
 import { geoJSONtoWKT, parseWKTtoGeoJSON } from "../utils/maputils";
 import { Zone, Parcours, Equipement } from "../types/map";
 
+// Extend types to include description property
+type ZoneWithDescription = Zone & { description?: string };
+type ParcoursWithDescription = Parcours & { description?: string };
+
 // Type utilitaire pour manipuler indifféremment une Zone ou un Parcours dans l'UI
-export type GeometryItem = (Zone | Parcours) & { type: "zone" | "parcours" };
+export type GeometryItem = (ZoneWithDescription | ParcoursWithDescription) & { type: "zone" | "parcours" };
 
 // Fonction utilitaire pour calculer la longueur d'une ligne en mètres (approximation Haversine)
 function calculateLineLength(coordinates: [number, number][]): number {
@@ -78,6 +82,7 @@ export function useMapGeometries(
   const drawingModeRef = useRef<"none" | "zone" | "parcours" | "interest" | "equipment">(
     "none"
   );
+  const popupRef = useRef<maplibregl.Popup | null>(null);
 
   useEffect(() => {
     selectedEventIdRef.current = selectedEventId;
@@ -262,7 +267,13 @@ export function useMapGeometries(
   // ✅ CHARGE les géométries au démarrage ou quand l'événement change
   useEffect(() => {
     if (!map || !selectedEventId) return;
-    loadGeometries();
+    
+    // Utiliser un timeout pour éviter l'appel synchrone de setState dans l'effet
+    const timeoutId = setTimeout(() => {
+      loadGeometries();
+    }, 0);
+    
+    return () => clearTimeout(timeoutId);
   }, [map, selectedEventId, loadGeometries]);
 
   // --- Initialisation Draw & Listeners ---
@@ -404,6 +415,12 @@ export function useMapGeometries(
   const highlightGeometry = (item: GeometryItem | null) => {
     if (!map) return;
 
+    // Nettoyage du popup existant
+    if (popupRef.current) {
+      popupRef.current.remove();
+      popupRef.current = null;
+    }
+
     // Nettoyage
     if (map.getLayer("highlight-geometry-fill"))
       map.removeLayer("highlight-geometry-fill");
@@ -449,6 +466,111 @@ export function useMapGeometries(
         "line-width": 5,
         "line-dasharray": [2, 2],
       },
+    });
+
+    // Calculer le centre de la géométrie pour placer le popup
+    let centerCoords: [number, number] = [0, 0];
+    
+    if (geometry.type === "Polygon" && geometry.coordinates && geometry.coordinates[0]) {
+      const coords = geometry.coordinates[0] as [number, number][];
+      const sumLng = coords.reduce((acc, c) => acc + c[0], 0);
+      const sumLat = coords.reduce((acc, c) => acc + c[1], 0);
+      centerCoords = [sumLng / coords.length, sumLat / coords.length];
+    } else if (geometry.type === "LineString" && geometry.coordinates) {
+      const coords = geometry.coordinates as [number, number][];
+      const midIndex = Math.floor(coords.length / 2);
+      centerCoords = coords[midIndex] || coords[0];
+    } else if (geometry.type === "Point" && geometry.coordinates) {
+      centerCoords = geometry.coordinates as [number, number];
+    }
+
+    // Créer le contenu du popup avec boutons d'action
+    const name = item.name || `${item.type === "zone" ? "Zone" : "Parcours"} #${item.id.slice(0, 8)}`;
+    const description = item.description || "Aucune description";
+    const emoji = item.type === "zone" ? "🟦" : "🟢";
+    const itemId = item.id;
+    const itemType = item.type;
+    
+    const popupContent = `
+      <div style="min-width: 220px; font-family: system-ui, -apple-system, sans-serif;">
+        <div style="font-weight: 700; font-size: 14px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+          <span>${emoji}</span>
+          <span>${name}</span>
+        </div>
+        <div style="font-size: 12px; color: #64748b; margin-bottom: 10px; line-height: 1.4;">
+          ${description}
+        </div>
+        <div style="display: flex; gap: 8px; font-size: 11px; color: #94a3b8; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid #e2e8f0;">
+          <span>Type: <strong style="color: #475569;">${item.type === "zone" ? "Zone" : "Parcours"}</strong></span>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button 
+            id="geo-edit-btn" 
+            data-id="${itemId}" 
+            data-type="${itemType}"
+            style="flex: 1; padding: 8px 12px; background: #3b82f6; color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;"
+          >
+            ✏️ Modifier
+          </button>
+          <button 
+            id="geo-delete-btn" 
+            data-id="${itemId}" 
+            data-type="${itemType}"
+            style="flex: 1; padding: 8px 12px; background: #ef4444; color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;"
+          >
+            🗑️ Supprimer
+          </button>
+        </div>
+      </div>
+    `;
+
+    // Créer et afficher le popup
+    popupRef.current = new maplibregl.Popup({
+      closeButton: true,
+      closeOnClick: false,
+      maxWidth: "320px",
+    })
+      .setLngLat(centerCoords)
+      .setHTML(popupContent)
+      .addTo(map);
+
+    // Ajouter les event listeners aux boutons après que le popup soit affiché
+    setTimeout(() => {
+      const editBtn = document.getElementById("geo-edit-btn");
+      const deleteBtn = document.getElementById("geo-delete-btn");
+      
+      if (editBtn) {
+        editBtn.addEventListener("click", () => {
+          if (popupRef.current) popupRef.current.remove();
+          startEditGeometry(item);
+        });
+      }
+      
+      if (deleteBtn) {
+        deleteBtn.addEventListener("click", () => {
+          if (popupRef.current) popupRef.current.remove();
+          handleDeleteGeometry(itemId, itemType);
+        });
+      }
+    }, 50);
+
+    // Quand le popup est fermé, désélectionner la géométrie
+    popupRef.current.on("close", () => {
+      setSelectedGeometry(null);
+      // Nettoyage highlight
+      if (map.getLayer("highlight-geometry-fill"))
+        map.removeLayer("highlight-geometry-fill");
+      if (map.getLayer("highlight-geometry-line"))
+        map.removeLayer("highlight-geometry-line");
+      if (map.getSource("highlight-geometry"))
+        map.removeSource("highlight-geometry");
+    });
+
+    // Centrer la carte sur la géométrie
+    map.flyTo({
+      center: centerCoords,
+      zoom: Math.max(map.getZoom(), 15),
+      duration: 500,
     });
   };
 

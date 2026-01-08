@@ -63,20 +63,6 @@ export async function deleteEvent(eventId: number): Promise<void> {
     }
 }
 
-// ========== SERVICES POUR LES TYPES DE GÉOMÉTRIE ==========
-
-/**
- * Récupère tous les types de géométries disponibles
- */
-export async function fetchGeometryTypes(): Promise<GeometryType[]> {
-    try {
-        return await invoke('fetch_geometry_types');
-    } catch (error) {
-        console.error('Erreur lors de la récupération des types de géométrie:', error);
-        throw new Error(`Impossible de récupérer les types de géométrie: ${error}`);
-    }
-}
-
 // ========== SERVICES POUR LES GÉOMÉTRIES D'ÉVÉNEMENTS ==========
 
 /**

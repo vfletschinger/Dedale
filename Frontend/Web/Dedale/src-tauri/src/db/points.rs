@@ -305,7 +305,7 @@ pub async fn retrieve_data_by_event(
             id,
             x: row.get("x"),
             y: row.get("y"),
-            name: row.get("name"),
+           // name: row.get("name"),
             comment: row.get("comment"),
             status: row.get("status"),
             event_id: row.get("event_id"),
