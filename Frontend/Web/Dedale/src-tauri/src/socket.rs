@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use crate::db::{get_db_pool, insert_point, PointDetail, PointWithDetails};
+use crate::db::{get_db_pool, insert_point, PointWithDetails};
 use base64::{engine::general_purpose, Engine as _};
 use image::codecs::png::PngEncoder;
 use image::{ImageEncoder, Luma};
@@ -169,7 +169,7 @@ pub(crate) struct TransferEvent {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[allow(dead_code)]
-struct EventAck {
+pub struct EventAck {
     id: i64,
     name: String,
     #[serde(default)]

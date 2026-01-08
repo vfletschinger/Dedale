@@ -20,30 +20,6 @@ export function useMapPoints(
 
   // --- FONCTIONS UTILITAIRES ---
 
-  const updateMapSource = useCallback((currentPoints: MapPoint[]) => {
-    // Sécurité : si la source n'est pas encore créée (style pas chargé), on ne fait rien
-    if (!map || !map.getSource("db-points")) return;
-
-    const geojson: GeoJSON.FeatureCollection<GeoJSON.Point> = {
-      type: "FeatureCollection",
-      features: currentPoints.map((p) => ({
-        type: "Feature",
-        geometry: {
-          type: "Point",
-          coordinates: [Number(p.x), Number(p.y)],
-        },
-        properties: {
-          id: p.id,
-          status: p.status,
-          comment: p.comment,
-          pictures: p.pictures,
-        },
-      })),
-    };
-
-    (map.getSource("db-points") as maplibregl.GeoJSONSource).setData(geojson);
-  }, [map]);
-
   const refreshPoints = useCallback(async () => {
     try {
       console.log("🔄 Chargement des points pour event_id:", selectedEventId);

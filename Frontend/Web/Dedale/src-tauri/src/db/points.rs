@@ -1,6 +1,5 @@
 use crate::db::get_db_pool;
 use crate::types::*;
-use rand::rand_core::le;
 use sqlx::{Row, SqlitePool};
 use sqlx::{Sqlite, Transaction};
 use tauri::AppHandle;

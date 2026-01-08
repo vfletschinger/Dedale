@@ -1,4 +1,4 @@
-use crate::db::{self, Point};
+use crate::db::{self};
 use crate::types::PointWithDetails;
 use crate::utils;
 use rust_xlsxwriter::{Color, Format, Workbook};

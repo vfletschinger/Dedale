@@ -17,7 +17,7 @@ import { useMapPoints } from "../hooks/useMapPoints";
 import { useMapGeometries } from "../hooks/useMapGeometries";
 
 // Types et Utils
-import { MapEvent, SearchResult } from "../types/map";
+import { SearchResult } from "../types/map";
 
 function OfflineMapLibre({
   selectedEventId,

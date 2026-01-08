@@ -263,7 +263,7 @@ export function useMapGeometries(
   useEffect(() => {
     if (!map || !selectedEventId) return;
     loadGeometries();
-  }, [map, selectedEventId]);
+  }, [map, selectedEventId, loadGeometries]);
 
   // --- Initialisation Draw & Listeners ---
   useEffect(() => {
@@ -308,7 +308,8 @@ export function useMapGeometries(
     drawRef.current = draw;
 
     // EVENT: CRÉATION
-    map.on("draw.create", async (e: any) => {
+
+    map.on("draw.create", async (e: MapboxDraw.DrawCreateEvent) => {
       const feature = e.features[0];
       if (!feature) return;
 
@@ -464,13 +465,12 @@ export function useMapGeometries(
 
     drawRef.current.deleteAll();
     // On utilise l'ID tel quel (string UUID)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     drawRef.current.add({
       type: "Feature",
       id: item.id,
       geometry,
       properties: {},
-    } as any);
+    } as GeoJSON.Feature);
 
     drawRef.current.changeMode("direct_select", { featureId: item.id });
 
@@ -721,10 +721,4 @@ export function useMapGeometries(
     handleDeleteEquipement,
   };
 
-  // Cleanup du mounted ref au unmount
-  useEffect(() => {
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
 }

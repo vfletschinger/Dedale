@@ -1,8 +1,5 @@
-use std::iter::Zip;
-
 use crate::db::get_db_pool;
 use crate::types::*;
-use rust_xlsxwriter::XlsxError;
 use sqlx::Row;
 use tauri::AppHandle;
 use uuid::Uuid;

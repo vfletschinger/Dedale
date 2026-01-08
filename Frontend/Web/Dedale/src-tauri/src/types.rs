@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use tauri::webview::cookie::time::convert::Hour;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Event {
