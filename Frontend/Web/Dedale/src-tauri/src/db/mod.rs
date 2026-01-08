@@ -5,11 +5,13 @@ use std::fs;
 use std::str::FromStr;
 use tauri::{AppHandle, Manager};
 
+pub mod equipements;
 pub mod events;
 pub mod geos;
 pub mod persons;
 pub mod points;
 pub mod teams;
+pub use equipements::*;
 pub use events::*;
 pub use geos::*;
 pub use persons::*;
@@ -128,11 +130,20 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
     .await
     .map_err(|e| format!("Error creating point: {}", e))?;
 
-    // Migration: Ajouter la colonne name si elle n'existe pas
-    sqlx::query("ALTER TABLE point ADD COLUMN name TEXT DEFAULT 'Nouveau point'")
-        .execute(&pool)
-        .await
-        .ok(); // Ignorer l'erreur si la colonne existe déjà
+    // --- POINTS D'INTÉRÊT ---
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS interest (
+            id CHAR(36) PRIMARY KEY,
+            event_id CHAR(36) NOT NULL,
+            x REAL NOT NULL,
+            y REAL NOT NULL,
+            description TEXT,
+            FOREIGN KEY (event_id) REFERENCES event (id) ON DELETE CASCADE
+        )",
+    )
+    .execute(&pool)
+    .await
+    .map_err(|e| format!("Error creating point: {}", e))?;
 
     sqlx::query(
         "CREATE TABLE IF NOT EXISTS picture (

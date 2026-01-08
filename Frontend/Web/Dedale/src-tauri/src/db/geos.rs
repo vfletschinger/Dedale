@@ -92,7 +92,7 @@ pub async fn fetch_geometries_for_event(
 
 #[allow(dead_code)]
 #[tauri::command]
-pub async fn fetch_zones(app: AppHandle, event_id: String) -> Result<Vec<Zone>, String> {
+pub async fn fetch_zones_for_event(app: AppHandle, event_id: String) -> Result<Vec<Zone>, String> {
     let pool = get_db_pool(&app).await?;
     let rows =
         sqlx::query("SELECT id, event_id, name, color, geometry_json FROM zone WHERE event_id = ?")
@@ -122,7 +122,10 @@ pub async fn fetch_zones(app: AppHandle, event_id: String) -> Result<Vec<Zone>, 
 
 #[allow(dead_code)]
 #[tauri::command]
-pub async fn fetch_parcours(app: AppHandle, event_id: String) -> Result<Vec<Parcours>, String> {
+pub async fn fetch_parcours_for_event(
+    app: AppHandle,
+    event_id: String,
+) -> Result<Vec<Parcours>, String> {
     let pool = get_db_pool(&app).await?;
     let rows = sqlx::query("SELECT id, event_id, name, color, start_time, speed_low, speed_high, geometry_json FROM parcours WHERE event_id = ?")
         .bind(&event_id)
@@ -190,13 +193,14 @@ pub async fn create_parcours(
     geom: String,
     name: String,
     color: String,
-    start_time: Option<f64>,
+    start_time: Option<i64>,
     speed_low: Option<f64>,
     speed_high: Option<f64>,
 ) -> Result<Parcours, String> {
     let pool = get_db_pool(&app).await?;
     let uuid = Uuid::new_v4().to_string();
-    let _result = sqlx::query("INSERT INTO parcours (id, event_id, geometry_json,name,color,start_time,speed_low,speed_high) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+
+    sqlx::query("INSERT INTO parcours (id, event_id, geometry_json, name, color, start_time, speed_low, speed_high) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
         .bind(&uuid)
         .bind(&event_id)
         .bind(&geom)
@@ -208,6 +212,8 @@ pub async fn create_parcours(
         .execute(&pool)
         .await
         .map_err(|e| e.to_string())?;
+
+    println!("[DB] ✅ Parcours {} créé avec succès", name);
 
     Ok(Parcours {
         id: uuid,
@@ -327,17 +333,11 @@ pub async fn create_geometry(
         .await
         .map_err(|e| e.to_string())?;
 
-        println!("[DB] ✅ Zone créée: {}", uuid);
-        Ok(Geometry {
-            id: uuid,
-            event_id,
-            geom,
-            geom_type: "zone".to_string(),
-            name: Some("Nouvelle zone".to_string()),
-        })
-    } else {
-        Err(format!("Type de géométrie non supporté: {}", geom))
-    }
+    Ok(Geometry {
+        id: uuid,
+        event_id,
+        geom,
+    })
 }
 
 /// Supprime une géométrie en cherchant dans toutes les tables (point, parcours, zone)
@@ -529,7 +529,7 @@ pub async fn update_parcours(
     geom: String,
     name: String,
     color: String,
-    start_time: Option<f64>,
+    start_time: Option<i64>,
     speed_low: Option<f64>,
     speed_high: Option<f64>,
 ) -> Result<Parcours, String> {

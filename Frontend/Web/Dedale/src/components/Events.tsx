@@ -42,9 +42,6 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
 
   // État pour le QR code de réception
   const [receiveQrCode, setReceiveQrCode] = useState<string | null>(null);
-  const [, setReceivingEventId] = useState<number | null>(
-    null,
-  );
   const [receiveStatus, setReceiveStatus] = useState<string>("En attente...");
 
   const loadEvents = async () => {
@@ -103,9 +100,8 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
   }, []);
 
   // Fonction pour démarrer la réception depuis le mobile
-  const handleReceiveFromMobile = async (eventId: number) => {
+  const handleReceiveFromMobile = async (eventId: string) => {
     try {
-      setReceivingEventId(eventId);
       setReceiveStatus("Génération du QR code...");
 
       console.log("📱 Démarrage serveur de réception pour event:", eventId);
@@ -123,7 +119,6 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
 
   const closeReceiveModal = () => {
     setReceiveQrCode(null);
-    setReceivingEventId(null);
     setReceiveStatus("En attente...");
   };
 
@@ -175,7 +170,7 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleDeleteEvent = async (eventId: number) => {
+  const handleDeleteEvent = async (eventId: string) => {
     if (!confirm("Êtes-vous sûr de vouloir supprimer cet événement ?")) {
       return;
     }

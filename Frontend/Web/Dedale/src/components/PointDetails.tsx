@@ -2,44 +2,27 @@ import { invoke } from "@tauri-apps/api/core";
 import { useState } from "react";
 
 // Fonction pour afficher un ID court (8 premiers caractères)
-const shortId = (id: string | number): string => {
-  const str = String(id);
-  return str.length > 8 ? str.substring(0, 8) : str;
-};
-
-export type Obstacle = {
-  id: number;
-  name?: string | null;
-  number?: number | null;
-  description?: string | null;
-  width?: number | null;
-  length?: number | null;
+const shortId = (id: string): string => {
+  return id.length > 8 ? id.substring(0, 8) : id;
 };
 
 export type Picture = {
-  id: number;
-  image: string;
-};
-
-export type CommentItem = {
-  id: number;
-  value: string;
+  id: string;
+  point_id?: string;
+  image?: string;
 };
 
 export type Point = {
-  id: number;
+  id: string;
   x: number;
   y: number;
-  name?: string | null;
-  pose?: string | null;
-  depose?: string | null;
-  obstacles: Obstacle[];
-  comments: CommentItem[];
-  pictures: Picture[];
+  status?: boolean;
+  comment?: string;
+  pictures?: Picture[];
 };
 
 // Resolve image src helper (support data:image or base64 string)
-function resolveImageSrc(image: string) {
+function resolveImageSrc(image?: string) {
   if (!image) return "";
   if (image.startsWith("data:")) return image;
   return `data:image/png;base64,${image}`;
@@ -55,19 +38,61 @@ export default function PointDetails({
   onRefresh?: () => void;
 }) {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [editingComment, setEditingComment] = useState(false);
+  const [newComment, setNewComment] = useState(point?.comment || "");
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+
+  async function toggleStatus() {
+    if (!point) return;
+    setUpdatingStatus(true);
+    const newStatus = !point.status;
+    try {
+      await invoke("update_point", {
+        point: {
+          ...point,
+          status: newStatus,
+        }
+      });
+      // Mettre à jour localement pour affichage immédiat
+      point.status = newStatus;
+      if (onRefresh) await onRefresh();
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour du statut:", error);
+      alert("Erreur lors de la mise à jour du statut.");
+    } finally {
+      setUpdatingStatus(false);
+    }
+  }
+
+  async function saveComment() {
+    if (!point) return;
+    try {
+      await invoke("update_point", {
+        point: {
+          ...point,
+          comment: newComment || null,
+        }
+      });
+      // Mettre à jour localement pour affichage immédiat
+      point.comment = newComment || undefined;
+      setEditingComment(false);
+      if (onRefresh) await onRefresh();
+    } catch (error) {
+      console.error("Erreur lors de la sauvegarde du commentaire:", error);
+      alert("Erreur lors de la sauvegarde du commentaire.");
+    }
+  }
 
   async function handleDelete() {
     if (!point) return;
-
     if (!confirm(`Supprimer le point #${shortId(point.id)} ?`)) return;
 
     try {
       await invoke("delete_point", { pointId: point.id });
-      // Fermer d'abord le panneau, puis rafraîchir
       if (onClose) onClose();
       if (onRefresh) await onRefresh();
     } catch (error) {
-      console.error("Failed to delete point:", error);
+      console.error("Erreur lors de la suppression:", error);
       alert("Erreur lors de la suppression du point.");
     }
   }
@@ -92,11 +117,8 @@ export default function PointDetails({
       <div className="p-4 bg-gradient-to-r from-indigo-500 to-purple-600 text-white">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-bold">{point.name || `Point #${shortId(point.id)}`}</h2>
-            <div className="text-white/80 text-sm mt-1 flex items-center gap-2">
-              <span>📍</span>
-              <span>{point.x.toFixed(5)}, {point.y.toFixed(5)}</span>
-            </div>
+            <h2 className="text-xl font-bold">Point #{shortId(point.id)}</h2>
+            
           </div>
           <button
             type="button"
@@ -113,94 +135,141 @@ export default function PointDetails({
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {/* Comments Section */}
+        
+        {/* Statut */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-4 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100 flex items-center gap-2">
-            <span className="text-xl">💬</span>
-            <span className="font-semibold text-gray-800">Commentaires</span>
-            <span className="px-2 py-0.5 bg-blue-200 text-blue-800 text-xs font-medium rounded-full">
-              {point.comments.length}
-            </span>
+          <div className="px-4 py-3 bg-gradient-to-r from-green-50 to-emerald-50 border-b border-green-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">✓</span>
+              <span className="font-bold text-gray-800">Statut</span>
+            </div>
+            <button
+              onClick={toggleStatus}
+              disabled={updatingStatus}
+              className={`px-4 py-1.5 rounded-lg font-medium transition-colors ${
+                point.status
+                  ? "bg-green-600 text-white hover:bg-green-700"
+                  : "bg-gray-300 text-gray-700 hover:bg-gray-400"
+              }`}
+            >
+              {updatingStatus ? "..." : point.status ? "Traité" : "Non traité"}
+            </button>
           </div>
-          
-          {point.comments.length === 0 ? (
-            <div className="p-4 text-center text-gray-400">
-              <div className="text-2xl mb-1">💭</div>
-              <div className="text-sm">Aucun commentaire</div>
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-50">
-              {point.comments.map((c) => (
-                <div key={c.id} className="p-3 hover:bg-gray-50 transition-colors">
-                  <p className="text-gray-700 text-sm leading-relaxed">{c.value}</p>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
 
-        {/* Photos Section */}
+        {/* Commentaire */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-4 py-3 bg-gradient-to-r from-green-50 to-emerald-50 border-b border-green-100 flex items-center gap-2">
-            <span className="text-xl">📸</span>
-            <span className="font-semibold text-gray-800">Photos</span>
-            <span className="px-2 py-0.5 bg-green-200 text-green-800 text-xs font-medium rounded-full">
-              {point.pictures.length}
-            </span>
+          <div className="px-4 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">💬</span>
+              <span className="font-bold text-gray-800">Commentaire</span>
+            </div>
+            {!editingComment && (
+              <button
+                onClick={() => {
+                  setEditingComment(true);
+                  setNewComment(point.comment || "");
+                }}
+                className="text-blue-600 hover:bg-blue-100 px-3 py-1 rounded-lg text-sm font-medium transition-colors"
+              >
+                ✏️ Modifier
+              </button>
+            )}
           </div>
-          
-          {point.pictures.length === 0 ? (
-            <div className="p-4 text-center text-gray-400">
-              <div className="text-2xl mb-1">🖼️</div>
-              <div className="text-sm">Aucune photo</div>
-            </div>
-          ) : (
-            <div className="p-3 grid grid-cols-2 gap-2">
-              {point.pictures.map((p) => (
-                <div 
-                  key={p.id} 
-                  className="aspect-square rounded-xl overflow-hidden bg-gray-100 cursor-pointer hover:opacity-90 transition-opacity shadow-sm"
-                  onClick={() => setSelectedImage(resolveImageSrc(p.image))}
-                >
-                  <img
-                    alt={`pic-${p.id}`}
-                    src={resolveImageSrc(p.image)}
-                    className="w-full h-full object-cover"
-                  />
+          <div className="p-4">
+            {editingComment ? (
+              <div className="space-y-3">
+                <textarea
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  rows={4}
+                  placeholder="Ajouter un commentaire..."
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={saveComment}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-medium transition-colors"
+                  >
+                    Sauvegarder
+                  </button>
+                  <button
+                    onClick={() => setEditingComment(false)}
+                    className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 py-2 rounded-lg font-medium transition-colors"
+                  >
+                    Annuler
+                  </button>
                 </div>
-              ))}
-            </div>
-          )}
+              </div>
+            ) : (
+              <div className="text-gray-700">
+                {point.comment || <span className="text-gray-400 italic">Aucun commentaire</span>}
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* Photos */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-4 py-3 bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple-100 flex items-center gap-2">
+            <span className="text-lg">📷</span>
+            <span className="font-bold text-gray-800">Photos</span>
+            <span className="text-sm text-gray-500">({point.pictures?.length || 0})</span>
+          </div>
+          <div className="p-4">
+            {point.pictures && point.pictures.length > 0 ? (
+              <div className="grid grid-cols-2 gap-3">
+                {point.pictures.map((pic) => (
+                  <div
+                    key={pic.id}
+                    onClick={() => setSelectedImage(resolveImageSrc(pic.image))}
+                    className="relative aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-75 transition-opacity border-2 border-gray-200 hover:border-purple-400"
+                  >
+                    <img
+                      src={resolveImageSrc(pic.image)}
+                      alt={`Photo ${shortId(pic.id)}`}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center text-gray-400 py-4">Aucune photo</div>
+            )}
+          </div>
+        </div>
+
       </div>
 
-      {/* Footer Actions */}
-      <div className="p-4 border-t border-gray-100 bg-white">
+      {/* Footer - Actions */}
+      <div className="p-4 bg-white border-t border-gray-200">
         <button
           onClick={handleDelete}
-          className="w-full px-4 py-3 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white font-semibold rounded-xl transition-all shadow-sm hover:shadow-md"
+          className="w-full bg-red-500 hover:bg-red-600 text-white py-3 rounded-lg font-bold transition-colors flex items-center justify-center gap-2"
         >
-          🗑️ Supprimer ce point
+          <span>🗑️</span>
+          <span>Supprimer ce point</span>
         </button>
       </div>
 
-      {/* Modal Image Fullscreen */}
+      {/* Image Modal */}
       {selectedImage && (
-        <div 
-          className="absolute inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4 cursor-pointer"
+        <div
           onClick={() => setSelectedImage(null)}
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
         >
-          <img
-            src={selectedImage}
-            alt="Fullscreen"
-            className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
-          />
           <button
-            className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center bg-white/20 hover:bg-white/30 text-white rounded-full transition-colors"
             onClick={() => setSelectedImage(null)}
+            className="absolute top-4 right-4 w-10 h-10 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center text-white text-2xl font-bold"
           >
             ✕
           </button>
+          <img
+            src={selectedImage}
+            alt="Agrandie"
+            className="max-w-full max-h-full object-contain rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          />
         </div>
       )}
     </div>

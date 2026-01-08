@@ -144,9 +144,17 @@ function App() {
       <header className="relative z-10">
         <Navigation
           currentPage={currentPage}
-          onNavigate={navigate}
+          onNavigate={(page) => {
+            // Empêcher la navigation vers map, team, person ou data si aucun événement sélectionné
+            if (!selectedEventId && (page === "map" || page === "team" || page === "person" || page === "data")) {
+              alert("Veuillez sélectionner un événement avant d'accéder à cette page.");
+              return;
+            }
+            navigate(page);
+          }}
           canGoBack={canGoBack}
           onGoBack={goBack}
+          selectedEventId={selectedEventId}
         />
       </header>
 

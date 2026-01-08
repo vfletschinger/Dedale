@@ -6,6 +6,7 @@ interface NavigationProps {
   onNavigate: (page: PageKey) => void;
   canGoBack?: boolean;
   onGoBack?: () => void;
+  selectedEventId?: number | null;
 }
 
 const NAV_ITEMS: { key: PageKey; label: string }[] = [
@@ -21,16 +22,17 @@ export default function Navigation({
   onNavigate,
   canGoBack,
   onGoBack,
+  selectedEventId,
 }: NavigationProps) {
   return (
     <nav className="sticky top-0 z-[100] w-full border-b border-gray-200 bg-slate-700 shadow-lg">
       {/* Barre d'accentuation supérieure */}
       <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-blue-500/60 to-transparent"></div>
 
-      <div className="mx-auto max-w-[1600px] px-4 sm:px-6">
-        <div className="flex h-14 items-center justify-between">
+      <div className="w-full px-2 sm:px-4">
+        <div className="flex h-14 items-center gap-6">
           {/* Section Gauche : Terminal Branding */}
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-6 flex-shrink-0">
             {canGoBack && onGoBack && (
               <button
                 onClick={onGoBack}
@@ -78,19 +80,27 @@ export default function Navigation({
           </div>
 
           {/* Section Centre : Navigation */}
-          <div className="flex items-center gap-2 px-2 py-1.5 bg-slate-800 rounded-lg border border-slate-600 shadow-md">
+          <div className="flex-1 flex justify-center">
+            <div className="flex items-center gap-2 px-2 py-1.5 bg-slate-800 rounded-lg border border-slate-600 shadow-md">
             {NAV_ITEMS.map(({ key, label }) => {
               const isActive = currentPage === key;
+              const requiresEvent = key !== "event";
+              const isDisabled = requiresEvent && !selectedEventId;
+              
               return (
                 <button
                   key={key}
                   onClick={() => onNavigate(key)}
+                  disabled={isDisabled}
                   className={`relative px-4 py-2 text-[11px] font-semibold tracking-wide uppercase transition-all duration-200 rounded-md
                     ${
                       isActive
                         ? "text-white bg-blue-600 shadow-md"
+                        : isDisabled
+                        ? "text-slate-500 bg-slate-800 cursor-not-allowed opacity-50"
                         : "text-slate-300 hover:text-white hover:bg-slate-700"
                     }`}
+                  title={isDisabled ? "Sélectionnez d'abord un événement" : ""}
                 >
                   <span className="relative z-10">{label}</span>
                   {isActive && (
@@ -99,28 +109,9 @@ export default function Navigation({
                 </button>
               );
             })}
-          </div>
-
-          {/* Section Droite : Informations système */}
-          <div className="flex items-center gap-4">
-            <div className="hidden lg:flex items-center gap-4 text-[10px] font-semibold tracking-wide">
-              <div className="flex flex-col items-end gap-1 px-2 py-1 bg-slate-800 rounded border border-slate-600">
-                <span className="text-slate-400 text-[9px]">
-                  Base de données
-                </span>
-                <span className="text-blue-400">0.42ms</span>
-              </div>
-              <div className="h-6 w-[1px] bg-slate-600"></div>
-              <div className="flex flex-col items-end gap-1 px-2 py-1 bg-slate-800 rounded border border-slate-600">
-                <span className="text-slate-400 text-[9px]">Système</span>
-                <span className="text-green-400">Active</span>
-              </div>
-            </div>
-
-            <div className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-500 bg-slate-600 group cursor-help hover:bg-slate-500 transition-all">
-              <div className="h-2 w-2 rounded-full bg-green-500 shadow-[0_0_8px_#22c55e] group-hover:scale-125 transition-transform"></div>
             </div>
           </div>
+
         </div>
       </div>
     </nav>

@@ -110,7 +110,7 @@ pub async fn create_pdf(app: AppHandle, event_id: Option<String>) -> Result<(), 
         eprintln!("Erreur génération map statique : {}", e);
     }
 
-    for p in data.iter() {
+    for (_point_index, p) in data.iter().enumerate() {
         let heading = format!("== Point {} (X: {}, Y: {})", p.id, p.x, p.y);
         writeln!(typst_src, "{}", heading).unwrap();
         typst_src.push_str("#v(0.5em)\n");

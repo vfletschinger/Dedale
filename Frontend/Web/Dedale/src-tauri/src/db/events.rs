@@ -1,7 +1,7 @@
 use crate::db::get_db_pool;
 use crate::types::*;
 use sqlx::{Row, SqlitePool};
-use tauri::{AppHandle, Emitter};
+use tauri::AppHandle;
 use uuid::Uuid;
 
 #[allow(dead_code)]

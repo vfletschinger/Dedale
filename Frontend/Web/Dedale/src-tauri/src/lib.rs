@@ -85,7 +85,6 @@ pub fn run() {
             db::create_geometry,
             db::delete_geometry,
             db::update_geometry,
-            db::update_geometry_name,
             db::update_point_dates,
             db::update_parcours,
             db::update_zone,
@@ -93,6 +92,22 @@ pub fn run() {
             db::create_parcours,
             db::delete_zone,
             db::delete_parcours,
+            db::fetch_points,
+            db::update_point,
+            db::fetch_zones_for_event,
+            db::fetch_parcours_for_event,
+            db::create_interest_point,
+            db::update_interest_point,
+            db::delete_interest_point,
+            db::fetch_interest_points,
+            // Équipements
+            db::fetch_equipment_types,
+            db::create_equipment_type,
+            db::seed_default_equipment_types,
+            db::create_equipement,
+            db::fetch_equipements_for_event,
+            db::delete_equipement,
+            db::update_equipement,
         ])
         .run(tauri::generate_context!())
         .expect("Erreur lors de l'exécution de l'application Tauri");
