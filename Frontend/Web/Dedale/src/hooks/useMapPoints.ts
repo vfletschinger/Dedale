@@ -6,13 +6,13 @@ import { MapPoint } from "../types/map";
 
 export function useMapPoints(
   map: maplibregl.Map | null,
-  selectedEventId: number | null
+  selectedEventId: string | null
 ) {
   // --- ÉTATS ---
   const [points, setPoints] = useState<MapPoint[]>([]);
   const pointsRef = useRef<MapPoint[]>([]);
   const [selectedPoint, setSelectedPoint] = useState<MapPoint | null>(null);
-  
+
   // États pour l'ajout de point
   const [addingPointCoords, setAddingPointCoords] = useState<{ lng: number; lat: number } | null>(null);
   const [awaitingMapClick, setAwaitingMapClick] = useState(false);
@@ -50,7 +50,7 @@ export function useMapPoints(
       const freshPoints = await invoke<MapPoint[]>("get_points", {
         eventId: selectedEventId || null,
       });
-      
+
       console.log(`${freshPoints.length} point(s) récupéré(s)`);
       pointsRef.current = freshPoints;
       setPoints(freshPoints);
@@ -83,7 +83,7 @@ export function useMapPoints(
   // --- AJOUTER CE BLOC DANS useMapPoints.ts ---
 
   const addPoint = async (pointData: { x: number; y: number; obstacles?: string; comments?: string; pictures?: string }) => {
-    
+
     // 1. Sécurité : On ne peut pas sauvegarder sans Event ID
     if (!selectedEventId) {
       console.error("Impossible d'ajouter un point : Aucun événement sélectionné.");
@@ -110,7 +110,7 @@ export function useMapPoints(
       // 3. Rafraîchir la carte et fermer le mode ajout
       await refreshPoints();
       setAddingPointCoords(null); // Ferme le formulaire
-      
+
     } catch (e) {
       console.error("❌ Erreur lors de l'ajout du point :", e);
       alert("Erreur lors de la sauvegarde : " + e);
@@ -151,7 +151,7 @@ export function useMapPoints(
         });
 
         // --- Gestionnaires d'événements liés aux layers ---
-        
+
         // Curseur pointer
         map.on("mouseenter", "db-points-layer", () => (map.getCanvas().style.cursor = "pointer"));
         map.on("mouseleave", "db-points-layer", () => (map.getCanvas().style.cursor = ""));
@@ -208,18 +208,18 @@ export function useMapPoints(
   useEffect(() => {
     if (!map) return;
     map.getCanvas().style.cursor = awaitingMapClick ? "crosshair" : "";
-    return () => { 
-        // Petite sécurité ici aussi
-        if(map && map.getCanvas()) map.getCanvas().style.cursor = ""; 
+    return () => {
+      // Petite sécurité ici aussi
+      if (map && map.getCanvas()) map.getCanvas().style.cursor = "";
     };
   }, [awaitingMapClick, map]);
 
   // 3. (J'ai renommé 4 en 3) Écoute des mises à jour temps réel
   useEffect(() => {
-    const unlisten = listen<number>("points-updated", (event) => {
+    const unlisten = listen<string>("points-updated", (event) => {
       console.log("📥 Points mis à jour via socket, event_id:", event.payload);
       if (!selectedEventId || selectedEventId === event.payload) {
-         if (map) refreshPoints();
+        if (map) refreshPoints();
       }
     });
 

@@ -28,7 +28,7 @@ export default function AddPointForm({
   initialCoords: { lng: number; lat: number };
   onClose?: () => void;
   onSaved?: () => void;
-  eventId?: number | null;
+  eventId?: string | null;
 }) {
   const [x, setX] = useState<number>(initialCoords.lng);
   const [y, setY] = useState<number>(initialCoords.lat);
@@ -117,7 +117,7 @@ export default function AddPointForm({
         return;
       }
     }
-    
+
     setSaving(true);
     try {
       // Prepare obstacles in backend-friendly shape (snake_case -> full Obstacle shape expected by insert_point_details)
@@ -157,9 +157,9 @@ export default function AddPointForm({
 
       console.log("📍 Envoi du point:", JSON.stringify(detail, null, 2));
       console.log("🎯 Event ID:", eventId);
-      const insertedIds = await invoke<string[]>("insert_point", { 
-        details: [detail], 
-        event_id: eventId || null 
+      const insertedIds = await invoke<string[]>("insert_point", {
+        details: [detail],
+        event_id: eventId || null
       });
       console.log("✅ Point inséré avec succès, IDs:", insertedIds);
 
@@ -250,11 +250,10 @@ export default function AddPointForm({
                 value={depose}
                 onChange={(e) => setDepose(e.target.value)}
                 min={pose || undefined}
-                className={`w-full px-3 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-gray-50 transition-all ${
-                  pose && depose && new Date(depose) < new Date(pose)
+                className={`w-full px-3 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-gray-50 transition-all ${pose && depose && new Date(depose) < new Date(pose)
                     ? 'border-red-400 bg-red-50'
                     : 'border-gray-200'
-                }`}
+                  }`}
               />
               {pose && depose && new Date(depose) < new Date(pose) && (
                 <p className="text-red-500 text-xs mt-1">⚠️ La dépose doit être après la pose</p>
@@ -291,8 +290,8 @@ export default function AddPointForm({
           </div>
           <div className="max-h-56 overflow-y-auto divide-y divide-gray-50">
             {mergedObstacles.map((o) => (
-              <div 
-                key={o.typeId} 
+              <div
+                key={o.typeId}
                 className={`p-3 transition-colors ${o.number > 0 ? 'bg-orange-50/50' : 'hover:bg-gray-50'}`}
               >
                 <div className="flex items-center justify-between gap-3">

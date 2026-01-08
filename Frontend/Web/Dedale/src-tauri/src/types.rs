@@ -12,7 +12,6 @@ pub struct Event {
     pub parcours: Option<String>,
 }
 
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Zone {
     #[serde(default)]
@@ -21,7 +20,6 @@ pub struct Zone {
     pub name: Option<String>,
     pub color: Option<String>,
     pub geometry_json: Option<String>,
-    
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -31,19 +29,18 @@ pub struct Parcours {
     pub event_id: String,
     pub name: Option<String>,
     pub color: Option<String>,
-    pub start_time : Option<f64>,
+    pub start_time: Option<f64>,
     pub speed_low: Option<f64>,
     pub speed_high: Option<f64>,
     pub geometry_json: Option<String>,
-    
 }
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Team {
     #[serde(default)]
     pub id: String,
     pub name: Option<String>,
-    #[serde(default)]
-    pub event_ids: Vec<String>,
+    pub number: i64,
+    pub event_id: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -71,7 +68,7 @@ pub struct EquipementCoordinate {
     pub x: f64,
     pub y: f64,
     pub order_index: Option<i64>,
-} 
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Type {
@@ -119,7 +116,6 @@ pub struct Person {
     pub id: String,
     pub firstname: Option<String>,
     pub lastname: Option<String>,
-    pub address: Option<String>,
     pub email: Option<String>,
     pub phone_number: Option<String>,
 }

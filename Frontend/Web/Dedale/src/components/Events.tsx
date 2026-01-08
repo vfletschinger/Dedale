@@ -42,7 +42,7 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
 
   // État pour le QR code de réception
   const [receiveQrCode, setReceiveQrCode] = useState<string | null>(null);
-  const [_receivingEventId, setReceivingEventId] = useState<number | null>(
+  const [_receivingEventId, setReceivingEventId] = useState<string | null>(
     null,
   );
   const [receiveStatus, setReceiveStatus] = useState<string>("En attente...");
@@ -104,7 +104,7 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
   }, []);
 
   // Fonction pour démarrer la réception depuis le mobile
-  const handleReceiveFromMobile = async (eventId: number) => {
+  const handleReceiveFromMobile = async (eventId: string) => {
     try {
       setReceivingEventId(eventId);
       setReceiveStatus("Génération du QR code...");
@@ -145,11 +145,11 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
         return;
       }
 
-    const newEvent = {
-      name: formData.name.trim(),
-      start_date: formData.dateDebut, // <--- Renommé pour matcher Rust
-      end_date: formData.dateFin,
-    };
+      const newEvent = {
+        name: formData.name.trim(),
+        start_date: formData.dateDebut, // <--- Renommé pour matcher Rust
+        end_date: formData.dateFin,
+      };
 
       console.log(" Création d'un nouvel événement...", newEvent);
       await invoke("insert_event", { event: newEvent });
@@ -176,7 +176,7 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleDeleteEvent = async (eventId: number) => {
+  const handleDeleteEvent = async (eventId: string) => {
     if (!confirm("Êtes-vous sûr de vouloir supprimer cet événement ?")) {
       return;
     }
@@ -313,7 +313,7 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
                       Sélectionné Du {formatDate(event.dateDebut)} au{" "}
                       {formatDate(event.dateFin)}
                     </span>
-                   
+
                   </div>
                 </div>
                 <div className="ml-4 flex gap-2">

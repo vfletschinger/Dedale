@@ -7,7 +7,7 @@ import { geoJSONtoWKT, parseWKTtoGeoJSON } from "../utils/maputils";
 import { GeometryData } from "../types/map";
 export function useMapGeometries(
   map: maplibregl.Map | null,
-  selectedEventId: number | null,
+  selectedEventId: string | null,
 ) {
   // --- ÉTATS ---
   const [geometries, setGeometries] = useState<GeometryData[]>([]);
@@ -25,7 +25,7 @@ export function useMapGeometries(
   // --- REFS ---
   const drawRef = useRef<MapboxDraw | null>(null);
   // Ref pour accéder à l'ID dans les event listeners sans déclencher de re-render
-  const selectedEventIdRef = useRef<number | null>(selectedEventId);
+  const selectedEventIdRef = useRef<string | null>(selectedEventId);
 
   useEffect(() => {
     selectedEventIdRef.current = selectedEventId;

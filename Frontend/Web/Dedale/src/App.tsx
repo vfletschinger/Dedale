@@ -44,18 +44,18 @@ function PageWrapper({
 }
 
 interface AppEvent {
-  id: number;
+  id: string;
   name: string;
   statut: string;
 }
 
 function App() {
-  const { currentPage, navigate, goBack, canGoBack, hasVisited } = useNavigation("event");
-  const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
+  const { currentPage, navigate, goBack, canGoBack, hasVisited, reset } = useNavigation("event");
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [events, setEvents] = useState<AppEvent[]>([]);
   const [firstLaunch, setFirstLaunch] = useState(false);
 
-  const handleEventClick = (eventId: number) => {
+  const handleEventClick = (eventId: string) => {
     setSelectedEventId(eventId);
     navigate("map");
   };
@@ -94,7 +94,7 @@ function App() {
     });
 
     // Si on demande d'aller voir un event
-    const unlistenMap = listen<{ eventId: number }>('navigate-to-map', (event) => {
+    const unlistenMap = listen<{ eventId: string }>('navigate-to-map', (event) => {
       const targetEventId = event.payload.eventId;
       setSelectedEventId(targetEventId);
       navigate("map");
@@ -116,6 +116,12 @@ function App() {
     }
   }
 
+  function handleDeselection() {
+    setSelectedEventId(null);
+    navigate("event");
+    reset();
+  }
+
 
 
   // Si c'est le premier lancement, afficher le formulaire admin
@@ -135,18 +141,14 @@ function App() {
 
   return (
     <div className="w-full min-h-screen bg-linear-to-br from-slate-50 via-indigo-50 to-purple-50 font-sans relative overflow-hidden">
-      {/* Background decorative elements */}
-      <div className="absolute inset-0 bg-grid-slate-100 mask-[linear-gradient(0deg,white,rgba(255,255,255,0.6))] -z-10"></div>
-      <div className="absolute top-0 left-1/4 w-72 h-72 bg-blue-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"></div>
-      <div className="absolute top-0 right-1/4 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse animation-delay-1000"></div>
-      <div className="absolute bottom-0 left-1/3 w-72 h-72 bg-indigo-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse animation-delay-2000"></div>
-
       <header className="relative z-10">
         <Navigation
           currentPage={currentPage}
           onNavigate={navigate}
           canGoBack={canGoBack}
           onGoBack={goBack}
+          eventSelected={selectedEventId === null || undefined ? false : true}
+          deselectEvent={handleDeselection}
         />
       </header>
 
@@ -162,39 +164,37 @@ function App() {
         className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-8"
         style={{ display: currentPage === "map" ? "none" : "block" }}
       >
-        <div className="bg-white/60 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-8 min-h-[calc(100vh-12rem)]">
-          <div className="relative">
-            <div className="absolute inset-0 bg-linear-to-br from-blue-50/50 via-transparent to-purple-50/50 rounded-3xl -z-10"></div>
+        <div className="relative">
+          <div className="absolute inset-0 bg-linear-to-br from-blue-50/50 via-transparent to-purple-50/50 rounded-3xl -z-10"></div>
 
 
-            {/* Events - kept mounted once visited */}
-            {hasVisited("event") && (
-              <PageWrapper isVisible={currentPage === "event"}>
-                <Event onEventClick={handleEventClick} onEventsLoaded={setEvents} />
-              </PageWrapper>
-            )}
+          {/* Events - kept mounted once visited */}
+          {hasVisited("event") && (
+            <PageWrapper isVisible={currentPage === "event"}>
+              <Event onEventClick={handleEventClick} onEventsLoaded={setEvents} />
+            </PageWrapper>
+          )}
 
-            {/* Teams - kept mounted once visited */}
-            {hasVisited("team") && (
-              <PageWrapper isVisible={currentPage === "team"}>
-                <Teams />
-              </PageWrapper>
-            )}
+          {/* Teams - kept mounted once visited */}
+          {selectedEventId && hasVisited("team") && (
+            <PageWrapper isVisible={currentPage === "team"}>
+              <Teams activeEventId={selectedEventId} />
+            </PageWrapper>
+          )}
 
-            {/* Persons - kept mounted once visited */}
-            {hasVisited("person") && (
-              <PageWrapper isVisible={currentPage === "person"}>
-                <Persons />
-              </PageWrapper>
-            )}
+          {/* Persons - kept mounted once visited */}
+          {hasVisited("person") && (
+            <PageWrapper isVisible={currentPage === "person"}>
+              <Persons activeEventId={selectedEventId} />
+            </PageWrapper>
+          )}
 
-            {/* Data - kept mounted once visited */}
-            {hasVisited("data") && (
-              <PageWrapper isVisible={currentPage === "data"}>
-                <Data />
-              </PageWrapper>
-            )}
-          </div>
+          {/* Data - kept mounted once visited */}
+          {hasVisited("data") && (
+            <PageWrapper isVisible={currentPage === "data"}>
+              <Data />
+            </PageWrapper>
+          )}
         </div>
       </main>
 

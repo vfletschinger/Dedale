@@ -29,22 +29,18 @@ const getGeometryTypeLabel = (
   return { label: "Inconnu", icon: "?" };
 };
 
-function OfflineMapLibre({
-  selectedEventId,
-}: {
-  selectedEventId: number | null;
-}) {
+function OfflineMapLibre({ selectedEventId }: { selectedEventId: string | null; }) {
   // --- ÉTATS GLOBAUX DU COMPOSANT ---
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
-  
+
   // Gestion des événements (Sélecteur en haut à gauche)
   const [events, setEvents] = useState<MapEvent[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<MapEvent | null>(null);
-  
+
   // Gestion de l'affichage (Vue Carte vs Timeline)
   const [viewMode, setViewMode] = useState<"points" | "timeline">("points");
-  
+
   // Gestion du marqueur d'adresse (Recherche)
   const [currentMarker, setCurrentMarker] = useState<maplibregl.Marker | null>(null);
 
@@ -117,11 +113,11 @@ function OfflineMapLibre({
       try {
         const allEvents = await invoke<MapEvent[]>("fetch_events");
         setEvents(allEvents);
-        
+
         // Si un ID est passé en props, on sélectionne l'événement correspondant
         if (selectedEventId) {
-            const ev = allEvents.find(e => e.id === selectedEventId);
-            if (ev) setSelectedEvent(ev);
+          const ev = allEvents.find(e => e.id === selectedEventId);
+          if (ev) setSelectedEvent(ev);
         }
       } catch (err) {
         console.error("Erreur chargement événements:", err);
@@ -151,7 +147,7 @@ function OfflineMapLibre({
   // --- RENDU ---
   return (
     <div className="h-full flex flex-col bg-gray-50 overflow-hidden">
-      
+
       {/* --- HEADER --- */}
       <div className="bg-slate-700 shadow-lg shrink-0">
         <div className="p-4 pb-0">
@@ -165,7 +161,7 @@ function OfflineMapLibre({
               <select
                 value={selectedEvent?.id || ""}
                 onChange={(e) => {
-                  const event = events.find((ev) => ev.id === parseInt(e.target.value));
+                  const event = events.find((ev) => ev.id === e.target.value);
                   setSelectedEvent(event ?? null);
                 }}
                 className="min-w-[200px] px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-semibold cursor-pointer"
@@ -193,11 +189,10 @@ function OfflineMapLibre({
         <div className="flex items-center gap-2 px-4 mt-3 border-t border-slate-600">
           <button
             onClick={() => setViewMode("points")}
-            className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
-              viewMode === "points"
-                ? "text-white border-blue-400"
-                : "text-slate-400 border-transparent hover:text-slate-200"
-            }`}
+            className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${viewMode === "points"
+              ? "text-white border-blue-400"
+              : "text-slate-400 border-transparent hover:text-slate-200"
+              }`}
           >
             <span className="flex items-center gap-2">
               <span>📋</span>
@@ -209,11 +204,10 @@ function OfflineMapLibre({
           </button>
           <button
             onClick={() => setViewMode("timeline")}
-            className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
-              viewMode === "timeline"
-                ? "text-white border-blue-400"
-                : "text-slate-400 border-transparent hover:text-slate-200"
-            }`}
+            className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${viewMode === "timeline"
+              ? "text-white border-blue-400"
+              : "text-slate-400 border-transparent hover:text-slate-200"
+              }`}
           >
             <span className="flex items-center gap-2">
               <span>📅</span>
@@ -225,7 +219,7 @@ function OfflineMapLibre({
 
       {/* --- CONTENU PRINCIPAL --- */}
       <div className="flex-1 flex overflow-hidden">
-        
+
         {/* PANNEAU LATÉRAL (Gauche) */}
         {viewMode === "points" && (
           <div className="w-96 bg-white border-r border-gray-200 shadow-lg flex flex-col z-20">
@@ -281,17 +275,17 @@ function OfflineMapLibre({
                         </button>
                       </div>
                       <div className="flex gap-2 text-xs">
-                         {/* Badges pour obstacles, photos, etc. */}
-                         <span className="bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded border border-orange-200">
-                           🚧 {p.obstacles?.length || 0}
-                         </span>
-                         <span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200">
-                           💬 {p.comments?.length || 0}
-                         </span>
+                        {/* Badges pour obstacles, photos, etc. */}
+                        <span className="bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded border border-orange-200">
+                          🚧 {p.obstacles?.length || 0}
+                        </span>
+                        <span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200">
+                          💬 {p.comments?.length || 0}
+                        </span>
                       </div>
                       {(p.pose || p.depose) && (
                         <div className="text-xs text-gray-500 mt-2">
-                           {p.pose ? formatDateShort(p.pose) : '...'} → {p.depose ? formatDateShort(p.depose) : '...'}
+                          {p.pose ? formatDateShort(p.pose) : '...'} → {p.depose ? formatDateShort(p.depose) : '...'}
                         </div>
                       )}
                     </div>
@@ -305,7 +299,7 @@ function OfflineMapLibre({
         {/* TIMELINE (50% largeur) */}
         {viewMode === "timeline" && (
           <div className="w-1/2 bg-white border-r border-gray-200 shadow-lg flex flex-col z-20">
-             <TimelinePanel points={points} onPointClick={openPopupForPoint} />
+            <TimelinePanel points={points} onPointClick={openPopupForPoint} />
           </div>
         )}
 
@@ -316,7 +310,7 @@ function OfflineMapLibre({
           {/* OUTILS FLOTTANTS (Sur la carte) */}
           {activeEventId && (
             <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
-              
+
               {/* Message d'aide */}
               {(drawingMode !== "none" || awaitingMapClick) && (
                 <div className="bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-medium animate-fade-in">
@@ -328,9 +322,8 @@ function OfflineMapLibre({
               <div className="flex gap-2">
                 <button
                   onClick={handleAddPointClick}
-                  className={`px-4 py-3 rounded-lg shadow-lg flex items-center justify-center transition-all ${
-                    awaitingMapClick ? "bg-amber-500 text-white animate-pulse" : "bg-white hover:bg-gray-50 text-gray-700"
-                  }`}
+                  className={`px-4 py-3 rounded-lg shadow-lg flex items-center justify-center transition-all ${awaitingMapClick ? "bg-amber-500 text-white animate-pulse" : "bg-white hover:bg-gray-50 text-gray-700"
+                    }`}
                   title="Ajouter un point"
                 >
                   <span className="text-xl">📍</span>
@@ -338,9 +331,8 @@ function OfflineMapLibre({
 
                 <button
                   onClick={startDrawPolygon}
-                  className={`px-4 py-3 rounded-lg shadow-lg flex items-center justify-center transition-all ${
-                    drawingMode === "polygon" ? "bg-blue-600 text-white" : "bg-white hover:bg-gray-50 text-gray-700"
-                  }`}
+                  className={`px-4 py-3 rounded-lg shadow-lg flex items-center justify-center transition-all ${drawingMode === "polygon" ? "bg-blue-600 text-white" : "bg-white hover:bg-gray-50 text-gray-700"
+                    }`}
                   title="Zone (Polygone)"
                 >
                   <span className="text-xl">⬡</span>
@@ -348,9 +340,8 @@ function OfflineMapLibre({
 
                 <button
                   onClick={startDrawLine}
-                  className={`px-4 py-3 rounded-lg shadow-lg flex items-center justify-center transition-all ${
-                    drawingMode === "line" ? "bg-green-600 text-white" : "bg-white hover:bg-gray-50 text-gray-700"
-                  }`}
+                  className={`px-4 py-3 rounded-lg shadow-lg flex items-center justify-center transition-all ${drawingMode === "line" ? "bg-green-600 text-white" : "bg-white hover:bg-gray-50 text-gray-700"
+                    }`}
                   title="Parcours (Ligne)"
                 >
                   <span className="text-xl">╱</span>
@@ -359,10 +350,10 @@ function OfflineMapLibre({
                 {(drawingMode !== "none" || awaitingMapClick) && (
                   <button
                     onClick={() => {
-                        if (drawingMode !== "none") cancelDrawing();
-                        if (awaitingMapClick) setAddingPointCoords(null); // Reset via hook logic handled implicitly
-                        // Note: Le hook useMapPoints gère le setAwaitingMapClick(false) mais ici on force l'annulation UI
-                        window.dispatchEvent(new Event('cancel-map-action')); // Simple trick ou appel direct si on expose setAwaiting
+                      if (drawingMode !== "none") cancelDrawing();
+                      if (awaitingMapClick) setAddingPointCoords(null); // Reset via hook logic handled implicitly
+                      // Note: Le hook useMapPoints gère le setAwaitingMapClick(false) mais ici on force l'annulation UI
+                      window.dispatchEvent(new Event('cancel-map-action')); // Simple trick ou appel direct si on expose setAwaiting
                     }}
                     className="px-4 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg shadow-lg font-semibold flex items-center gap-2"
                   >
@@ -392,21 +383,21 @@ function OfflineMapLibre({
                         return (
                           <div key={geom.id} className={`p-2 border-b border-gray-200 last:border-0 ${isSelected ? "bg-blue-50" : isEditing ? "bg-amber-50" : ""}`}>
                             <div className="flex items-center justify-between">
-                                <button onClick={() => highlightGeometry(isSelected ? null : geom)} className="text-left flex-1 text-xs font-medium truncate">
-                                    <span className="mr-2 text-base">{icon}</span> {label} #{geom.id}
-                                </button>
-                                {!isEditing && (
-                                    <div className="flex gap-1">
-                                        <button onClick={() => startEditGeometry(geom)} className="p-1 text-blue-600 hover:bg-blue-100 rounded">✏️</button>
-                                        <button onClick={() => handleDeleteGeometry(geom.id)} className="p-1 text-red-600 hover:bg-red-100 rounded">🗑️</button>
-                                    </div>
-                                )}
+                              <button onClick={() => highlightGeometry(isSelected ? null : geom)} className="text-left flex-1 text-xs font-medium truncate">
+                                <span className="mr-2 text-base">{icon}</span> {label} #{geom.id}
+                              </button>
+                              {!isEditing && (
+                                <div className="flex gap-1">
+                                  <button onClick={() => startEditGeometry(geom)} className="p-1 text-blue-600 hover:bg-blue-100 rounded">✏️</button>
+                                  <button onClick={() => handleDeleteGeometry(geom.id)} className="p-1 text-red-600 hover:bg-red-100 rounded">🗑️</button>
+                                </div>
+                              )}
                             </div>
                             {isEditing && (
-                                <div className="flex gap-2 mt-2">
-                                    <button onClick={saveEditGeometry} className="flex-1 bg-green-600 text-white text-xs py-1 rounded">Sauver</button>
-                                    <button onClick={cancelEditGeometry} className="flex-1 bg-gray-500 text-white text-xs py-1 rounded">Annuler</button>
-                                </div>
+                              <div className="flex gap-2 mt-2">
+                                <button onClick={saveEditGeometry} className="flex-1 bg-green-600 text-white text-xs py-1 rounded">Sauver</button>
+                                <button onClick={cancelEditGeometry} className="flex-1 bg-gray-500 text-white text-xs py-1 rounded">Annuler</button>
+                              </div>
                             )}
                           </div>
                         );

@@ -1,8 +1,8 @@
-use sqlx::{Row, SqlitePool};
-use tauri::{AppHandle};
-use uuid::Uuid;
 use crate::db::get_db_pool;
 use crate::types::*;
+use sqlx::{Row, SqlitePool};
+use tauri::AppHandle;
+use uuid::Uuid;
 
 pub async fn fetch_event_ids(app: AppHandle, point_id: &str) -> Result<Vec<String>, String> {
     let pool = get_db_pool(&app).await?;
@@ -48,16 +48,15 @@ pub async fn fetch_events(app: AppHandle) -> Result<Vec<Event>, String> {
             name: row.get("name"),
             start_date: row.get("start_date"),
             end_date: row.get("end_date"),
-            
-            // --- CORRECTION ICI ---
-            // Ne fais PAS row.get("zone") car la colonne n'existe pas !
-            // Zone et Parcours sont des tables séparées, donc pour l'instant on met None.
-            zone: None,      
-            parcours: None,  
+            zone: None,
+            parcours: None,
         });
     }
 
-    println!("[DB] ✅ Récupération terminée. {} événements.", events.len());
+    println!(
+        "[DB] ✅ Récupération terminée. {} événements.",
+        events.len()
+    );
     Ok(events)
 }
 
@@ -85,7 +84,6 @@ pub async fn insert_event(event: Event, app: AppHandle) -> Result<(), String> {
     );
     Ok(())
 }
-
 
 #[tauri::command]
 pub async fn link_point_to_event(
@@ -123,7 +121,6 @@ pub async fn unlink_point_from_event(
         .await
         .map_err(|e| format!("Failed to unlink point from event: {}", e))?;
 
-   
     Ok(())
 }
 

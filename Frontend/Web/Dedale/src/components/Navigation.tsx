@@ -6,6 +6,8 @@ interface NavigationProps {
   onNavigate: (page: PageKey) => void;
   canGoBack?: boolean;
   onGoBack?: () => void;
+  eventSelected: boolean;
+  deselectEvent: () => void;
 }
 
 const NAV_ITEMS: { key: PageKey; label: string }[] = [
@@ -21,6 +23,8 @@ export default function Navigation({
   onNavigate,
   canGoBack,
   onGoBack,
+  eventSelected,
+  deselectEvent,
 }: NavigationProps) {
   return (
     <nav className="sticky top-0 z-[100] w-full border-b border-gray-200 bg-slate-700 shadow-lg">
@@ -34,7 +38,7 @@ export default function Navigation({
             {canGoBack && onGoBack && (
               <button
                 onClick={onGoBack}
-                className="group flex h-8 w-8 items-center justify-center rounded-lg bg-slate-600 text-slate-300 hover:text-white transition-all border border-slate-500 hover:border-blue-400 hover:bg-slate-500"
+                className="group flex h-8 w-8 items-center justify-center rounded-lg bg-slate-600 text-slate-300 hover:text-white transition-all border border-slate-500 hover:border-blue-400 hover:bg-slate-500 cursor-pointer"
                 aria-label="Retour"
               >
                 <svg
@@ -74,22 +78,29 @@ export default function Navigation({
                   Gestion Événements
                 </span>
               </div>
+              <div hidden={!eventSelected} className="flex items-center gap-2 px-2 py-1.5 bg-slate-800 rounded-lg border border-slate-600 shadow-md">
+                <button onClick={deselectEvent} className={`relative px-4 py-2 text-[11px] font-semibold tracking-wide uppercase transition-all duration-200 rounded-md cursor-pointer text-slate-300 hover:text-white hover:bg-slate-700`}>
+                  Déselectionner l'événement
+                </button>
+              </div>
             </div>
           </div>
 
           {/* Section Centre : Navigation */}
           <div className="flex items-center gap-2 px-2 py-1.5 bg-slate-800 rounded-lg border border-slate-600 shadow-md">
             {NAV_ITEMS.map(({ key, label }) => {
+              if (!eventSelected && (key === "team" || key === "data")) {
+                return ""
+              }
               const isActive = currentPage === key;
               return (
                 <button
                   key={key}
                   onClick={() => onNavigate(key)}
-                  className={`relative px-4 py-2 text-[11px] font-semibold tracking-wide uppercase transition-all duration-200 rounded-md
-                    ${
-                      isActive
-                        ? "text-white bg-blue-600 shadow-md"
-                        : "text-slate-300 hover:text-white hover:bg-slate-700"
+                  className={`relative px-4 py-2 text-[11px] font-semibold tracking-wide uppercase transition-all duration-200 rounded-md cursor-pointer
+                    ${isActive
+                      ? "text-white bg-blue-600 shadow-md"
+                      : "text-slate-300 hover:text-white hover:bg-slate-700"
                     }`}
                 >
                   <span className="relative z-10">{label}</span>
@@ -99,27 +110,6 @@ export default function Navigation({
                 </button>
               );
             })}
-          </div>
-
-          {/* Section Droite : Informations système */}
-          <div className="flex items-center gap-4">
-            <div className="hidden lg:flex items-center gap-4 text-[10px] font-semibold tracking-wide">
-              <div className="flex flex-col items-end gap-1 px-2 py-1 bg-slate-800 rounded border border-slate-600">
-                <span className="text-slate-400 text-[9px]">
-                  Base de données
-                </span>
-                <span className="text-blue-400">0.42ms</span>
-              </div>
-              <div className="h-6 w-[1px] bg-slate-600"></div>
-              <div className="flex flex-col items-end gap-1 px-2 py-1 bg-slate-800 rounded border border-slate-600">
-                <span className="text-slate-400 text-[9px]">Système</span>
-                <span className="text-green-400">Active</span>
-              </div>
-            </div>
-
-            <div className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-500 bg-slate-600 group cursor-help hover:bg-slate-500 transition-all">
-              <div className="h-2 w-2 rounded-full bg-green-500 shadow-[0_0_8px_#22c55e] group-hover:scale-125 transition-transform"></div>
-            </div>
           </div>
         </div>
       </div>
