@@ -4,10 +4,11 @@ use sqlx::{Row, SqlitePool};
 use tauri::AppHandle;
 use uuid::Uuid;
 
+#[allow(dead_code)]
 pub async fn fetch_event_ids(app: AppHandle, point_id: &str) -> Result<Vec<String>, String> {
     let pool = get_db_pool(&app).await?;
 
-    let rows = sqlx::query("SELECT event_id FROM point_event WHERE point_id = ?")
+    let rows = sqlx::query("SELECT event_id FROM point WHERE id = ? AND event_id IS NOT NULL")
         .bind(point_id)
         .fetch_all(&pool)
         .await
@@ -86,6 +87,10 @@ pub async fn insert_event(event: Event, app: AppHandle) -> Result<(), String> {
         "[DB] ✅ Événement '{:?}' créé avec succès (id: {})!",
         event.name, event_id
     );
+
+    // Émettre un événement pour notifier le frontend
+    let _ = app.emit("events-updated", ());
+
     Ok(())
 }
 
@@ -98,9 +103,9 @@ pub async fn link_point_to_event(
     println!("[DB] 🔗 Liaison point {} → event {}", point_id, event_id);
     let pool = get_db_pool(&app).await?;
 
-    sqlx::query("INSERT OR IGNORE INTO point_event (point_id, event_id) VALUES (?, ?)")
-        .bind(&point_id)
+    sqlx::query("UPDATE point SET event_id = ? WHERE id = ?")
         .bind(&event_id)
+        .bind(&point_id)
         .execute(&pool)
         .await
         .map_err(|e| format!("Failed to link point to event: {}", e))?;
@@ -113,14 +118,13 @@ pub async fn link_point_to_event(
 pub async fn unlink_point_from_event(
     app: AppHandle,
     point_id: String,
-    event_id: String,
+    _event_id: String,
 ) -> Result<(), String> {
-    println!("[DB]  Déliaison point {} ← event {}", point_id, event_id);
+    println!("[DB]  Déliaison point {}", point_id);
     let pool = get_db_pool(&app).await?;
 
-    sqlx::query("DELETE FROM point_event WHERE point_id = ? AND event_id = ?")
+    sqlx::query("UPDATE point SET event_id = NULL WHERE id = ?")
         .bind(&point_id)
-        .bind(&event_id)
         .execute(&pool)
         .await
         .map_err(|e| format!("Failed to unlink point from event: {}", e))?;
@@ -132,13 +136,13 @@ pub async fn unlink_point_from_event(
 pub async fn get_points_for_event(app: AppHandle, event_id: String) -> Result<Vec<String>, String> {
     let pool = get_db_pool(&app).await?;
 
-    let rows = sqlx::query("SELECT point_id FROM point_event WHERE event_id = ?")
+    let rows = sqlx::query("SELECT id FROM point WHERE event_id = ?")
         .bind(event_id)
         .fetch_all(&pool)
         .await
         .map_err(|e| e.to_string())?;
 
-    let point_ids: Vec<String> = rows.into_iter().map(|row| row.get("point_id")).collect();
+    let point_ids: Vec<String> = rows.into_iter().map(|row| row.get("id")).collect();
     Ok(point_ids)
 }
 
@@ -154,9 +158,14 @@ pub async fn delete_event(app: AppHandle, event_id: String) -> Result<(), String
         .map_err(|e| e.to_string())?;
 
     println!("[DB]  Événement {} supprimé", event_id);
+
+    // Émettre un événement pour notifier le frontend
+    let _ = app.emit("events-updated", ());
+
     Ok(())
 }
 
+#[allow(dead_code)]
 pub async fn is_first_launch(pool: &SqlitePool) -> sqlx::Result<bool> {
     let (count,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM user")
         .fetch_one(pool)

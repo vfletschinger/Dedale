@@ -112,7 +112,7 @@ export default function PointDetails({
   }
 
   return (
-    <div className="h-full flex flex-col bg-gradient-to-b from-white to-gray-50">
+    <div className="h-full flex flex-col bg-gradient-to-b from-white to-gray-50 relative">
       {/* Header */}
       <div className="p-4 bg-gradient-to-r from-indigo-500 to-purple-600 text-white">
         <div className="flex items-center justify-between">
@@ -121,8 +121,12 @@ export default function PointDetails({
             
           </div>
           <button
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onClose) onClose();
+            }}
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors cursor-pointer z-10"
           >
             ✕
           </button>

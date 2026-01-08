@@ -54,7 +54,7 @@ pub async fn create_person(
     .map_err(|e| e.to_string())?;
 
     Ok(Person {
-        id: id,
+        id,
         firstname: Some(firstname),
         lastname: Some(lastname),
         email: Some(email),

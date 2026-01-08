@@ -6,7 +6,7 @@ import { MapInterest, MapPoint } from "../types/map";
 
 export function useMapPoints(
   map: maplibregl.Map | null,
-  selectedEventId: number | null
+  selectedEventId: string | number | null
 ) {
   // --- ÉTATS ---
   const [points, setPoints] = useState<MapPoint[]>([]);
@@ -360,6 +360,18 @@ export function useMapPoints(
     };
   }, [selectedEventId, map, refreshPoints]);
 
+  // 4. Recharger les points quand l'événement sélectionné change
+  useEffect(() => {
+    if (map && map.getSource("db-points")) {
+      console.log("🔄 Changement d'événement, rechargement des points...");
+      // Defer the refresh to avoid synchronous setState in effect
+      const timeoutId = setTimeout(() => {
+        refreshPoints();
+      }, 0);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [selectedEventId, map, refreshPoints]);
+
   return {
     points,
     selectedPoint,
@@ -372,5 +384,6 @@ export function useMapPoints(
     refreshInterest,
     openPopupForPoint,
     addPoint,
+    updateMapSource, // Exposé pour permettre le filtrage externe
   };
 }
