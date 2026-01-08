@@ -78,11 +78,6 @@ export default function Navigation({
                   Gestion Événements
                 </span>
               </div>
-              <div hidden={!eventSelected} className="flex items-center gap-2 px-2 py-1.5 bg-slate-800 rounded-lg border border-slate-600 shadow-md">
-                <button onClick={deselectEvent} className={`relative px-4 py-2 text-[11px] font-semibold tracking-wide uppercase transition-all duration-200 rounded-md cursor-pointer text-slate-300 hover:text-white hover:bg-slate-700`}>
-                  Déselectionner l'événement
-                </button>
-              </div>
             </div>
           </div>
 
@@ -90,9 +85,6 @@ export default function Navigation({
           <div className="flex-1 flex justify-center">
             <div className="flex items-center gap-2 px-2 py-1.5 bg-slate-800 rounded-lg border border-slate-600 shadow-md">
               {NAV_ITEMS.map(({ key, label }) => {
-                if (!eventSelected && (key === "team" || key === "data")) {
-                  return ""
-                }
                 const isActive = currentPage === key;
                 const requiresEvent = key !== "event";
                 const isDisabled = requiresEvent && !eventSelected;
@@ -119,6 +111,11 @@ export default function Navigation({
                 );
               })}
             </div>
+          </div>
+          <div hidden={!eventSelected} className="flex items-center gap-2 px-2 py-1.5 bg-slate-800 rounded-lg border border-slate-600 shadow-md">
+            <button onClick={deselectEvent} className={`relative px-4 py-2 text-[11px] font-semibold tracking-wide uppercase transition-all duration-200 rounded-md cursor-pointer text-slate-300 hover:text-white hover:bg-slate-700`}>
+              Déselectionner l'événement
+            </button>
           </div>
         </div>
       </div>

@@ -151,8 +151,8 @@ pub async fn fetch_team_events(app: AppHandle, team_id: String) -> Result<Vec<Ev
             name: row.get("name"),
             start_date: row.get("start_date"),
             end_date: row.get("end_date"),
-            parcours: row.get("parcours"),
-            zone: row.get("zone"),
+            parcours: None,
+            zone: None,
         })
         .collect();
 
