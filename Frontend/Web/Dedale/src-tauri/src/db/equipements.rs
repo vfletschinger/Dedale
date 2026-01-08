@@ -1,8 +1,8 @@
+use crate::db::get_db_pool;
+use crate::types::*;
 use sqlx::Row;
 use tauri::AppHandle;
 use uuid::Uuid;
-use crate::db::get_db_pool;
-use crate::types::*;
 
 // ============================================
 // TYPES D'ÉQUIPEMENTS
@@ -11,7 +11,7 @@ use crate::types::*;
 #[tauri::command]
 pub async fn fetch_equipment_types(app: AppHandle) -> Result<Vec<Type>, String> {
     let pool = get_db_pool(&app).await?;
-    
+
     let rows = sqlx::query("SELECT id, name, description FROM type")
         .fetch_all(&pool)
         .await
@@ -196,7 +196,7 @@ pub async fn fetch_equipements_for_event(
                 t.name as type_name, t.description as type_description
          FROM equipement e
          LEFT JOIN type t ON e.type_id = t.id
-         WHERE e.event_id = ?"
+         WHERE e.event_id = ?",
     )
     .bind(&event_id)
     .fetch_all(&pool)
@@ -213,7 +213,7 @@ pub async fn fetch_equipements_for_event(
             "SELECT id, equipement_id, x, y, order_index 
              FROM equipement_coordinate 
              WHERE equipement_id = ? 
-             ORDER BY order_index"
+             ORDER BY order_index",
         )
         .bind(&equipement_id)
         .fetch_all(&pool)

@@ -1,11 +1,11 @@
+use crate::db::get_db_pool;
+use crate::types::*;
 use rand::rand_core::le;
 use sqlx::{Row, SqlitePool};
 use sqlx::{Sqlite, Transaction};
+use tauri::AppHandle;
 use tauri::State;
-use tauri::{AppHandle};
 use uuid::Uuid;
-use crate::types::*;
-use crate::db::get_db_pool;
 
 #[tauri::command]
 pub async fn fetch_points(
@@ -13,14 +13,16 @@ pub async fn fetch_points(
     event_id: Option<String>,
 ) -> Result<Vec<PointWithDetails>, String> {
     let pool = get_db_pool(&app).await?;
-    
+
     let rows = if let Some(eid) = event_id {
         println!("[DB] Récupération des points pour event_id: {}", eid);
-        sqlx::query("SELECT id, x, y, event_id, comment, status, type FROM point WHERE event_id = ?")
-            .bind(eid)
-            .fetch_all(&pool)
-            .await
-            .map_err(|e| e.to_string())?
+        sqlx::query(
+            "SELECT id, x, y, event_id, comment, status, type FROM point WHERE event_id = ?",
+        )
+        .bind(eid)
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| e.to_string())?
     } else {
         println!("[DB] Récupération de tous les points");
         sqlx::query("SELECT id, x, y, event_id, comment, status, type FROM point")
@@ -28,28 +30,27 @@ pub async fn fetch_points(
             .await
             .map_err(|e| e.to_string())?
     };
-    
+
     let mut points_with_details: Vec<PointWithDetails> = Vec::new();
-    
+
     for row in rows {
         let point_id: String = row.get("id");
-        
+
         // Récupérer les photos pour ce point
-        let pictures = sqlx::query(
-            r#"SELECT id, point_id, image_data FROM picture WHERE point_id = ?"#
-        )
-        .bind(&point_id)
-        .fetch_all(&pool)
-        .await
-        .map_err(|e| e.to_string())?
-        .into_iter()
-        .map(|pic_row| Picture {
-            id: pic_row.get("id"),
-            point_id: pic_row.get("point_id"),
-            image: pic_row.get("image_data"),
-        })
-        .collect();
-        
+        let pictures =
+            sqlx::query(r#"SELECT id, point_id, image_data FROM picture WHERE point_id = ?"#)
+                .bind(&point_id)
+                .fetch_all(&pool)
+                .await
+                .map_err(|e| e.to_string())?
+                .into_iter()
+                .map(|pic_row| Picture {
+                    id: pic_row.get("id"),
+                    point_id: pic_row.get("point_id"),
+                    image: pic_row.get("image_data"),
+                })
+                .collect();
+
         points_with_details.push(PointWithDetails {
             id: point_id,
             x: row.get("x"),
@@ -61,17 +62,14 @@ pub async fn fetch_points(
             pictures,
         });
     }
-        
+
     println!("[DB]  {} point(s) récupéré(s)", points_with_details.len());
 
     Ok(points_with_details)
 }
 
 #[tauri::command]
-pub async fn update_point(
-    app: AppHandle,
-    point: Point, 
-) -> Result<Point, String> {
+pub async fn update_point(app: AppHandle, point: Point) -> Result<Point, String> {
     let pool = get_db_pool(&app).await?;
     sqlx::query("UPDATE point SET x = ?, y = ?, comment = ?, type = ?, status = ?, event_id = ? WHERE id = ?")
         .bind(point.x)
@@ -81,20 +79,17 @@ pub async fn update_point(
         .bind(point.status)
         .bind(&point.event_id)
         .bind(&point.id)
-        .execute(&pool) 
+        .execute(&pool)
         .await
         .map_err(|e| e.to_string())?;
 
     Ok(point)
 }
 #[tauri::command]
-pub async fn fetch_pictures(
-    app: AppHandle,
-    point_id: String, 
-) -> Result<Vec<Picture>, String> {
+pub async fn fetch_pictures(app: AppHandle, point_id: String) -> Result<Vec<Picture>, String> {
     let rows = sqlx::query("SELECT id, image, point_id FROM picture WHERE point_id = ?")
         .bind(point_id)
-        .fetch_all(&get_db_pool(&app).await?) 
+        .fetch_all(&get_db_pool(&app).await?)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -109,7 +104,6 @@ pub async fn fetch_pictures(
 
     Ok(pictures)
 }
-
 
 pub async fn fetch_equipement_coordinates(
     pool: &SqlitePool,
@@ -179,7 +173,6 @@ pub async fn fetch_equipement_details(
         None => Ok(None), // L'ID n'existe pas
     }
 }
-
 
 #[tauri::command]
 pub async fn fetch_obstacle_types(app: AppHandle) -> Result<Vec<ObstacleType>, String> {
@@ -295,20 +288,18 @@ pub async fn retrieve_data_by_event(
         let id: String = row.get("id");
 
         // Récupérer les photos pour ce point
-        let pictures = sqlx::query(
-            r#"SELECT id, point_id, image FROM picture WHERE point_id = ?"#
-        )
-        .bind(&id)
-        .fetch_all(&pool)
-        .await
-        .map_err(|e| e.to_string())?
-        .into_iter()
-        .map(|pic_row| Picture {
-            id: pic_row.get("id"),
-            point_id: pic_row.get("point_id"),
-            image: pic_row.get("image"),
-        })
-        .collect();
+        let pictures = sqlx::query(r#"SELECT id, point_id, image FROM picture WHERE point_id = ?"#)
+            .bind(&id)
+            .fetch_all(&pool)
+            .await
+            .map_err(|e| e.to_string())?
+            .into_iter()
+            .map(|pic_row| Picture {
+                id: pic_row.get("id"),
+                point_id: pic_row.get("point_id"),
+                image: pic_row.get("image"),
+            })
+            .collect();
 
         points.push(PointWithDetails {
             id,
@@ -326,13 +317,8 @@ pub async fn retrieve_data_by_event(
     Ok(points)
 }
 
-
 #[tauri::command]
-pub async fn insert_point(
-    app: AppHandle,
-    point: PointWithDetails,
-) -> Result<Vec<String>, String> {
-    
+pub async fn insert_point(app: AppHandle, point: PointWithDetails) -> Result<Vec<String>, String> {
     let pool = get_db_pool(&app).await?;
 
     let id = Uuid::new_v4().to_string();
@@ -388,7 +374,6 @@ pub async fn delete_point(app: AppHandle, point_id: String) -> Result<(), String
         .await
         .map_err(|e| format!("Failed to delete pictures: {}", e))?;
 
-
     sqlx::query("DELETE FROM point WHERE id = ?")
         .bind(&point_id)
         .execute(&mut *tx)
@@ -436,10 +421,7 @@ pub async fn create_interest_point(
     Ok(point_id)
 }
 #[tauri::command]
-pub async fn delete_interest_point(
-    app: AppHandle,
-    point_id: &str,
-) -> Result<(), String> {
+pub async fn delete_interest_point(app: AppHandle, point_id: &str) -> Result<(), String> {
     let pool = get_db_pool(&app).await?;
 
     sqlx::query("DELETE FROM interest WHERE id = ?")
@@ -483,7 +465,6 @@ pub async fn update_interest_point(
     Ok(())
 }
 
-
 #[tauri::command]
 pub async fn fetch_interest_points(
     app: AppHandle,
@@ -492,7 +473,10 @@ pub async fn fetch_interest_points(
     let pool = get_db_pool(&app).await?;
 
     let rows = if let Some(eid) = event_id {
-        println!("[DB] Récupération des points d'intérêt pour event_id: {}", eid);
+        println!(
+            "[DB] Récupération des points d'intérêt pour event_id: {}",
+            eid
+        );
         sqlx::query("SELECT id, x, y, description, event_id FROM interest WHERE event_id = ?")
             .bind(eid)
             .fetch_all(&pool)

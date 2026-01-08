@@ -1,11 +1,11 @@
 use std::iter::Zip;
 
-use rust_xlsxwriter::XlsxError;
-use sqlx::{Row};
-use tauri::{AppHandle};
-use uuid::Uuid;
-use crate::types::*;
 use crate::db::get_db_pool;
+use crate::types::*;
+use rust_xlsxwriter::XlsxError;
+use sqlx::Row;
+use tauri::AppHandle;
+use uuid::Uuid;
 
 #[tauri::command]
 pub async fn fetch_geometries_for_event(
@@ -37,16 +37,14 @@ pub async fn fetch_geometries_for_event(
 }
 
 #[tauri::command]
-pub async fn fetch_zones_for_event(
-    app: AppHandle,
-    event_id: String,
-) -> Result<Vec<Zone>, String> {
+pub async fn fetch_zones_for_event(app: AppHandle, event_id: String) -> Result<Vec<Zone>, String> {
     let pool = get_db_pool(&app).await?;
-    let rows = sqlx::query("SELECT id, event_id, name, color, geometry_json FROM zone WHERE event_id = ?")
-        .bind(&event_id)
-        .fetch_all(&pool)
-        .await
-        .map_err(|e| e.to_string())?;
+    let rows =
+        sqlx::query("SELECT id, event_id, name, color, geometry_json FROM zone WHERE event_id = ?")
+            .bind(&event_id)
+            .fetch_all(&pool)
+            .await
+            .map_err(|e| e.to_string())?;
 
     let geometries: Vec<Zone> = rows
         .into_iter()
@@ -111,17 +109,25 @@ pub async fn create_zone(
 ) -> Result<Zone, String> {
     let pool = get_db_pool(&app).await?;
     let uuid = Uuid::new_v4().to_string();
-    let _result = sqlx::query("INSERT INTO zone (id, event_id, geometry_json,name,color) VALUES (?, ?, ?, ?, ?)")
-        .bind(&uuid)
-        .bind(&event_id)
-        .bind(&geom)
-        .bind(&name)
-        .bind(&color)
-        .execute(&pool)
-        .await
-        .map_err(|e| e.to_string())?;
+    let _result = sqlx::query(
+        "INSERT INTO zone (id, event_id, geometry_json,name,color) VALUES (?, ?, ?, ?, ?)",
+    )
+    .bind(&uuid)
+    .bind(&event_id)
+    .bind(&geom)
+    .bind(&name)
+    .bind(&color)
+    .execute(&pool)
+    .await
+    .map_err(|e| e.to_string())?;
 
-    Ok(Zone { id: uuid, event_id, name: Some(name), color: Some(color), geometry_json: Some(geom) })
+    Ok(Zone {
+        id: uuid,
+        event_id,
+        name: Some(name),
+        color: Some(color),
+        geometry_json: Some(geom),
+    })
 }
 #[tauri::command]
 pub async fn create_parcours(
@@ -136,7 +142,7 @@ pub async fn create_parcours(
 ) -> Result<Parcours, String> {
     let pool = get_db_pool(&app).await?;
     let uuid = Uuid::new_v4().to_string();
-    
+
     sqlx::query("INSERT INTO parcours (id, event_id, geometry_json, name, color, start_time, speed_low, speed_high) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
         .bind(&uuid)
         .bind(&event_id)
@@ -151,16 +157,16 @@ pub async fn create_parcours(
         .map_err(|e| e.to_string())?;
 
     println!("[DB] ✅ Parcours {} créé avec succès", name);
-    
-    Ok(Parcours { 
-        id: uuid, 
-        event_id, 
-        name: Some(name), 
-        color: Some(color), 
-        start_time, 
-        speed_low, 
-        speed_high, 
-        geometry_json: Some(geom) 
+
+    Ok(Parcours {
+        id: uuid,
+        event_id,
+        name: Some(name),
+        color: Some(color),
+        start_time,
+        speed_low,
+        speed_high,
+        geometry_json: Some(geom),
     })
 }
 
@@ -206,7 +212,11 @@ pub async fn create_geometry(
         .await
         .map_err(|e| e.to_string())?;
 
-    Ok(Geometry { id: uuid, event_id, geom })
+    Ok(Geometry {
+        id: uuid,
+        event_id,
+        geom,
+    })
 }
 
 #[tauri::command]

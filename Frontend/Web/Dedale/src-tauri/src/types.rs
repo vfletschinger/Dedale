@@ -12,7 +12,6 @@ pub struct Event {
     pub parcours: Option<String>,
 }
 
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Zone {
     #[serde(default)]
@@ -21,7 +20,6 @@ pub struct Zone {
     pub name: Option<String>,
     pub color: Option<String>,
     pub geometry_json: Option<String>,
-    
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -31,11 +29,10 @@ pub struct Parcours {
     pub event_id: String,
     pub name: Option<String>,
     pub color: Option<String>,
-    pub start_time : Option<i64>,
+    pub start_time: Option<i64>,
     pub speed_low: Option<f64>,
     pub speed_high: Option<f64>,
     pub geometry_json: Option<String>,
-    
 }
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Team {
@@ -71,7 +68,7 @@ pub struct EquipementCoordinate {
     pub x: f64,
     pub y: f64,
     pub order_index: Option<i64>,
-} 
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Type {
@@ -123,7 +120,6 @@ pub struct Interest {
     pub event_id: Option<String>,
 }
 
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PointWithDetails {
     pub id: String,
@@ -147,7 +143,7 @@ pub struct Person {
     pub phone_number: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize,Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Picture {
     pub id: String,
     pub point_id: Option<String>,

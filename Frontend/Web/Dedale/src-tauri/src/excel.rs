@@ -1,9 +1,9 @@
 use crate::db::{self, Point};
+use crate::types::PointWithDetails;
 use crate::utils;
 use rust_xlsxwriter::{Color, Format, Workbook};
 use sqlx::Row;
 use tauri::AppHandle;
-use crate::types::PointWithDetails;
 
 #[tauri::command]
 pub async fn export_points_excel(app: AppHandle, event_id: Option<String>) -> Result<(), String> {

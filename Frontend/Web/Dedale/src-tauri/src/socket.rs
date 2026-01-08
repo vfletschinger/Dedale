@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use crate::db::{PointDetail, PointWithDetails, get_db_pool, insert_point};
+use crate::db::{get_db_pool, insert_point, PointDetail, PointWithDetails};
 use base64::{engine::general_purpose, Engine as _};
 use image::codecs::png::PngEncoder;
 use image::{ImageEncoder, Luma};
