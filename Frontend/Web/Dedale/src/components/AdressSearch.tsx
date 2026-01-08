@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { SearchResult } from "../types/map";
 
 interface AddressSearchProps {
@@ -17,16 +18,18 @@ export default function AddressSearch({ onSelect }: AddressSearchProps) {
 
   useEffect(() => {
     const timeout = setTimeout(async () => {
+      if (query.trim().length < 2) {
+        setResults([]);
+        return;
+      }
+
       try {
-        const response = await fetch(
-          `http://localhost:8081/search?q=${encodeURIComponent(
-            query,
-          )}&format=json&limit=5`,
-        );
-        const data = await response.json();
+        // Appel à la commande Tauri de géocodage local
+        const data = await invoke<SearchResult[]>("search_address", { query });
         setResults(data);
       } catch (error) {
         console.error("Erreur recherche adresse :", error);
+        setResults([]);
       }
     }, 300);
 

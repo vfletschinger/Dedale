@@ -10,6 +10,7 @@ mod seed;
 mod socket;
 mod types;
 mod utils;
+mod geocoding;
 
 #[cfg(test)]
 mod tests;
@@ -108,6 +109,8 @@ pub fn run() {
             db::fetch_equipements_for_event,
             db::delete_equipement,
             db::update_equipement,
+            // Géocodage local
+            geocoding::search_address,
         ])
         .run(tauri::generate_context!())
         .expect("Erreur lors de l'exécution de l'application Tauri");
