@@ -100,6 +100,14 @@ pub fn run() {
             db::update_interest_point,
             db::delete_interest_point,
             db::fetch_interest_points,
+            // Équipements
+            db::fetch_equipment_types,
+            db::create_equipment_type,
+            db::seed_default_equipment_types,
+            db::create_equipement,
+            db::fetch_equipements_for_event,
+            db::delete_equipement,
+            db::update_equipement,
         ])
         .run(tauri::generate_context!())
         .expect("Erreur lors de l'exécution de l'application Tauri");
