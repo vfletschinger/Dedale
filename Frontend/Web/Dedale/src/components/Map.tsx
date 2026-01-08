@@ -2,53 +2,42 @@ import { useRef, useEffect, useState } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
-import { invoke } from "@tauri-apps/api/core";
 
 // Composants
-import PointDetails, { type Point } from "./PointDetails";
+import PointDetails from "./PointDetails";
 import AddPointForm from "./AddPointForm";
-import TimelinePanel from "./TimelinePanel";
+import TimelineBar from "./TimelineBar";
 import AddressSearch from "./AdressSearch";
+import ParcoursForm from "./ParcoursForm";
+import InterestForm from "./InterestForm";
+import EquipementForm from "./EquipementForm";
 
 // Hooks personnalisés
 import { useMapPoints } from "../hooks/useMapPoints";
 import { useMapGeometries } from "../hooks/useMapGeometries";
+import { useEvents } from "../hooks/useEvents";
 
 // Types et Utils
-import { MapEvent, SearchResult } from "../types/map";
-import { formatDateShort } from "../utils/maputils";
-
-// Helper pour l'affichage des icônes de géométrie dans la liste
-const getGeometryTypeLabel = (
-  wkt: string
-): { label: string; icon: string } => {
-  const upper = wkt.toUpperCase();
-  if (upper.startsWith("POLYGON")) return { label: "Polygone", icon: "⬡" };
-  if (upper.startsWith("LINESTRING")) return { label: "Ligne", icon: "╱" };
-  if (upper.startsWith("POINT")) return { label: "Point", icon: "●" };
-  return { label: "Inconnu", icon: "?" };
-};
+import { SearchResult, MapEvent } from "../types/map";
 
 function OfflineMapLibre({ selectedEventId }: { selectedEventId: string | null; }) {
   // --- ÉTATS GLOBAUX DU COMPOSANT ---
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
 
-  // Gestion des événements (Sélecteur en haut à gauche)
-  const [events, setEvents] = useState<MapEvent[]>([]);
-  const [selectedEvent, setSelectedEvent] = useState<MapEvent | null>(null);
-
   // Gestion de l'affichage (Vue Carte vs Timeline)
   const [viewMode, setViewMode] = useState<"points" | "timeline">("points");
 
+  // État pour le filtre spatial (limites visibles de la carte)
+  const [mapBounds, setMapBounds] = useState<{ north: number; south: number; east: number; west: number } | null>(null);
+
   // Gestion du marqueur d'adresse (Recherche)
-  const [currentMarker, setCurrentMarker] = useState<maplibregl.Marker | null>(null);
+  const [currentMarker, setCurrentMarker] = useState<maplibregl.Marker | null>(
+    null
+  );
 
-  // Calcul de l'ID actif (soit celui sélectionné dans la liste, soit celui passé en props)
-  const activeEventId = selectedEvent?.id ?? selectedEventId;
 
-  // --- APPEL DES HOOKS ---
-  // Toute la logique des points est ici
+  // 1. Logique des POINTS
   const {
     points,
     selectedPoint,
@@ -58,30 +47,51 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: string | null; 
     awaitingMapClick,
     handleAddPointClick,
     refreshPoints,
+    refreshInterest,
     openPopupForPoint,
-  } = useMapPoints(map, activeEventId);
+  } = useMapPoints(map, selectedEventId);
 
-  // Toute la logique des géométries est ici
+  // 2. Logique des GÉOMÉTRIES (Zones & Parcours)
   const {
-    geometries,
+    zones,
+    parcours,
+    equipements,
     drawingMode,
-    selectedGeometryId,
-    editingGeometryId,
+    selectedGeometry,
+    editingGeometry,
     isGeometryListOpen,
     setIsGeometryListOpen,
     startDrawPolygon,
     startDrawLine,
+    startDrawInterest,
+    startDrawEquipment,
     cancelDrawing,
     saveEditGeometry,
     handleDeleteGeometry,
     startEditGeometry,
     cancelEditGeometry,
     highlightGeometry,
-  } = useMapGeometries(map, activeEventId);
+    pendingParcoursGeometry,
+    pendingInterestGeometry,
+    saveParcoursWithDetails,
+    saveInterestWithDetails,
+    cancelParcoursForm,
+    cancelInterestForm,
+    pendingEquipmentData,
+    saveEquipmentWithDetails,
+    cancelEquipmentForm,
+    handleDeleteEquipement,
+  } = useMapGeometries(map, selectedEventId);
+
+  // 3. Logique des ÉVÉNEMENTS
+  const { events } = useEvents();
+  const currentEvent: MapEvent | undefined = events.find(
+    (e) => String(e.id) === String(selectedEventId)
+  );
 
   // --- EFFETS (Chargement initial) ---
 
-  // 1. Initialisation de la carte MapLibre
+  // Initialisation de la carte MapLibre
   useEffect(() => {
     if (map || !mapContainer.current) return;
 
@@ -92,7 +102,6 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: string | null; 
       zoom: 13,
     });
 
-    // Petit marqueur de bienvenue à Strasbourg
     const initialMarker = new maplibregl.Marker()
       .setLngLat([7.7635, 48.5465])
       .setPopup(new maplibregl.Popup().setText("Bienvenue à Strasbourg !"))
@@ -107,28 +116,49 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: string | null; 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 2. Charger la liste des événements pour le menu déroulant
+  // Mise à jour des limites visibles de la carte quand elle est déplacée/zoomée
   useEffect(() => {
-    const loadAllEvents = async () => {
-      try {
-        const allEvents = await invoke<MapEvent[]>("fetch_events");
-        setEvents(allEvents);
+    if (!map) return;
 
-        // Si un ID est passé en props, on sélectionne l'événement correspondant
-        if (selectedEventId) {
-          const ev = allEvents.find(e => e.id === selectedEventId);
-          if (ev) setSelectedEvent(ev);
-        }
-      } catch (err) {
-        console.error("Erreur chargement événements:", err);
-      }
+    const updateBounds = () => {
+      const bounds = map.getBounds();
+      setMapBounds({
+        north: bounds.getNorth(),
+        south: bounds.getSouth(),
+        east: bounds.getEast(),
+        west: bounds.getWest(),
+      });
     };
-    loadAllEvents();
-  }, [selectedEventId]);
+
+    // Mettre à jour au chargement
+    updateBounds();
+
+    // Ajouter les listeners pour les mouvements de la carte
+    map.on("moveend", updateBounds);
+    map.on("zoomend", updateBounds);
+    map.on("resize", updateBounds);
+
+    return () => {
+      map.off("moveend", updateBounds);
+      map.off("zoomend", updateBounds);
+      map.off("resize", updateBounds);
+    };
+  }, [map]);
+
+  // Forcer le recalcul des bounds quand la vue change (timeline ouverte/fermée)
+  useEffect(() => {
+    if (!map) return;
+
+    // Attendre que le DOM soit mis à jour puis forcer le resize de la carte
+    const timeout = setTimeout(() => {
+      map.resize();
+    }, 100);
+
+    return () => clearTimeout(timeout);
+  }, [map, viewMode]);
 
   // --- GESTIONNAIRES D'INTERFACE ---
 
-  // Quand on sélectionne une adresse dans la barre de recherche
   const handleAddressSelect = (place: SearchResult) => {
     if (!map) return;
     const { lon, lat, display_name } = place;
@@ -147,45 +177,16 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: string | null; 
   // --- RENDU ---
   return (
     <div className="h-full flex flex-col bg-gray-50 overflow-hidden">
-
       {/* --- HEADER --- */}
       <div className="bg-slate-700 shadow-lg shrink-0">
         <div className="p-4 pb-0">
           <div className="flex items-center gap-3">
-            {/* Sélecteur d'événement */}
-            <div className="flex items-center gap-2">
-              <label className="text-white font-semibold text-base flex items-center gap-2">
-                <span className="text-xl">🎯</span>
-                <span>Événement</span>
-              </label>
-              <select
-                value={selectedEvent?.id || ""}
-                onChange={(e) => {
-                  const event = events.find((ev) => ev.id === e.target.value);
-                  setSelectedEvent(event ?? null);
-                }}
-                className="min-w-[200px] px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-semibold cursor-pointer"
-              >
-                <option value="">Choisir un événement...</option>
-                {events.map((event) => (
-                  <option key={event.id} value={event.id}>
-                    {event.event_type === "Marathon" && "🏃‍♂️"}
-                    {event.event_type === "Cyclisme" && "🚴‍♂️"}
-                    {event.event_type === "Trail" && "🥾"}
-                    {event.name || `Événement #${event.id}`}
-                    {event.status === "active" && " 🟢"}
-                    {event.status === "planned" && " 🔵"}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Barre de recherche (Composant extrait) */}
+            {/* Barre de recherche */}
             <AddressSearch onSelect={handleAddressSelect} />
           </div>
         </div>
 
-        {/* Onglets Navigation (Carte / Timeline) */}
+        {/* Onglets Navigation */}
         <div className="flex items-center gap-2 px-4 mt-3 border-t border-slate-600">
           <button
             onClick={() => setViewMode("points")}
@@ -219,198 +220,427 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: string | null; 
 
       {/* --- CONTENU PRINCIPAL --- */}
       <div className="flex-1 flex overflow-hidden">
-
         {/* PANNEAU LATÉRAL (Gauche) */}
-        {viewMode === "points" && (
-          <div className="w-96 bg-white border-r border-gray-200 shadow-lg flex flex-col z-20">
-            {addingPointCoords ? (
-              // Mode: Ajout d'un point
-              <div className="flex-1 overflow-y-auto">
-                <AddPointForm
-                  initialCoords={addingPointCoords}
-                  onClose={() => setAddingPointCoords(null)}
-                  onSaved={() => {
-                    setAddingPointCoords(null);
-                    refreshPoints();
-                  }}
-                  eventId={activeEventId}
-                />
-              </div>
-            ) : selectedPoint ? (
-              // Mode: Détails d'un point sélectionné
-              <div className="flex-1 overflow-y-auto">
-                <PointDetails
-                  point={{
-                    ...selectedPoint,
-                    obstacles: (selectedPoint.obstacles || []).map(o => ({ ...o, id: o.id ?? 0 })),
-                    comments: selectedPoint.comments || [],
-                    pictures: selectedPoint.pictures || [],
-                  } as Point}
-                  onClose={() => setSelectedPoint(null)}
-                  onRefresh={refreshPoints}
-                />
-              </div>
-            ) : (
-              // Mode: Liste des points
-              <div className="flex-1 overflow-y-auto p-2 space-y-2">
-                {points.length === 0 ? (
-                  <div className="text-center text-gray-500 py-8">
-                    <p className="text-5xl mb-3">📭</p>
-                    <p className="font-semibold text-gray-700">Aucun point</p>
-                    <p className="text-sm mt-2">Sélectionnez un événement et ajoutez des points sur la carte.</p>
-                  </div>
-                ) : (
-                  points.map((p) => (
-                    <div
-                      key={p.id}
-                      onClick={() => openPopupForPoint(p)}
-                      className="p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-400 hover:shadow-md cursor-pointer group"
-                    >
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="font-bold text-gray-800 text-sm flex gap-2">
-                          <span>📍</span> Point #{p.id}
-                        </span>
-                        <button className="text-blue-600 text-xs font-semibold px-2 py-1 rounded hover:bg-blue-50">
-                          Voir →
-                        </button>
-                      </div>
-                      <div className="flex gap-2 text-xs">
-                        {/* Badges pour obstacles, photos, etc. */}
-                        <span className="bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded border border-orange-200">
-                          🚧 {p.obstacles?.length || 0}
-                        </span>
-                        <span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200">
-                          💬 {p.comments?.length || 0}
-                        </span>
-                      </div>
-                      {(p.pose || p.depose) && (
-                        <div className="text-xs text-gray-500 mt-2">
-                          {p.pose ? formatDateShort(p.pose) : '...'} → {p.depose ? formatDateShort(p.depose) : '...'}
-                        </div>
-                      )}
+        {
+          viewMode === "points" && (
+            <div className="w-96 bg-white border-r border-gray-200 shadow-lg flex flex-col z-20">
+              {addingPointCoords ? (
+                // Mode: Ajout d'un point
+                <div className="flex-1 overflow-y-auto">
+                  <AddPointForm
+                    initialCoords={addingPointCoords}
+                    onClose={() => setAddingPointCoords(null)}
+                    onSaved={() => {
+                      setAddingPointCoords(null);
+                      refreshPoints();
+                    }}
+                    eventId={selectedEventId}
+                  />
+                </div>
+              ) : selectedPoint ? (
+                // Mode: Détails d'un point sélectionné
+                <div className="flex-1 overflow-y-auto">
+                  <PointDetails
+                    point={selectedPoint}
+                    onClose={() => setSelectedPoint(null)}
+                    onRefresh={refreshPoints}
+                  />
+                </div>
+              ) : (
+                // Mode: Liste des points
+                <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                  {points.length === 0 ? (
+                    <div className="text-center text-gray-500 py-8">
+                      <p className="text-5xl mb-3">📭</p>
+                      <p className="font-semibold text-gray-700">Aucun point</p>
+                      <p className="text-sm mt-2">
+                        Sélectionnez un événement et ajoutez des points sur la
+                        carte.
+                      </p>
                     </div>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
-        )}
+                  ) : (
+                    points.map((p) => (
+                      <div
+                        key={p.id}
+                        onClick={() => openPopupForPoint(p)}
+                        className="p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-400 hover:shadow-md cursor-pointer group"
+                      >
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="font-bold text-gray-800 text-sm flex gap-2">
+                            <span>📍</span> Point #{p.id}
+                          </span>
+                          <button className="text-blue-600 text-xs font-semibold px-2 py-1 rounded hover:bg-blue-50">
+                            Voir →
+                          </button>
+                        </div>
+                        <div className="flex gap-2 text-xs">
+                          <span className="bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-200">
+                            📷 {p.pictures?.length || 0}
+                          </span>
+                          {p.status && (
+                            <span className="bg-green-50 text-green-700 px-1.5 py-0.5 rounded border border-green-200">
+                              ✓ Traité
+                            </span>
+                          )}
+                        </div>
+                        {p.comment && (
+                          <div className="text-xs text-gray-500 mt-2 line-clamp-1">
+                            💬 {p.comment}
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        }
 
-        {/* TIMELINE (50% largeur) */}
-        {viewMode === "timeline" && (
-          <div className="w-1/2 bg-white border-r border-gray-200 shadow-lg flex flex-col z-20">
-            <TimelinePanel points={points} onPointClick={openPopupForPoint} />
-          </div>
-        )}
+        {/* TIMELINE */}
+        {
+          viewMode === "timeline" && (
+            <div className="w-1/2 h-full bg-white border-r border-gray-200 shadow-lg flex flex-col z-20 overflow-hidden">
+              {currentEvent ? (
+                <TimelineBar
+                  event={currentEvent}
+                  points={points}
+                  equipements={equipements}
+                  onPointClick={openPopupForPoint}
+                  onClose={() => setViewMode("points")}
+                  onDateChange={() => { }}
+                  mapBounds={mapBounds}
+                />
+              ) : (
+                <div className="p-4 bg-gray-100 text-center flex items-center justify-center h-full">
+                  <div>
+                    <p className="text-5xl mb-3">📅</p>
+                    <p className="font-semibold text-gray-700">Aucun événement sélectionné</p>
+                    <p className="text-sm mt-2 text-gray-500">
+                      Sélectionnez un événement pour voir la frise chronologique
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        }
 
-        {/* CARTE (Reste de l'espace) */}
+        {/* CARTE */}
         <div className="flex-1 flex flex-col overflow-hidden relative">
           <div ref={mapContainer} className="flex-1 h-full" />
 
           {/* OUTILS FLOTTANTS (Sur la carte) */}
-          {activeEventId && (
+          {selectedEventId && (
             <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
-
               {/* Message d'aide */}
-              {(drawingMode !== "none" || awaitingMapClick) && (
-                <div className="bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-medium animate-fade-in">
-                  {awaitingMapClick ? "📍 Cliquez sur la carte pour placer le point" : "Double-cliquez pour terminer le dessin"}
-                </div>
-              )}
+              {
+                (drawingMode !== "none" || awaitingMapClick) && (
+                  <div className="bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-medium animate-fade-in">
+                    {awaitingMapClick
+                      ? "📍 Cliquez sur la carte pour placer le point"
+                      : "Double-cliquez pour terminer le dessin"}
+                  </div>
+                )
+              }
 
               {/* Barre d'outils */}
               <div className="flex gap-2">
                 <button
                   onClick={handleAddPointClick}
-                  className={`px-4 py-3 rounded-lg shadow-lg flex items-center justify-center transition-all ${awaitingMapClick ? "bg-amber-500 text-white animate-pulse" : "bg-white hover:bg-gray-50 text-gray-700"
+                  className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${awaitingMapClick
+                    ? "bg-amber-500 text-white animate-pulse"
+                    : "bg-white hover:bg-gray-50 text-gray-700"
                     }`}
                   title="Ajouter un point"
                 >
-                  <span className="text-xl">📍</span>
+                  <span className="text-base">📍</span>
                 </button>
 
                 <button
                   onClick={startDrawPolygon}
-                  className={`px-4 py-3 rounded-lg shadow-lg flex items-center justify-center transition-all ${drawingMode === "polygon" ? "bg-blue-600 text-white" : "bg-white hover:bg-gray-50 text-gray-700"
+                  className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${drawingMode === "zone"
+                    ? "bg-blue-600 text-white"
+                    : "bg-white hover:bg-gray-50 text-gray-700"
                     }`}
                   title="Zone (Polygone)"
                 >
-                  <span className="text-xl">⬡</span>
+                  <span className="text-base">⬡</span>
                 </button>
 
                 <button
                   onClick={startDrawLine}
-                  className={`px-4 py-3 rounded-lg shadow-lg flex items-center justify-center transition-all ${drawingMode === "line" ? "bg-green-600 text-white" : "bg-white hover:bg-gray-50 text-gray-700"
+                  className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${drawingMode === "parcours"
+                    ? "bg-red-500 text-white"
+                    : "bg-white hover:bg-gray-50 text-gray-700"
                     }`}
                   title="Parcours (Ligne)"
                 >
-                  <span className="text-xl">╱</span>
+                  <span className="text-base">╱</span>
+                </button>
+                <button
+                  onClick={startDrawInterest}
+                  className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${drawingMode === "interest"
+                    ? "bg-purple-600 text-white"
+                    : "bg-black/30 hover:bg-black/40 backdrop-blur-sm text-white"
+                    }`}
+                  title="Point d'intérêt"
+                >
+                  <span className="text-base font-bold">?</span>
+                </button>
+
+                <button
+                  onClick={startDrawEquipment}
+                  className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${drawingMode === "equipment"
+                    ? "bg-green-600 text-white"
+                    : "bg-white hover:bg-gray-50 text-gray-700"
+                    }`}
+                  title="Équipement"
+                >
+                  <span className="text-base">🚧</span>
                 </button>
 
                 {(drawingMode !== "none" || awaitingMapClick) && (
                   <button
                     onClick={() => {
                       if (drawingMode !== "none") cancelDrawing();
-                      if (awaitingMapClick) setAddingPointCoords(null); // Reset via hook logic handled implicitly
-                      // Note: Le hook useMapPoints gère le setAwaitingMapClick(false) mais ici on force l'annulation UI
-                      window.dispatchEvent(new Event('cancel-map-action')); // Simple trick ou appel direct si on expose setAwaiting
+                      if (awaitingMapClick) {
+                        setAddingPointCoords(null);
+                        // Hack pour forcer l'annulation si le state awaitingMapClick n'est pas exposé directement
+                        window.dispatchEvent(new Event("cancel-map-action"));
+                      }
                     }}
-                    className="px-4 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg shadow-lg font-semibold flex items-center gap-2"
+                    className="px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg shadow-lg text-sm font-semibold flex items-center gap-1"
                   >
                     <span>✕ Annuler</span>
                   </button>
                 )}
               </div>
 
-              {/* Liste des géométries (Dropdown) */}
-              {geometries.length > 0 && (
-                <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden max-w-sm mt-2">
-                  <button
-                    onClick={() => setIsGeometryListOpen(!isGeometryListOpen)}
-                    className="w-full px-4 py-2 flex justify-between items-center text-sm font-semibold hover:bg-gray-50"
-                  >
-                    <span>📐 {geometries.length} géométrie(s)</span>
-                    <span className={`transform transition-transform ${isGeometryListOpen ? "rotate-180" : ""}`}>▼</span>
-                  </button>
+              {/* Liste des Zones et Parcours (Dropdown) */}
+              {
+                (zones.length > 0 || parcours.length > 0 || equipements.length > 0) && (
+                  <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden max-w-sm mt-2">
+                    <button
+                      onClick={() => setIsGeometryListOpen(!isGeometryListOpen)}
+                      className="w-full px-4 py-2 flex justify-between items-center text-sm font-semibold hover:bg-gray-50"
+                    >
+                      <span>📐 {zones.length + parcours.length + equipements.length} élément(s)</span>
+                      <span
+                        className={`transform transition-transform ${isGeometryListOpen ? "rotate-180" : ""
+                          }`}
+                      >
+                        ▼
+                      </span>
+                    </button>
 
-                  {isGeometryListOpen && (
-                    <div className="max-h-60 overflow-y-auto bg-gray-50 border-t border-gray-200">
-                      {geometries.map((geom) => {
-                        const { label, icon } = getGeometryTypeLabel(geom.geom);
-                        const isSelected = selectedGeometryId === geom.id;
-                        const isEditing = editingGeometryId === geom.id;
-
-                        return (
-                          <div key={geom.id} className={`p-2 border-b border-gray-200 last:border-0 ${isSelected ? "bg-blue-50" : isEditing ? "bg-amber-50" : ""}`}>
-                            <div className="flex items-center justify-between">
-                              <button onClick={() => highlightGeometry(isSelected ? null : geom)} className="text-left flex-1 text-xs font-medium truncate">
-                                <span className="mr-2 text-base">{icon}</span> {label} #{geom.id}
-                              </button>
-                              {!isEditing && (
-                                <div className="flex gap-1">
-                                  <button onClick={() => startEditGeometry(geom)} className="p-1 text-blue-600 hover:bg-blue-100 rounded">✏️</button>
-                                  <button onClick={() => handleDeleteGeometry(geom.id)} className="p-1 text-red-600 hover:bg-red-100 rounded">🗑️</button>
-                                </div>
-                              )}
+                    {isGeometryListOpen && (
+                      <div className="max-h-60 overflow-y-auto bg-gray-50 border-t border-gray-200">
+                        {/* --- SECTION ZONES --- */}
+                        {zones.length > 0 && (
+                          <div>
+                            <div className="px-3 py-1 bg-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                              Zones
                             </div>
-                            {isEditing && (
-                              <div className="flex gap-2 mt-2">
-                                <button onClick={saveEditGeometry} className="flex-1 bg-green-600 text-white text-xs py-1 rounded">Sauver</button>
-                                <button onClick={cancelEditGeometry} className="flex-1 bg-gray-500 text-white text-xs py-1 rounded">Annuler</button>
-                              </div>
-                            )}
+                            {zones.map((zone) => {
+                              const itemData = { ...zone, type: "zone" as const };
+                              const isSelected =
+                                selectedGeometry?.id === zone.id &&
+                                selectedGeometry?.type === "zone";
+                              const isEditing =
+                                editingGeometry?.id === zone.id &&
+                                editingGeometry?.type === "zone";
+
+                              return (
+                                <div
+                                  key={`zone-${zone.id}`}
+                                  className={`p-2 border-b border-gray-200 last:border-0 hover:bg-blue-50 cursor-pointer transition-colors ${isSelected
+                                    ? "bg-blue-100 border-l-4 border-l-blue-500"
+                                    : isEditing
+                                      ? "bg-amber-50"
+                                      : ""
+                                    }`}
+                                  onClick={() =>
+                                    highlightGeometry(
+                                      isSelected ? null : itemData
+                                    )
+                                  }
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-base">🟦</span>
+                                    <span className="text-xs font-medium truncate flex-1">
+                                      {zone.name || `Zone #${zone.id.slice(0, 8)}`}
+                                    </span>
+                                    {isSelected && (
+                                      <span className="text-blue-500 text-xs">👁️</span>
+                                    )}
+                                  </div>
+
+                                  {isEditing && (
+                                    <div className="flex gap-2 mt-2">
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); saveEditGeometry(); }}
+                                        className="flex-1 bg-green-600 text-white text-xs py-1 rounded"
+                                      >
+                                        Sauver
+                                      </button>
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); cancelEditGeometry(); }}
+                                        className="flex-1 bg-gray-500 text-white text-xs py-1 rounded"
+                                      >
+                                        Annuler
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+                        )}
+
+                        {/* --- SECTION PARCOURS --- */}
+                        {parcours.length > 0 && (
+                          <div>
+                            <div className="px-3 py-1 bg-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider border-t border-gray-200">
+                              Parcours
+                            </div>
+                            {parcours.map((p) => {
+                              const itemData = {
+                                ...p,
+                                type: "parcours" as const,
+                              };
+                              const isSelected =
+                                selectedGeometry?.id === p.id &&
+                                selectedGeometry?.type === "parcours";
+                              const isEditing =
+                                editingGeometry?.id === p.id &&
+                                editingGeometry?.type === "parcours";
+
+                              return (
+                                <div
+                                  key={`parcours-${p.id}`}
+                                  className={`p-2 border-b border-gray-200 last:border-0 hover:bg-blue-50 cursor-pointer transition-colors ${isSelected
+                                    ? "bg-blue-100 border-l-4 border-l-green-500"
+                                    : isEditing
+                                      ? "bg-amber-50"
+                                      : ""
+                                    }`}
+                                  onClick={() =>
+                                    highlightGeometry(
+                                      isSelected ? null : itemData
+                                    )
+                                  }
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-base">〰️</span>
+                                    <span className="text-xs font-medium truncate flex-1">
+                                      {p.name || `Parcours #${p.id.slice(0, 8)}`}
+                                    </span>
+                                    {isSelected && (
+                                      <span className="text-green-500 text-xs">👁️</span>
+                                    )}
+                                  </div>
+
+                                  {isEditing && (
+                                    <div className="flex gap-2 mt-2">
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); saveEditGeometry(); }}
+                                        className="flex-1 bg-green-600 text-white text-xs py-1 rounded"
+                                      >
+                                        Sauver
+                                      </button>
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); cancelEditGeometry(); }}
+                                        className="flex-1 bg-gray-500 text-white text-xs py-1 rounded"
+                                      >
+                                        Annuler
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* --- SECTION ÉQUIPEMENTS --- */}
+                        {equipements.length > 0 && (
+                          <div>
+                            <div className="px-3 py-1 bg-orange-100 text-xs font-bold text-orange-700 uppercase tracking-wider">
+                              🚧 Équipements
+                            </div>
+                            {equipements.map((eq) => (
+                              <div
+                                key={`equipement-${eq.id}`}
+                                className="p-2 border-b border-gray-200 last:border-0 hover:bg-orange-50"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex-1">
+                                    <span className="text-sm font-medium text-gray-700">
+                                      {eq.type_name || "Équipement"}
+                                    </span>
+                                    <div className="text-xs text-gray-500 mt-0.5">
+                                      {eq.length}m/unité • {eq.coordinates?.length || 0} points
+                                    </div>
+                                  </div>
+                                  <button
+                                    onClick={() => handleDeleteEquipement(eq.id)}
+                                    className="p-1 text-red-600 hover:bg-red-100 rounded"
+                                    title="Supprimer"
+                                  >
+                                    🗑️
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              }
+
+            </div >
+          )
+          }
+        </div >
+      </div >
+
+      {/* Formulaire de création de parcours */}
+      {
+        pendingParcoursGeometry && (
+          <ParcoursForm
+            onSubmit={saveParcoursWithDetails}
+            onCancel={cancelParcoursForm}
+          />
+        )
+      }
+
+      {/* Formulaire de création de point d'intérêt */}
+      {
+        pendingInterestGeometry && (
+          <InterestForm
+            onSubmit={async (data) => {
+              await saveInterestWithDetails(data);
+              refreshInterest();
+            }}
+            onCancel={cancelInterestForm}
+          />
+        )
+      }
+
+      {/* Formulaire de création d'équipement */}
+      {
+        pendingEquipmentData && (
+          <EquipementForm
+            lineLength={pendingEquipmentData.lineLength}
+            onSubmit={saveEquipmentWithDetails}
+            onCancel={cancelEquipmentForm}
+          />
+        )
+      }
+    </div >
   );
 }
 

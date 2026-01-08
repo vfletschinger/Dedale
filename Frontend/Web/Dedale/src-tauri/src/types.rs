@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use tauri::webview::cookie::time::convert::Hour;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Event {
@@ -29,7 +28,7 @@ pub struct Parcours {
     pub event_id: String,
     pub name: Option<String>,
     pub color: Option<String>,
-    pub start_time: Option<f64>,
+    pub start_time: Option<i64>,
     pub speed_low: Option<f64>,
     pub speed_high: Option<f64>,
     pub geometry_json: Option<String>,
@@ -50,6 +49,7 @@ pub struct Member {
     pub person_id: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Equipement {
     pub id: String,
@@ -70,6 +70,7 @@ pub struct EquipementCoordinate {
     pub order_index: Option<i64>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Type {
     pub id: String,
@@ -80,6 +81,7 @@ pub struct Type {
     pub height: Option<f64>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Course {
     pub id: String,
@@ -100,15 +102,38 @@ pub struct User {
     pub role: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Point {
     pub id: String,
     pub x: f64,
     pub y: f64,
+    pub name: Option<String>,
     pub comment: Option<String>,
     pub r#type: Option<String>,
     pub status: Option<bool>,
     pub event_id: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Interest {
+    pub id: String,
+    pub x: f64,
+    pub y: f64,
+    pub description: Option<String>,
+    pub event_id: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PointWithDetails {
+    pub id: String,
+    pub x: f64,
+    pub y: f64,
+    pub event_id: Option<String>,
+    pub status: Option<bool>,
+    pub comment: Option<String>,
+    pub r#type: Option<String>,
+    #[serde(default)]
+    pub pictures: Vec<Picture>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -120,7 +145,7 @@ pub struct Person {
     pub phone_number: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Picture {
     pub id: String,
     pub point_id: Option<String>,
@@ -160,6 +185,8 @@ pub struct Geometry {
     pub id: String,
     pub event_id: String,
     pub geom: String,
+    pub geom_type: String, // "point", "parcours", ou "zone"
+    pub name: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

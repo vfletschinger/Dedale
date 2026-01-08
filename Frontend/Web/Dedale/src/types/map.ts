@@ -4,6 +4,24 @@ export interface GeometryData {
   event_id: number;
   geom: string;
 }
+export interface Zone {
+  id: string;
+  name: string;
+  event_id: string;
+  color: string;
+  geometry_json: string;
+}
+
+export interface Parcours {
+  id: string;
+  event_id: string;
+  name: string;
+  color: string;
+  start_time: string;
+  speed_low: number;
+  speed_high: number;
+  geometry_json: string;
+}
 
 // Type pour les obstacles
 export interface Obstacle {
@@ -17,14 +35,26 @@ export interface Obstacle {
 
 // Type pour les points de la carte
 export interface MapPoint {
-  id: number;
+  id: string;
   x: number;
   y: number;
-  pose?: string | null;
-  depose?: string | null;
-  obstacles?: Obstacle[];
-  comments?: { id: number; value: string }[];
-  pictures?: { id: number; image: string }[];
+  event_id: string | null;
+  status?: boolean;
+  comment?: string;
+  type?: string;
+  pictures?: Array<{
+    id: string;
+    point_id: string;
+    image?: string;
+  }>;
+}
+
+export interface MapInterest {
+  id: string;
+  x: number;
+  y: number;
+  description: string;
+  event_id: string | null;
 }
 
 // Type pour les événements
@@ -41,4 +71,32 @@ export interface SearchResult {
   lon: string;
   lat: string;
   display_name: string;
+}
+
+// Types pour les équipements
+export interface EquipementType {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+export interface EquipementCoordinate {
+  id: string;
+  equipement_id: string;
+  x: number;
+  y: number;
+  order_index?: number;
+}
+
+export interface Equipement {
+  id: string;
+  type_id?: string;
+  type_name?: string;
+  type_description?: string;
+  length?: number;
+  date_pose?: string;
+  hour_pose?: string;
+  date_depose?: string;
+  hour_depose?: string;
+  coordinates: EquipementCoordinate[];
 }

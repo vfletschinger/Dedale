@@ -31,10 +31,10 @@ export default function Navigation({
       {/* Barre d'accentuation supérieure */}
       <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-blue-500/60 to-transparent"></div>
 
-      <div className="mx-auto max-w-[1600px] px-4 sm:px-6">
-        <div className="flex h-14 items-center justify-between">
+      <div className="w-full px-2 sm:px-4">
+        <div className="flex h-14 items-center gap-6">
           {/* Section Gauche : Terminal Branding */}
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-6 flex-shrink-0">
             {canGoBack && onGoBack && (
               <button
                 onClick={onGoBack}
@@ -87,29 +87,38 @@ export default function Navigation({
           </div>
 
           {/* Section Centre : Navigation */}
-          <div className="flex items-center gap-2 px-2 py-1.5 bg-slate-800 rounded-lg border border-slate-600 shadow-md">
-            {NAV_ITEMS.map(({ key, label }) => {
-              if (!eventSelected && (key === "team" || key === "data")) {
-                return ""
-              }
-              const isActive = currentPage === key;
-              return (
-                <button
-                  key={key}
-                  onClick={() => onNavigate(key)}
-                  className={`relative px-4 py-2 text-[11px] font-semibold tracking-wide uppercase transition-all duration-200 rounded-md cursor-pointer
+          <div className="flex-1 flex justify-center">
+            <div className="flex items-center gap-2 px-2 py-1.5 bg-slate-800 rounded-lg border border-slate-600 shadow-md">
+              {NAV_ITEMS.map(({ key, label }) => {
+                if (!eventSelected && (key === "team" || key === "data")) {
+                  return ""
+                }
+                const isActive = currentPage === key;
+                const requiresEvent = key !== "event";
+                const isDisabled = requiresEvent && !eventSelected;
+
+                return (
+                  <button
+                    key={key}
+                    onClick={() => onNavigate(key)}
+                    disabled={isDisabled}
+                    className={`relative px-4 py-2 text-[11px] font-semibold tracking-wide uppercase transition-all duration-200 rounded-md
                     ${isActive
-                      ? "text-white bg-blue-600 shadow-md"
-                      : "text-slate-300 hover:text-white hover:bg-slate-700"
-                    }`}
-                >
-                  <span className="relative z-10">{label}</span>
-                  {isActive && (
-                    <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent rounded-md"></div>
-                  )}
-                </button>
-              );
-            })}
+                        ? "text-white bg-blue-600 shadow-md"
+                        : isDisabled
+                          ? "text-slate-500 bg-slate-800 cursor-not-allowed opacity-50"
+                          : "text-slate-300 hover:text-white hover:bg-slate-700"
+                      }`}
+                    title={isDisabled ? "Sélectionnez d'abord un événement" : ""}
+                  >
+                    <span className="relative z-10">{label}</span>
+                    {isActive && (
+                      <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent rounded-md"></div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>

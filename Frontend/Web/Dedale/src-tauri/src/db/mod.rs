@@ -5,11 +5,13 @@ use std::fs;
 use std::str::FromStr;
 use tauri::{AppHandle, Manager};
 
+pub mod equipements;
 pub mod events;
 pub mod geos;
 pub mod persons;
 pub mod points;
 pub mod teams;
+pub use equipements::*;
 pub use events::*;
 pub use geos::*;
 pub use persons::*;
@@ -117,9 +119,25 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
             event_id CHAR(36) NOT NULL,
             x REAL NOT NULL,
             y REAL NOT NULL,
+            name TEXT DEFAULT 'Nouveau point',
             comment TEXT,
             type TEXT,
             status BOOLEAN,
+            FOREIGN KEY (event_id) REFERENCES event (id) ON DELETE CASCADE
+        )",
+    )
+    .execute(&pool)
+    .await
+    .map_err(|e| format!("Error creating point: {}", e))?;
+
+    // --- POINTS D'INTÉRÊT ---
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS interest (
+            id CHAR(36) PRIMARY KEY,
+            event_id CHAR(36) NOT NULL,
+            x REAL NOT NULL,
+            y REAL NOT NULL,
+            description TEXT,
             FOREIGN KEY (event_id) REFERENCES event (id) ON DELETE CASCADE
         )",
     )
