@@ -2,7 +2,6 @@ import { useRef, useEffect, useState } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
-import { invoke } from "@tauri-apps/api/core";
 
 // Composants
 import PointDetails from "./PointDetails";
@@ -29,9 +28,6 @@ function OfflineMapLibre({
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
 
-  // Gestion des événements (Sélecteur en haut à gauche)
-  const [events, setEvents] = useState<MapEvent[]>([]);
-  const [selectedEvent, setSelectedEvent] = useState<MapEvent | null>(null);
 
   // Gestion de l'affichage (Vue Carte vs Timeline)
   const [viewMode, setViewMode] = useState<"points" | "timeline">("points");
@@ -41,10 +37,6 @@ function OfflineMapLibre({
     null
   );
 
-  // Calcul de l'ID actif (soit celui sélectionné dans la liste, soit celui passé en props)
-  const activeEventId = selectedEvent?.id ?? selectedEventId;
-
-  // --- APPEL DES HOOKS ---
 
   // 1. Logique des POINTS
   const {
@@ -58,7 +50,7 @@ function OfflineMapLibre({
     refreshPoints,
     refreshInterest,
     openPopupForPoint,
-  } = useMapPoints(map, activeEventId);
+  } = useMapPoints(map, selectedEventId);
 
   // 2. Logique des GÉOMÉTRIES (Zones & Parcours)
   const {
@@ -72,6 +64,8 @@ function OfflineMapLibre({
     setIsGeometryListOpen,
     startDrawPolygon,
     startDrawLine,
+    startDrawInterest,
+    startDrawEquipment,
     cancelDrawing,
     saveEditGeometry,
     handleDeleteGeometry,
@@ -83,7 +77,12 @@ function OfflineMapLibre({
     saveParcoursWithDetails,
     saveInterestWithDetails,
     cancelParcoursForm,
-  } = useMapGeometries(map, activeEventId);
+    cancelInterestForm,
+    pendingEquipmentData,
+    saveEquipmentWithDetails,
+    cancelEquipmentForm,
+    handleDeleteEquipement,
+  } = useMapGeometries(map, selectedEventId);
 
   // --- EFFETS (Chargement initial) ---
 
@@ -93,7 +92,7 @@ function OfflineMapLibre({
 
     const mapInstance = new maplibregl.Map({
       container: mapContainer.current,
-      style: "http://localhost:8082/styles/basic-preview/style.json",
+      style: "http://localhost:8080/styles/basic-preview/style.json",
       center: [7.7635, 48.5465],
       zoom: 13,
     });
@@ -111,24 +110,6 @@ function OfflineMapLibre({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Charger la liste des événements
-  useEffect(() => {
-    const loadAllEvents = async () => {
-      try {
-        const allEvents = await invoke<MapEvent[]>("fetch_events");
-        setEvents(allEvents);
-
-        if (selectedEventId) {
-          const ev = allEvents.find((e) => e.id === selectedEventId);
-          if (ev) setSelectedEvent(ev);
-        }
-      } catch (err) {
-        console.error("Erreur chargement événements:", err);
-      }
-    };
-    loadAllEvents();
-  }, [selectedEventId]);
 
   // --- GESTIONNAIRES D'INTERFACE ---
 
@@ -208,7 +189,7 @@ function OfflineMapLibre({
                     setAddingPointCoords(null);
                     refreshPoints();
                   }}
-                  eventId={activeEventId}
+                  eventId={selectedEventId}
                 />
               </div>
             ) : selectedPoint ? (
@@ -282,7 +263,7 @@ function OfflineMapLibre({
           <div ref={mapContainer} className="flex-1 h-full" />
 
           {/* OUTILS FLOTTANTS (Sur la carte) */}
-          {activeEventId && (
+          {selectedEventId && (
             <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
               {/* Message d'aide */}
               {(drawingMode !== "none" || awaitingMapClick) && (
@@ -340,6 +321,18 @@ function OfflineMapLibre({
                   title="Point d'intérêt"
                 >
                   <span className="text-base font-bold">?</span>
+                </button>
+
+                <button
+                  onClick={startDrawEquipment}
+                  className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${
+                    drawingMode === "equipment"
+                      ? "bg-green-600 text-white"
+                      : "bg-white hover:bg-gray-50 text-gray-700"
+                  }`}
+                  title="Équipement"
+                >
+                  <span className="text-base">🚧</span>
                 </button>
 
                 {(drawingMode !== "none" || awaitingMapClick) && (
@@ -630,6 +623,26 @@ function OfflineMapLibre({
         <ParcoursForm
           onSubmit={saveParcoursWithDetails}
           onCancel={cancelParcoursForm}
+        />
+      )}
+
+      {/* Formulaire de création de point d'intérêt */}
+      {pendingInterestGeometry && (
+        <InterestForm
+          onSubmit={async (data) => {
+            await saveInterestWithDetails(data);
+            refreshInterest();
+          }}
+          onCancel={cancelInterestForm}
+        />
+      )}
+
+      {/* Formulaire de création d'équipement */}
+      {pendingEquipmentData && (
+        <EquipementForm
+          lineLength={pendingEquipmentData.lineLength}
+          onSubmit={saveEquipmentWithDetails}
+          onCancel={cancelEquipmentForm}
         />
       )}
     </div>
