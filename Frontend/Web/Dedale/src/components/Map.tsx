@@ -11,13 +11,15 @@ import AddPointForm from "./AddPointForm";
 import TimelinePanel from "./TimelinePanel";
 import AddressSearch from "./AdressSearch";
 import ParcoursForm from "./ParcoursForm";
+import InterestForm from "./InterestForm";
+import EquipementForm from "./EquipementForm";
 
 // Hooks personnalisés
 import { useMapPoints } from "../hooks/useMapPoints";
 import { useMapGeometries } from "../hooks/useMapGeometries";
 
 // Types et Utils
-import { MapEvent, SearchResult } from "../types/map";
+import { SearchResult } from "../types/map";
 
 function OfflineMapLibre({
   selectedEventId,
@@ -28,9 +30,6 @@ function OfflineMapLibre({
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
 
-  // Gestion des événements (Sélecteur en haut à gauche)
-  const [events, setEvents] = useState<MapEvent[]>([]);
-  const [selectedEvent, setSelectedEvent] = useState<MapEvent | null>(null);
 
   // Gestion de l'affichage (Vue Carte vs Timeline)
   const [viewMode, setViewMode] = useState<"points" | "timeline">("points");
@@ -40,10 +39,6 @@ function OfflineMapLibre({
     null,
   );
 
-  // Calcul de l'ID actif (soit celui sélectionné dans la liste, soit celui passé en props)
-  const activeEventId = selectedEvent?.id ?? selectedEventId;
-
-  // --- APPEL DES HOOKS ---
 
   // 1. Logique des POINTS
   const {
@@ -55,13 +50,15 @@ function OfflineMapLibre({
     awaitingMapClick,
     handleAddPointClick,
     refreshPoints,
+    refreshInterest,
     openPopupForPoint,
-  } = useMapPoints(map, activeEventId);
+  } = useMapPoints(map, selectedEventId);
 
   // 2. Logique des GÉOMÉTRIES (Zones & Parcours)
   const {
     zones,
     parcours,
+    equipements,
     drawingMode,
     selectedGeometry,
     editingGeometry,
@@ -69,6 +66,8 @@ function OfflineMapLibre({
     setIsGeometryListOpen,
     startDrawPolygon,
     startDrawLine,
+    startDrawInterest,
+    startDrawEquipment,
     cancelDrawing,
     saveEditGeometry,
     handleDeleteGeometry,
@@ -76,9 +75,16 @@ function OfflineMapLibre({
     cancelEditGeometry,
     highlightGeometry,
     pendingParcoursGeometry,
+    pendingInterestGeometry,
     saveParcoursWithDetails,
+    saveInterestWithDetails,
     cancelParcoursForm,
-  } = useMapGeometries(map, activeEventId);
+    cancelInterestForm,
+    pendingEquipmentData,
+    saveEquipmentWithDetails,
+    cancelEquipmentForm,
+    handleDeleteEquipement,
+  } = useMapGeometries(map, selectedEventId);
 
   // --- EFFETS (Chargement initial) ---
 
@@ -265,24 +271,6 @@ function OfflineMapLibre({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Charger la liste des événements
-  useEffect(() => {
-    const loadAllEvents = async () => {
-      try {
-        const allEvents = await invoke<MapEvent[]>("fetch_events");
-        setEvents(allEvents);
-
-        if (selectedEventId) {
-          const ev = allEvents.find((e) => e.id === selectedEventId);
-          if (ev) setSelectedEvent(ev);
-        }
-      } catch (err) {
-        console.error("Erreur chargement événements:", err);
-      }
-    };
-    loadAllEvents();
-  }, [selectedEventId]);
-
   // --- GESTIONNAIRES D'INTERFACE ---
 
   const handleAddressSelect = (place: SearchResult) => {
@@ -361,7 +349,7 @@ function OfflineMapLibre({
                     setAddingPointCoords(null);
                     refreshPoints();
                   }}
-                  eventId={activeEventId}
+                  eventId={selectedEventId}
                 />
               </div>
             ) : selectedPoint ? (
@@ -435,7 +423,7 @@ function OfflineMapLibre({
           <div ref={mapContainer} className="flex-1 h-full" />
 
           {/* OUTILS FLOTTANTS (Sur la carte) */}
-          {activeEventId && (
+          {selectedEventId && (
             <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
               {/* Message d'aide */}
               {(drawingMode !== "none" || awaitingMapClick) && (
@@ -450,38 +438,61 @@ function OfflineMapLibre({
               <div className="flex gap-2">
                 <button
                   onClick={handleAddPointClick}
-                  className={`px-4 py-3 rounded-lg shadow-lg flex items-center justify-center transition-all ${
+                  className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${
                     awaitingMapClick
                       ? "bg-amber-500 text-white animate-pulse"
                       : "bg-white hover:bg-gray-50 text-gray-700"
                   }`}
                   title="Ajouter un point"
                 >
-                  <span className="text-xl">📍</span>
+                  <span className="text-base">📍</span>
                 </button>
 
                 <button
                   onClick={startDrawPolygon}
-                  className={`px-4 py-3 rounded-lg shadow-lg flex items-center justify-center transition-all ${
+                  className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${
                     drawingMode === "zone"
                       ? "bg-blue-600 text-white"
                       : "bg-white hover:bg-gray-50 text-gray-700"
                   }`}
                   title="Zone (Polygone)"
                 >
-                  <span className="text-xl">⬡</span>
+                  <span className="text-base">⬡</span>
                 </button>
 
                 <button
                   onClick={startDrawLine}
-                  className={`px-4 py-3 rounded-lg shadow-lg flex items-center justify-center transition-all ${
+                  className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${
                     drawingMode === "parcours"
-                      ? "bg-green-600 text-white"
+                      ? "bg-red-500 text-white"
                       : "bg-white hover:bg-gray-50 text-gray-700"
                   }`}
                   title="Parcours (Ligne)"
                 >
-                  <span className="text-xl">╱</span>
+                  <span className="text-base">╱</span>
+                </button>
+                <button
+                  onClick={startDrawInterest}
+                  className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${
+                    drawingMode === "interest"
+                      ? "bg-purple-600 text-white"
+                      : "bg-black/30 hover:bg-black/40 backdrop-blur-sm text-white"
+                  }`}
+                  title="Point d'intérêt"
+                >
+                  <span className="text-base font-bold">?</span>
+                </button>
+
+                <button
+                  onClick={startDrawEquipment}
+                  className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${
+                    drawingMode === "equipment"
+                      ? "bg-green-600 text-white"
+                      : "bg-white hover:bg-gray-50 text-gray-700"
+                  }`}
+                  title="Équipement"
+                >
+                  <span className="text-base">🚧</span>
                 </button>
 
                 {(drawingMode !== "none" || awaitingMapClick) && (
@@ -494,7 +505,7 @@ function OfflineMapLibre({
                         window.dispatchEvent(new Event("cancel-map-action"));
                       }
                     }}
-                    className="px-4 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg shadow-lg font-semibold flex items-center gap-2"
+                    className="px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg shadow-lg text-sm font-semibold flex items-center gap-1"
                   >
                     <span>✕ Annuler</span>
                   </button>
@@ -502,13 +513,13 @@ function OfflineMapLibre({
               </div>
 
               {/* Liste des Zones et Parcours (Dropdown) */}
-              {(zones.length > 0 || parcours.length > 0) && (
+              {(zones.length > 0 || parcours.length > 0 || equipements.length > 0) && (
                 <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden max-w-sm mt-2">
                   <button
                     onClick={() => setIsGeometryListOpen(!isGeometryListOpen)}
                     className="w-full px-4 py-2 flex justify-between items-center text-sm font-semibold hover:bg-gray-50"
                   >
-                    <span>📐 {zones.length + parcours.length} élément(s)</span>
+                    <span>📐 {zones.length + parcours.length + equipements.length} élément(s)</span>
                     <span
                       className={`transform transition-transform ${
                         isGeometryListOpen ? "rotate-180" : ""
@@ -659,7 +670,7 @@ function OfflineMapLibre({
                                               <div>
                                                 📅{" "}
                                                 {new Date(
-                                                  p.start_time,
+                                                  p.start_time
                                                 ).toLocaleString("fr-FR", {
                                                   day: "2-digit",
                                                   month: "2-digit",
@@ -724,10 +735,44 @@ function OfflineMapLibre({
                           })}
                         </div>
                       )}
+
+                      {/* --- SECTION ÉQUIPEMENTS --- */}
+                      {equipements.length > 0 && (
+                        <div>
+                          <div className="px-3 py-1 bg-orange-100 text-xs font-bold text-orange-700 uppercase tracking-wider">
+                            🚧 Équipements
+                          </div>
+                          {equipements.map((eq) => (
+                            <div
+                              key={`equipement-${eq.id}`}
+                              className="p-2 border-b border-gray-200 last:border-0 hover:bg-orange-50"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <span className="text-sm font-medium text-gray-700">
+                                    {eq.type_name || "Équipement"}
+                                  </span>
+                                  <div className="text-xs text-gray-500 mt-0.5">
+                                    {eq.length}m/unité • {eq.coordinates?.length || 0} points
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => handleDeleteEquipement(eq.id)}
+                                  className="p-1 text-red-600 hover:bg-red-100 rounded"
+                                  title="Supprimer"
+                                >
+                                  🗑️
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
               )}
+
             </div>
           )}
         </div>
@@ -738,6 +783,26 @@ function OfflineMapLibre({
         <ParcoursForm
           onSubmit={saveParcoursWithDetails}
           onCancel={cancelParcoursForm}
+        />
+      )}
+
+      {/* Formulaire de création de point d'intérêt */}
+      {pendingInterestGeometry && (
+        <InterestForm
+          onSubmit={async (data) => {
+            await saveInterestWithDetails(data);
+            refreshInterest();
+          }}
+          onCancel={cancelInterestForm}
+        />
+      )}
+
+      {/* Formulaire de création d'équipement */}
+      {pendingEquipmentData && (
+        <EquipementForm
+          lineLength={pendingEquipmentData.lineLength}
+          onSubmit={saveEquipmentWithDetails}
+          onCancel={cancelEquipmentForm}
         />
       )}
     </div>

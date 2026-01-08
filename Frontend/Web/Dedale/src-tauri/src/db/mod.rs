@@ -1,20 +1,22 @@
 use bcrypt::{hash, verify, DEFAULT_COST};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
-use sqlx::{SqlitePool};
+use sqlx::SqlitePool;
 use std::fs;
 use std::str::FromStr;
 use tauri::{AppHandle, Manager};
 
+pub mod equipements;
 pub mod events;
-pub mod teams;
-pub mod points;
 pub mod geos;
 pub mod persons;
+pub mod points;
+pub mod teams;
+pub use equipements::*;
 pub use events::*;
-pub use teams::*;
-pub use points::*;
 pub use geos::*;
 pub use persons::*;
+pub use points::*;
+pub use teams::*;
 // Réexporter les types depuis le module types
 pub use crate::types::*;
 
@@ -51,7 +53,6 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
         .execute(&pool)
         .await
         .map_err(|e| format!("Failed to enable foreign keys: {}", e))?;
-
 
     // --- GESTION DES ACCÈS ---
     sqlx::query(
@@ -121,6 +122,21 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
             comment TEXT,
             type TEXT,
             status BOOLEAN,
+            FOREIGN KEY (event_id) REFERENCES event (id) ON DELETE CASCADE
+        )",
+    )
+    .execute(&pool)
+    .await
+    .map_err(|e| format!("Error creating point: {}", e))?;
+
+    // --- POINTS D'INTÉRÊT ---
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS interest (
+            id CHAR(36) PRIMARY KEY,
+            event_id CHAR(36) NOT NULL,
+            x REAL NOT NULL,
+            y REAL NOT NULL,
+            description TEXT,
             FOREIGN KEY (event_id) REFERENCES event (id) ON DELETE CASCADE
         )",
     )

@@ -1,7 +1,7 @@
-use sqlx::{Row};
-use tauri::{AppHandle};
-use uuid::Uuid;
 use crate::types::*;
+use sqlx::Row;
+use tauri::AppHandle;
+use uuid::Uuid;
 
 use crate::db::get_db_pool;
 
@@ -39,7 +39,7 @@ pub async fn create_person(
     phone_number: String,
 ) -> Result<Person, String> {
     let pool = get_db_pool(&app).await?;
-    let id = Uuid::new_v4().to_string();    
+    let id = Uuid::new_v4().to_string();
     let _result = sqlx::query(
         "INSERT INTO person (id, firstname, lastname, email, address, phone_number) VALUES (?, ?, ?, ?, ?, ?)"
     )
@@ -52,7 +52,6 @@ pub async fn create_person(
     .execute(&pool)
     .await
     .map_err(|e| e.to_string())?;
-
 
     Ok(Person {
         id: id,
