@@ -41,11 +41,20 @@ export interface MapPoint {
   event_id: string | null;
   status?: boolean;
   comment?: string;
+  type?: string;
   pictures?: Array<{
     id: string;
     point_id: string;
     image?: string;
   }>;
+}
+
+export interface MapInterest {
+  id: string;
+  x: number;
+  y: number;
+  description: string;
+  event_id: string | null;
 }
 
 // Type pour les événements

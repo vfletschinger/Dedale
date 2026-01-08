@@ -45,9 +45,12 @@ export function useMapGeometries(
   const [parcours, setParcours] = useState<Parcours[]>([]);
   const [equipements, setEquipements] = useState<Equipement[]>([]);
   const [drawingMode, setDrawingMode] = useState<
-    "none" | "zone" | "parcours" | "equipment"
+    "none" | "zone" | "parcours" | "interest" | "equipment"
   >("none");
   const [pendingParcoursGeometry, setPendingParcoursGeometry] = useState<
+    string | null
+  >(null);
+  const [pendingInterestGeometry, setPendingInterestGeometry] = useState<
     string | null
   >(null);
   // État pour stocker les coordonnées d'un équipement en attente de validation
@@ -71,7 +74,8 @@ export function useMapGeometries(
   // --- REFS ---
   const drawRef = useRef<MapboxDraw | null>(null);
   const selectedEventIdRef = useRef<number | null>(selectedEventId);
-  const drawingModeRef = useRef<"none" | "zone" | "parcours" | "equipment">(
+  const mountedRef = useRef(true);
+  const drawingModeRef = useRef<"none" | "zone" | "parcours" | "interest" | "equipment">(
     "none"
   );
 
@@ -134,7 +138,7 @@ export function useMapGeometries(
           return {
             type: "Feature",
             geometry,
-            properties: { id: p.id, type: "parcours", event_id: p.event_id },
+            properties: { id: p.id, type: "parcours", event_id: p.event_id, color: p.color || "#ef4444" },
           } as GeoJSON.Feature;
         })
         .filter((f): f is GeoJSON.Feature => f !== null);
@@ -157,26 +161,26 @@ export function useMapGeometries(
           paint: { "fill-color": "#6366f1", "fill-opacity": 0.3 },
         });
 
-        mapObj.addLayer({
-          id: "event-geometries-line",
-          type: "line",
-          source: "event-geometries",
-          filter: [
-            "any",
-            ["==", ["geometry-type"], "LineString"],
-            ["==", ["geometry-type"], "Polygon"],
+      mapObj.addLayer({
+        id: "event-geometries-line",
+        type: "line",
+        source: "event-geometries",
+        filter: [
+          "any",
+          ["==", ["geometry-type"], "LineString"],
+          ["==", ["geometry-type"], "Polygon"],
+        ],
+        paint: {
+          "line-color": [
+            "case",
+            ["==", ["get", "type"], "parcours"],
+            "#ef4444", // Rouge Parcours
+            "#4f46e5", // Bleu Zones
           ],
-          paint: {
-            "line-color": [
-              "case",
-              ["==", ["get", "type"], "parcours"],
-              "#ef4444", // Rouge Parcours
-              "#4f46e5", // Bleu Zones
-            ],
-            "line-width": 3,
-          },
-        });
-      }
+          "line-width": 3,
+        },
+      });
+    }
 
       // Affichage des équipements
       if (currentEquipements.length > 0) {
@@ -239,19 +243,27 @@ export function useMapGeometries(
             eventId: String(selectedEventId),
           }),
         ]);
-      setZones(fetchedZones);
-      setParcours(fetchedParcours);
-      setEquipements(fetchedEquipements);
-      refreshGeometriesOnMap(
-        map,
-        fetchedZones,
-        fetchedParcours,
-        fetchedEquipements
-      );
+      if (mountedRef.current) {
+        setZones(fetchedZones);
+        setParcours(fetchedParcours);
+        setEquipements(fetchedEquipements);
+        refreshGeometriesOnMap(
+          map,
+          fetchedZones,
+          fetchedParcours,
+          fetchedEquipements
+        );
+      }
     } catch (err) {
       console.error("Erreur chargement données:", err);
     }
   }, [map, selectedEventId, refreshGeometriesOnMap]);
+
+  // ✅ CHARGE les géométries au démarrage ou quand l'événement change
+  useEffect(() => {
+    if (!map || !selectedEventId) return;
+    loadGeometries();
+  }, [map, selectedEventId, loadGeometries]);
 
   // --- Initialisation Draw & Listeners ---
   useEffect(() => {
@@ -276,7 +288,7 @@ export function useMapGeometries(
             ["==", "$type", "LineString"],
             ["!=", "mode", "static"],
           ],
-          paint: { "line-color": "#22c55e", "line-width": 4 },
+          paint: { "line-color": "#ef4444", "line-width": 4 },
         },
         {
           id: "gl-draw-point-active",
@@ -296,7 +308,8 @@ export function useMapGeometries(
     drawRef.current = draw;
 
     // EVENT: CRÉATION
-    map.on("draw.create", async (e: any) => {
+
+    map.on("draw.create", async (e: MapboxDraw.DrawCreateEvent) => {
       const feature = e.features[0];
       if (!feature) return;
 
@@ -337,6 +350,12 @@ export function useMapGeometries(
             draw.deleteAll();
             draw.changeMode("simple_select");
           }
+        } else if (geomType === "Point") {
+          // Pour les points d'intérêt, on stocke la géométrie et on attend le formulaire
+          setPendingInterestGeometry(wkt);
+          draw.deleteAll();
+          draw.changeMode("simple_select");
+          setDrawingMode("none");
         }
       } catch (err) {
         console.error("Erreur save:", err);
@@ -359,6 +378,12 @@ export function useMapGeometries(
       return alert("⚠️ Sélectionnez un événement.");
     setDrawingMode("parcours");
     drawRef.current.changeMode("draw_line_string");
+  };
+
+  const startDrawInterest = () => {
+    if (!drawRef.current || !selectedEventId) return alert("⚠️ Sélectionnez un événement.");
+    setDrawingMode("interest");
+    drawRef.current.changeMode("draw_point");
   };
 
   const cancelDrawing = () => {
@@ -440,13 +465,12 @@ export function useMapGeometries(
 
     drawRef.current.deleteAll();
     // On utilise l'ID tel quel (string UUID)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     drawRef.current.add({
       type: "Feature",
       id: item.id,
       geometry,
       properties: {},
-    } as any);
+    } as GeoJSON.Feature);
 
     drawRef.current.changeMode("direct_select", { featureId: item.id });
 
@@ -545,6 +569,35 @@ export function useMapGeometries(
       console.error(err);
     }
   };
+  const saveInterestWithDetails = async (data: {
+    description: string;
+  }) => {
+    if (!pendingInterestGeometry || !selectedEventId) return;
+    try {
+      // Extraire les coordonnées du WKT Point (format: "POINT(x y)")
+      const match = pendingInterestGeometry.match(/POINT\(([^ ]+)\s+([^ ]+)\)/);
+      if (!match) {
+        alert("Erreur: coordonnées invalides");
+        return;
+      }
+      const x = parseFloat(match[1]);
+      const y = parseFloat(match[2]);
+
+      await invoke("create_interest_point", {
+        eventId: String(selectedEventId),
+        x,
+        y,
+        description: data.description,
+      });
+      setPendingInterestGeometry(null);
+      setDrawingMode("none");
+      // ✅ Appeler refreshInterest au lieu de loadGeometries
+    } catch (err) {
+      console.error("Erreur création point d'intérêt:", err);
+      alert("Erreur lors de la création du point d'intérêt");
+    }
+  
+  }
 
   // Fonction pour sauvegarder le parcours avec les détails du formulaire
   const saveParcoursWithDetails = async (data: {
@@ -583,6 +636,10 @@ export function useMapGeometries(
 
   const cancelParcoursForm = () => {
     setPendingParcoursGeometry(null);
+    setDrawingMode("none");
+  };
+  const cancelInterestForm = () => {
+    setPendingInterestGeometry(null);
     setDrawingMode("none");
   };
 
@@ -643,6 +700,7 @@ export function useMapGeometries(
     setIsGeometryListOpen,
     startDrawPolygon,
     startDrawLine,
+    startDrawInterest,
     startDrawEquipment,
     cancelDrawing,
     saveEditGeometry,
@@ -651,7 +709,10 @@ export function useMapGeometries(
     cancelEditGeometry,
     highlightGeometry,
     pendingParcoursGeometry,
+    pendingInterestGeometry,
     saveParcoursWithDetails,
+    saveInterestWithDetails,
+    cancelInterestForm,
     cancelParcoursForm,
     // Équipements
     pendingEquipmentData,
@@ -659,4 +720,5 @@ export function useMapGeometries(
     cancelEquipmentForm,
     handleDeleteEquipement,
   };
+
 }

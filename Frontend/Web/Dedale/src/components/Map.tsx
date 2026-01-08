@@ -2,7 +2,6 @@ import { useRef, useEffect, useState } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
-import { invoke } from "@tauri-apps/api/core";
 
 // Composants
 import PointDetails from "./PointDetails";
@@ -10,6 +9,7 @@ import AddPointForm from "./AddPointForm";
 import TimelinePanel from "./TimelinePanel";
 import AddressSearch from "./AdressSearch";
 import ParcoursForm from "./ParcoursForm";
+import InterestForm from "./InterestForm";
 import EquipementForm from "./EquipementForm";
 
 // Hooks personnalisés
@@ -17,7 +17,7 @@ import { useMapPoints } from "../hooks/useMapPoints";
 import { useMapGeometries } from "../hooks/useMapGeometries";
 
 // Types et Utils
-import { MapEvent, SearchResult } from "../types/map";
+import { SearchResult } from "../types/map";
 
 function OfflineMapLibre({
   selectedEventId,
@@ -28,9 +28,6 @@ function OfflineMapLibre({
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
 
-  // Gestion des événements (Sélecteur en haut à gauche)
-  const [events, setEvents] = useState<MapEvent[]>([]);
-  const [selectedEvent, setSelectedEvent] = useState<MapEvent | null>(null);
 
   // Gestion de l'affichage (Vue Carte vs Timeline)
   const [viewMode, setViewMode] = useState<"points" | "timeline">("points");
@@ -40,10 +37,6 @@ function OfflineMapLibre({
     null
   );
 
-  // Calcul de l'ID actif (soit celui sélectionné dans la liste, soit celui passé en props)
-  const activeEventId = selectedEvent?.id ?? selectedEventId;
-
-  // --- APPEL DES HOOKS ---
 
   // 1. Logique des POINTS
   const {
@@ -55,8 +48,9 @@ function OfflineMapLibre({
     awaitingMapClick,
     handleAddPointClick,
     refreshPoints,
+    refreshInterest,
     openPopupForPoint,
-  } = useMapPoints(map, activeEventId);
+  } = useMapPoints(map, selectedEventId);
 
   // 2. Logique des GÉOMÉTRIES (Zones & Parcours)
   const {
@@ -70,6 +64,7 @@ function OfflineMapLibre({
     setIsGeometryListOpen,
     startDrawPolygon,
     startDrawLine,
+    startDrawInterest,
     startDrawEquipment,
     cancelDrawing,
     saveEditGeometry,
@@ -78,13 +73,16 @@ function OfflineMapLibre({
     cancelEditGeometry,
     highlightGeometry,
     pendingParcoursGeometry,
+    pendingInterestGeometry,
     saveParcoursWithDetails,
+    saveInterestWithDetails,
     cancelParcoursForm,
+    cancelInterestForm,
     pendingEquipmentData,
     saveEquipmentWithDetails,
     cancelEquipmentForm,
     handleDeleteEquipement,
-  } = useMapGeometries(map, activeEventId);
+  } = useMapGeometries(map, selectedEventId);
 
   // --- EFFETS (Chargement initial) ---
 
@@ -94,7 +92,7 @@ function OfflineMapLibre({
 
     const mapInstance = new maplibregl.Map({
       container: mapContainer.current,
-      style: "http://localhost:8082/styles/basic-preview/style.json",
+      style: "http://localhost:8080/styles/basic-preview/style.json",
       center: [7.7635, 48.5465],
       zoom: 13,
     });
@@ -112,24 +110,6 @@ function OfflineMapLibre({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Charger la liste des événements
-  useEffect(() => {
-    const loadAllEvents = async () => {
-      try {
-        const allEvents = await invoke<MapEvent[]>("fetch_events");
-        setEvents(allEvents);
-
-        if (selectedEventId) {
-          const ev = allEvents.find((e) => e.id === selectedEventId);
-          if (ev) setSelectedEvent(ev);
-        }
-      } catch (err) {
-        console.error("Erreur chargement événements:", err);
-      }
-    };
-    loadAllEvents();
-  }, [selectedEventId]);
 
   // --- GESTIONNAIRES D'INTERFACE ---
 
@@ -209,7 +189,7 @@ function OfflineMapLibre({
                     setAddingPointCoords(null);
                     refreshPoints();
                   }}
-                  eventId={activeEventId}
+                  eventId={selectedEventId}
                 />
               </div>
             ) : selectedPoint ? (
@@ -283,7 +263,7 @@ function OfflineMapLibre({
           <div ref={mapContainer} className="flex-1 h-full" />
 
           {/* OUTILS FLOTTANTS (Sur la carte) */}
-          {activeEventId && (
+          {selectedEventId && (
             <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
               {/* Message d'aide */}
               {(drawingMode !== "none" || awaitingMapClick) && (
@@ -298,49 +278,61 @@ function OfflineMapLibre({
               <div className="flex gap-2">
                 <button
                   onClick={handleAddPointClick}
-                  className={`px-4 py-3 rounded-lg shadow-lg flex items-center justify-center transition-all ${
+                  className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${
                     awaitingMapClick
                       ? "bg-amber-500 text-white animate-pulse"
                       : "bg-white hover:bg-gray-50 text-gray-700"
                   }`}
                   title="Ajouter un point"
                 >
-                  <span className="text-xl">📍</span>
+                  <span className="text-base">📍</span>
                 </button>
 
                 <button
                   onClick={startDrawPolygon}
-                  className={`px-4 py-3 rounded-lg shadow-lg flex items-center justify-center transition-all ${
+                  className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${
                     drawingMode === "zone"
                       ? "bg-blue-600 text-white"
                       : "bg-white hover:bg-gray-50 text-gray-700"
                   }`}
                   title="Zone (Polygone)"
                 >
-                  <span className="text-xl">⬡</span>
+                  <span className="text-base">⬡</span>
                 </button>
 
                 <button
                   onClick={startDrawLine}
-                  className={`px-4 py-3 rounded-lg shadow-lg flex items-center justify-center transition-all ${
+                  className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${
                     drawingMode === "parcours"
-                      ? "bg-green-600 text-white"
+                      ? "bg-red-500 text-white"
                       : "bg-white hover:bg-gray-50 text-gray-700"
                   }`}
                   title="Parcours (Ligne)"
                 >
-                  <span className="text-xl">╱</span>
+                  <span className="text-base">╱</span>
+                </button>
+                <button
+                  onClick={startDrawInterest}
+                  className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${
+                    drawingMode === "interest"
+                      ? "bg-purple-600 text-white"
+                      : "bg-black/30 hover:bg-black/40 backdrop-blur-sm text-white"
+                  }`}
+                  title="Point d'intérêt"
+                >
+                  <span className="text-base font-bold">?</span>
                 </button>
 
                 <button
                   onClick={startDrawEquipment}
-                  className={`px-4 py-3 rounded-lg shadow-lg flex items-center justify-center transition-all ${
+                  className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${
                     drawingMode === "equipment"
                       ? "bg-green-600 text-white"
                       : "bg-white hover:bg-gray-50 text-gray-700"
                   }`}
+                  title="Équipement"
                 >
-                  <span className="text-xl">🚧</span>
+                  <span className="text-base">🚧</span>
                 </button>
 
                 {(drawingMode !== "none" || awaitingMapClick) && (
@@ -353,7 +345,7 @@ function OfflineMapLibre({
                         window.dispatchEvent(new Event("cancel-map-action"));
                       }
                     }}
-                    className="px-4 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg shadow-lg font-semibold flex items-center gap-2"
+                    className="px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg shadow-lg text-sm font-semibold flex items-center gap-1"
                   >
                     <span>✕ Annuler</span>
                   </button>
@@ -620,6 +612,7 @@ function OfflineMapLibre({
                   )}
                 </div>
               )}
+
             </div>
           )}
         </div>
@@ -630,6 +623,17 @@ function OfflineMapLibre({
         <ParcoursForm
           onSubmit={saveParcoursWithDetails}
           onCancel={cancelParcoursForm}
+        />
+      )}
+
+      {/* Formulaire de création de point d'intérêt */}
+      {pendingInterestGeometry && (
+        <InterestForm
+          onSubmit={async (data) => {
+            await saveInterestWithDetails(data);
+            refreshInterest();
+          }}
+          onCancel={cancelInterestForm}
         />
       )}
 
