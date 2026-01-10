@@ -49,10 +49,6 @@ pub async fn fetch_events(app: AppHandle) -> Result<Vec<Event>, String> {
             name: row.get("name"),
             start_date: row.get("start_date"),
             end_date: row.get("end_date"),
-
-            // --- CORRECTION ICI ---
-            // Ne fais PAS row.get("zone") car la colonne n'existe pas !
-            // Zone et Parcours sont des tables séparées, donc pour l'instant on met None.
             zone: None,
             parcours: None,
         });
@@ -160,7 +156,7 @@ pub async fn delete_event(app: AppHandle, event_id: String) -> Result<(), String
     println!("[DB]  Événement {} supprimé", event_id);
 
     // Émettre un événement pour notifier le frontend
-   // let _ = app.emit("events-updated", ());
+    // let _ = app.emit("events-updated", ());
 
     Ok(())
 }

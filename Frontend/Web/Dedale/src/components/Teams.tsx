@@ -7,15 +7,10 @@ import MultiRangeSlider from "./MultiRangeSlider";
 import PersonDetails from "./PersonDetails";
 
 interface Team {
-  id: number;
+  id: string;
   name: string;
-  number: number;
-  event_ids: number[];
-}
-
-interface SimpleEvent {
-  id: number;
-  name: string;
+  number: number; //nombre de membres pour cette équipe
+  eventId: string;
 }
 
 interface SelectedTeamState {
@@ -23,21 +18,20 @@ interface SelectedTeamState {
   data: TeamDetailData | undefined;
 }
 
-function Teams({ onTeamClick }: { onTeamClick?: (teamId: number) => void }) {
+function Teams({ activeEventId }: { activeEventId: string; }) {
+  // Etats globaux du composant
   const [teams, setTeams] = useState<Team[]>([]);
-  const [availableEvents, setAvailableEvents] = useState<SimpleEvent[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // Filtres (barre de gauche)
   const [filterName, setFilterName] = useState("");
   const [filterMinMembers, setFilterMinMembers] = useState<number>(0);
   const [filterMaxMembers, setFilterMaxMembers] = useState<number>(10);
-  const [filterEventId, setFilterEventId] = useState<number | 'all' | 'none'>('all');
 
-  const [detailsCache, setDetailsCache] = useState<Record<number, TeamDetailData>>({});
+  const [detailsCache, setDetailsCache] = useState<Record<string, TeamDetailData>>({});
   const [selectedTeamData, setSelectedTeamData] = useState<SelectedTeamState | null>(null);
-  const [loadingTeamId, setLoadingTeamId] = useState<number | null>(null);
+  const [loadingTeamId, setLoadingTeamId] = useState<string | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [isEventMenuOpen, setIsEventMenuOpen] = useState(false);
   const [viewingPerson, setViewingPerson] = useState<Person | null>(null);
 
   const loadData = async (showSpinner = true) => {
@@ -46,12 +40,8 @@ function Teams({ onTeamClick }: { onTeamClick?: (teamId: number) => void }) {
     }
 
     try {
-      const [teamsData, eventsData] = await Promise.all([
-        invoke<Team[]>("fetch_teams"),
-        invoke<{ id: number; name: string }[]>("fetch_events")
-      ]);
+      let teamsData = await invoke<Team[]>("fetch_teams", { eventId: activeEventId });
       setTeams(teamsData);
-      setAvailableEvents(eventsData.map((e) => ({ id: e.id, name: e.name })));
     } catch (e) {
       console.error(e);
     } finally {
@@ -62,6 +52,10 @@ function Teams({ onTeamClick }: { onTeamClick?: (teamId: number) => void }) {
   };
 
   useEffect(() => {
+    loadData();
+  }, [activeEventId]);
+
+  useEffect(() => {
     const unlisten = listen('team-update', () => {
       console.log("♻️ Mise à jour silencieuse...");
 
@@ -70,13 +64,13 @@ function Teams({ onTeamClick }: { onTeamClick?: (teamId: number) => void }) {
       setDetailsCache({});
     });
 
-    const unlistenNav = listen<{ id: number; name: string }>('navigate-to-team', (event) => {
+    const unlistenNav = listen<{ id: string; name: string, number: number }>('navigate-to-team', (event) => {
       const teamToOpen = event.payload;
       const teamObj: Team = {
         id: teamToOpen.id,
         name: teamToOpen.name,
-        number: 0,
-        event_ids: []
+        number: teamToOpen.number,
+        eventId: activeEventId
       };
       handleOpenTeam(teamObj);
     });
@@ -95,19 +89,15 @@ function Teams({ onTeamClick }: { onTeamClick?: (teamId: number) => void }) {
     return teams.filter(team => {
       const matchName = team.name.toLowerCase().includes(filterName.toLowerCase());
 
-      let matchEvent = true;
-      if (filterEventId === 'none') matchEvent = team.event_ids.length === 0;
-      else if (filterEventId !== 'all') matchEvent = team.event_ids.includes(filterEventId as number);
-
       const SLIDER_MAX = 10;
       const effectiveMax = filterMaxMembers === SLIDER_MAX ? Infinity : filterMaxMembers;
       const matchMembers = team.number >= filterMinMembers && team.number <= effectiveMax;
 
-      return matchName && matchMembers && matchEvent;
+      return matchName && matchMembers;
     });
-  }, [teams, filterName, filterMinMembers, filterMaxMembers, filterEventId]);
+  }, [teams, filterName, filterMinMembers, filterMaxMembers]);
 
-  const fetchDetailsForTeam = async (teamId: number): Promise<TeamDetailData> => {
+  const fetchDetailsForTeam = async (teamId: string): Promise<TeamDetailData> => {
     if (detailsCache[teamId]) return detailsCache[teamId];
     const [members, events] = await Promise.all([
       invoke<Person[]>("fetch_team_members", { teamId }),
@@ -118,29 +108,26 @@ function Teams({ onTeamClick }: { onTeamClick?: (teamId: number) => void }) {
     return data;
   };
 
-  const handleMouseEnter = (teamId: number) => { fetchDetailsForTeam(teamId).catch(() => { /* ignore */ }); };
+  const handleMouseEnter = (teamId: string) => { fetchDetailsForTeam(teamId).catch(() => { /* ignore */ }); };
 
   const handleOpenTeam = async (team: Team) => {
     if (loadingTeamId === team.id) return;
     if (detailsCache[team.id]) {
       setSelectedTeamData({ info: team, data: detailsCache[team.id] });
-      if (onTeamClick) onTeamClick(team.id);
       return;
     }
     setLoadingTeamId(team.id);
     try {
       const data = await fetchDetailsForTeam(team.id);
       setSelectedTeamData({ info: team, data });
-      if (onTeamClick) onTeamClick(team.id);
     } finally { setLoadingTeamId(null); }
   };
 
   const handleTeamCreated = (newTeam: Team) => {
-    const teamWithEvents = { ...newTeam, event_ids: [] };
-    setTeams([...teams, teamWithEvents]);
+    setTeams([...teams, { ...newTeam }]);
   };
 
-  const handleTeamDeleted = (deletedId: number) => {
+  const handleTeamDeleted = (deletedId: string) => {
     const updatedTeams = teams.filter(t => t.id !== deletedId);
     setTeams(updatedTeams);
 
@@ -153,7 +140,7 @@ function Teams({ onTeamClick }: { onTeamClick?: (teamId: number) => void }) {
 
   return (
     <div className="flex gap-6 relative h-full">
-      {isCreateModalOpen && <CreateTeam onClose={() => setIsCreateModalOpen(false)} onTeamCreated={handleTeamCreated} />}
+      {isCreateModalOpen && <CreateTeam activeEventId={activeEventId} onClose={() => setIsCreateModalOpen(false)} onTeamCreated={handleTeamCreated} />}
       {selectedTeamData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4 animate-in fade-in duration-200">
           <TeamDetails
@@ -172,6 +159,7 @@ function Teams({ onTeamClick }: { onTeamClick?: (teamId: number) => void }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-md p-4 animate-in fade-in zoom-in-95 duration-200">
           <PersonDetails
             person={viewingPerson}
+            activeEventId={activeEventId}
             onClose={() => setViewingPerson(null)}
             onDelete={() => {
               setViewingPerson(null);
@@ -195,13 +183,11 @@ function Teams({ onTeamClick }: { onTeamClick?: (teamId: number) => void }) {
             }}
             onTeamClick={(team) => {
               setViewingPerson(null);
-              setSelectedTeamData({
-                info: {
-                  id: team.id,
-                  name: team.name,
-                  number: 0,
-                  event_ids: []
-                }, data: detailsCache[team.id] || undefined
+              handleOpenTeam({
+                id: team.id,
+                name: team.name,
+                number: team.number,
+                eventId: activeEventId
               });
             }}
           />
@@ -223,56 +209,6 @@ function Teams({ onTeamClick }: { onTeamClick?: (teamId: number) => void }) {
             onChange={(e) => setFilterName(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
           />
-        </div>
-
-        {/* 2. Filtre Événement */}
-        <div className="relative">
-          <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase">Événement</label>
-
-          <button
-            onClick={() => setIsEventMenuOpen(!isEventMenuOpen)}
-            className="cursor-pointer w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-left flex justify-between items-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-          >
-            <span className="truncate">
-              {filterEventId === 'all' ? "Tous" :
-                filterEventId === 'none' ? "⚠️ Sans événement" :
-                  availableEvents.find(e => e.id === filterEventId)?.name || "Sélectionner..."}
-            </span>
-            <svg className={`w-4 h-4 text-gray-400 transition-transform ${isEventMenuOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-          </button>
-
-          {isEventMenuOpen && (
-            <>
-              <div className="fixed inset-0 z-10" onClick={() => setIsEventMenuOpen(false)}></div>
-              <div className="absolute top-full left-0 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-xl z-20 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
-                <div
-                  onClick={() => { setFilterEventId('all'); setIsEventMenuOpen(false); }}
-                  className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 hover:text-blue-700 ${filterEventId === 'all' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'}`}
-                >
-                  Tous
-                </div>
-                <div
-                  onClick={() => { setFilterEventId('none'); setIsEventMenuOpen(false); }}
-                  className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 hover:text-blue-700 ${filterEventId === 'none' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'}`}
-                >
-                  ⚠️ Sans événement
-                </div>
-
-                <div className="h-px bg-gray-200 my-1 mx-2"></div>
-
-                {/* Liste des événements */}
-                {availableEvents.map(evt => (
-                  <div
-                    key={evt.id}
-                    onClick={() => { setFilterEventId(evt.id); setIsEventMenuOpen(false); }}
-                    className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 hover:text-blue-700 ${filterEventId === evt.id ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'}`}
-                  >
-                    {evt.name}
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
         </div>
 
         <div>
@@ -304,11 +240,10 @@ function Teams({ onTeamClick }: { onTeamClick?: (teamId: number) => void }) {
         <div className="mt-auto pt-4 text-xs text-gray-400 text-center border-t border-gray-100">
           <p className="mb-2"><b>{filteredTeams.length}</b> / {teams.length} équipes</p>
 
-          {(filterName || filterEventId !== 'all' || filterMinMembers > 0 || filterMaxMembers < 10) && (
+          {(filterName || filterMinMembers > 0 || filterMaxMembers < 10) && (
             <button
               onClick={() => {
                 setFilterName("");
-                setFilterEventId('all');
                 setFilterMinMembers(0);
                 setFilterMaxMembers(10);
               }}
@@ -347,7 +282,7 @@ function Teams({ onTeamClick }: { onTeamClick?: (teamId: number) => void }) {
                     {loadingTeamId === team.id && (
                       <div className="absolute top-2 right-2"><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div></div>
                     )}
-                    <div><h3 className="font-semibold text-gray-800">{team.name}</h3></div>
+                    <div><h3 className="font-semibold text-gray-800 text-transform: capitalize">{team.name}</h3></div>
                     <p className="text-xs text-gray-500 mt-4">👤 {team.number} membre{team.number > 1 ? "s" : ""}</p>
                   </div>
                 ))

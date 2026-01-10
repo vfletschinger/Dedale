@@ -59,7 +59,7 @@ export interface MapInterest {
 
 // Type pour les événements
 export interface MapEvent {
-  id: number;
+  id: string;
   name?: string;
   event_type?: string;
   status?: string;

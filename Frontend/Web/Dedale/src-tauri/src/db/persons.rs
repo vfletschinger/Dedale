@@ -9,7 +9,7 @@ use crate::db::get_db_pool;
 pub async fn fetch_people(app: AppHandle) -> Result<Vec<Person>, String> {
     let pool = get_db_pool(&app).await?;
 
-    let rows = sqlx::query("SELECT id, firstname, lastname, address, email, phone_number FROM person ORDER BY lastname, firstname")
+    let rows = sqlx::query("SELECT id, firstname, lastname, email, phone_number FROM person ORDER BY lastname, firstname")
         .fetch_all(&pool)
         .await
         .map_err(|e| e.to_string())?;
@@ -20,7 +20,6 @@ pub async fn fetch_people(app: AppHandle) -> Result<Vec<Person>, String> {
             id: row.get("id"),
             firstname: row.get("firstname"),
             lastname: row.get("lastname"),
-            address: row.get("address"),
             email: row.get("email"),
             phone_number: row.get("phone_number"),
         })
@@ -35,19 +34,17 @@ pub async fn create_person(
     firstname: String,
     lastname: String,
     email: String,
-    address: String,
     phone_number: String,
 ) -> Result<Person, String> {
     let pool = get_db_pool(&app).await?;
     let id = Uuid::new_v4().to_string();
     let _result = sqlx::query(
-        "INSERT INTO person (id, firstname, lastname, email, address, phone_number) VALUES (?, ?, ?, ?, ?, ?)"
+        "INSERT INTO person (id, firstname, lastname, email, phone_number) VALUES (?, ?, ?, ?, ?)",
     )
     .bind(&id)
     .bind(&firstname)
     .bind(&lastname)
     .bind(&email)
-    .bind(&address)
     .bind(&phone_number)
     .execute(&pool)
     .await
@@ -58,7 +55,6 @@ pub async fn create_person(
         firstname: Some(firstname),
         lastname: Some(lastname),
         email: Some(email),
-        address: Some(address),
         phone_number: Some(phone_number),
     })
 }
@@ -84,23 +80,19 @@ pub async fn update_person(
     firstname: String,
     lastname: String,
     email: String,
-    address: String,
     phone_number: String,
 ) -> Result<(), String> {
     let pool = get_db_pool(&app).await?;
 
-    sqlx::query(
-        "UPDATE person SET firstname=?, lastname=?, email=?, address=?, phone_number=? WHERE id=?",
-    )
-    .bind(firstname)
-    .bind(lastname)
-    .bind(email)
-    .bind(address)
-    .bind(phone_number)
-    .bind(id)
-    .execute(&pool)
-    .await
-    .map_err(|e| e.to_string())?;
+    sqlx::query("UPDATE person SET firstname=?, lastname=?, email=?, phone_number=? WHERE id=?")
+        .bind(firstname)
+        .bind(lastname)
+        .bind(email)
+        .bind(phone_number)
+        .bind(id)
+        .execute(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
 
     Ok(())
 }

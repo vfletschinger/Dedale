@@ -6,7 +6,8 @@ interface NavigationProps {
   onNavigate: (page: PageKey) => void;
   canGoBack?: boolean;
   onGoBack?: () => void;
-  selectedEventId?: number | null;
+  eventSelected: boolean;
+  deselectEvent: () => void;
 }
 
 const NAV_ITEMS: { key: PageKey; label: string }[] = [
@@ -22,7 +23,8 @@ export default function Navigation({
   onNavigate,
   canGoBack,
   onGoBack,
-  selectedEventId,
+  eventSelected,
+  deselectEvent,
 }: NavigationProps) {
   return (
     <nav className="sticky top-0 z-[100] w-full border-b border-gray-200 bg-slate-700 shadow-lg">
@@ -36,7 +38,7 @@ export default function Navigation({
             {canGoBack && onGoBack && (
               <button
                 onClick={onGoBack}
-                className="group flex h-8 w-8 items-center justify-center rounded-lg bg-slate-600 text-slate-300 hover:text-white transition-all border border-slate-500 hover:border-blue-400 hover:bg-slate-500"
+                className="group flex h-8 w-8 items-center justify-center rounded-lg bg-slate-600 text-slate-300 hover:text-white transition-all border border-slate-500 hover:border-blue-400 hover:bg-slate-500 cursor-pointer"
                 aria-label="Retour"
               >
                 <svg
@@ -82,36 +84,39 @@ export default function Navigation({
           {/* Section Centre : Navigation */}
           <div className="flex-1 flex justify-center">
             <div className="flex items-center gap-2 px-2 py-1.5 bg-slate-800 rounded-lg border border-slate-600 shadow-md">
-            {NAV_ITEMS.map(({ key, label }) => {
-              const isActive = currentPage === key;
-              const requiresEvent = key !== "event";
-              const isDisabled = requiresEvent && !selectedEventId;
-              
-              return (
-                <button
-                  key={key}
-                  onClick={() => onNavigate(key)}
-                  disabled={isDisabled}
-                  className={`relative px-4 py-2 text-[11px] font-semibold tracking-wide uppercase transition-all duration-200 rounded-md
-                    ${
-                      isActive
+              {NAV_ITEMS.map(({ key, label }) => {
+                const isActive = currentPage === key;
+                const requiresEvent = key !== "event";
+                const isDisabled = requiresEvent && !eventSelected;
+
+                return (
+                  <button
+                    key={key}
+                    onClick={() => onNavigate(key)}
+                    disabled={isDisabled}
+                    className={`relative px-4 py-2 text-[11px] font-semibold tracking-wide uppercase transition-all duration-200 rounded-md
+                    ${isActive
                         ? "text-white bg-blue-600 shadow-md"
                         : isDisabled
-                        ? "text-slate-500 bg-slate-800 cursor-not-allowed opacity-50"
-                        : "text-slate-300 hover:text-white hover:bg-slate-700"
-                    }`}
-                  title={isDisabled ? "Sélectionnez d'abord un événement" : ""}
-                >
-                  <span className="relative z-10">{label}</span>
-                  {isActive && (
-                    <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent rounded-md"></div>
-                  )}
-                </button>
-              );
-            })}
+                          ? "text-slate-500 bg-slate-800 cursor-not-allowed opacity-50"
+                          : "text-slate-300 hover:text-white hover:bg-slate-700"
+                      }`}
+                    title={isDisabled ? "Sélectionnez d'abord un événement" : ""}
+                  >
+                    <span className="relative z-10">{label}</span>
+                    {isActive && (
+                      <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent rounded-md"></div>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
-
+          <div hidden={!eventSelected} className="flex items-center gap-2 px-2 py-1.5 bg-slate-800 rounded-lg border border-slate-600 shadow-md">
+            <button onClick={deselectEvent} className={`relative px-4 py-2 text-[11px] font-semibold tracking-wide uppercase transition-all duration-200 rounded-md cursor-pointer text-slate-300 hover:text-white hover:bg-slate-700`}>
+              Déselectionner l'événement
+            </button>
+          </div>
         </div>
       </div>
     </nav>

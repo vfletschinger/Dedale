@@ -38,8 +38,8 @@ pub struct Team {
     #[serde(default)]
     pub id: String,
     pub name: Option<String>,
-    #[serde(default)]
-    pub event_ids: Vec<String>,
+    pub number: i64,
+    pub event_id: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -141,7 +141,6 @@ pub struct Person {
     pub id: String,
     pub firstname: Option<String>,
     pub lastname: Option<String>,
-    pub address: Option<String>,
     pub email: Option<String>,
     pub phone_number: Option<String>,
 }

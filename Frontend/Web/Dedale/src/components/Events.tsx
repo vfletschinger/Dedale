@@ -151,11 +151,11 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
         return;
       }
 
-    const newEvent = {
-      name: formData.name.trim(),
-      start_date: formData.dateDebut, // <--- Renommé pour matcher Rust
-      end_date: formData.dateFin,
-    };
+      const newEvent = {
+        name: formData.name.trim(),
+        start_date: formData.dateDebut, // <--- Renommé pour matcher Rust
+        end_date: formData.dateFin,
+      };
 
       console.log(" Création d'un nouvel événement...", newEvent);
       await invoke("insert_event", { event: newEvent });
@@ -320,7 +320,7 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
                     <span>
                       📅 Du {formatDate(event.start_date)} au {formatDate(event.end_date)}
                     </span>
-                   
+
                   </div>
                 </div>
                 <div className="ml-4 flex gap-2">

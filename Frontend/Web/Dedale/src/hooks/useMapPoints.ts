@@ -6,13 +6,13 @@ import { MapInterest, MapPoint } from "../types/map";
 
 export function useMapPoints(
   map: maplibregl.Map | null,
-  selectedEventId: string | number | null
+  selectedEventId: string | null
 ) {
   // --- ÉTATS ---
   const [points, setPoints] = useState<MapPoint[]>([]);
   const pointsRef = useRef<MapPoint[]>([]);
   const [selectedPoint, setSelectedPoint] = useState<MapPoint | null>(null);
-  
+
   // États pour l'ajout de point
   const [addingPointCoords, setAddingPointCoords] = useState<{ lng: number; lat: number } | null>(null);
   const [awaitingMapClick, setAwaitingMapClick] = useState(false);
@@ -26,11 +26,11 @@ export function useMapPoints(
       const freshPoints = await invoke<MapPoint[]>("fetch_points", {
         eventId: selectedEventId ? String(selectedEventId) : null,
       });
-      
+
       console.log(`${freshPoints.length} point(s) récupéré(s)`);
       pointsRef.current = freshPoints;
       setPoints(freshPoints);
-      
+
       // Mettre à jour la source de la carte directement
       if (map && map.getSource("db-points")) {
         const geojson: GeoJSON.FeatureCollection<GeoJSON.Point> = {
@@ -62,9 +62,9 @@ export function useMapPoints(
       const freshInterests = await invoke<MapInterest[]>("fetch_interest_points", {
         eventId: selectedEventId ? String(selectedEventId) : null,
       });
-      
+
       console.log(`${freshInterests.length} point(s) d'intérêt récupéré(s)`);
-      
+
       // Mettre à jour la source de la carte directement
       if (map && map.getSource("db-interests")) {
         const geojson: GeoJSON.FeatureCollection<GeoJSON.Point> = {
@@ -106,7 +106,7 @@ export function useMapPoints(
   // --- AJOUTER CE BLOC DANS useMapPoints.ts ---
 
   const addPoint = async (pointData: { x: number; y: number; obstacles?: string; comments?: string; pictures?: string }) => {
-    
+
     // 1. Sécurité : On ne peut pas sauvegarder sans Event ID
     if (!selectedEventId) {
       console.error("Impossible d'ajouter un point : Aucun événement sélectionné.");
@@ -133,7 +133,7 @@ export function useMapPoints(
       // 3. Rafraîchir la carte et fermer le mode ajout
       await refreshPoints();
       setAddingPointCoords(null); // Ferme le formulaire
-      
+
     } catch (e) {
       console.error("❌ Erreur lors de l'ajout du point :", e);
       alert("Erreur lors de la sauvegarde : " + e);
@@ -204,7 +204,7 @@ export function useMapPoints(
         }
 
         // --- Gestionnaires d'événements liés aux layers ---
-        
+
         // Curseur pointer
         map.on("mouseenter", "db-points-layer", () => (map.getCanvas().style.cursor = "pointer"));
         map.on("mouseleave", "db-points-layer", () => (map.getCanvas().style.cursor = ""));
@@ -245,7 +245,7 @@ export function useMapPoints(
               console.log(`${freshPoints.length} point(s) récupéré(s)`);
               pointsRef.current = freshPoints;
               setPoints(freshPoints);
-              
+
               const geojson: GeoJSON.FeatureCollection<GeoJSON.Point> = {
                 type: "FeatureCollection",
                 features: freshPoints.map((p) => ({
@@ -289,7 +289,7 @@ export function useMapPoints(
   // 2. Charger les points quand l'événement change ou la source est prête
   useEffect(() => {
     if (!map || !map.getSource("db-points")) return;
-    
+
     // Charger les points directement ici pour éviter le warning
     const loadPoints = async () => {
       try {
@@ -297,11 +297,11 @@ export function useMapPoints(
         const freshPoints = await invoke<MapPoint[]>("fetch_points", {
           eventId: selectedEventId ? String(selectedEventId) : null,
         });
-        
+
         console.log(`${freshPoints.length} point(s) récupéré(s)`);
         pointsRef.current = freshPoints;
         setPoints(freshPoints);
-        
+
         // Mettre à jour la source de la carte
         if (map && map.getSource("db-points")) {
           const geojson: GeoJSON.FeatureCollection<GeoJSON.Point> = {
@@ -326,7 +326,7 @@ export function useMapPoints(
         console.error("Erreur chargement points:", err);
       }
     };
-    
+
     loadPoints();
   }, [selectedEventId, map]); // Seulement selectedEventId et map, pas selectedPoint ni updateMapSource
 
@@ -340,18 +340,18 @@ export function useMapPoints(
   useEffect(() => {
     if (!map) return;
     map.getCanvas().style.cursor = awaitingMapClick ? "crosshair" : "";
-    return () => { 
-        // Petite sécurité ici aussi
-        if(map && map.getCanvas()) map.getCanvas().style.cursor = ""; 
+    return () => {
+      // Petite sécurité ici aussi
+      if (map && map.getCanvas()) map.getCanvas().style.cursor = "";
     };
   }, [awaitingMapClick, map]);
 
   // 4. Écoute des mises à jour temps réel
   useEffect(() => {
-    const unlisten = listen<number>("points-updated", (event) => {
+    const unlisten = listen<string>("points-updated", (event) => {
       console.log("📥 Points mis à jour via socket, event_id:", event.payload);
       if (!selectedEventId || selectedEventId === event.payload) {
-         if (map) refreshPoints();
+        if (map) refreshPoints();
       }
     });
 

@@ -29,9 +29,9 @@ function calculateLineLength(coordinates: [number, number][]): number {
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
       Math.cos(toRad(lat1)) *
-        Math.cos(toRad(lat2)) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
 
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     totalLength += R * c;
@@ -42,7 +42,7 @@ function calculateLineLength(coordinates: [number, number][]): number {
 
 export function useMapGeometries(
   map: maplibregl.Map | null,
-  selectedEventId: number | null // Si vos Event IDs sont aussi des strings, changez ici en string | null
+  selectedEventId: string | null,
 ) {
   // --- ÉTATS ---
   const [zones, setZones] = useState<Zone[]>([]);
@@ -77,7 +77,8 @@ export function useMapGeometries(
 
   // --- REFS ---
   const drawRef = useRef<MapboxDraw | null>(null);
-  const selectedEventIdRef = useRef<number | null>(selectedEventId);
+  // Ref pour accéder à l'ID dans les event listeners sans déclencher de re-render
+  const selectedEventIdRef = useRef<string | null>(selectedEventId);
   const mountedRef = useRef(true);
   const drawingModeRef = useRef<"none" | "zone" | "parcours" | "interest" | "equipment">(
     "none"
@@ -166,26 +167,26 @@ export function useMapGeometries(
           paint: { "fill-color": "#6366f1", "fill-opacity": 0.3 },
         });
 
-      mapObj.addLayer({
-        id: "event-geometries-line",
-        type: "line",
-        source: "event-geometries",
-        filter: [
-          "any",
-          ["==", ["geometry-type"], "LineString"],
-          ["==", ["geometry-type"], "Polygon"],
-        ],
-        paint: {
-          "line-color": [
-            "case",
-            ["==", ["get", "type"], "parcours"],
-            "#ef4444", // Rouge Parcours
-            "#4f46e5", // Bleu Zones
+        mapObj.addLayer({
+          id: "event-geometries-line",
+          type: "line",
+          source: "event-geometries",
+          filter: [
+            "any",
+            ["==", ["geometry-type"], "LineString"],
+            ["==", ["geometry-type"], "Polygon"],
           ],
-          "line-width": 3,
-        },
-      });
-    }
+          paint: {
+            "line-color": [
+              "case",
+              ["==", ["get", "type"], "parcours"],
+              "#ef4444", // Rouge Parcours
+              "#4f46e5", // Bleu Zones
+            ],
+            "line-width": 3,
+          },
+        });
+      }
 
       // Affichage des équipements
       if (currentEquipements.length > 0) {
@@ -267,12 +268,12 @@ export function useMapGeometries(
   // ✅ CHARGE les géométries au démarrage ou quand l'événement change
   useEffect(() => {
     if (!map || !selectedEventId) return;
-    
+
     // Utiliser un timeout pour éviter l'appel synchrone de setState dans l'effet
     const timeoutId = setTimeout(() => {
       loadGeometries();
     }, 0);
-    
+
     return () => clearTimeout(timeoutId);
   }, [map, selectedEventId, loadGeometries]);
 
@@ -470,7 +471,7 @@ export function useMapGeometries(
 
     // Calculer le centre de la géométrie pour placer le popup
     let centerCoords: [number, number] = [0, 0];
-    
+
     if (geometry.type === "Polygon" && geometry.coordinates && geometry.coordinates[0]) {
       const coords = geometry.coordinates[0] as [number, number][];
       const sumLng = coords.reduce((acc, c) => acc + c[0], 0);
@@ -490,7 +491,7 @@ export function useMapGeometries(
     const emoji = item.type === "zone" ? "🟦" : "🟢";
     const itemId = item.id;
     const itemType = item.type;
-    
+
     const popupContent = `
       <div style="min-width: 220px; font-family: system-ui, -apple-system, sans-serif;">
         <div style="font-weight: 700; font-size: 14px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
@@ -538,14 +539,14 @@ export function useMapGeometries(
     setTimeout(() => {
       const editBtn = document.getElementById("geo-edit-btn");
       const deleteBtn = document.getElementById("geo-delete-btn");
-      
+
       if (editBtn) {
         editBtn.addEventListener("click", () => {
           if (popupRef.current) popupRef.current.remove();
           startEditGeometry(item);
         });
       }
-      
+
       if (deleteBtn) {
         deleteBtn.addEventListener("click", () => {
           if (popupRef.current) popupRef.current.remove();
@@ -718,7 +719,7 @@ export function useMapGeometries(
       console.error("Erreur création point d'intérêt:", err);
       alert("Erreur lors de la création du point d'intérêt");
     }
-  
+
   }
 
   // Fonction pour sauvegarder le parcours avec les détails du formulaire
