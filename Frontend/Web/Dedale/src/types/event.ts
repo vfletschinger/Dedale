@@ -1,7 +1,11 @@
 export interface Event {
-    id: number;
+    id: string;
     name?: string;
-    date: Date;
+    date?: Date;
+    date_debut?: string;
+    date_fin?: string;
+    statut?: string;
+    description?: string;
     geometry?: string;
 }
 

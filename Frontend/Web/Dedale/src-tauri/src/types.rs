@@ -38,8 +38,8 @@ pub struct Team {
     #[serde(default)]
     pub id: String,
     pub name: Option<String>,
-    #[serde(default)]
-    pub event_ids: Vec<String>,
+    pub number: i64,
+    pub event_id: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -49,6 +49,7 @@ pub struct Member {
     pub person_id: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Equipement {
     pub id: String,
@@ -69,6 +70,7 @@ pub struct EquipementCoordinate {
     pub order_index: Option<i64>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Type {
     pub id: String,
@@ -79,6 +81,7 @@ pub struct Type {
     pub height: Option<f64>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Course {
     pub id: String,
@@ -104,6 +107,7 @@ pub struct Point {
     pub id: String,
     pub x: f64,
     pub y: f64,
+    pub name: Option<String>,
     pub comment: Option<String>,
     pub r#type: Option<String>,
     pub status: Option<bool>,
@@ -137,7 +141,6 @@ pub struct Person {
     pub id: String,
     pub firstname: Option<String>,
     pub lastname: Option<String>,
-    pub address: Option<String>,
     pub email: Option<String>,
     pub phone_number: Option<String>,
 }
@@ -182,6 +185,8 @@ pub struct Geometry {
     pub id: String,
     pub event_id: String,
     pub geom: String,
+    pub geom_type: String, // "point", "parcours", ou "zone"
+    pub name: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

@@ -23,8 +23,21 @@ export default function EquipementForm({
   const [selectedTypeId, setSelectedTypeId] = useState<string>("");
   const [lengthPerUnit, setLengthPerUnit] = useState<number>(2); // 2 mètres par défaut
   const [quantity, setQuantity] = useState<number>(1); // Quantité modifiable par l'utilisateur
-  const [datePose, setDatePose] = useState<string>("2000-01-01T00:00");
-  const [dateDepose, setDateDepose] = useState<string>("2000-01-01T00:00");
+  
+  // Utiliser la date actuelle formatée en ISO comme date par défaut
+  const getCurrentDateTimeISO = () => {
+    const now = new Date();
+    // Formater en ISO avec timezone locale (YYYY-MM-DDTHH:mm)
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+  
+  const [datePose, setDatePose] = useState<string>(getCurrentDateTimeISO());
+  const [dateDepose, setDateDepose] = useState<string>(getCurrentDateTimeISO());
 
   // Calcul automatique de la quantité suggérée (indication uniquement)
   const suggestedQuantity =
@@ -61,6 +74,26 @@ export default function EquipementForm({
 
     if (!selectedTypeId) {
       alert("Veuillez sélectionner un type d'équipement");
+      return;
+    }
+
+    // Vérifier que les dates ne sont pas dans le passé
+    const now = new Date();
+    const poseDate = new Date(datePose);
+    const deposeDate = new Date(dateDepose);
+    
+    if (poseDate < now) {
+      alert("La date de pose ne peut pas être dans le passé !");
+      return;
+    }
+    
+    if (deposeDate < now) {
+      alert("La date de dépose ne peut pas être dans le passé !");
+      return;
+    }
+    
+    if (poseDate >= deposeDate) {
+      alert("La date de dépose doit être postérieure à la date de pose !");
       return;
     }
 
@@ -170,6 +203,7 @@ export default function EquipementForm({
             <input
               type="datetime-local"
               value={datePose}
+              min={new Date().toISOString().slice(0, 16)} // Empêche la sélection de dates passées
               onChange={(e) => setDatePose(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
@@ -183,6 +217,7 @@ export default function EquipementForm({
             <input
               type="datetime-local"
               value={dateDepose}
+              min={new Date().toISOString().slice(0, 16)} // Empêche la sélection de dates passées
               onChange={(e) => setDateDepose(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
             />

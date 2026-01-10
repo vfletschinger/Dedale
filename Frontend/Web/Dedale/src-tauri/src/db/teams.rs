@@ -1,16 +1,19 @@
 use crate::types::*;
+use sqlx::QueryBuilder;
 use sqlx::Row;
+use sqlx::Sqlite;
 use tauri::AppHandle;
 
 use crate::db::get_db_pool;
 
 #[tauri::command]
-pub async fn fetch_team_members(app: AppHandle, team_id: String) -> Result<Vec<Member>, String> {
+pub async fn fetch_team_members(app: AppHandle, team_id: String) -> Result<Vec<Person>, String> {
     let pool = get_db_pool(&app).await?;
 
     let query = r#"
-        SELECT m.id, m.team_id, m.person_id
-        FROM member m
+        SELECT p.id, p.firstname, p.lastname, p.email, p.phone_number
+        FROM person p
+        JOIN member m on m.person_id = p.id
         WHERE m.team_id = ?
     "#;
 
@@ -20,85 +23,56 @@ pub async fn fetch_team_members(app: AppHandle, team_id: String) -> Result<Vec<M
         .await
         .map_err(|e| e.to_string())?;
 
-    let members = rows
+    let people = rows
         .into_iter()
-        .map(|row| Member {
+        .map(|row| Person {
             id: row.get("id"),
-            team_id: row.get("team_id"),
-            person_id: row.get("person_id"),
+            firstname: row.get("firstname"),
+            lastname: row.get("lastname"),
+            email: row.get("email"),
+            phone_number: row.get("phone_number"),
         })
         .collect();
 
-    Ok(members)
+    Ok(people)
 }
 
 #[tauri::command]
-pub async fn fetch_team_events(app: AppHandle, team_id: String) -> Result<Vec<Event>, String> {
+pub async fn fetch_teams(app: AppHandle, event_id: Option<String>) -> Result<Vec<Team>, String> {
     let pool = get_db_pool(&app).await?;
 
-    let query = r#"
-        SELECT e.id, e.name, e.start_date, e.end_date
-        FROM event e
-        INNER JOIN team_event te ON e.id = te.event_id
-        WHERE te.team_id = ?
-    "#;
-
-    let rows = sqlx::query(query)
-        .bind(team_id)
-        .fetch_all(&pool)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let events = rows
-        .into_iter()
-        .map(|row| Event {
-            id: row.get("id"),
-            name: row.get("name"),
-            start_date: row.get("start_date"),
-            end_date: row.get("end_date"),
-            zone: row.get("zone"),
-            parcours: row.get("parcours"),
-        })
-        .collect();
-
-    Ok(events)
-}
-
-#[tauri::command]
-pub async fn fetch_teams(app: AppHandle) -> Result<Vec<Team>, String> {
-    let pool = get_db_pool(&app).await?;
-
-    let query = r#"
+    let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
+        r#"
         SELECT
             t.id,
             t.name,
             COUNT(DISTINCT m.person_id) as number,
-            GROUP_CONCAT(DISTINCT te.event_id) as event_ids_str
+            t.event_id
         FROM team t
         LEFT JOIN member m ON t.id = m.team_id
-        LEFT JOIN team_event te ON t.id = te.team_id
-        GROUP BY t.id, t.name
-    "#;
+        WHERE 1=1
+    "#,
+    );
+    if event_id.is_some() {
+        query_builder.push(" AND t.event_id = ");
+        query_builder.push_bind(event_id);
+    }
 
-    let rows = sqlx::query(query)
+    query_builder.push("GROUP BY t.id, t.name, t.event_id");
+
+    let rows = query_builder
+        .build()
         .fetch_all(&pool)
         .await
         .map_err(|e| e.to_string())?;
 
     let teams = rows
         .into_iter()
-        .map(|row| {
-            let event_ids_str: Option<String> = row.get("event_ids_str");
-            let event_ids: Vec<String> = match event_ids_str {
-                Some(s) => s.split(',').map(|id| id.to_string()).collect(),
-                None => Vec::new(),
-            };
-
-            Team {
-                id: row.get("id"),
-                name: row.get("name"),
-                event_ids: event_ids,
-            }
+        .map(|row| Team {
+            id: row.get("id"),
+            name: row.get("name"),
+            number: row.get("number"),
+            event_id: row.get("event_id"),
         })
         .collect();
 
@@ -106,13 +80,14 @@ pub async fn fetch_teams(app: AppHandle) -> Result<Vec<Team>, String> {
 }
 
 #[tauri::command]
-pub async fn create_team(app: AppHandle, name: String) -> Result<Team, String> {
+pub async fn create_team(app: AppHandle, name: String, event_id: String) -> Result<Team, String> {
     let pool = get_db_pool(&app).await?;
     let new_id = uuid::Uuid::new_v4().to_string();
 
-    let _result = sqlx::query("INSERT INTO team (id, name) VALUES (?, ?)")
+    let _result = sqlx::query("INSERT INTO team (id, name, event_id) VALUES (?, ?, ?)")
         .bind(&new_id)
         .bind(&name)
+        .bind(&event_id)
         .execute(&pool)
         .await
         .map_err(|e| e.to_string())?;
@@ -120,7 +95,8 @@ pub async fn create_team(app: AppHandle, name: String) -> Result<Team, String> {
     Ok(Team {
         id: new_id,
         name: Some(name),
-        event_ids: Vec::new(),
+        number: 0,
+        event_id: event_id,
     })
 }
 
@@ -149,6 +125,38 @@ pub async fn update_team(app: AppHandle, id: String, name: String) -> Result<(),
         .map_err(|e| e.to_string())?;
 
     Ok(())
+}
+
+#[tauri::command]
+pub async fn fetch_team_events(app: AppHandle, team_id: String) -> Result<Vec<Event>, String> {
+    let pool = get_db_pool(&app).await?;
+
+    let query = r#"
+        SELECT e.id, e.name, e.start_date, e.end_date
+        FROM event e
+        INNER JOIN team te ON e.id = te.event_id
+        WHERE te.id = ?
+    "#;
+
+    let rows = sqlx::query(query)
+        .bind(team_id)
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let events = rows
+        .into_iter()
+        .map(|row| Event {
+            id: row.get("id"),
+            name: row.get("name"),
+            start_date: row.get("start_date"),
+            end_date: row.get("end_date"),
+            parcours: None,
+            zone: None,
+        })
+        .collect();
+
+    Ok(events)
 }
 
 #[tauri::command]
@@ -212,18 +220,29 @@ pub async fn remove_member(
 }
 
 #[tauri::command]
-pub async fn fetch_person_teams(app: AppHandle, person_id: String) -> Result<Vec<Team>, String> {
+pub async fn fetch_person_teams(
+    app: AppHandle,
+    person_id: String,
+    event_id: Option<String>,
+) -> Result<Vec<Team>, String> {
     let pool = get_db_pool(&app).await?;
-    let query = r#"
-        SELECT t.id, t.name,
-               (SELECT COUNT(*) FROM member m2 WHERE m2.team_id = t.id) as number
+    let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
+        r#"
+        SELECT t.id, t.name, (SELECT COUNT(*) FROM member m2 WHERE m2.team_id = t.id) as number, t.event_id
         FROM team t
         INNER JOIN member m ON t.id = m.team_id
-        WHERE m.person_id = ?
-    "#;
+        WHERE m.person_id = 
+    "#,
+    );
+    query_builder.push_bind(person_id);
 
-    let rows = sqlx::query(query)
-        .bind(person_id)
+    if event_id.is_some() {
+        query_builder.push(" AND t.event_id = ");
+        query_builder.push_bind(event_id);
+    }
+
+    let rows = query_builder
+        .build()
         .fetch_all(&pool)
         .await
         .map_err(|e| e.to_string())?;
@@ -233,7 +252,8 @@ pub async fn fetch_person_teams(app: AppHandle, person_id: String) -> Result<Vec
         .map(|row| Team {
             id: row.get("id"),
             name: row.get("name"),
-            event_ids: Vec::new(),
+            number: row.get("number"),
+            event_id: row.get("event_id"),
         })
         .collect();
 

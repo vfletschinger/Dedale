@@ -8,11 +8,10 @@ export interface TeamDetailData {
 }
 
 export interface Person {
-    id: number;
+    id: string;
     firstname: string;
     lastname: string;
     email: string;
-    address: string;
     phone_number: string;
 }
 
@@ -23,15 +22,16 @@ export interface Event {
 }
 
 interface TeamDetailsProps {
-    teamId: number;
+    teamId: string;
     teamName: string;
     data?: TeamDetailData;
     onClose: () => void;
-    onDelete: (teamId: number) => void;
+    onDelete: (teamId: string) => void;
     onMemberClick: (person: Person) => void;
 }
 
 export default function TeamDetails({ teamId, teamName, data, onClose, onDelete, onMemberClick }: TeamDetailsProps) {
+    const [loading, setLoading] = useState(false);
     const [activeTab, setActiveTab] = useState<'members' | 'events'>('members');
     const [showConfirm, setShowConfirm] = useState(false);
 
@@ -46,6 +46,9 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
     const [currentEvents, setCurrentEvents] = useState<Event[]>(data?.events || []);
 
     useEffect(() => {
+        setEditedName(teamName);
+        setIsEditing(false);
+
         if (data) {
             setCurrentMembers(data.members);
             setCurrentEvents(data.events);
@@ -53,6 +56,7 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
         }
 
         const loadData = async () => {
+            setLoading(true);
             try {
                 const [m, e] = await Promise.all([
                     invoke<Person[]>("fetch_team_members", { teamId }),
@@ -60,10 +64,16 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
                 ]);
                 setCurrentMembers(m);
                 setCurrentEvents(e);
-            } catch (err) { console.error(err); }
+            }
+            catch (err) {
+                console.error(err);
+            }
+            finally {
+                setLoading(false);
+            }
         };
         loadData();
-    }, [teamId, data]);
+    }, [teamId, data, teamName]);
 
 
     // ========================
@@ -73,7 +83,7 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
     const [availablePeople, setAvailablePeople] = useState<Person[]>([]);
     const [selectedPersonId, setSelectedPersonId] = useState<string>("");
 
-    const handleRemoveMember = async (personId: number) => {
+    const handleRemoveMember = async (personId: string) => {
         try {
             await invoke("remove_member", { teamId, personId });
             setCurrentMembers(currentMembers.filter(m => m.id !== personId));
@@ -92,60 +102,13 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
 
     const confirmAddMember = async () => {
         if (!selectedPersonId) return;
-        const pid = parseInt(selectedPersonId);
         try {
-            await invoke("add_member", { teamId, personId: pid });
-            const personToAdd = availablePeople.find(p => p.id === pid);
+            await invoke("add_member", { teamId, personId: selectedPersonId });
+            const personToAdd = availablePeople.find(p => p.id === selectedPersonId);
             if (personToAdd) setCurrentMembers([...currentMembers, personToAdd]);
             setIsAddingMember(false);
             setSelectedPersonId("");
             await emit("team-update");
-        } catch (e) { console.error(e); }
-    };
-
-
-    // ========================
-    // LOGIQUE ÉVÉNEMENTS
-    // ========================
-    const [isAddingEvent, setIsAddingEvent] = useState(false);
-    const [availableEvents, setAvailableEvents] = useState<Event[]>([]);
-    const [selectedEventId, setSelectedEventId] = useState<string>("");
-
-    const handleRemoveEvent = async (eventId: number) => {
-        try {
-            await invoke("remove_team_event", { teamId, eventId });
-            setCurrentEvents(currentEvents.filter(e => e.id !== eventId));
-            await emit("team-update"); // Met à jour les petits points verts sur la carte
-        } catch (e) { console.error(e); }
-    };
-
-    const startAddingEvent = async () => {
-        setIsAddingEvent(true);
-        try {
-            // On utilise fetch_events (qui renvoie des objets un peu différents, attention au mapping si besoin)
-            // Ici on suppose que fetch_events renvoie un tableau compatible ou on mappe
-            const allEvents = await invoke<{ id: number; name: string; statut: string }[]>("fetch_events");
-            const existingIds = new Set(currentEvents.map(e => e.id));
-
-            // On filtre et on adapte le type si nécessaire
-            const filtered = allEvents
-                .filter((e) => !existingIds.has(e.id))
-                .map((e) => ({ id: e.id, name: e.name, statut: e.statut }));
-
-            setAvailableEvents(filtered);
-        } catch (e) { console.error(e); }
-    };
-
-    const confirmAddEvent = async () => {
-        if (!selectedEventId) return;
-        const eid = parseInt(selectedEventId);
-        try {
-            await invoke("add_team_event", { teamId, eventId: eid });
-            const eventToAdd = availableEvents.find(e => e.id === eid);
-            if (eventToAdd) setCurrentEvents([...currentEvents, eventToAdd]);
-            setIsAddingEvent(false);
-            setSelectedEventId("");
-            await emit("team-update"); // Met à jour les petits points verts
         } catch (e) { console.error(e); }
     };
 
@@ -204,13 +167,13 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
                             type="text"
                             value={editedName}
                             onChange={(e) => setEditedName(e.target.value)}
-                            className="w-full text-lg font-bold text-gray-800 bg-white border border-blue-300 rounded px-2 py-1 outline-none focus:ring-2 focus:ring-blue-200"
+                            className="w-full text-lg font-bold text-gray-800 bg-white border border-blue-300 rounded px-2 py-1 outline-none focus:ring-2 focus:ring-blue-200 text-transform: capitalize"
                             autoFocus
                         />
                     ) : (
-                        <h2 className="text-lg font-bold text-gray-800 truncate">{editedName}</h2>
+                        <h2 className="text-lg font-bold text-gray-800 truncate text-transform: capitalize">{editedName}</h2>
                     )}
-                    <p className="text-xs text-gray-500">Détails de l'équipe</p>
+                    <p className="text-xs text-gray-500 text-transform: capitalize">{currentEvents.length === 0 ? "" : currentEvents[0].name}</p>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -218,7 +181,7 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
                     {!isEditing && (
                         <button
                             onClick={() => setIsEditing(true)}
-                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
                             title="Modifier le nom"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -226,7 +189,7 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
                             </svg>
                         </button>
                     )}
-                    <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-200 text-gray-400">✕</button>
+                    <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-200 text-gray-400 cursor-pointer">✕</button>
                 </div>
             </div>
 
@@ -235,28 +198,25 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
                 <button onClick={() => { if (!isEditing) setActiveTab('members'); }} className={`flex-1 py-3 text-sm font-medium transition-colors ${activeTab === 'members' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-gray-500 hover:text-gray-700'}`}>
                     👥 Membres ({currentMembers.length})
                 </button>
-                <button onClick={() => { if (!isEditing) setActiveTab('events'); }} className={`flex-1 py-3 text-sm font-medium transition-colors ${activeTab === 'events' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-gray-500 hover:text-gray-700'}`}>
-                    📅 Événements ({currentEvents.length})
-                </button>
             </div>
 
             {/* CONTENU */}
-            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+            < div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                {loading ?
+                    <div className="flex justify-center items-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div></div>
 
-                {/* --- ONGLET MEMBRES --- */}
-                {activeTab === 'members' && (
-                    <div className="space-y-3">
+                    :
+                    (<div className="space-y-3">
                         {currentMembers.map((member) => (
                             <div key={member.id} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg transition-colors border border-transparent hover:border-blue-300 cursor-pointer group" onClick={() => {
                                 if (!isEditing) onMemberClick(member);
                             }}>
                                 <div className="flex items-center gap-3 overflow-hidden">
                                     <div className="w-8 h-8 rounded-full bg-blue-100 shrink-0 flex items-center justify-center text-blue-700 font-bold text-xs">
-                                        {member.firstname[0]}{member.lastname[0]}
+                                        {member.firstname[0].toUpperCase()}{member.lastname[0].toUpperCase()}
                                     </div>
                                     <div className="overflow-hidden">
-                                        <p className="text-sm font-medium text-gray-800 truncate">{member.firstname} {member.lastname}</p>
-                                        <p className="text-xs text-gray-500 truncate">{member.email}</p>
+                                        <p className="text-sm font-medium text-gray-800 truncate text-transform: capitalize">{member.firstname} {member.lastname}</p>
                                     </div>
                                 </div>
                                 <button
@@ -266,7 +226,7 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
                                             handleRemoveMember(member.id);
                                         }
                                     }}
-                                    className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 p-1"
+                                    className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 p-1 cursor-pointer"
                                 >                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
                             </div>
@@ -277,95 +237,39 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
                             <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
                                 <p className="text-xs font-bold text-blue-800 mb-2">Ajouter un membre</p>
                                 <div className="flex gap-2">
-                                    <select value={selectedPersonId} onChange={(e) => setSelectedPersonId(e.target.value)} className="flex-1 text-sm border border-blue-200 rounded px-2 py-1 outline-none">
+                                    <select value={selectedPersonId} onChange={(e) => setSelectedPersonId(e.target.value)} className="flex-1 text-sm border border-blue-200 rounded px-2 py-1 outline-none cursor-pointer">
                                         <option value="">Choisir...</option>
                                         {availablePeople.map(p => <option key={p.id} value={p.id}>{p.firstname} {p.lastname}</option>)}
                                     </select>
-                                    <button onClick={confirmAddMember} disabled={!selectedPersonId} className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">OK</button>
-                                    <button onClick={() => setIsAddingMember(false)} className="text-gray-500 px-2">✕</button>
+                                    <button onClick={confirmAddMember} disabled={!selectedPersonId} className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 cursor-pointer">OK</button>
+                                    <button onClick={() => setIsAddingMember(false)} className="text-gray-500 px-2 cursor-pointer">✕</button>
                                 </div>
                             </div>
                         ) : (
-                            <button onClick={startAddingMember} className="w-full py-2 mt-2 border border-dashed border-gray-300 rounded-lg text-gray-500 text-xs hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all flex items-center justify-center gap-1">
+                            <button onClick={startAddingMember} className="w-full py-2 mt-2 border border-dashed border-gray-300 rounded-lg text-gray-500 text-xs hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all flex items-center justify-center gap-1 cursor-pointer">
                                 <span>+</span> Ajouter un membre
                             </button>
                         ))}
-                        {currentMembers.length === 0 && !isAddingMember && <p className="text-gray-400 text-center text-sm py-4">Aucun membre.</p>}
-                    </div>
-                )}
-
-                {/* --- ONGLET ÉVÉNEMENTS (MODIFIÉ) --- */}
-                {activeTab === 'events' && (
-                    <div className="space-y-3">
-                        {currentEvents.map((event) => (
-                            <div key={event.id} onClick={() => {
-                                if (!isEditing) {
-                                    onClose();
-                                    emit("navigate-to-map", { eventId: event.id });
-                                }
-                            }} className="flex justify-between items-center group p-3 border border-gray-100 rounded-lg hover:shadow-sm hover:border-blue-200 transition-all bg-white">
-                                <div className="overflow-hidden">
-                                    <div className="flex items-center gap-2">
-                                        <p className="text-sm font-semibold text-gray-800 truncate">{event.name}</p>
-                                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0 ${event.statut === 'Actif' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>{event.statut || 'Planifié'}</span>
-                                    </div>
-                                </div>
-                                {/* Bouton supprimer */}
-                                <button onClick={() => { if (!isEditing) handleRemoveEvent(event.id); }} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 p-1 ml-2 shrink-0">
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                                </button>
-                            </div>
-                        ))}
-
-                        {/* AJOUT ÉVÉNEMENT */}
-                        {!isEditing && isAddingEvent && (
-                            <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100 animate-in fade-in slide-in-from-top-2">
-                                <p className="text-xs font-bold text-blue-800 mb-2">Lier à un événement</p>
-                                <div className="flex gap-2">
-                                    <select
-                                        value={selectedEventId}
-                                        onChange={(e) => setSelectedEventId(e.target.value)}
-                                        className="flex-1 text-sm border border-blue-200 rounded px-2 py-1 outline-none"
-                                        autoFocus
-                                    >
-                                        <option value="">Choisir un événement...</option>
-                                        {availableEvents.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-                                    </select>
-                                    <button onClick={confirmAddEvent} disabled={!selectedEventId} className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">OK</button>
-                                    <button onClick={() => setIsAddingEvent(false)} className="text-gray-500 px-2">✕</button>
-                                </div>
-                            </div>
-                        )}
-                        {!isEditing && !isAddingEvent && (
-                            <button
-                                onClick={() => startAddingEvent()}
-                                className="w-full py-2 mt-2 border border-dashed border-gray-300 rounded-lg text-gray-500 text-xs hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all flex items-center justify-center gap-1"
-                            >
-                                <span>+</span> Lier à un événement
-                            </button>
-                        )}
-
-                        {currentEvents.length === 0 && !isAddingEvent && <div className="text-center py-10"><p className="text-gray-400 text-sm">Aucun événement assigné.</p></div>}
-                    </div>
-                )}
+                    </div>)
+                }
             </div>
 
             {/* FOOTER */}
             <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-between items-center shrink-0">
                 {isEditing ? (
                     <div className="flex gap-2 w-full">
-                        <button onClick={() => { setIsEditing(false); setEditedName(teamName); }} className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded text-sm text-gray-700 hover:bg-gray-50">Annuler</button>
-                        <button onClick={handleSaveName} disabled={isSaving} className="flex-1 px-3 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700 flex items-center justify-center gap-2">
+                        <button onClick={() => { setIsEditing(false); setEditedName(teamName); }} className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">Annuler</button>
+                        <button onClick={handleSaveName} disabled={isSaving} className="flex-1 px-3 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700 flex items-center justify-center gap-2 cursor-pointer">
                             {isSaving && <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>}
                             Enregistrer
                         </button>
                     </div>
                 ) : (
                     <>
-                        <button onClick={() => setShowConfirm(true)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg">
+                        <button onClick={() => setShowConfirm(true)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg cursor-pointer">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                         </button>
-                        <button onClick={onClose} className="px-4 py-2 bg-white border border-gray-300 rounded text-xs font-medium text-gray-700 hover:bg-gray-100">Fermer</button>
+                        <button onClick={onClose} className="px-4 py-2 bg-white border border-gray-300 rounded text-xs font-medium text-gray-700 hover:bg-gray-100 cursor-pointer">Fermer</button>
                     </>
                 )}
             </div>

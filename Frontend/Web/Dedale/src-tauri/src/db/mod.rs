@@ -119,6 +119,7 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
             event_id CHAR(36) NOT NULL,
             x REAL NOT NULL,
             y REAL NOT NULL,
+            name TEXT DEFAULT 'Nouveau point',
             comment TEXT,
             type TEXT,
             status BOOLEAN,

@@ -6,7 +6,6 @@ import {
     createEvent,
     updateEvent,
     deleteEvent,
-    fetchGeometryTypes,
     createEventGeometry,
     updateEventGeometry,
     deleteEventGeometry,
@@ -62,17 +61,6 @@ export function useEvents(): UseEventsReturn {
             console.error('Erreur lors du chargement des événements:', err);
         } finally {
             setIsLoading(false);
-        }
-    }, []);
-
-    // Charger les types de géométrie
-    const loadGeometryTypes = useCallback(async () => {
-        try {
-            const types = await fetchGeometryTypes();
-            setGeometryTypes(types);
-        } catch (err: unknown) {
-            console.error('Erreur lors du chargement des types de géométrie:', err);
-            // Ne pas définir d'erreur car ce n'est pas critique pour l'UI
         }
     }, []);
 
@@ -207,8 +195,7 @@ export function useEvents(): UseEventsReturn {
     // Chargement initial
     useEffect(() => {
         loadEvents();
-        loadGeometryTypes();
-    }, [loadEvents, loadGeometryTypes]);
+    }, [loadEvents]);
 
     return {
         // État des données

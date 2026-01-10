@@ -6,8 +6,8 @@ import { useState, useEffect } from "react";
 interface Event {
   id: string;
   name: string;
-  dateDebut: string;
-  dateFin: string;
+  start_date: string;
+  end_date: string;
 }
 
 interface EventsProps {
@@ -134,16 +134,28 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
         return;
       }
 
+      // Vérifier que les dates ne sont pas dans le passé
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD d'aujourd'hui
+      if (formData.dateDebut < today) {
+        alert("La date de début ne peut pas être dans le passé !");
+        return;
+      }
+
+      if (formData.dateFin < today) {
+        alert("La date de fin ne peut pas être dans le passé !");
+        return;
+      }
+
       if (new Date(formData.dateDebut) >= new Date(formData.dateFin)) {
         alert("La date de fin doit être postérieure à la date de début !");
         return;
       }
 
-    const newEvent = {
-      name: formData.name.trim(),
-      start_date: formData.dateDebut, // <--- Renommé pour matcher Rust
-      end_date: formData.dateFin,
-    };
+      const newEvent = {
+        name: formData.name.trim(),
+        start_date: formData.dateDebut, // <--- Renommé pour matcher Rust
+        end_date: formData.dateFin,
+      };
 
       console.log(" Création d'un nouvel événement...", newEvent);
       await invoke("insert_event", { event: newEvent });
@@ -247,6 +259,7 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
                 type="date"
                 name="dateDebut"
                 value={formData.dateDebut}
+                min={new Date().toISOString().split('T')[0]} // Empêche la sélection de dates passées
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
@@ -259,6 +272,7 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
                 type="date"
                 name="dateFin"
                 value={formData.dateFin}
+                min={new Date().toISOString().split('T')[0]} // Empêche la sélection de dates passées
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
@@ -304,10 +318,9 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
                   </h3>
                   <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
                     <span>
-                      Sélectionné Du {formatDate(event.dateDebut)} au{" "}
-                      {formatDate(event.dateFin)}
+                      📅 Du {formatDate(event.start_date)} au {formatDate(event.end_date)}
                     </span>
-                   
+
                   </div>
                 </div>
                 <div className="ml-4 flex gap-2">

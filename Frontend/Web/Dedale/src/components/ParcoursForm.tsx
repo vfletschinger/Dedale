@@ -22,6 +22,15 @@ export default function ParcoursForm({ onSubmit, onCancel }: ParcoursFormProps) 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Vérifier que la date n'est pas dans le passé
+    if (startDate) {
+      const today = new Date().toISOString().split('T')[0];
+      if (startDate < today) {
+        alert("La date de début ne peut pas être dans le passé !");
+        return;
+      }
+    }
+    
     // Combiner date et heure en un seul datetime string
     const datetime = startDate && startTime ? `${startDate}T${startTime}` : "";
     
@@ -87,6 +96,7 @@ export default function ParcoursForm({ onSubmit, onCancel }: ParcoursFormProps) 
               <input
                 type="date"
                 value={startDate}
+                min={new Date().toISOString().split('T')[0]} // Empêche la sélection de dates passées
                 onChange={(e) => setStartDate(e.target.value)}
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
               />

@@ -5,9 +5,9 @@ import PersonDetails from "./PersonDetails";
 import { listen } from "@tauri-apps/api/event";
 import TeamDetails from "./TeamDetails";
 
-interface Team { id: number; name: string; }
+interface Team { id: string; name: string; }
 
-export default function Persons() {
+export default function Persons({ activeEventId }: { activeEventId: string | null; }) {
     const [people, setPeople] = useState<Person[]>([]);
     const [loading, setLoading] = useState(false);
     const [filterName, setFilterName] = useState("");
@@ -30,7 +30,7 @@ export default function Persons() {
     };
 
     useEffect(() => {
-        const unlistenNav = listen<{ id: number }>('navigate-to-person', (event) => {
+        const unlistenNav = listen<{ id: string }>('navigate-to-person', (event) => {
             const targetId = event.payload.id;
             setPeople(currentPeople => {
                 const found = currentPeople.find(p => p.id === targetId);
@@ -56,7 +56,7 @@ export default function Persons() {
         setPeople([...people, newPerson]);
     };
 
-    const handleDeleted = (id: number) => {
+    const handleDeleted = (id: string) => {
         setPeople(people.filter(p => p.id !== id));
         setSelectedPerson(null);
     };
@@ -74,6 +74,7 @@ export default function Persons() {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4 animate-in fade-in duration-200">
                     <PersonDetails
                         person={selectedPerson}
+                        activeEventId={activeEventId}
                         onClose={() => setSelectedPerson(null)}
                         onDelete={handleDeleted}
                         onUpdate={handleUpdate}
@@ -138,10 +139,10 @@ export default function Persons() {
                                         className="p-4 bg-white border border-gray-300 rounded-xl hover:shadow-md hover:border-blue-200 transition-all cursor-pointer flex items-center gap-4 group"
                                     >
                                         <div className="w-10 h-10 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center font-bold text-sm group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
-                                            {person.firstname[0]}{person.lastname[0]}
+                                            {person.firstname[0].toUpperCase()}{person.lastname[0].toUpperCase()}
                                         </div>
                                         <div className="overflow-hidden">
-                                            <h3 className="font-semibold text-gray-800 truncate">{person.firstname} {person.lastname}</h3>
+                                            <h3 className="font-semibold text-gray-800 truncate text-transform: capitalize">{person.firstname} {person.lastname}</h3>
                                             <p className="text-xs text-gray-500 truncate">{person.email || "Pas d'email"}</p>
                                         </div>
                                     </div>

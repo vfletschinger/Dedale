@@ -6,6 +6,7 @@ use tauri::AppHandle;
 use tauri::State;
 use uuid::Uuid;
 
+#[allow(dead_code)]
 #[tauri::command]
 pub async fn fetch_points(
     app: AppHandle,
@@ -117,6 +118,7 @@ pub async fn fetch_equipement_coordinates(
     .map_err(|e| format!("Erreur coordonnées: {}", e))
 }
 
+#[allow(dead_code)]
 #[tauri::command]
 pub async fn fetch_equipement_details(
     pool: State<'_, SqlitePool>, // Utilisation de State au lieu de AppHandle
@@ -196,6 +198,7 @@ pub async fn fetch_obstacle_types(app: AppHandle) -> Result<Vec<ObstacleType>, S
     Ok(obstacles)
 }
 
+#[allow(dead_code)]
 #[tauri::command]
 pub async fn insert_equipements(
     app: AppHandle,
@@ -255,10 +258,9 @@ pub async fn retrieve_data_by_event(
         println!("[DB] Récupération des points pour l'event_id: {}", eid);
         sqlx::query(
             r#"
-            SELECT DISTINCT p.id, p.x, p.y, p.comment, p.type, p.status, pe.event_id
+            SELECT DISTINCT p.id, p.x, p.y, p.name, p.comment, p.type, p.status, p.event_id
             FROM point p
-            INNER JOIN point_event pe ON p.id = pe.point_id
-            WHERE pe.event_id = ?
+            WHERE p.event_id = ?
             ORDER BY p.id
         "#,
         )
@@ -270,9 +272,8 @@ pub async fn retrieve_data_by_event(
         println!("[DB]  Récupération de tous les points");
         sqlx::query(
             r#"
-            SELECT p.id, p.x, p.y, p.comment, p.type, p.status, pe.event_id
+            SELECT p.id, p.x, p.y, p.name, p.comment, p.type, p.status, p.event_id
             FROM point p
-            LEFT JOIN point_event pe ON p.id = pe.point_id
             ORDER BY p.id
         "#,
         )
@@ -304,6 +305,7 @@ pub async fn retrieve_data_by_event(
             id,
             x: row.get("x"),
             y: row.get("y"),
+           // name: row.get("name"),
             comment: row.get("comment"),
             status: row.get("status"),
             event_id: row.get("event_id"),

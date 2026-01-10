@@ -83,7 +83,6 @@ pub fn run() {
             db::update_person,
             db::update_team,
             db::fetch_geometries_for_event,
-            db::create_geometry,
             db::delete_geometry,
             db::update_geometry,
             db::update_point_dates,
