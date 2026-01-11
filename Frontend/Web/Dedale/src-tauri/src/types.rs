@@ -220,3 +220,21 @@ pub struct EquipementComplet {
     pub hour_depose: Option<String>,
     pub coordinates: Vec<EquipementCoordinate>,
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Action {
+    pub id: String,
+    pub team_id: String,
+    pub equipement_id: String,
+    pub action_type: Option<String>,
+    pub scheduled_time: Option<String>,
+    pub is_done: Option<bool>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EquipementActionComplet {
+    pub equipement: EquipementComplet,
+    pub event_id: Option<String>,
+    pub action_id: Option<String>,
+    pub action_type: Option<String>,
+}

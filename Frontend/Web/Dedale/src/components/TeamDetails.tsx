@@ -1,10 +1,23 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useState, useEffect } from "react";
 import { emit } from "@tauri-apps/api/event";
+import SelectableList from "./SelectableList";
+import { Equipement } from "../types/map";
+
+interface AvailableActionOption extends Equipement {
+    temp_type: 'pose' | 'retrait';
+    label: string;
+}
+
+export interface EquipementAction extends Equipement {
+    action_id: string;
+    action_type: string;
+}
 
 export interface TeamDetailData {
     members: Person[];
     events: Event[];
+    actions: EquipementAction[];
 }
 
 export interface Person {
@@ -25,14 +38,15 @@ interface TeamDetailsProps {
     teamId: string;
     teamName: string;
     data?: TeamDetailData;
+    activeEventId: string;
     onClose: () => void;
     onDelete: (teamId: string) => void;
     onMemberClick: (person: Person) => void;
 }
 
-export default function TeamDetails({ teamId, teamName, data, onClose, onDelete, onMemberClick }: TeamDetailsProps) {
+export default function TeamDetails({ teamId, teamName, data, onClose, onDelete, onMemberClick, activeEventId }: TeamDetailsProps) {
     const [loading, setLoading] = useState(false);
-    const [activeTab, setActiveTab] = useState<'members' | 'events'>('members');
+    const [activeTab, setActiveTab] = useState<'members' | 'equipements'>('members');
     const [showConfirm, setShowConfirm] = useState(false);
 
     // --- ÉTATS ÉDITION ---
@@ -45,6 +59,10 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
     const [currentMembers, setCurrentMembers] = useState<Person[]>(data?.members || []);
     const [currentEvents, setCurrentEvents] = useState<Event[]>(data?.events || []);
 
+    const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
+    const [showMultiDeleteConfirm, setShowMultiDeleteConfirm] = useState(false);
+    const [currentActions, setCurrentActions] = useState<EquipementAction[]>([]);
+
     useEffect(() => {
         setEditedName(teamName);
         setIsEditing(false);
@@ -52,18 +70,21 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
         if (data) {
             setCurrentMembers(data.members);
             setCurrentEvents(data.events);
+            setCurrentActions(data.actions);
             return;
         }
 
         const loadData = async () => {
             setLoading(true);
             try {
-                const [m, e] = await Promise.all([
+                const [m, e, eq] = await Promise.all([
                     invoke<Person[]>("fetch_team_members", { teamId }),
                     invoke<Event[]>("fetch_team_events", { teamId }),
+                    invoke<EquipementAction[]>("fetch_team_actions", { teamId }),
                 ]);
                 setCurrentMembers(m);
                 setCurrentEvents(e);
+                setCurrentActions(eq);
             }
             catch (err) {
                 console.error(err);
@@ -110,6 +131,132 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
             setSelectedPersonId("");
             await emit("team-update");
         } catch (e) { console.error(e); }
+    };
+
+    const handleRemoveSelectedMembers = async () => {
+        try {
+            setLoading(true);
+            await Promise.all(
+                selectedItemIds.map(id => invoke("remove_member", { teamId, personId: id }))
+            );
+
+            setCurrentMembers(prev => prev.filter(m => !selectedItemIds.includes(m.id)));
+            setSelectedItemIds([]);
+            setShowMultiDeleteConfirm(false);
+            await emit("team-update");
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+
+    // ========================
+    // LOGIQUE EQUIPEMENTS
+    // ========================
+    const [isAddingEquipementAction, setIsAddingEquipementAction] = useState(false);
+    const [availableEquipements, setavailableEquipements] = useState<Equipement[]>([]);
+    const [selectedEquipementId, setSelectedEquipementId] = useState<string>("");
+
+    const handleRemoveEquipementAction = async (actionId: string) => {
+        try {
+            await invoke("delete_action", { actionId });
+            setCurrentActions(currentActions.filter(e => e.action_id !== actionId));
+            await emit("team-update");
+        } catch (e) { console.error(e); }
+    };
+
+    const startAddingEquipementAction = async () => {
+        setIsAddingEquipementAction(true);
+        try {
+            const allEquipements = await invoke<Equipement[]>("fetch_equipements_for_event", { eventId: activeEventId });
+            const allEventActions = await invoke<any[]>("fetch_actions", { eventId: activeEventId });
+
+            const takenSet = new Set(allEventActions.map(a => `${a.equipement_id}-${a.action_type}`));
+
+            const actionsList: AvailableActionOption[] = [];
+
+            allEquipements.forEach(eq => {
+                const format = (d: string | undefined) => {
+                    if (!d) return "Non planifié";
+                    const date = new Date(d);
+                    return date.toLocaleString('fr-FR', {
+                        day: 'numeric',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                };
+
+                if (!takenSet.has(`${eq.id}-pose`)) {
+                    actionsList.push({
+                        ...eq,
+                        temp_type: 'pose',
+                        label: `${eq.type_name} • Pose • ${format(eq.date_pose)}`
+                    });
+                }
+                if (!takenSet.has(`${eq.id}-retrait`)) {
+                    actionsList.push({
+                        ...eq,
+                        temp_type: 'retrait',
+                        label: `${eq.type_name} • Retrait • ${format(eq.date_depose)}`
+                    });
+                }
+            });
+
+            setavailableEquipements(actionsList as any);
+        } catch (e) { console.error(e); }
+    };
+
+    const confirmAddEquipementAction = async () => {
+        if (!selectedEquipementId) return;
+        const [equipId, actionType] = selectedEquipementId.split('|');
+
+        try {
+            const newActionId = await invoke<string>("add_action", {
+                teamId,
+                equipementId: equipId,
+                actionType
+            });
+
+            const equipmentData = availableEquipements.find(e => e.id === equipId);
+
+            if (equipmentData) {
+                setCurrentActions(prev => [
+                    ...prev,
+                    {
+                        ...equipmentData,
+                        action_id: newActionId,
+                        action_type: actionType
+                    } as EquipementAction
+                ]);
+            }
+
+            setIsAddingEquipementAction(false);
+            setSelectedEquipementId("");
+            await emit("team-update");
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    const handleRemoveSelectedEquipements = async () => {
+        try {
+            setLoading(true);
+            await Promise.all(
+                selectedItemIds.map(id => invoke("delete_action", { actionId: id }))
+            );
+
+            setCurrentActions(prev => prev.filter(m => !selectedItemIds.includes(m.action_id)));
+            setSelectedItemIds([]);
+            setShowMultiDeleteConfirm(false);
+            await emit("team-update");
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
+        }
     };
 
     // ========================
@@ -195,44 +342,49 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
 
             {/* ONGLETS */}
             <div className="flex border-b border-gray-100 shrink-0">
-                <button onClick={() => { if (!isEditing) setActiveTab('members'); }} className={`flex-1 py-3 text-sm font-medium transition-colors ${activeTab === 'members' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-gray-500 hover:text-gray-700'}`}>
+                <button onClick={() => { if (!isEditing) setActiveTab('members'); setSelectedItemIds([]); }} className={`flex-1 py-3 text-sm font-medium transition-colors ${activeTab === 'members' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-gray-500 hover:text-gray-700'}`}>
                     👥 Membres ({currentMembers.length})
+                </button>
+                <button onClick={() => { if (!isEditing) setActiveTab('equipements'); setSelectedItemIds([]); }} className={`flex-1 py-3 text-sm font-medium transition-colors ${activeTab === 'equipements' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-gray-500 hover:text-gray-700'}`}>
+                    👥 Equipements ({currentActions.length})
                 </button>
             </div>
 
             {/* CONTENU */}
             < div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                <div className="flex items-center justify-center gap-2 bg-blue-50 p-2 rounded-lg border border-blue-100 animate-in slide-in-from-top-2 duration-200"><button
+                    onClick={() => activeTab == "equipements" ? setSelectedItemIds(currentActions.map((action) => action.action_id)) : activeTab == "members" ? setSelectedItemIds(currentMembers.map((member) => member.id)) : ""}
+                    className="text-[10px] sm:text-xs bg-gray-500 text-white px-3 py-1.5 rounded-md hover:bg-gray-700 transition-colors font-bold whitespace-nowrap"
+                >
+                    Tout sélectionner
+                </button>
+
+                    {selectedItemIds.length > 0 && (
+                        <>
+                            <button
+                                onClick={() => setSelectedItemIds([])}
+                                className="text-[10px] sm:text-xs bg-gray-500 text-white px-3 py-1.5 rounded-md hover:bg-gray-700 transition-colors font-bold whitespace-nowrap"
+                            >
+                                Tout déselectionner
+                            </button>
+                            <button
+                                onClick={() => setShowMultiDeleteConfirm(true)}
+                                className="text-[10px] sm:text-xs bg-red-600 text-white px-3 py-1.5 rounded-md hover:bg-red-700 transition-colors font-bold whitespace-nowrap"
+                            >
+                                Supprimer sélection
+                            </button>
+                        </>
+                    )}
+                </div>
+                <span className="text-xs font-medium text-blue-700">
+                    {selectedItemIds.length} élément(s) sélectionné(s)
+                </span>
                 {loading ?
                     <div className="flex justify-center items-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div></div>
-
                     :
-                    (<div className="space-y-3">
-                        {currentMembers.map((member) => (
-                            <div key={member.id} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg transition-colors border border-transparent hover:border-blue-300 cursor-pointer group" onClick={() => {
-                                if (!isEditing) onMemberClick(member);
-                            }}>
-                                <div className="flex items-center gap-3 overflow-hidden">
-                                    <div className="w-8 h-8 rounded-full bg-blue-100 shrink-0 flex items-center justify-center text-blue-700 font-bold text-xs">
-                                        {member.firstname[0].toUpperCase()}{member.lastname[0].toUpperCase()}
-                                    </div>
-                                    <div className="overflow-hidden">
-                                        <p className="text-sm font-medium text-gray-800 truncate text-transform: capitalize">{member.firstname} {member.lastname}</p>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={(e) => {
-                                        if (!isEditing) {
-                                            e.stopPropagation();
-                                            handleRemoveMember(member.id);
-                                        }
-                                    }}
-                                    className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 p-1 cursor-pointer"
-                                >                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                                </button>
-                            </div>
-                        ))}
-
-                        {/* AJOUT MEMBRE */}
+                    activeTab == "members"
+                    &&
+                    (<div>
                         {!isEditing && (isAddingMember ? (
                             <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
                                 <p className="text-xs font-bold text-blue-800 mb-2">Ajouter un membre</p>
@@ -250,9 +402,137 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
                                 <span>+</span> Ajouter un membre
                             </button>
                         ))}
+                        <SelectableList
+                            items={currentMembers}
+                            selectedIds={selectedItemIds}
+                            onSelectionChange={setSelectedItemIds}
+                            renderItem={(member, isSelected) => (
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3 overflow-hidden flex-1">
+                                        <div className="w-8 h-8 rounded-full bg-blue-100 shrink-0 flex items-center justify-center text-blue-700 font-bold text-xs">
+                                            {member.firstname[0].toUpperCase()}{member.lastname[0].toUpperCase()}
+                                        </div>
+                                        <input type="checkbox" checked={isSelected} readOnly />
+                                        <div className="overflow-hidden">
+                                            <button
+                                                data-no-select
+                                                onClick={(e) => {
+                                                    if (!isEditing) {
+                                                        e.stopPropagation();
+                                                        onMemberClick(member);
+                                                    }
+                                                }}>
+                                                <p className="hover:text-blue-600 transition-colors cursor-pointer text-sm font-medium text-gray-800 truncate text-transform: capitalize">
+                                                    {member.firstname} {member.lastname}
+                                                </p>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <button
+                                        data-no-select
+                                        onClick={(e) => {
+                                            if (!isEditing) {
+                                                e.stopPropagation();
+                                                handleRemoveMember(member.id);
+                                            }
+                                        }}
+                                        className="text-gray-300 hover:text-red-500 p-1 cursor-pointer"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                    </button>
+                                </div>
+                            )}
+                        />
+                    </div>)
+                    ||
+                    activeTab == "equipements"
+                    &&
+                    (<div>
+                        {!isEditing && (isAddingEquipementAction ? (
+                            <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                                <p className="text-xs font-bold text-blue-800 mb-2">Ajouter un membre</p>
+                                <div className="flex gap-2">
+                                    <select value={selectedEquipementId} onChange={(e) => setSelectedEquipementId(e.target.value)} className="flex-1 text-sm border border-blue-200 rounded px-2 py-1 outline-none cursor-pointer">
+                                        <option value="">Choisir...</option>
+                                        {availableEquipements.map((action: any) => (
+                                            <option key={`${action.id}-${action.temp_type}`} value={`${action.id}|${action.temp_type}`}>
+                                                {action.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <button onClick={confirmAddEquipementAction} disabled={!selectedEquipementId} className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 cursor-pointer">OK</button>
+                                    <button onClick={() => setIsAddingEquipementAction(false)} className="text-gray-500 px-2 cursor-pointer">✕</button>
+                                </div>
+                            </div>
+                        ) : (
+                            <button onClick={startAddingEquipementAction} className="w-full py-2 mt-2 border border-dashed border-gray-300 rounded-lg text-gray-500 text-xs hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all flex items-center justify-center gap-1 cursor-pointer">
+                                <span>+</span> Ajouter un Equipement
+                            </button>
+                        ))}
+                        <SelectableList
+                            items={currentActions.map(a => ({ ...a, id: a.action_id }))}
+                            selectedIds={selectedItemIds}
+                            onSelectionChange={setSelectedItemIds}
+                            renderItem={(equipement, isSelected) => (
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3 overflow-hidden flex-1">
+                                        <input type="checkbox" checked={isSelected} readOnly />
+                                        <div className="overflow-hidden">
+                                            <p className="hover:text-blue-600 transition-colors cursor-pointer text-sm font-medium text-gray-800 truncate text-transform: capitalize">
+                                                {equipement.type_name}
+                                                <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 uppercase">
+                                                    {equipement.action_type}
+                                                </span>
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        data-no-select
+                                        onClick={(e) => {
+                                            if (!isEditing) {
+                                                e.stopPropagation();
+                                                handleRemoveEquipementAction(equipement.action_id);
+                                            }
+                                        }}
+                                        className="text-gray-300 hover:text-red-500 p-1 cursor-pointer"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                    </button>
+                                </div>
+                            )}
+                        />
                     </div>)
                 }
             </div>
+
+
+            {showMultiDeleteConfirm && (
+                <div className="absolute inset-0 z-[60] bg-white/95 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-200">
+                    <div className="bg-red-100 p-4 rounded-full mb-4">
+                        <svg className="h-8 w-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                    </div>
+                    <h3 className="text-lg font-bold text-gray-800">Supprimer les éléments sélectionnés ?</h3>
+                    <p className="text-sm text-gray-500 mt-2">
+                        Vous allez retirer {selectedItemIds.length} éléments de l'équipe "{teamName}".
+                    </p>
+                    <div className="flex gap-3 w-full mt-6">
+                        <button
+                            onClick={() => setShowMultiDeleteConfirm(false)}
+                            className="flex-1 px-4 py-2 bg-gray-100 rounded-lg text-gray-700 hover:bg-gray-200 transition-colors"
+                        >
+                            Annuler
+                        </button>
+                        <button
+                            onClick={() => { activeTab == "members" ? handleRemoveSelectedMembers() : activeTab == "equipements" ? handleRemoveSelectedEquipements() : ""; }}
+                            className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-bold"
+                        >
+                            Confirmer
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* FOOTER */}
             <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-between items-center shrink-0">
