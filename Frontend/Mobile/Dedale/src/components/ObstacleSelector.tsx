@@ -61,7 +61,9 @@ export default function ObstacleSelector({
 
   const fetchObstacleTypes = () => {
     try {
-      const types = db.getAllSync<ObstacleType>("SELECT * FROM obstacle_type");
+      const types = db.getAllSync<ObstacleType>(
+        "SELECT * FROM equipement_type"
+      );
       setAvailableObstacles(types || []);
     } catch (error) {
       console.error(

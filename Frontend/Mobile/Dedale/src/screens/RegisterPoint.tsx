@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import React, { useState, useRef } from "react";
 import CustomButton from "../components/CustomButton";
+import ObstacleSelector from "../components/ObstacleSelector";
 import Map from "../components/Map";
 import MapView, { Marker } from "react-native-maps";
 import * as Location from "expo-location";
@@ -23,6 +24,12 @@ import * as ImageHelper from "../services/ImageHelper";
 import { useEvent } from "../context/EventContext";
 import { usePoints } from "../context/PointsContext";
 import { generateUUID } from "../services/Helper";
+
+type SelectedObstacle = {
+  type_id: number;
+  name: string;
+  number: number;
+};
 
 export default function RegisterPointScreen() {
   const { selectedEventId } = useEvent();
@@ -38,8 +45,13 @@ export default function RegisterPointScreen() {
   const mapRef = useRef<MapView | null>(null);
   const db: any = getDatabase();
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isObstacleSelectorVisible, setIsObstacleSelectorVisible] =
+    useState(false);
   const [pointComment, setPointComment] = useState("");
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
+  const [selectedObstacles, setSelectedObstacles] = useState<
+    SelectedObstacle[]
+  >([]);
 
   React.useEffect(() => {
     requestLocation();
@@ -119,19 +131,12 @@ export default function RegisterPointScreen() {
     try {
       // Générer un UUID pour le point
       const pointId = generateUUID();
-      
-      db.runSync(
-        "INSERT INTO point (id, x, y) VALUES (?, ?, ?)",
-        [pointId, x, y]
-      );
 
-      // Associate point with current event via junction table
-      if (selectedEventId) {
-        db.runSync(
-          "INSERT INTO point_event (point_id, event_id) VALUES (?, ?)",
-          [pointId, selectedEventId]
-        );
-      }
+      // Insérer le point avec event_id direct et le commentaire
+      db.runSync(
+        "INSERT INTO point (id, event_id, x, y, comment) VALUES (?, ?, ?, ?, ?)",
+        [pointId, selectedEventId, x, y, commentValue.trim() || null]
+      );
 
       // Sauvegarder les images
       if (selectedImages.length > 0) {
@@ -153,14 +158,26 @@ export default function RegisterPointScreen() {
         }
       }
 
-      // Sauvegarder le commentaire
-      if (commentValue.trim()) {
-        const commentId = generateUUID();
-        db.runSync("INSERT INTO comment (id, point_id, value) VALUES (?, ?, ?)", [
-          commentId,
-          pointId,
-          commentValue,
-        ]);
+      // Sauvegarder les équipements (anciennement obstacles)
+      if (selectedObstacles.length > 0) {
+        for (const obstacle of selectedObstacles) {
+          try {
+            const equipementId = generateUUID();
+            db.runSync(
+              "INSERT INTO equipement (id, point_id, type_id, quantity) VALUES (?, ?, ?, ?)",
+              [equipementId, pointId, obstacle.type_id, obstacle.number]
+            );
+          } catch (equipErr) {
+            console.error(
+              "Erreur lors de la sauvegarde de l'équipement:",
+              equipErr
+            );
+            Alert.alert(
+              "Attention",
+              `Le point a été enregistré mais un équipement n'a pas pu être ajouté.`
+            );
+          }
+        }
       }
 
       return pointId;
@@ -175,6 +192,10 @@ export default function RegisterPointScreen() {
       );
       return null;
     }
+  };
+
+  const handleSaveObstacles = (obstacles: SelectedObstacle[]) => {
+    setSelectedObstacles(obstacles);
   };
 
   return (
@@ -289,6 +310,30 @@ export default function RegisterPointScreen() {
                 multiline
               />
 
+              {/* Bouton pour ajouter des obstacles */}
+              <CustomButton
+                title={`Ajouter des obstacles ${selectedObstacles.length > 0 ? `(${selectedObstacles.length})` : ""}`}
+                onPress={() => setIsObstacleSelectorVisible(true)}
+              />
+
+              {/* Affichage des obstacles sélectionnés */}
+              {selectedObstacles.length > 0 && (
+                <View className="my-2">
+                  <Text className="font-semibold mb-1">
+                    Obstacles sélectionnés :
+                  </Text>
+                  <View className="flex-row flex-wrap gap-2">
+                    {selectedObstacles.map((obs, idx) => (
+                      <View key={idx} className="obstacle-tag">
+                        <Text className="obstacle-tag-text">
+                          {obs.name} ({obs.number})
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
+
               {/* Bouton pour prendre une photo */}
               <CustomButton title="Prendre une photo" onPress={pickImage} />
 
@@ -332,6 +377,7 @@ export default function RegisterPointScreen() {
                       setIsModalVisible(false);
                       setPointComment("");
                       setSelectedImages([]);
+                      setSelectedObstacles([]);
                       setLocation(null);
                     }
                   } else {
@@ -347,12 +393,21 @@ export default function RegisterPointScreen() {
                   setIsModalVisible(false);
                   setPointComment("");
                   setSelectedImages([]);
+                  setSelectedObstacles([]);
                 }}
               />
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Composant ObstacleSelector */}
+      <ObstacleSelector
+        visible={isObstacleSelectorVisible}
+        onClose={() => setIsObstacleSelectorVisible(false)}
+        onSave={handleSaveObstacles}
+        initialObstacles={selectedObstacles}
+      />
     </View>
   );
 }

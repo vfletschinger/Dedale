@@ -53,6 +53,7 @@ pub fn run() {
             map::get_points,
             socket::start_server,
             socket::send_event_to_mobile,
+            socket::terminate_server,
             socket::start_receive_server,
             db::fetch_obstacle_types,
             db::delete_point,
