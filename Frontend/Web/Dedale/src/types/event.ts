@@ -28,7 +28,7 @@ export interface GeometryType {
 
 // Type pour les inputs lors de la création/modification d'une géométrie
 export interface EventGeometryInput {
-  event_id: number;
+  event_id: string;
   geometry_type_id: number;
   geom: string;
   style_properties?: string;

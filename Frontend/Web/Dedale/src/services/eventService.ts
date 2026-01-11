@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { Event, EventInput, EventGeometryInput, GeometryType } from '../types/event';
+import type { Event, EventInput, EventGeometryInput } from '../types/event';
 
 // ========== SERVICES POUR LES ÉVÉNEMENTS ==========
 
@@ -18,7 +18,7 @@ export async function fetchEvents(): Promise<Event[]> {
 /**
  * Récupère un événement par son ID avec ses géométries
  */
-export async function fetchEventById(eventId: number): Promise<Event | null> {
+export async function fetchEventById(eventId: string): Promise<Event | null> {
     try {
         return await invoke('fetch_event_by_id', { eventId });
     } catch (error) {
@@ -30,7 +30,7 @@ export async function fetchEventById(eventId: number): Promise<Event | null> {
 /**
  * Crée un nouvel événement
  */
-export async function createEvent(event: EventInput): Promise<number> {
+export async function createEvent(event: EventInput): Promise<string> {
     try {
         return await invoke('create_event', { event });
     } catch (error) {
@@ -42,7 +42,7 @@ export async function createEvent(event: EventInput): Promise<number> {
 /**
  * Met à jour un événement existant
  */
-export async function updateEvent(eventId: number, event: EventInput): Promise<void> {
+export async function updateEvent(eventId: string, event: EventInput): Promise<void> {
     try {
         await invoke('update_event', { eventId, event });
     } catch (error) {
@@ -54,7 +54,7 @@ export async function updateEvent(eventId: number, event: EventInput): Promise<v
 /**
  * Supprime un événement
  */
-export async function deleteEvent(eventId: number): Promise<void> {
+export async function deleteEvent(eventId: string): Promise<void> {
     try {
         await invoke('delete_event', { eventId });
     } catch (error) {
@@ -108,7 +108,7 @@ export async function deleteEventGeometry(geometryId: number): Promise<void> {
  */
 export function parseStyleProperties(stylePropertiesJson?: string): Record<string, unknown> | null {
     if (!stylePropertiesJson) return null;
-    
+
     try {
         return JSON.parse(stylePropertiesJson);
     } catch (error) {
@@ -138,7 +138,7 @@ export function getDefaultColorForGeometryType(geometryTypeId: number): string {
         7: '#FFEB3B', // Ligne de départ/arrivée - Jaune
         8: '#795548', // Zone logistique - Marron
     };
-    
+
     return colorMap[geometryTypeId] || '#000000';
 }
 
@@ -149,13 +149,13 @@ export function validateWKT(wkt: string): boolean {
     if (!wkt || wkt.trim().length === 0) {
         return false;
     }
-    
+
     // Vérifications basiques pour les formats WKT courants
     const wktUpper = wkt.trim().toUpperCase();
     const validTypes = [
-        'POINT', 'LINESTRING', 'POLYGON', 'MULTIPOINT', 
+        'POINT', 'LINESTRING', 'POLYGON', 'MULTIPOINT',
         'MULTILINESTRING', 'MULTIPOLYGON', 'GEOMETRYCOLLECTION'
     ];
-    
+
     return validTypes.some(type => wktUpper.startsWith(type));
 }
