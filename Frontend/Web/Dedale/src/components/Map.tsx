@@ -2,7 +2,6 @@ import { useRef, useEffect, useState } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
-import { Protocol } from "pmtiles";
 
 // Composants
 import PointDetails from "./PointDetails";
@@ -13,8 +12,6 @@ import ParcoursForm from "./ParcoursForm";
 import InterestForm from "./InterestForm";
 import EquipementForm from "./EquipementForm";
 import EquipementTypeFilter from "./EquipementTypeFilter";
-import MapToolbar from "./MapToolbar";
-import MapGeometryList from "./MapGeometryList";
 
 // Hooks personnalisés
 import { useMapPoints } from "../hooks/useMapPoints";
@@ -23,7 +20,6 @@ import { useEvents } from "../hooks/useEvents";
 
 // Types et Utils
 import { SearchResult, MapEvent, Equipement } from "../types/map";
-import { getMapStyle } from "../utils/mapStyles";
 
 function OfflineMapLibre({
   selectedEventId,
@@ -38,12 +34,7 @@ function OfflineMapLibre({
   const [viewMode, setViewMode] = useState<"points" | "timeline">("points");
 
   // État pour le filtre spatial (limites visibles de la carte)
-  const [mapBounds, setMapBounds] = useState<{
-    north: number;
-    south: number;
-    east: number;
-    west: number;
-  } | null>(null);
+  const [mapBounds, setMapBounds] = useState<{ north: number; south: number; east: number; west: number } | null>(null);
 
   // État pour le filtre temporel de la timeline (date du curseur)
   const [timelineFilterDate, setTimelineFilterDate] = useState<Date | null>(null);
@@ -54,7 +45,7 @@ function OfflineMapLibre({
 
   // Gestion du marqueur d'adresse (Recherche)
   const [currentMarker, setCurrentMarker] = useState<maplibregl.Marker | null>(
-    null,
+    null
   );
 
   // 1. Logique des POINTS
@@ -106,7 +97,7 @@ function OfflineMapLibre({
   // 3. Logique des ÉVÉNEMENTS
   const { events } = useEvents();
   const currentEvent: MapEvent | undefined = events.find(
-    (e) => String(e.id) === String(selectedEventId),
+    (e) => String(e.id) === String(selectedEventId)
   );
 
   // --- EFFETS (Chargement initial) ---
@@ -115,19 +106,11 @@ function OfflineMapLibre({
   useEffect(() => {
     if (map || !mapContainer.current) return;
 
-    // Enregistrer le protocole PMTiles
-    const protocol = new Protocol();
-    maplibregl.addProtocol("pmtiles", protocol.tile);
-
-    // Utilisation du style externe avec les nouvelles couleurs
-    const mapStyle = getMapStyle();
-
     const mapInstance = new maplibregl.Map({
       container: mapContainer.current,
-      style: mapStyle,
+      style: "http://localhost:8082/styles/basic-preview/style.json",
       center: [7.7635, 48.5465],
-      zoom: 17, // Zoom initial plus proche pour voir le détail
-      maxZoom: 22, // Permettre le zoom très proche
+      zoom: 13,
     });
 
     const initialMarker = new maplibregl.Marker()
@@ -139,7 +122,6 @@ function OfflineMapLibre({
     setMap(mapInstance);
 
     return () => {
-      maplibregl.removeProtocol("pmtiles");
       mapInstance.remove();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -236,17 +218,17 @@ function OfflineMapLibre({
       .addTo(map);
 
     setCurrentMarker(marker);
-    map.flyTo({ center: [parseFloat(lon), parseFloat(lat)], zoom: 18 });
+    map.flyTo({ center: [parseFloat(lon), parseFloat(lat)], zoom: 15 });
   };
 
   // --- RENDU ---
   return (
     <div className="h-full flex flex-col bg-gray-50 overflow-hidden">
       {/* --- HEADER --- */}
-      <div className="bg-slate-700 shadow-lg shrink-0 z-30 relative">
+      <div className="bg-slate-700 shadow-lg shrink-0">
         <div className="p-4 pb-0">
-          <div className="flex items-center w-full">
-            {/* Barre de recherche style Google Maps */}
+          <div className="flex items-center gap-3">
+            {/* Barre de recherche */}
             <AddressSearch onSelect={handleAddressSelect} />
           </div>
         </div>
@@ -273,18 +255,17 @@ function OfflineMapLibre({
           </button>
           <button
             onClick={() => setViewMode("timeline")}
-            className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
-              viewMode === "timeline"
+            className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${viewMode === "timeline"
                 ? "text-white border-blue-400"
                 : "text-slate-400 border-transparent hover:text-slate-200"
-            }`}
+              }`}
           >
             <span className="flex items-center gap-2">
               <span>📅</span>
               <span>Frise chronologique</span>
             </span>
           </button>
-          
+
           {/* Filtre des types d'équipements - Aligné à droite */}
           <div className="ml-auto">
             <EquipementTypeFilter
@@ -347,20 +328,33 @@ function OfflineMapLibre({
                           <span className="font-bold text-gray-800 text-sm flex gap-2">
                             <span>📍</span> {p.name || `Point #${p.id.slice(0, 8)}`}
                           </span>
+                          <button className="text-blue-600 text-xs font-semibold px-2 py-1 rounded hover:bg-blue-50">
+                            Voir →
+                          </button>
+                        </div>
+                        <div className="flex gap-2 text-xs">
+                          <span className="bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-200">
+                            📷 {p.pictures?.length || 0}
+                          </span>
+                          {p.status && (
+                            <span className="bg-green-50 text-green-700 px-1.5 py-0.5 rounded border border-green-200">
+                              ✓ Traité
+                            </span>
+                          )}
+                        </div>
+                        {p.comment && (
+                          <div className="text-xs text-gray-500 mt-2 line-clamp-1">
+                            💬 {p.comment}
+                          </div>
                         )}
                       </div>
-                      {p.comment && (
-                        <div className="text-xs text-gray-500 mt-2 line-clamp-1">
-                          💬 {p.comment}
-                        </div>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
-        )}
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        }
 
         {/* TIMELINE */}
         {
@@ -372,7 +366,7 @@ function OfflineMapLibre({
                   points={points}
                   equipements={selectedEquipementTypes === null
                     ? equipements  // Pas encore initialisé = tous
-                    : selectedEquipementTypes.length === 0 
+                    : selectedEquipementTypes.length === 0
                       ? []  // Filtre vide = aucun
                       : equipements.filter(eq => !eq.type_id || selectedEquipementTypes.includes(eq.type_id))
                   }
@@ -395,10 +389,10 @@ function OfflineMapLibre({
                     </p>
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
-        )}
+              )}
+            </div>
+          )
+        }
 
         {/* CARTE */}
         <div className="flex-1 flex flex-col overflow-hidden relative">
@@ -420,11 +414,10 @@ function OfflineMapLibre({
               <div className="flex gap-2">
                 <button
                   onClick={handleAddPointClick}
-                  className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${
-                    awaitingMapClick
+                  className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${awaitingMapClick
                       ? "bg-amber-500 text-white animate-pulse"
                       : "bg-white hover:bg-gray-50 text-gray-700"
-                  }`}
+                    }`}
                   title="Ajouter un point"
                 >
                   <span className="text-base">📍</span>
@@ -432,11 +425,10 @@ function OfflineMapLibre({
 
                 <button
                   onClick={startDrawPolygon}
-                  className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${
-                    drawingMode === "zone"
+                  className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${drawingMode === "zone"
                       ? "bg-blue-600 text-white"
                       : "bg-white hover:bg-gray-50 text-gray-700"
-                  }`}
+                    }`}
                   title="Zone (Polygone)"
                 >
                   <span className="text-base">⬡</span>
@@ -444,22 +436,20 @@ function OfflineMapLibre({
 
                 <button
                   onClick={startDrawLine}
-                  className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${
-                    drawingMode === "parcours"
+                  className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${drawingMode === "parcours"
                       ? "bg-red-500 text-white"
                       : "bg-white hover:bg-gray-50 text-gray-700"
-                  }`}
+                    }`}
                   title="Parcours (Ligne)"
                 >
                   <span className="text-base">╱</span>
                 </button>
                 <button
                   onClick={startDrawInterest}
-                  className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${
-                    drawingMode === "interest"
+                  className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${drawingMode === "interest"
                       ? "bg-purple-600 text-white"
                       : "bg-black/30 hover:bg-black/40 backdrop-blur-sm text-white"
-                  }`}
+                    }`}
                   title="Point d'intérêt"
                 >
                   <span className="text-base font-bold">?</span>
@@ -467,11 +457,10 @@ function OfflineMapLibre({
 
                 <button
                   onClick={startDrawEquipment}
-                  className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${
-                    drawingMode === "equipment"
+                  className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${drawingMode === "equipment"
                       ? "bg-green-600 text-white"
                       : "bg-white hover:bg-gray-50 text-gray-700"
-                  }`}
+                    }`}
                   title="Équipement"
                 >
                   <span className="text-base">🚧</span>
@@ -493,180 +482,173 @@ function OfflineMapLibre({
                   </button>
                 )}
               </div>
-            </>
-          )}
-        </div>
-      </div>
 
               {/* Liste des Zones et Parcours (Dropdown) */}
               {(zones.length > 0 ||
                 parcours.length > 0 ||
                 equipements.length > 0) && (
-                <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden max-w-sm mt-2">
-                  <button
-                    onClick={() => setIsGeometryListOpen(!isGeometryListOpen)}
-                    className="w-full px-4 py-2 flex justify-between items-center text-sm font-semibold hover:bg-gray-50"
-                  >
-                    <span>
-                      📐 {zones.length + parcours.length + equipements.length}{" "}
-                      élément(s)
-                    </span>
-                    <span
-                      className={`transform transition-transform ${
-                        isGeometryListOpen ? "rotate-180" : ""
-                      }`}
+                  <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden max-w-sm mt-2">
+                    <button
+                      onClick={() => setIsGeometryListOpen(!isGeometryListOpen)}
+                      className="w-full px-4 py-2 flex justify-between items-center text-sm font-semibold hover:bg-gray-50"
                     >
-                      ▼
-                    </span>
-                  </button>
+                      <span>
+                        📐 {zones.length + parcours.length + equipements.length}{" "}
+                        élément(s)
+                      </span>
+                      <span
+                        className={`transform transition-transform ${isGeometryListOpen ? "rotate-180" : ""
+                          }`}
+                      >
+                        ▼
+                      </span>
+                    </button>
 
-                  {isGeometryListOpen && (
-                    <div className="max-h-60 overflow-y-auto bg-gray-50 border-t border-gray-200">
-                      {/* --- SECTION ZONES --- */}
-                      {zones.length > 0 && (
-                        <div>
-                          <div className="px-3 py-1 bg-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                            Zones
-                          </div>
-                          {zones.map((zone) => {
-                            const itemData = { ...zone, type: "zone" as const };
-                            const isSelected =
-                              selectedGeometry?.id === zone.id &&
-                              selectedGeometry?.type === "zone";
-                            const isEditing =
-                              editingGeometry?.id === zone.id &&
-                              editingGeometry?.type === "zone";
+                    {isGeometryListOpen && (
+                      <div className="max-h-60 overflow-y-auto bg-gray-50 border-t border-gray-200">
+                        {/* --- SECTION ZONES --- */}
+                        {zones.length > 0 && (
+                          <div>
+                            <div className="px-3 py-1 bg-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                              Zones
+                            </div>
+                            {zones.map((zone) => {
+                              const itemData = { ...zone, type: "zone" as const };
+                              const isSelected =
+                                selectedGeometry?.id === zone.id &&
+                                selectedGeometry?.type === "zone";
+                              const isEditing =
+                                editingGeometry?.id === zone.id &&
+                                editingGeometry?.type === "zone";
 
-                            return (
-                              <div
-                                key={`zone-${zone.id}`}
-                                className={`p-2 border-b border-gray-200 last:border-0 hover:bg-blue-50 cursor-pointer transition-colors ${
-                                  isSelected
-                                    ? "bg-blue-100 border-l-4 border-l-blue-500"
-                                    : isEditing
-                                    ? "bg-amber-50"
-                                    : ""
-                                }`}
-                                onClick={() =>
-                                  highlightGeometry(
-                                    isSelected ? null : itemData
-                                  )
-                                }
-                              >
-                                <div className="flex items-center gap-2">
-                                  <span className="text-base">🟦</span>
-                                  <span className="text-xs font-medium truncate flex-1">
-                                    {zone.name ||
-                                      `Zone #${zone.id.slice(0, 8)}`}
-                                  </span>
-                                  {isSelected && (
-                                    <span className="text-blue-500 text-xs">
-                                      👁️
+                              return (
+                                <div
+                                  key={`zone-${zone.id}`}
+                                  className={`p-2 border-b border-gray-200 last:border-0 hover:bg-blue-50 cursor-pointer transition-colors ${isSelected
+                                      ? "bg-blue-100 border-l-4 border-l-blue-500"
+                                      : isEditing
+                                        ? "bg-amber-50"
+                                        : ""
+                                    }`}
+                                  onClick={() =>
+                                    highlightGeometry(
+                                      isSelected ? null : itemData
+                                    )
+                                  }
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-base">🟦</span>
+                                    <span className="text-xs font-medium truncate flex-1">
+                                      {zone.name ||
+                                        `Zone #${zone.id.slice(0, 8)}`}
                                     </span>
+                                    {isSelected && (
+                                      <span className="text-blue-500 text-xs">
+                                        👁️
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {isEditing && (
+                                    <div className="flex gap-2 mt-2">
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          saveEditGeometry();
+                                        }}
+                                        className="flex-1 bg-green-600 text-white text-xs py-1 rounded"
+                                      >
+                                        Sauver
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          cancelEditGeometry();
+                                        }}
+                                        className="flex-1 bg-gray-500 text-white text-xs py-1 rounded"
+                                      >
+                                        Annuler
+                                      </button>
+                                    </div>
                                   )}
                                 </div>
-
-                                {isEditing && (
-                                  <div className="flex gap-2 mt-2">
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        saveEditGeometry();
-                                      }}
-                                      className="flex-1 bg-green-600 text-white text-xs py-1 rounded"
-                                    >
-                                      Sauver
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        cancelEditGeometry();
-                                      }}
-                                      className="flex-1 bg-gray-500 text-white text-xs py-1 rounded"
-                                    >
-                                      Annuler
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-
-                      {/* --- SECTION PARCOURS --- */}
-                      {parcours.length > 0 && (
-                        <div>
-                          <div className="px-3 py-1 bg-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider border-t border-gray-200">
-                            Parcours
+                              );
+                            })}
                           </div>
-                          {parcours.map((p) => {
-                            const itemData = {
-                              ...p,
-                              type: "parcours" as const,
-                            };
-                            const isSelected =
-                              selectedGeometry?.id === p.id &&
-                              selectedGeometry?.type === "parcours";
-                            const isEditing =
-                              editingGeometry?.id === p.id &&
-                              editingGeometry?.type === "parcours";
+                        )}
 
-                            return (
-                              <div
-                                key={`parcours-${p.id}`}
-                                className={`p-2 border-b border-gray-200 last:border-0 hover:bg-blue-50 cursor-pointer transition-colors ${
-                                  isSelected
-                                    ? "bg-blue-100 border-l-4 border-l-green-500"
-                                    : isEditing
-                                    ? "bg-amber-50"
-                                    : ""
-                                }`}
-                                onClick={() =>
-                                  highlightGeometry(
-                                    isSelected ? null : itemData
-                                  )
-                                }
-                              >
-                                <div className="flex items-center gap-2">
-                                  <span className="text-base">〰️</span>
-                                  <span className="text-xs font-medium truncate flex-1">
-                                    {p.name || `Parcours #${p.id.slice(0, 8)}`}
-                                  </span>
-                                  {isSelected && (
-                                    <span className="text-green-500 text-xs">
-                                      👁️
+                        {/* --- SECTION PARCOURS --- */}
+                        {parcours.length > 0 && (
+                          <div>
+                            <div className="px-3 py-1 bg-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider border-t border-gray-200">
+                              Parcours
+                            </div>
+                            {parcours.map((p) => {
+                              const itemData = {
+                                ...p,
+                                type: "parcours" as const,
+                              };
+                              const isSelected =
+                                selectedGeometry?.id === p.id &&
+                                selectedGeometry?.type === "parcours";
+                              const isEditing =
+                                editingGeometry?.id === p.id &&
+                                editingGeometry?.type === "parcours";
+
+                              return (
+                                <div
+                                  key={`parcours-${p.id}`}
+                                  className={`p-2 border-b border-gray-200 last:border-0 hover:bg-blue-50 cursor-pointer transition-colors ${isSelected
+                                      ? "bg-blue-100 border-l-4 border-l-green-500"
+                                      : isEditing
+                                        ? "bg-amber-50"
+                                        : ""
+                                    }`}
+                                  onClick={() =>
+                                    highlightGeometry(
+                                      isSelected ? null : itemData
+                                    )
+                                  }
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-base">〰️</span>
+                                    <span className="text-xs font-medium truncate flex-1">
+                                      {p.name || `Parcours #${p.id.slice(0, 8)}`}
                                     </span>
+                                    {isSelected && (
+                                      <span className="text-green-500 text-xs">
+                                        👁️
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {isEditing && (
+                                    <div className="flex gap-2 mt-2">
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          saveEditGeometry();
+                                        }}
+                                        className="flex-1 bg-green-600 text-white text-xs py-1 rounded"
+                                      >
+                                        Sauver
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          cancelEditGeometry();
+                                        }}
+                                        className="flex-1 bg-gray-500 text-white text-xs py-1 rounded"
+                                      >
+                                        Annuler
+                                      </button>
+                                    </div>
                                   )}
                                 </div>
-
-                                {isEditing && (
-                                  <div className="flex gap-2 mt-2">
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        saveEditGeometry();
-                                      }}
-                                      className="flex-1 bg-green-600 text-white text-xs py-1 rounded"
-                                    >
-                                      Sauver
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        cancelEditGeometry();
-                                      }}
-                                      className="flex-1 bg-gray-500 text-white text-xs py-1 rounded"
-                                    >
-                                      Annuler
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
+                              );
+                            })}
+                          </div>
+                        )}
 
                         {/* --- SECTION ÉQUIPEMENTS --- */}
                         {equipements.length > 0 && (
