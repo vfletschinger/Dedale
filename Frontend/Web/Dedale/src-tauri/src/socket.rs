@@ -195,6 +195,38 @@ pub(crate) struct TransferPoint {
     status: Option<bool>,
 }
 
+/// Structure pour une équipe envoyée au mobile
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TransferTeam {
+    id: String,
+    event_id: String,
+    name: Option<String>,
+    members: Vec<TransferMember>,
+}
+
+/// Structure pour un membre d'équipe envoyé au mobile
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TransferMember {
+    id: String,
+    team_id: String,
+    person_id: String,
+    person_name: Option<String>,
+}
+
+/// Structure pour une action envoyée au mobile
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TransferAction {
+    id: String,
+    team_id: String,
+    equipement_id: String,
+    action_type: Option<String>,
+    scheduled_time: Option<String>,
+    is_done: Option<bool>,
+}
+
 /// Structure pour un event envoyé au mobile (avec noms camelCase pour compatibilité)
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -206,6 +238,8 @@ pub(crate) struct TransferEvent {
     parcours: Vec<TransferParcours>,
     zones: Vec<TransferZone>,
     points: Vec<TransferPoint>,
+    teams: Vec<TransferTeam>,
+    actions: Vec<TransferAction>,
 }
 
 /// Structure pour un accusé de réception d'event du mobile
@@ -468,6 +502,84 @@ async fn fetch_events_for_transfer(
                 })
                 .collect();
 
+            // Récupérer les équipes de cet événement
+            let teams_rows = sqlx::query(
+                "SELECT id, event_id, name FROM team WHERE event_id = ?"
+            )
+            .bind(&event_id_str)
+            .fetch_all(&pool)
+            .await
+            .map_err(|e| format!("Erreur récupération teams: {}", e))?;
+
+            let mut teams: Vec<TransferTeam> = Vec::new();
+            for team_row in teams_rows {
+                let team_id: String = team_row.get("id");
+                
+                // Récupérer les membres de cette équipe avec les infos de la personne
+                let members_rows = sqlx::query(
+                    "SELECT m.id, m.team_id, m.person_id, p.firstname, p.lastname 
+                     FROM member m 
+                     LEFT JOIN person p ON m.person_id = p.id 
+                     WHERE m.team_id = ?"
+                )
+                .bind(&team_id)
+                .fetch_all(&pool)
+                .await
+                .map_err(|e| format!("Erreur récupération members: {}", e))?;
+
+                let members: Vec<TransferMember> = members_rows
+                    .iter()
+                    .map(|row| {
+                        let firstname: Option<String> = row.get("firstname");
+                        let lastname: Option<String> = row.get("lastname");
+                        let person_name = match (firstname, lastname) {
+                            (Some(fn_), Some(ln)) => Some(format!("{} {}", fn_, ln)),
+                            (Some(fn_), None) => Some(fn_),
+                            (None, Some(ln)) => Some(ln),
+                            (None, None) => None,
+                        };
+                        TransferMember {
+                            id: row.get("id"),
+                            team_id: row.get("team_id"),
+                            person_id: row.get("person_id"),
+                            person_name,
+                        }
+                    })
+                    .collect();
+
+                teams.push(TransferTeam {
+                    id: team_id,
+                    event_id: event_id_str.clone(),
+                    name: team_row.get("name"),
+                    members,
+                });
+            }
+
+            // Récupérer les actions liées aux équipes de cet événement
+            let actions_rows = sqlx::query(
+                "SELECT a.id, a.team_id, a.equipement_id, a.type, a.scheduled_time, a.is_done 
+                 FROM action a 
+                 WHERE a.team_id IN (
+                     SELECT id FROM team WHERE event_id = ?
+                 )"
+            )
+            .bind(&event_id_str)
+            .fetch_all(&pool)
+            .await
+            .map_err(|e| format!("Erreur récupération actions: {}", e))?;
+
+            let actions: Vec<TransferAction> = actions_rows
+                .iter()
+                .map(|row| TransferAction {
+                    id: row.get("id"),
+                    team_id: row.get("team_id"),
+                    equipement_id: row.get("equipement_id"),
+                    action_type: row.get("type"),
+                    scheduled_time: row.get("scheduled_time"),
+                    is_done: row.get("is_done"),
+                })
+                .collect();
+
             transfer_events.push(TransferEvent {
                 id: event_id_str.clone(),
                 name: event_row.get("name"),
@@ -476,14 +588,18 @@ async fn fetch_events_for_transfer(
                 parcours,
                 zones,
                 points,
+                teams,
+                actions,
             });
 
             println!(
-                "📋 Event '{}' récupéré avec {} parcours, {} zones, {} points",
+                "📋 Event '{}' récupéré avec {} parcours, {} zones, {} points, {} équipes, {} actions",
                 event_row.get::<String, _>("name"),
                 transfer_events.last().unwrap().parcours.len(),
                 transfer_events.last().unwrap().zones.len(),
-                transfer_events.last().unwrap().points.len()
+                transfer_events.last().unwrap().points.len(),
+                transfer_events.last().unwrap().teams.len(),
+                transfer_events.last().unwrap().actions.len(),
             );
         }
     }

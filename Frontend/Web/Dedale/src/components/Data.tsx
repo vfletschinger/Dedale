@@ -197,12 +197,10 @@ function Data() {
   };
 
   const baseBtn =
-    "w-full px-6 py-3 font-semibold rounded-xl transition duration-300 shadow-md transform hover:scale-[1.02]";
-  const exportBtnClass = `${baseBtn} bg-green-500 text-white hover:bg-green-600 focus:ring-4 focus:ring-green-300`;
-  const pdfBtnClass = `${baseBtn} bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-4 focus:ring-indigo-300`;
-  const connectBtnClass = qrCodeBase64
-    ? `${baseBtn} bg-blue-500 text-white hover:bg-blue-600 focus:ring-4 focus:ring-blue-300`
-    : `${baseBtn} bg-gray-700 text-white hover:bg-gray-800 focus:ring-4 focus:ring-gray-400`;
+    "w-full px-6 py-3 font-semibold rounded-lg transition-all hover:shadow-md";
+  const exportBtnClass = `${baseBtn} bg-green-600 text-white hover:bg-green-700`;
+  const pdfBtnClass = `${baseBtn} bg-blue-600 text-white hover:bg-blue-700`;
+  const connectBtnClass = `${baseBtn} bg-blue-600 text-white hover:bg-blue-700 hover:scale-105`;
 
   const FeedbackMessage = ({
     type,
@@ -213,10 +211,10 @@ function Data() {
   }) => {
     const classes =
       type === "success"
-        ? "bg-green-100 border-green-500 text-green-700"
+        ? "bg-green-50 border-green-300 text-green-700"
         : type === "info"
-        ? "bg-blue-100 border-blue-500 text-blue-700"
-        : "bg-red-100 border-red-500 text-red-700";
+        ? "bg-blue-50 border-blue-300 text-blue-700"
+        : "bg-red-50 border-red-300 text-red-700";
     const title =
       type === "success"
         ? "Succès"
@@ -225,169 +223,108 @@ function Data() {
         : "Erreur";
     return (
       <div
-        className={`p-4 border-l-4 ${classes} rounded-lg shadow-inner mt-4 w-full max-w-lg mx-auto`}
+        className={`p-4 border-l-4 ${classes} rounded-xl mb-8 w-full shadow-sm`}
       >
-        <p className="font-bold">{title}</p>
+        <p className="font-semibold text-sm">{title}</p>
         <p className="text-sm break-all">{text}</p>
       </div>
     );
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col items-center p-4 sm:p-8 font-sans">
-      <div className="w-full max-w-5xl bg-white rounded-3xl shadow-2xl p-6 md:p-12">
-        <header className="text-center mb-10">
-          <h1 className="text-4xl font-extrabold text-gray-800 tracking-tight">
-            Dedale - Console de Gestion
+    <div className="min-h-screen bg-gradient-to-br from-white to-gray-50 flex flex-col items-center p-4 sm:p-8">
+      <div className="w-full max-w-2xl">
+        <header className="mb-10">
+          <h1 className="text-4xl font-bold text-gray-900">
+            Gestion des Données
           </h1>
-          <p className="text-lg text-gray-500 mt-2">
-            Gérez l'export des données et la connexion à l'application mobile.
+          <p className="text-gray-600 mt-2 text-lg">
+            Connectez l'application mobile
           </p>
+          <div className="h-1 w-16 bg-blue-600 rounded-full mt-4"></div>
         </header>
 
         {message && <FeedbackMessage type={message.type} text={message.text} />}
 
-        <div className="mt-8 grid lg:grid-cols-3 gap-8">
-          {/* Gestion des Données (Export/PDF) */}
-          <div className="lg:col-span-1 bg-gray-50 p-6 rounded-2xl border border-gray-200 shadow-lg h-full flex flex-col">
-            <h2 className="text-2xl font-bold text-gray-700 mb-6 border-b pb-2">
-              Gestion des Fichiers
-            </h2>
+        {/* Section: Connexion Mobile */}
+        <div className="bg-white border border-gray-200 rounded-xl p-10 shadow-sm">
+          <h2 className="text-2xl font-bold text-gray-900 mb-8">
+            Synchronisation Mobile
+          </h2>
 
-            {/* --- SÉLECTEUR D'ÉVÉNEMENT --- */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Filtrer par événement
-              </label>
-              <div className="relative">
-                <select
-                  value={selectedEventId}
-                  onChange={(e) => setSelectedEventId(e.target.value)}
-                  className="block w-full pl-3 pr-10 py-3 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-xl border shadow-sm bg-white"
-                >
-                  <option value="">📂 Tous les événements</option>
-                  <hr />
-                  {events.map((evt) => (
-                    <option key={evt.id} value={evt.id}>
-                      🔹 {evt.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <p className="text-xs text-gray-500 mt-2 italic">
-                {selectedEventId
-                  ? "L'export ne contiendra que les points de cet événement."
-                  : "L'export contiendra la totalité de la base de données."}
-              </p>
-            </div>
-
-            <div className="space-y-4 mt-auto">
+          {/* Phase initiale: bouton pour démarrer */}
+          {transferPhase === "idle" && (
+            <div className="flex flex-col items-center justify-center py-12">
               <button
-                className={`${exportBtnClass} ${
-                  !selectedEventId ? "opacity-90" : ""
-                }`}
-                onClick={generate_excel}
+                className={connectBtnClass}
+                onClick={qr_code}
+                disabled={isLoading}
+                aria-label="Démarrer le serveur et connecter l'application"
               >
-                Exporter Excel {selectedEventId ? "(Filtré)" : "(Complet)"}
-              </button>
-              <button
-                className={`${pdfBtnClass} ${
-                  !selectedEventId ? "opacity-90" : ""
-                }`}
-                onClick={createPdf}
-              >
-                Générer PDF {selectedEventId ? "(Filtré)" : "(Complet)"}
-              </button>
-            </div>
-          </div>
-
-          {/* COLONNE 2 & 3: Connexion Mobile (QR Code) */}
-          <div className="lg:col-span-2 bg-blue-50 p-6 rounded-2xl border-2 border-dashed border-blue-200 shadow-lg flex flex-col min-h-[300px]">
-            <h2 className="text-2xl font-bold text-blue-700 mb-6 text-center">
-              Connexion de l'Application Mobile
-            </h2>
-
-            {/* Phase initiale: bouton pour démarrer */}
-            {transferPhase === "idle" && (
-              <div className="flex-1 flex flex-col items-center justify-center">
-                <div className="w-full max-w-md">
-                  <button
-                    className={connectBtnClass}
-                    onClick={qr_code}
-                    disabled={isLoading}
-                    aria-label="Démarrer le serveur et connecter l'application"
-                  >
-                    {isLoading ? (
-                      <span className="flex items-center justify-center">
-                        <svg
-                          className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                        >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                          ></circle>
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                          ></path>
-                        </svg>
-                        Démarrage du serveur...
-                      </span>
-                    ) : (
-                      "Transférer vers l'App Mobile"
-                    )}
-                  </button>
-                </div>
+                {isLoading ? (
+                  <span className="flex items-center justify-center">
+                    <svg
+                      className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        ></path>
+                      </svg>
+                      Démarrage...
+                    </span>
+                  ) : (
+                    "Afficher le QR Code"
+                  )}
+                </button>
               </div>
             )}
 
-            {/* Phase QR affiché: uniquement le QR code en attente de connexion */}
+            {/* Phase QR affiché */}
             {transferPhase === "qr_displayed" && qrCodeBase64 && (
-              <div className="flex-1 flex flex-col items-center justify-center">
-                <div className="flex flex-col items-center">
-                  <p className="text-lg text-gray-700 mb-4 font-medium">
-                    Scannez ce code depuis l'application mobile
-                  </p>
-                  <QrCode qrCodeUri={getQrCodeUri(qrCodeBase64)} />
-                  <p className="text-sm text-gray-500 mt-4 animate-pulse">
-                    En attente de connexion...
-                  </p>
-                </div>
-
-                {/* Bouton Annuler */}
-                <div className="mt-6">
-                  <button
-                    onClick={terminateTransfer}
-                    className="px-6 py-2 bg-gray-400 hover:bg-gray-500 text-white font-medium rounded-lg transition-colors"
-                  >
-                    Annuler
-                  </button>
-                </div>
+              <div className="flex flex-col items-center justify-center min-h-64">
+                <p className="text-sm font-medium text-gray-900 mb-6">
+                  Scannez ce code depuis l'application mobile
+                </p>
+                <QrCode qrCodeUri={getQrCodeUri(qrCodeBase64)} />
+                <p className="text-sm text-gray-500 mt-6 animate-pulse">
+                  En attente de connexion...
+                </p>
+                <button
+                  onClick={terminateTransfer}
+                  className="mt-6 px-6 py-2 bg-gray-300 hover:bg-gray-400 text-gray-900 font-medium rounded-lg transition-colors"
+                >
+                  Annuler
+                </button>
               </div>
             )}
 
-            {/* Phase connecté: liste des events avec boutons Envoyer */}
+            {/* Phase connecté */}
             {transferPhase === "connected" && (
-              <div className="flex-1 flex flex-col">
-                {/* Header connexion */}
-                <div className="flex items-center justify-center gap-2 mb-4 p-3 bg-green-100 rounded-lg">
-                  <span className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
-                  <span className="text-green-700 font-medium">
+              <div className="flex flex-col min-h-64">
+                {/* Indicateur de connexion */}
+                <div className="flex items-center gap-2 mb-6 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <span className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse"></span>
+                  <span className="text-green-700 font-medium text-sm">
                     Mobile connecté
                   </span>
                 </div>
 
-                {/* Liste des événements à envoyer */}
-                <div className="flex-1 bg-white rounded-xl p-4 border border-gray-200 overflow-y-auto max-h-64">
-                  <h3 className="font-semibold text-gray-700 mb-3">
+                {/* Liste des événements */}
+                <div className="flex-1 bg-gray-50 rounded-lg p-4 border border-gray-200 overflow-y-auto max-h-64 mb-4">
+                  <h3 className="font-medium text-gray-900 mb-4">
                     Événements à transférer ({selectedEventIds.size})
                   </h3>
                   <div className="space-y-2">
@@ -396,18 +333,15 @@ function Data() {
                       .map((event) => (
                         <div
                           key={event.id}
-                          className={`flex items-center justify-between p-3 rounded-lg border ${
+                          className={`flex items-center justify-between p-3 rounded-lg border text-sm ${
                             sentEventIds.has(event.id)
                               ? "bg-green-50 border-green-300"
-                              : "bg-gray-50 border-gray-200"
+                              : "bg-white border-gray-200"
                           }`}
                         >
                           <div className="flex-1 min-w-0 mr-3">
-                            <div className="font-medium text-gray-800 truncate">
+                            <div className="font-medium text-gray-900">
                               {event.name}
-                            </div>
-                            <div className="text-xs text-gray-500 truncate">
-                              {event.description}
                             </div>
                           </div>
                           <button
@@ -416,18 +350,18 @@ function Data() {
                               sendingEventId === event.id ||
                               sentEventIds.has(event.id)
                             }
-                            className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                            className={`px-3 py-1.5 rounded-lg font-medium text-sm transition-all whitespace-nowrap ${
                               sentEventIds.has(event.id)
-                                ? "bg-green-500 text-white cursor-default"
+                                ? "bg-green-600 text-white cursor-default"
                                 : sendingEventId === event.id
-                                ? "bg-blue-300 text-white cursor-wait"
-                                : "bg-blue-500 hover:bg-blue-600 text-white"
+                                ? "bg-blue-400 text-white cursor-wait"
+                                : "bg-blue-600 hover:bg-blue-700 text-white"
                             }`}
                           >
                             {sentEventIds.has(event.id)
-                              ? "✓ Envoyé"
+                              ? "Envoyé"
                               : sendingEventId === event.id
-                              ? "Envoi..."
+                              ? "..."
                               : "Envoyer"}
                           </button>
                         </div>
@@ -436,28 +370,22 @@ function Data() {
                 </div>
 
                 {/* Bouton Terminer */}
-                <div className="mt-4">
-                  <button
-                    onClick={terminateTransfer}
-                    className="w-full px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl transition-colors shadow-md"
-                  >
-                    Terminer le transfert
-                  </button>
-                </div>
+                <button
+                  onClick={terminateTransfer}
+                  className="w-full px-6 py-2.5 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-lg transition-colors"
+                >
+                  Terminer le transfert
+                </button>
               </div>
             )}
 
             {/* Erreur */}
             {error && (
-              <div className="mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg text-center shadow-lg">
-                <h3 className="font-bold mb-1">Erreur Critique</h3>
-                <p className="text-sm">
-                  Impossible de démarrer le serveur. Erreur:{" "}
-                  <code className="text-xs break-all">{error}</code>
-                </p>
+              <div className="mt-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+                <p className="font-medium mb-1">Erreur</p>
+                <p className="text-xs break-all">{error}</p>
               </div>
             )}
-          </div>
         </div>
       </div>
     </div>

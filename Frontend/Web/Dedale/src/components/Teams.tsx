@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { emit } from "@tauri-apps/api/event";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import TeamDetails, { TeamDetailData, Person, Event, EquipementAction } from "./TeamDetails";
 import CreateTeam from "./CreateTeam";
@@ -168,6 +169,8 @@ function Teams({ activeEventId }: { activeEventId: string }) {
 
   const handleTeamCreated = (newTeam: Team) => {
     setTeams([...teams, { ...newTeam }]);
+    // Émettre un événement pour les autres pages
+    emit("team-created").catch(() => {});
   };
 
   const handleTeamDeleted = (deletedId: string) => {
@@ -179,6 +182,8 @@ function Teams({ activeEventId }: { activeEventId: string }) {
     setDetailsCache(newCache);
 
     setSelectedTeamData(null);
+    // Émettre un événement pour les autres pages
+    emit("team-deleted").catch(() => {});
   };
 
   return (

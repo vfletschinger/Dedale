@@ -11,12 +11,14 @@ pub mod geos;
 pub mod persons;
 pub mod points;
 pub mod teams;
+pub mod planning;
 pub use equipements::*;
 pub use events::*;
 pub use geos::*;
 pub use persons::*;
 pub use points::*;
 pub use teams::*;
+pub use planning::*;
 // Réexporter les types depuis le module types
 pub use crate::types::*;
 
