@@ -326,6 +326,15 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
                 </div>
 
                 <div className="flex items-center gap-2">
+                    {!isEditing && (
+                        <button
+                            onClick={() => invoke("create_team_mission_pdf", { teamId: teamId, eventId: activeEventId })}
+                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                            title="Créer pdf avec planning"
+                        >
+                            Créer pdf
+                        </button>
+                    )}
                     {/* Bouton Edit (Crayon) */}
                     {!isEditing && (
                         <button
