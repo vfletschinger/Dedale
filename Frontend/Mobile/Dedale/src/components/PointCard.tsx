@@ -81,7 +81,7 @@ export default function PointCard({
               </View>
               <View>
                 <Text className="text-gray-800 font-bold text-lg">
-                  Point #{shortId(item.id)}
+                  {item.name || `Point #${shortId(item.id)}`}
                 </Text>
               </View>
             </View>

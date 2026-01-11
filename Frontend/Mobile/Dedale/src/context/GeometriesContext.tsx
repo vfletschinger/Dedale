@@ -6,11 +6,13 @@ import React, {
   useEffect,
   useCallback,
 } from "react";
-import { GeometryType } from "../types/database";
+import { ParcoursType, ZoneType } from "../types/database";
 import { getDatabase } from "../../assets/migrations";
 
+type GeometryUnion = (ParcoursType | ZoneType) & { type: "parcours" | "zone" };
+
 interface GeometriesContextType {
-  geometriesByEvent: { [key: number]: GeometryType[] };
+  geometriesByEvent: { [key: string]: GeometryUnion[] };
   loading: boolean;
   refreshGeometries: () => Promise<void>;
 }
@@ -21,7 +23,7 @@ const GeometriesContext = createContext<GeometriesContextType | undefined>(
 
 export function GeometriesProvider({ children }: { children: ReactNode }) {
   const [geometriesByEvent, setGeometriesByEvent] = useState<{
-    [key: number]: GeometryType[];
+    [key: string]: GeometryUnion[];
   }>({});
   const [loading, setLoading] = useState(true);
 
@@ -29,16 +31,36 @@ export function GeometriesProvider({ children }: { children: ReactNode }) {
     try {
       setLoading(true);
       const db = getDatabase();
-      const allGeometries = await db.getAllAsync<GeometryType>(
-        `SELECT id, event_id, wkt, created_at FROM geometry`
+
+      // Charger tous les parcours
+      const allParcours = await db.getAllAsync<ParcoursType>(
+        `SELECT id, event_id, wkt, created_at FROM parcours`
       );
 
-      const groupedGeometries: { [key: number]: GeometryType[] } = {};
-      for (const geometry of allGeometries) {
-        if (!groupedGeometries[geometry.event_id]) {
-          groupedGeometries[geometry.event_id] = [];
+      // Charger toutes les zones
+      const allZones = await db.getAllAsync<ZoneType>(
+        `SELECT id, event_id, wkt, created_at FROM zone`
+      );
+
+      const groupedGeometries: { [key: string]: GeometryUnion[] } = {};
+
+      // Ajouter les parcours
+      for (const parcours of allParcours) {
+        if (!groupedGeometries[parcours.event_id]) {
+          groupedGeometries[parcours.event_id] = [];
         }
-        groupedGeometries[geometry.event_id].push(geometry);
+        groupedGeometries[parcours.event_id].push({
+          ...parcours,
+          type: "parcours",
+        });
+      }
+
+      // Ajouter les zones
+      for (const zone of allZones) {
+        if (!groupedGeometries[zone.event_id]) {
+          groupedGeometries[zone.event_id] = [];
+        }
+        groupedGeometries[zone.event_id].push({ ...zone, type: "zone" });
       }
 
       setGeometriesByEvent(groupedGeometries);

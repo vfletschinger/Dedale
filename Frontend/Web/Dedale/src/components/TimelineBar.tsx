@@ -14,6 +14,7 @@ interface TimelineBarProps {
   points: MapPoint[];
   equipements?: Equipement[];
   onPointClick: (point: MapPoint) => void;
+  onEquipementClick?: (equipement: Equipement) => void;
   onClose: () => void;
   onDateChange: (date: Date | null) => void;
   mapBounds?: MapBounds | null;
@@ -32,17 +33,17 @@ const getSmartInterval = (durationMs: number) => {
 
 function TimelineBar({ 
   equipements = [], 
+  onEquipementClick,
   onClose, 
   onDateChange, 
   mapBounds 
 }: TimelineBarProps) {
-  const [sliderValue, setSliderValue] = useState<number>(0);
   const [isFilterActive, setIsFilterActive] = useState(false);
   const [isSpatialFilterActive, setIsSpatialFilterActive] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // 1. Calcul des bornes (Start / End)
-  const { startDate, endDate, totalDuration } = useMemo(() => {
+  // 1. Calcul des bornes (Start / End) ET de la position initiale du slider
+  const { startDate, endDate, totalDuration, initialSliderValue } = useMemo(() => {
     const allDates: number[] = [];
     
     equipements.forEach((eq) => {
@@ -62,6 +63,7 @@ function TimelineBar({
         startDate: now,
         endDate: new Date(now.getTime() + 24 * 60 * 60 * 1000),
         totalDuration: 24 * 60 * 60 * 1000,
+        initialSliderValue: 0,
       };
     }
 
@@ -77,12 +79,28 @@ function TimelineBar({
     end.setMinutes(0, 0, 0);
     end.setHours(end.getHours() + 2); // +2h de marge
 
+    const duration = end.getTime() - start.getTime();
+    
+    // Calculer la position initiale au niveau de la première date de pose
+    const initialPercent = duration > 0 
+      ? Math.max(0, Math.min(100, ((minDate.getTime() - start.getTime()) / duration) * 100))
+      : 0;
+
     return {
       startDate: start,
       endDate: end,
-      totalDuration: end.getTime() - start.getTime(),
+      totalDuration: duration,
+      initialSliderValue: initialPercent,
     };
   }, [equipements]);
+
+  // État du slider initialisé avec la valeur calculée
+  const [sliderValue, setSliderValue] = useState<number>(initialSliderValue);
+  
+  // Mettre à jour le slider quand la valeur initiale change (nouveaux équipements)
+  useEffect(() => {
+    setSliderValue(initialSliderValue);
+  }, [initialSliderValue]);
 
   // 2. Calcul des blocs "Jours" (Ligne du haut)
   const dayBlocks = useMemo(() => {
@@ -159,9 +177,25 @@ function TimelineBar({
     return new Date(startDate.getTime() + (sliderValue / 100) * totalDuration);
   }, [sliderValue, startDate, totalDuration]);
 
+  // Utiliser un timestamp pour éviter les comparaisons d'objets Date
+  const currentSliderTimestamp = currentSliderDate.getTime();
+  
+  // Ref pour tracker la dernière valeur envoyée et éviter les doublons
+  const lastSentRef = useRef<{ timestamp: number | null; isActive: boolean }>({ timestamp: null, isActive: false });
+
   useEffect(() => {
-    onDateChange(isFilterActive ? currentSliderDate : null);
-  }, [currentSliderDate, isFilterActive, onDateChange]);
+    const timestampToSend = isFilterActive ? currentSliderTimestamp : null;
+    
+    // Éviter les appels en double si rien n'a changé
+    if (lastSentRef.current.timestamp === timestampToSend && lastSentRef.current.isActive === isFilterActive) {
+      return;
+    }
+    
+    lastSentRef.current = { timestamp: timestampToSend, isActive: isFilterActive };
+    
+    const dateToSend = isFilterActive ? new Date(currentSliderTimestamp) : null;
+    onDateChange(dateToSend);
+  }, [currentSliderTimestamp, isFilterActive, onDateChange]);
 
   const equipementsWithDates = useMemo(() => {
     return equipements.filter((eq) => {
@@ -322,7 +356,11 @@ function TimelineBar({
               else if (hasEnd) { left = endP; }
 
               return (
-                <div key={eq.id} className="group relative h-7 w-full hover:bg-white rounded hover:shadow-sm transition-all flex items-center">
+                <div 
+                  key={eq.id} 
+                  className="group relative h-7 w-full hover:bg-white rounded hover:shadow-sm transition-all flex items-center cursor-pointer"
+                  onClick={() => onEquipementClick?.(eq)}
+                >
                   {/* Label Equipement */}
                   <div className="sticky left-0 z-20 w-32 truncate text-[10px] font-medium text-slate-500 group-hover:text-blue-600 bg-slate-50/90 group-hover:bg-white px-2 py-0.5 rounded backdrop-blur-sm border-r border-transparent group-hover:border-slate-100">
                      {eq.type_name || `EQ #${eq.id}`}

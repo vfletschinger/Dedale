@@ -21,13 +21,22 @@ const SCANNER_SIZE = width * 0.7;
 import { getDatabase } from "../../assets/migrations";
 import { useWebSocket } from "../context/WebSocketContext";
 import { useEvent } from "../context/EventContext";
-import { EventType, InterestPointsType, CommentType, PictureType, ObstacleType } from "../types/database";
+import { usePoints } from "../context/PointsContext";
+import { useGeometries } from "../context/GeometriesContext";
+import {
+  EventType,
+  TransferEventType,
+  InterestPointsType,
+  PictureType,
+  EquipementType,
+  ParcoursType,
+  ZoneType,
+} from "../types/database";
 
 // Types pour l'export
 type PointWithDetails = InterestPointsType & {
-  comments: CommentType[];
   pictures: PictureType[];
-  obstacles: ObstacleType[];
+  equipements: EquipementType[];
 };
 
 type EventExportData = {
@@ -37,25 +46,29 @@ type EventExportData = {
 
 interface QRCodeScannerProps {
   setScanQR: (value: boolean) => void;
-  mode?: 'receive' | 'send';  // Mode: recevoir des events ou envoyer
-  eventToSend?: any;  // L'événement à envoyer (si mode 'send')
-  onExportSuccess?: () => void;  // Callback quand l'export réussit
+  mode?: "receive" | "send"; // Mode: recevoir des events ou envoyer
+  eventToSend?: any; // L'événement à envoyer (si mode 'send')
+  onExportSuccess?: () => void; // Callback quand l'export réussit
 }
 
 const QRCodeScanner = ({
   setScanQR,
-  mode = 'receive',
+  mode = "receive",
   eventToSend,
   onExportSuccess,
 }: QRCodeScannerProps) => {
   const { setWsClient, setIsConnected } = useWebSocket();
   const { refreshEvents } = useEvent();
+  const { refreshPoints } = usePoints();
+  const { refreshGeometries } = useGeometries();
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [isTransferring, setIsTransferring] = useState(false);
   const [transferStatus, setTransferStatus] = useState("Connexion en cours...");
   const [receivedCount, setReceivedCount] = useState(0);
-  const [currentClient, setCurrentClient] = useState<WebSocketClient | null>(null);
+  const [currentClient, setCurrentClient] = useState<WebSocketClient | null>(
+    null
+  );
   const db = getDatabase();
 
   if (!permission || !permission.granted) {
@@ -75,12 +88,25 @@ const QRCodeScanner = ({
     );
   }
 
-  const insertEvents = (events: EventType[]) => {
+  const insertEvents = (events: (EventType | TransferEventType)[]) => {
     try {
       let insertedCount = 0;
       let updatedCount = 0;
+      let parcoursCount = 0;
+      let zonesCount = 0;
+      let pointsCount = 0;
 
-      for (const event of events) {
+      for (const eventData of events) {
+        // Normaliser les noms de champs (camelCase vers snake_case)
+        const event: EventType = {
+          id: eventData.id,
+          name: eventData.name,
+          description: eventData.description || "",
+          dateDebut: eventData.dateDebut || eventData.startDate || "",
+          dateFin: eventData.dateFin || eventData.endDate || "",
+          statut: eventData.statut || "actif",
+        };
+
         const existing = db.getFirstSync<EventType>(
           "SELECT id FROM event WHERE id = ?",
           [event.id]
@@ -88,21 +114,20 @@ const QRCodeScanner = ({
 
         if (existing) {
           db.runSync(
-            "UPDATE event SET name = ?, description = ?, dateDebut = ?, dateFin = ?, statut = ?, geometry = ? WHERE id = ?",
+            "UPDATE event SET name = ?, description = ?, dateDebut = ?, dateFin = ?, statut = ? WHERE id = ?",
             [
               event.name,
               event.description,
               event.dateDebut,
               event.dateFin,
               event.statut,
-              event.geometry,
               event.id,
             ]
           );
           updatedCount++;
         } else {
           db.runSync(
-            "INSERT INTO event (id, name, description, dateDebut, dateFin, statut, geometry) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO event (id, name, description, dateDebut, dateFin, statut) VALUES (?, ?, ?, ?, ?, ?)",
             [
               event.id,
               event.name,
@@ -110,18 +135,111 @@ const QRCodeScanner = ({
               event.dateDebut,
               event.dateFin,
               event.statut,
-              event.geometry,
             ]
           );
           insertedCount++;
+        }
+
+        // Insérer les parcours si présents
+        const transferEvent = eventData as TransferEventType;
+        if (transferEvent.parcours && Array.isArray(transferEvent.parcours)) {
+          for (const parcours of transferEvent.parcours) {
+            const existingParcours = db.getFirstSync(
+              "SELECT id FROM parcours WHERE id = ?",
+              [parcours.id]
+            );
+
+            const wkt = parcours.geometryJson || parcours.wkt || "";
+
+            if (!existingParcours) {
+              db.runSync(
+                "INSERT INTO parcours (id, event_id, wkt) VALUES (?, ?, ?)",
+                [parcours.id, event.id, wkt]
+              );
+              parcoursCount++;
+            } else {
+              db.runSync("UPDATE parcours SET wkt = ? WHERE id = ?", [
+                wkt,
+                parcours.id,
+              ]);
+            }
+          }
+        }
+
+        // Insérer les zones si présentes
+        if (transferEvent.zones && Array.isArray(transferEvent.zones)) {
+          for (const zone of transferEvent.zones) {
+            const existingZone = db.getFirstSync(
+              "SELECT id FROM zone WHERE id = ?",
+              [zone.id]
+            );
+
+            const wkt = zone.geometryJson || zone.wkt || "";
+
+            if (!existingZone) {
+              db.runSync(
+                "INSERT INTO zone (id, event_id, wkt) VALUES (?, ?, ?)",
+                [zone.id, event.id, wkt]
+              );
+              zonesCount++;
+            } else {
+              db.runSync("UPDATE zone SET wkt = ? WHERE id = ?", [
+                wkt,
+                zone.id,
+              ]);
+            }
+          }
+        }
+
+        // Insérer les points si présents
+        if (transferEvent.points && Array.isArray(transferEvent.points)) {
+          for (const point of transferEvent.points) {
+            const existingPoint = db.getFirstSync(
+              "SELECT id FROM point WHERE id = ?",
+              [point.id]
+            );
+
+            if (!existingPoint) {
+              db.runSync(
+                "INSERT INTO point (id, event_id, x, y, name, comment, type, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                [
+                  point.id,
+                  event.id,
+                  point.x,
+                  point.y,
+                  point.name || "Point",
+                  point.comment || null,
+                  point.type || null,
+                  point.status !== undefined ? (point.status ? 1 : 0) : 0,
+                ]
+              );
+              pointsCount++;
+            } else {
+              db.runSync(
+                "UPDATE point SET x = ?, y = ?, name = ?, comment = ?, type = ?, status = ? WHERE id = ?",
+                [
+                  point.x,
+                  point.y,
+                  point.name || "Point",
+                  point.comment || null,
+                  point.type || null,
+                  point.status !== undefined ? (point.status ? 1 : 0) : 0,
+                  point.id,
+                ]
+              );
+            }
+          }
         }
       }
 
       console.log(
         `✅ ${insertedCount} événement(s) inséré(s), ${updatedCount} mis à jour`
       );
+      console.log(
+        `✅ ${parcoursCount} parcours, ${zonesCount} zones, ${pointsCount} points ajoutés`
+      );
       setTransferStatus(
-        `${insertedCount} événement(s) ajouté(s), ${updatedCount} mis à jour`
+        `${insertedCount} événement(s) ajouté(s), ${updatedCount} mis à jour\n${parcoursCount} parcours, ${zonesCount} zones, ${pointsCount} points`
       );
     } catch (error) {
       console.error("❌ Erreur lors de l'insertion des événements:", error);
@@ -139,28 +257,21 @@ const QRCodeScanner = ({
       if (!event) return null;
 
       const points = db.getAllSync<InterestPointsType>(
-        `SELECT p.id, p.x, p.y, pe.event_id 
-         FROM point p 
-         INNER JOIN point_event pe ON p.id = pe.point_id 
-         WHERE pe.event_id = ?`,
+        `SELECT p.* FROM point p WHERE p.event_id = ?`,
         [eventId]
       );
 
       const pointsWithDetails: PointWithDetails[] = points.map((point) => {
-        const comments = db.getAllSync<CommentType>(
-          "SELECT * FROM comment WHERE point_id = ?",
-          [point.id]
-        );
         const pictures = db.getAllSync<PictureType>(
           "SELECT * FROM picture WHERE point_id = ?",
           [point.id]
         );
-        const obstacles = db.getAllSync<ObstacleType>(
-          "SELECT * FROM obstacle WHERE point_id = ?",
+        const equipements = db.getAllSync<EquipementType>(
+          "SELECT * FROM equipement WHERE point_id = ?",
           [point.id]
         );
 
-        return { ...point, comments, pictures, obstacles };
+        return { ...point, pictures, equipements };
       });
 
       return { event: eventToSend || event, points: pointsWithDetails };
@@ -183,7 +294,7 @@ const QRCodeScanner = ({
       const client = new WebSocketClient(websocketUri);
       setCurrentClient(client);
 
-      if (mode === 'send' && eventToSend) {
+      if (mode === "send" && eventToSend) {
         // Mode ENVOI: connecter et envoyer l'événement
         client.setCallbacks(
           () => {
@@ -200,6 +311,12 @@ const QRCodeScanner = ({
           }
         );
 
+        // Configurer le callback de fermeture
+        client.setOnClose(() => {
+          console.log("🚪 Connexion fermée par le serveur");
+          handleCloseConnection();
+        });
+
         client.setOnResponse((response: WebSocketResponse) => {
           console.log("📨 Réponse serveur:", response);
           if (response.code === 3) {
@@ -213,17 +330,26 @@ const QRCodeScanner = ({
           }
         });
 
-        client.connect()
+        client
+          .connect()
           .then(() => {
             console.log("✅ Connecté, envoi de l'événement...");
             setTransferStatus("Connecté ! Envoi des données...");
-            
+
             // Récupérer et envoyer les données
             const exportData = getEventExportData(eventToSend.id);
             if (exportData) {
-              console.log("📤 Envoi:", exportData.event.name, "avec", exportData.points.length, "points");
+              console.log(
+                "📤 Envoi:",
+                exportData.event.name,
+                "avec",
+                exportData.points.length,
+                "points"
+              );
               client.send(JSON.stringify(exportData));
-              setTransferStatus(`Envoi de ${exportData.points.length} point(s)...`);
+              setTransferStatus(
+                `Envoi de ${exportData.points.length} point(s)...`
+              );
             } else {
               setTransferStatus("Erreur: données non trouvées");
             }
@@ -245,8 +371,11 @@ const QRCodeScanner = ({
           console.log("📦 Événements reçus:", events.length);
           try {
             insertEvents(events);
+            // Rafraîchir tous les contextes pour afficher immédiatement les données
             refreshEvents();
-            setReceivedCount(prev => prev + events.length);
+            refreshPoints();
+            refreshGeometries();
+            setReceivedCount((prev) => prev + events.length);
             setTransferStatus(`${events.length} événement(s) reçu(s) !`);
           } catch (error) {
             console.error("Erreur insertion:", error);
@@ -254,12 +383,18 @@ const QRCodeScanner = ({
           }
         };
 
+        // Configurer le callback de fermeture
+        client.setOnClose(() => {
+          console.log("🚪 Connexion fermée par le serveur");
+          handleCloseConnection();
+        });
+
         client
           .connect(onEventsReceived)
           .then(() => {
             console.log("✅ Connexion WebSocket établie");
             setTransferStatus("Connecté ! En attente des événements...");
-            
+
             setWsClient(client);
             setIsConnected(true);
           })
@@ -328,17 +463,17 @@ const QRCodeScanner = ({
           <View className="bg-white rounded-2xl p-10 items-center min-w-[280px] shadow-lg">
             <ActivityIndicator size="large" color="#4A90E2" />
             <Text className="text-xl font-bold mt-5 mb-2 text-gray-800">
-              {mode === 'send' ? 'Export en cours' : 'Synchronisation'}
+              {mode === "send" ? "Export en cours" : "Synchronisation"}
             </Text>
             <Text className="text-base text-gray-600 text-center mb-2">
               {transferStatus}
             </Text>
-            {mode === 'send' && eventToSend && (
+            {mode === "send" && eventToSend && (
               <Text className="text-sm text-blue-600 mb-2">
                 Événement: {eventToSend.name}
               </Text>
             )}
-            {mode === 'receive' && receivedCount > 0 && (
+            {mode === "receive" && receivedCount > 0 && (
               <Text className="text-sm text-green-600 mb-4">
                 Total reçu: {receivedCount} événement(s)
               </Text>
@@ -348,7 +483,7 @@ const QRCodeScanner = ({
               className="mt-4 bg-red-500 px-6 py-3 rounded-xl"
             >
               <Text className="text-white font-semibold">
-                {mode === 'send' ? 'Annuler' : 'Fermer la connexion'}
+                {mode === "send" ? "Annuler" : "Fermer la connexion"}
               </Text>
             </TouchableOpacity>
           </View>

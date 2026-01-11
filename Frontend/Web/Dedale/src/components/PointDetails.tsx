@@ -51,7 +51,7 @@ export default function PointDetails({
         point: {
           ...point,
           status: newStatus,
-        }
+        },
       });
       // Mettre à jour localement pour affichage immédiat
       point.status = newStatus;
@@ -71,7 +71,7 @@ export default function PointDetails({
         point: {
           ...point,
           comment: newComment || null,
-        }
+        },
       });
       // Mettre à jour localement pour affichage immédiat
       point.comment = newComment || undefined;
@@ -100,7 +100,9 @@ export default function PointDetails({
   if (!point) {
     return (
       <div className="p-6 text-center">
-        <div className="text-gray-400 text-lg">Aucune donnée pour ce point.</div>
+        <div className="text-gray-400 text-lg">
+          Aucune donnée pour ce point.
+        </div>
         <button
           onClick={onClose}
           className="mt-4 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
@@ -117,8 +119,9 @@ export default function PointDetails({
       <div className="p-4 bg-gradient-to-r from-indigo-500 to-purple-600 text-white">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-bold">Point #{shortId(point.id)}</h2>
-            
+            <h2 className="text-xl font-bold">
+              {point.name || `Point #${shortId(point.id)}`}
+            </h2>
           </div>
           <button
             type="button"
@@ -135,7 +138,6 @@ export default function PointDetails({
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        
         {/* Statut */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-4 py-3 bg-gradient-to-r from-green-50 to-emerald-50 border-b border-green-100 flex items-center justify-between">
@@ -203,7 +205,11 @@ export default function PointDetails({
               </div>
             ) : (
               <div className="text-gray-700">
-                {point.comment || <span className="text-gray-400 italic">Aucun commentaire</span>}
+                {point.comment || (
+                  <span className="text-gray-400 italic">
+                    Aucun commentaire
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -214,7 +220,9 @@ export default function PointDetails({
           <div className="px-4 py-3 bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple-100 flex items-center gap-2">
             <span className="text-lg">📷</span>
             <span className="font-bold text-gray-800">Photos</span>
-            <span className="text-sm text-gray-500">({point.pictures?.length || 0})</span>
+            <span className="text-sm text-gray-500">
+              ({point.pictures?.length || 0})
+            </span>
           </div>
           <div className="p-4">
             {point.pictures && point.pictures.length > 0 ? (
@@ -238,7 +246,6 @@ export default function PointDetails({
             )}
           </div>
         </div>
-
       </div>
 
       {/* Footer - Actions */}
