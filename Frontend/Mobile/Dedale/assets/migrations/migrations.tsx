@@ -619,4 +619,37 @@ export const migrations: Migration[] = [
       );
     },
   },
+  {
+    version: 4,
+    name: "add_name_type_status_to_point",
+    up: (db: SQLiteDatabase) => {
+      console.log(
+        "🔄 Migration v4: Ajout des colonnes name, type et status à la table point"
+      );
+
+      // Vérifier si les colonnes existent déjà
+      const tableInfo = db.getAllSync("PRAGMA table_info(point)");
+      const columnNames = tableInfo.map((col: any) => col.name);
+
+      // Ajouter la colonne name si elle n'existe pas
+      if (!columnNames.includes("name")) {
+        db.execSync("ALTER TABLE point ADD COLUMN name TEXT DEFAULT 'Point'");
+        console.log("✅ Colonne 'name' ajoutée à la table point");
+      }
+
+      // Ajouter la colonne type si elle n'existe pas
+      if (!columnNames.includes("type")) {
+        db.execSync("ALTER TABLE point ADD COLUMN type TEXT");
+        console.log("✅ Colonne 'type' ajoutée à la table point");
+      }
+
+      // Ajouter la colonne status si elle n'existe pas
+      if (!columnNames.includes("status")) {
+        db.execSync("ALTER TABLE point ADD COLUMN status INTEGER DEFAULT 0");
+        console.log("✅ Colonne 'status' ajoutée à la table point");
+      }
+
+      console.log("✅ Migration v4 terminée");
+    },
+  },
 ];

@@ -3,7 +3,10 @@ export type InterestPointsType = {
   event_id: string; // UUID reference to event
   x: number;
   y: number;
+  name?: string | null;
   comment?: string | null; // Integrated comment field
+  type?: string | null;
+  status?: boolean | null;
   created_at?: string;
   modified_at?: string;
 };
@@ -17,24 +20,44 @@ export type PictureType = {
 export type EventType = {
   id: string; // UUID
   name: string;
-  description: string;
-  dateDebut: string;
-  dateFin: string;
-  statut: string;
+  description?: string;
+  dateDebut?: string;
+  dateFin?: string;
+  startDate?: string; // Alias pour compatibilité avec le serveur
+  endDate?: string; // Alias pour compatibilité avec le serveur
+  statut?: string;
 };
 
 export type ParcoursType = {
   id: string; // UUID
-  event_id: string; // UUID reference
-  wkt: string;
+  eventId?: string; // Alias camelCase pour compatibilité
+  event_id?: string; // UUID reference
+  name?: string;
+  color?: string;
+  geometryJson?: string; // Format GeoJSON ou WKT
+  wkt?: string; // Alias pour compatibilité
+  speedLow?: number;
+  speedHigh?: number;
+  startTime?: string;
   created_at?: string;
 };
 
 export type ZoneType = {
   id: string; // UUID
-  event_id: string; // UUID reference
-  wkt: string;
+  eventId?: string; // Alias camelCase pour compatibilité
+  event_id?: string; // UUID reference
+  name?: string;
+  color?: string;
+  geometryJson?: string; // Format GeoJSON ou WKT
+  wkt?: string; // Alias pour compatibilité
   created_at?: string;
+};
+
+// Type pour les événements reçus du serveur avec toutes les données
+export type TransferEventType = EventType & {
+  parcours?: ParcoursType[];
+  zones?: ZoneType[];
+  points?: InterestPointsType[];
 };
 
 export type EventWithGeometries = EventType & {

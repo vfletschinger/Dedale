@@ -1,4 +1,8 @@
-import { EventType, PointDetailType } from "../types/database";
+import {
+  EventType,
+  TransferEventType,
+  PointDetailType,
+} from "../types/database";
 
 export interface WebSocketResponse {
   code: 1 | 2 | 3;
@@ -17,7 +21,9 @@ class WebSocketClient {
   private onErrorCallback?: (error: string) => void;
   private onLoadingChangeCallback?: (isLoading: boolean) => void;
   private finishedSuccessfully: boolean = false;
-  private onMessageCallback?: (events: EventType[]) => void;
+  private onMessageCallback?: (
+    events: (EventType | TransferEventType)[]
+  ) => void;
   private onResponseCallback?: (response: WebSocketResponse) => void;
 
   constructor(uri: string) {
@@ -51,7 +57,9 @@ class WebSocketClient {
   /**
    * Tente d'établir la connexion WebSocket.
    */
-  public connect(onMessage?: (events: EventType[]) => void): Promise<boolean> {
+  public connect(
+    onMessage?: (events: (EventType | TransferEventType)[]) => void
+  ): Promise<boolean> {
     this.onMessageCallback = onMessage;
 
     return new Promise((resolve, reject) => {
@@ -106,12 +114,14 @@ class WebSocketClient {
             switch (data.type) {
               case "connected":
                 // Serveur confirme la connexion, ne plus demander automatiquement les events
-                console.log("🔗 Connecté au serveur, en attente d'événements...");
+                console.log(
+                  "🔗 Connecté au serveur, en attente d'événements..."
+                );
                 break;
               case "events":
                 // Serveur envoie tous les events (batch)
                 if (data.data && Array.isArray(data.data)) {
-                  const events: EventType[] = data.data;
+                  const events: (EventType | TransferEventType)[] = data.data;
                   console.log("📦 Événements reçus (batch):", events.length);
                   if (this.onMessageCallback) {
                     this.onMessageCallback(events);
@@ -121,8 +131,12 @@ class WebSocketClient {
               case "event":
                 // Serveur envoie un seul event (envoi individuel)
                 if (data.data) {
-                  const event: EventType = data.data;
-                  console.log("📦 Événement individuel reçu:", event.id, event.name);
+                  const event: EventType | TransferEventType = data.data;
+                  console.log(
+                    "📦 Événement individuel reçu:",
+                    event.id,
+                    event.name
+                  );
                   if (this.onMessageCallback) {
                     this.onMessageCallback([event]);
                   }
@@ -148,7 +162,12 @@ class WebSocketClient {
             // Format d'export: { event: {...}, points: [...] }
             const event: EventType = data.event;
             const points: PointDetailType[] = data.points;
-            console.log("📦 Événement avec points reçu:", event.name, "- Points:", points.length);
+            console.log(
+              "📦 Événement avec points reçu:",
+              event.name,
+              "- Points:",
+              points.length
+            );
             if (this.onMessageCallback) {
               this.onMessageCallback([event]);
             }
@@ -161,7 +180,10 @@ class WebSocketClient {
               this.onMessageCallback(events);
             }
           } else {
-            console.log("⚠️ Format de message non reconnu:", JSON.stringify(data).substring(0, 100));
+            console.log(
+              "⚠️ Format de message non reconnu:",
+              JSON.stringify(data).substring(0, 100)
+            );
           }
         } catch {
           console.log("🤔 Message non reconnu:", e.data);

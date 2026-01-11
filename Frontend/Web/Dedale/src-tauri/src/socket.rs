@@ -152,17 +152,57 @@ pub fn get_default_local_ip() -> IpAddr {
 /// Canal global pour envoyer des événements au thread WebSocket
 static EVENT_SENDER: Lazy<Mutex<Option<Sender<TransferEvent>>>> = Lazy::new(|| Mutex::new(None));
 
+/// Structure pour un parcours envoyé au mobile
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TransferParcours {
+    id: String,
+    event_id: String,
+    name: String,
+    color: Option<String>,
+    start_time: Option<String>,
+    speed_low: Option<f64>,
+    speed_high: Option<f64>,
+    geometry_json: Option<String>,
+}
+
+/// Structure pour une zone envoyée au mobile
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TransferZone {
+    id: String,
+    event_id: String,
+    name: String,
+    color: Option<String>,
+    geometry_json: Option<String>,
+}
+
+/// Structure pour un point envoyé au mobile
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TransferPoint {
+    id: String,
+    event_id: String,
+    x: f64,
+    y: f64,
+    name: Option<String>,
+    comment: Option<String>,
+    #[serde(rename = "type")]
+    point_type: Option<String>,
+    status: Option<bool>,
+}
+
 /// Structure pour un event envoyé au mobile (avec noms camelCase pour compatibilité)
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct TransferEvent {
-    id: i64,
+    id: String,
     name: String,
-    description: String,
-    date_debut: String,
-    date_fin: String,
-    statut: String,
-    geometry: Option<String>,
+    start_date: String,
+    end_date: String,
+    parcours: Vec<TransferParcours>,
+    zones: Vec<TransferZone>,
+    points: Vec<TransferPoint>,
 }
 
 /// Structure pour un accusé de réception d'event du mobile
@@ -170,7 +210,7 @@ pub(crate) struct TransferEvent {
 #[serde(rename_all = "camelCase")]
 #[allow(dead_code)]
 pub struct EventAck {
-    id: i64,
+    id: String,
     name: String,
     #[serde(default)]
     description: Option<String>,
@@ -249,7 +289,7 @@ struct MobileObstacle {
 #[serde(rename_all = "camelCase")]
 #[allow(dead_code)]
 struct MobileExportEvent {
-    id: i64,
+    id: String,
     name: String,
     description: Option<String>,
     date_debut: Option<String>,
@@ -263,7 +303,7 @@ struct MobileExportEvent {
 /// Insère les points au format mobile dans la base de données
 async fn insert_mobile_points(
     app: &AppHandle,
-    event_id: i64,
+    event_id: String,
     points: Vec<MobilePointDetail>,
 ) -> Result<(), String> {
     let pool = get_db_pool(app).await?;
@@ -284,7 +324,7 @@ async fn insert_mobile_points(
 
         // Lier le point à l'event (utiliser l'event_id passé en paramètre)
         sqlx::query(r#"INSERT OR IGNORE INTO point_event (event_id, point_id) VALUES (?, ?)"#)
-            .bind(event_id)
+            .bind(&event_id)
             .bind(&point.id)
             .execute(&mut *tx)
             .await
@@ -332,53 +372,129 @@ async fn insert_mobile_points(
     Ok(())
 }
 
-/// Récupère les events sélectionnés pour le transfert
+/// Récupère les events sélectionnés pour le transfert avec leurs parcours, zones et points
 async fn fetch_events_for_transfer(
     app: &AppHandle,
-    event_ids: &[i64],
+    event_ids: &[String],
 ) -> Result<Vec<TransferEvent>, String> {
     let pool = get_db_pool(app).await?;
 
-    // Récupérer les events sélectionnés
-    let event_ids_placeholder = event_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let mut transfer_events = Vec::new();
 
-    let events_query = format!(
-        "SELECT id, name, description, date_debut, date_fin, statut, geometry FROM event WHERE id IN ({})",
-        event_ids_placeholder
-    );
+    for event_id in event_ids {
+        // Récupérer l'événement
+        let event_row = sqlx::query(
+            "SELECT id, name, start_date, end_date FROM event WHERE id = ?"
+        )
+        .bind(event_id)
+        .fetch_optional(&pool)
+        .await
+        .map_err(|e| format!("Erreur récupération event {}: {}", event_id, e))?;
 
-    let mut query = sqlx::query(&events_query);
-    for id in event_ids {
-        query = query.bind(id);
+        if let Some(event_row) = event_row {
+            let event_id_str: String = event_row.get("id");
+
+            // Récupérer les parcours de cet événement
+            let parcours_rows = sqlx::query(
+                "SELECT id, event_id, name, color, start_time, speed_low, speed_high, geometry_json 
+                 FROM parcours WHERE event_id = ?"
+            )
+            .bind(&event_id_str)
+            .fetch_all(&pool)
+            .await
+            .map_err(|e| format!("Erreur récupération parcours: {}", e))?;
+
+            let parcours: Vec<TransferParcours> = parcours_rows
+                .iter()
+                .map(|row| TransferParcours {
+                    id: row.get("id"),
+                    event_id: row.get("event_id"),
+                    name: row.get("name"),
+                    color: row.get("color"),
+                    start_time: row.get("start_time"),
+                    speed_low: row.get("speed_low"),
+                    speed_high: row.get("speed_high"),
+                    geometry_json: row.get("geometry_json"),
+                })
+                .collect();
+
+            // Récupérer les zones de cet événement
+            let zones_rows = sqlx::query(
+                "SELECT id, event_id, name, color, geometry_json 
+                 FROM zone WHERE event_id = ?"
+            )
+            .bind(&event_id_str)
+            .fetch_all(&pool)
+            .await
+            .map_err(|e| format!("Erreur récupération zones: {}", e))?;
+
+            let zones: Vec<TransferZone> = zones_rows
+                .iter()
+                .map(|row| TransferZone {
+                    id: row.get("id"),
+                    event_id: row.get("event_id"),
+                    name: row.get("name"),
+                    color: row.get("color"),
+                    geometry_json: row.get("geometry_json"),
+                })
+                .collect();
+
+            // Récupérer les points de cet événement
+            let points_rows = sqlx::query(
+                "SELECT id, event_id, x, y, name, comment, type, status 
+                 FROM point WHERE event_id = ?"
+            )
+            .bind(&event_id_str)
+            .fetch_all(&pool)
+            .await
+            .map_err(|e| format!("Erreur récupération points: {}", e))?;
+
+            let points: Vec<TransferPoint> = points_rows
+                .iter()
+                .map(|row| TransferPoint {
+                    id: row.get("id"),
+                    event_id: row.get("event_id"),
+                    x: row.get("x"),
+                    y: row.get("y"),
+                    name: row.get("name"),
+                    comment: row.get("comment"),
+                    point_type: row.get("type"),
+                    status: row.get("status"),
+                })
+                .collect();
+
+            transfer_events.push(TransferEvent {
+                id: event_id_str.clone(),
+                name: event_row.get("name"),
+                start_date: event_row.get("start_date"),
+                end_date: event_row.get("end_date"),
+                parcours,
+                zones,
+                points,
+            });
+
+            println!(
+                "📋 Event '{}' récupéré avec {} parcours, {} zones, {} points",
+                event_row.get::<String, _>("name"),
+                transfer_events.last().unwrap().parcours.len(),
+                transfer_events.last().unwrap().zones.len(),
+                transfer_events.last().unwrap().points.len()
+            );
+        }
     }
 
-    let event_rows = query
-        .fetch_all(&pool)
-        .await
-        .map_err(|e| format!("Erreur récupération events: {}", e))?;
+    println!(
+        "✅ {} événement(s) récupéré(s) pour le transfert",
+        transfer_events.len()
+    );
 
-    let events: Vec<TransferEvent> = event_rows
-        .iter()
-        .map(|row| TransferEvent {
-            id: row.get("id"),
-            name: row.get("name"),
-            description: row.get("description"),
-            date_debut: row.get("date_debut"),
-            date_fin: row.get("date_fin"),
-            statut: row.get("statut"),
-            geometry: row.get("geometry"),
-        })
-        .collect();
-
-    println!("📋 {} event(s) récupéré(s) pour le transfert", events.len());
-
-    Ok(events)
+    Ok(transfer_events)
 }
 
 async fn handle_websocket(
     app: &AppHandle,
     mut websocket: tungstenite::WebSocket<std::net::TcpStream>,
-    event_ids: Arc<Vec<i64>>,
+    event_ids: Arc<Vec<String>>,
     event_receiver: Receiver<TransferEvent>,
 ) -> Result<(), String> {
     println!("📱 Client mobile connecté, en attente d'actions...");
@@ -527,7 +643,7 @@ async fn handle_websocket(
                                 "🚀 Insertion de {} point(s) en base de données...",
                                 points_count
                             );
-                            match insert_mobile_points(app, event_id, mobile_export.points).await {
+                            match insert_mobile_points(app, event_id.clone(), mobile_export.points).await {
                                 Ok(_) => {
                                     println!("✅ Points insérés avec succès !");
                                     // Émettre un événement pour notifier le frontend
@@ -664,7 +780,7 @@ async fn handle_websocket(
 }
 
 #[tauri::command]
-pub fn start_server(app: AppHandle, event_ids: Vec<i64>) -> Result<String, String> {
+pub fn start_server(app: AppHandle, event_ids: Vec<String>) -> Result<String, String> {
     println!(
         "🚀 Démarrage du serveur WebSocket pour {} événement(s)",
         event_ids.len()
@@ -746,30 +862,16 @@ pub fn start_server(app: AppHandle, event_ids: Vec<i64>) -> Result<String, Strin
 
 /// Envoyer un événement individuel au mobile connecté
 #[tauri::command]
-pub async fn send_event_to_mobile(app: AppHandle, event_id: i64) -> Result<(), String> {
+pub async fn send_event_to_mobile(app: AppHandle, event_id: String) -> Result<(), String> {
     println!("📤 Demande d'envoi de l'événement {} au mobile", event_id);
 
-    // Récupérer l'événement depuis la base de données
-    let pool = get_db_pool(&app).await?;
-
-    let row = sqlx::query(
-        "SELECT id, name, description, date_debut, date_fin, statut, geometry FROM event WHERE id = ?"
-    )
-    .bind(event_id)
-    .fetch_optional(&pool)
-    .await
-    .map_err(|e| format!("Erreur récupération event: {}", e))?
-    .ok_or_else(|| format!("Event {} non trouvé", event_id))?;
-
-    let event = TransferEvent {
-        id: row.get("id"),
-        name: row.get("name"),
-        description: row.get("description"),
-        date_debut: row.get("date_debut"),
-        date_fin: row.get("date_fin"),
-        statut: row.get("statut"),
-        geometry: row.get("geometry"),
-    };
+    // Utiliser fetch_events_for_transfer pour récupérer toutes les données
+    let events = fetch_events_for_transfer(&app, &[event_id.clone()]).await?;
+    
+    let event = events
+        .into_iter()
+        .next()
+        .ok_or_else(|| format!("Event {} non trouvé", event_id))?;
 
     // Envoyer via le canal global
     let sender = EVENT_SENDER
@@ -787,7 +889,7 @@ pub async fn send_event_to_mobile(app: AppHandle, event_id: i64) -> Result<(), S
 
 /// Démarrer un serveur WebSocket pour recevoir les données du mobile
 #[tauri::command]
-pub fn start_receive_server(app: AppHandle, event_id: i64) -> Result<String, String> {
+pub fn start_receive_server(app: AppHandle, event_id: String) -> Result<String, String> {
     println!(
         "📥 Démarrage du serveur de réception pour l'événement {}",
         event_id
@@ -824,12 +926,13 @@ pub fn start_receive_server(app: AppHandle, event_id: i64) -> Result<String, Str
                     Ok(ws) => {
                         println!("📱 Client mobile connecté pour réception");
                         let app_clone = app_for_thread.clone();
+                        let event_id_clone = event_id.clone();
 
                         thread::spawn(move || {
                             let rt = tokio::runtime::Runtime::new().unwrap();
                             rt.block_on(async {
                                 if let Err(e) =
-                                    handle_receive_websocket(&app_clone, ws, event_id).await
+                                    handle_receive_websocket(&app_clone, ws, event_id_clone).await
                                 {
                                     eprintln!("Erreur WebSocket réception: {}", e);
                                 }
@@ -850,7 +953,7 @@ pub fn start_receive_server(app: AppHandle, event_id: i64) -> Result<String, Str
 async fn handle_receive_websocket(
     app: &AppHandle,
     mut websocket: tungstenite::WebSocket<std::net::TcpStream>,
-    event_id: i64,
+    event_id: String,
 ) -> Result<(), String> {
     println!("📥 Client connecté pour réception, event_id: {}", event_id);
 
@@ -895,7 +998,7 @@ async fn handle_receive_websocket(
 
                         if points_count > 0 {
                             println!("🚀 Insertion de {} point(s)...", points_count);
-                            match insert_mobile_points(app, event_id, mobile_export.points).await {
+                            match insert_mobile_points(app, event_id.clone(), mobile_export.points).await {
                                 Ok(_) => {
                                     println!("✅ Points insérés avec succès !");
 

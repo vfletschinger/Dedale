@@ -21,11 +21,16 @@ const SCANNER_SIZE = width * 0.7;
 import { getDatabase } from "../../assets/migrations";
 import { useWebSocket } from "../context/WebSocketContext";
 import { useEvent } from "../context/EventContext";
+import { usePoints } from "../context/PointsContext";
+import { useGeometries } from "../context/GeometriesContext";
 import {
   EventType,
+  TransferEventType,
   InterestPointsType,
   PictureType,
   EquipementType,
+  ParcoursType,
+  ZoneType,
 } from "../types/database";
 
 // Types pour l'export
@@ -54,6 +59,8 @@ const QRCodeScanner = ({
 }: QRCodeScannerProps) => {
   const { setWsClient, setIsConnected } = useWebSocket();
   const { refreshEvents } = useEvent();
+  const { refreshPoints } = usePoints();
+  const { refreshGeometries } = useGeometries();
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [isTransferring, setIsTransferring] = useState(false);
@@ -81,12 +88,25 @@ const QRCodeScanner = ({
     );
   }
 
-  const insertEvents = (events: EventType[]) => {
+  const insertEvents = (events: (EventType | TransferEventType)[]) => {
     try {
       let insertedCount = 0;
       let updatedCount = 0;
+      let parcoursCount = 0;
+      let zonesCount = 0;
+      let pointsCount = 0;
 
-      for (const event of events) {
+      for (const eventData of events) {
+        // Normaliser les noms de champs (camelCase vers snake_case)
+        const event: EventType = {
+          id: eventData.id,
+          name: eventData.name,
+          description: eventData.description || "",
+          dateDebut: eventData.dateDebut || eventData.startDate || "",
+          dateFin: eventData.dateFin || eventData.endDate || "",
+          statut: eventData.statut || "actif",
+        };
+
         const existing = db.getFirstSync<EventType>(
           "SELECT id FROM event WHERE id = ?",
           [event.id]
@@ -119,13 +139,107 @@ const QRCodeScanner = ({
           );
           insertedCount++;
         }
+
+        // Insérer les parcours si présents
+        const transferEvent = eventData as TransferEventType;
+        if (transferEvent.parcours && Array.isArray(transferEvent.parcours)) {
+          for (const parcours of transferEvent.parcours) {
+            const existingParcours = db.getFirstSync(
+              "SELECT id FROM parcours WHERE id = ?",
+              [parcours.id]
+            );
+
+            const wkt = parcours.geometryJson || parcours.wkt || "";
+
+            if (!existingParcours) {
+              db.runSync(
+                "INSERT INTO parcours (id, event_id, wkt) VALUES (?, ?, ?)",
+                [parcours.id, event.id, wkt]
+              );
+              parcoursCount++;
+            } else {
+              db.runSync("UPDATE parcours SET wkt = ? WHERE id = ?", [
+                wkt,
+                parcours.id,
+              ]);
+            }
+          }
+        }
+
+        // Insérer les zones si présentes
+        if (transferEvent.zones && Array.isArray(transferEvent.zones)) {
+          for (const zone of transferEvent.zones) {
+            const existingZone = db.getFirstSync(
+              "SELECT id FROM zone WHERE id = ?",
+              [zone.id]
+            );
+
+            const wkt = zone.geometryJson || zone.wkt || "";
+
+            if (!existingZone) {
+              db.runSync(
+                "INSERT INTO zone (id, event_id, wkt) VALUES (?, ?, ?)",
+                [zone.id, event.id, wkt]
+              );
+              zonesCount++;
+            } else {
+              db.runSync("UPDATE zone SET wkt = ? WHERE id = ?", [
+                wkt,
+                zone.id,
+              ]);
+            }
+          }
+        }
+
+        // Insérer les points si présents
+        if (transferEvent.points && Array.isArray(transferEvent.points)) {
+          for (const point of transferEvent.points) {
+            const existingPoint = db.getFirstSync(
+              "SELECT id FROM point WHERE id = ?",
+              [point.id]
+            );
+
+            if (!existingPoint) {
+              db.runSync(
+                "INSERT INTO point (id, event_id, x, y, name, comment, type, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                [
+                  point.id,
+                  event.id,
+                  point.x,
+                  point.y,
+                  point.name || "Point",
+                  point.comment || null,
+                  point.type || null,
+                  point.status !== undefined ? (point.status ? 1 : 0) : 0,
+                ]
+              );
+              pointsCount++;
+            } else {
+              db.runSync(
+                "UPDATE point SET x = ?, y = ?, name = ?, comment = ?, type = ?, status = ? WHERE id = ?",
+                [
+                  point.x,
+                  point.y,
+                  point.name || "Point",
+                  point.comment || null,
+                  point.type || null,
+                  point.status !== undefined ? (point.status ? 1 : 0) : 0,
+                  point.id,
+                ]
+              );
+            }
+          }
+        }
       }
 
       console.log(
         `✅ ${insertedCount} événement(s) inséré(s), ${updatedCount} mis à jour`
       );
+      console.log(
+        `✅ ${parcoursCount} parcours, ${zonesCount} zones, ${pointsCount} points ajoutés`
+      );
       setTransferStatus(
-        `${insertedCount} événement(s) ajouté(s), ${updatedCount} mis à jour`
+        `${insertedCount} événement(s) ajouté(s), ${updatedCount} mis à jour\n${parcoursCount} parcours, ${zonesCount} zones, ${pointsCount} points`
       );
     } catch (error) {
       console.error("❌ Erreur lors de l'insertion des événements:", error);
@@ -251,7 +365,10 @@ const QRCodeScanner = ({
           console.log("📦 Événements reçus:", events.length);
           try {
             insertEvents(events);
+            // Rafraîchir tous les contextes pour afficher immédiatement les données
             refreshEvents();
+            refreshPoints();
+            refreshGeometries();
             setReceivedCount((prev) => prev + events.length);
             setTransferStatus(`${events.length} événement(s) reçu(s) !`);
           } catch (error) {
