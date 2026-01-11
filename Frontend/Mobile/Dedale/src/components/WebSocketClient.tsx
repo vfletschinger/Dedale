@@ -1,4 +1,8 @@
-import { EventType, PointDetailType } from "../types/database";
+import {
+  EventType,
+  TransferEventType,
+  PointDetailType,
+} from "../types/database";
 
 export interface WebSocketResponse {
   code: 1 | 2 | 3;
@@ -16,8 +20,12 @@ class WebSocketClient {
   private onFinishedCallback?: () => void;
   private onErrorCallback?: (error: string) => void;
   private onLoadingChangeCallback?: (isLoading: boolean) => void;
+  private onCloseCallback?: () => void;
   private finishedSuccessfully: boolean = false;
-  private onMessageCallback?: (events: EventType[]) => void;
+  private expectedClose: boolean = false;
+  private onMessageCallback?: (
+    events: (EventType | TransferEventType)[]
+  ) => void;
   private onResponseCallback?: (response: WebSocketResponse) => void;
 
   constructor(uri: string) {
@@ -51,7 +59,9 @@ class WebSocketClient {
   /**
    * Tente d'établir la connexion WebSocket.
    */
-  public connect(onMessage?: (events: EventType[]) => void): Promise<boolean> {
+  public connect(
+    onMessage?: (events: (EventType | TransferEventType)[]) => void
+  ): Promise<boolean> {
     this.onMessageCallback = onMessage;
 
     return new Promise((resolve, reject) => {
@@ -106,12 +116,14 @@ class WebSocketClient {
             switch (data.type) {
               case "connected":
                 // Serveur confirme la connexion, ne plus demander automatiquement les events
-                console.log("🔗 Connecté au serveur, en attente d'événements...");
+                console.log(
+                  "🔗 Connecté au serveur, en attente d'événements..."
+                );
                 break;
               case "events":
                 // Serveur envoie tous les events (batch)
                 if (data.data && Array.isArray(data.data)) {
-                  const events: EventType[] = data.data;
+                  const events: (EventType | TransferEventType)[] = data.data;
                   console.log("📦 Événements reçus (batch):", events.length);
                   if (this.onMessageCallback) {
                     this.onMessageCallback(events);
@@ -121,8 +133,12 @@ class WebSocketClient {
               case "event":
                 // Serveur envoie un seul event (envoi individuel)
                 if (data.data) {
-                  const event: EventType = data.data;
-                  console.log("📦 Événement individuel reçu:", event.id, event.name);
+                  const event: EventType | TransferEventType = data.data;
+                  console.log(
+                    "📦 Événement individuel reçu:",
+                    event.id,
+                    event.name
+                  );
                   if (this.onMessageCallback) {
                     this.onMessageCallback([event]);
                   }
@@ -130,6 +146,12 @@ class WebSocketClient {
                 break;
               case "goodbye":
                 console.log("👋 Serveur a fermé la connexion");
+                this.expectedClose = true;
+                if (this.onCloseCallback) {
+                  this.onCloseCallback();
+                }
+                // Ne pas appeler ws.close() ici, le serveur ferme déjà la connexion
+                // L'événement onclose sera déclenché automatiquement
                 break;
               default:
                 console.log("🤔 Type de message inconnu:", data.type);
@@ -148,7 +170,12 @@ class WebSocketClient {
             // Format d'export: { event: {...}, points: [...] }
             const event: EventType = data.event;
             const points: PointDetailType[] = data.points;
-            console.log("📦 Événement avec points reçu:", event.name, "- Points:", points.length);
+            console.log(
+              "📦 Événement avec points reçu:",
+              event.name,
+              "- Points:",
+              points.length
+            );
             if (this.onMessageCallback) {
               this.onMessageCallback([event]);
             }
@@ -161,7 +188,10 @@ class WebSocketClient {
               this.onMessageCallback(events);
             }
           } else {
-            console.log("⚠️ Format de message non reconnu:", JSON.stringify(data).substring(0, 100));
+            console.log(
+              "⚠️ Format de message non reconnu:",
+              JSON.stringify(data).substring(0, 100)
+            );
           }
         } catch {
           console.log("🤔 Message non reconnu:", e.data);
@@ -174,10 +204,15 @@ class WebSocketClient {
       };
 
       this.ws.onerror = (e: Event) => {
-        console.error("❌ Erreur WebSocket:", e);
+        // Ne pas traiter comme erreur si on attend la fermeture
+        if (!this.expectedClose) {
+          console.error("❌ Erreur WebSocket - Type:", e.type);
+        }
         this.isConnected = false;
         this.setLoading(false);
-        reject("Erreur de connexion WebSocket");
+        if (!this.expectedClose) {
+          reject("Erreur de connexion WebSocket");
+        }
       };
 
       this.ws.onclose = (e: CloseEvent) => {
@@ -191,15 +226,15 @@ class WebSocketClient {
             this.isConnected = false;
             return; // Pas d'erreur pour les fermetures normales
           case 1006:
-            console.log(
-              "❌ Fermeture anormale - Problème de connexion/serveur"
-            );
-            // Ne pas traiter comme une erreur si on a déjà reçu "fini"
-            if (this.finishedSuccessfully) {
-              console.log("ℹ️ Fermeture après succès - pas d'erreur");
+            // Ne pas traiter comme une erreur si on attend la fermeture ou si terminé avec succès
+            if (this.expectedClose || this.finishedSuccessfully) {
+              console.log("ℹ️ Fermeture normale après goodbye/succès");
               this.isConnected = false;
               return;
             }
+            console.log(
+              "❌ Fermeture anormale - Problème de connexion/serveur"
+            );
             errorMessage =
               "Connexion perdue - Vérifiez que l'application Tauri est démarrée";
             break;
@@ -216,6 +251,11 @@ class WebSocketClient {
         this.isConnected = false;
         this.setLoading(false);
 
+        // Appeler le callback de fermeture
+        if (this.onCloseCallback) {
+          this.onCloseCallback();
+        }
+
         // Déclencher l'erreur seulement si nécessaire
         if (this.onErrorCallback && errorMessage) {
           this.onErrorCallback(errorMessage);
@@ -229,6 +269,13 @@ class WebSocketClient {
    */
   public setOnResponse(callback: (response: WebSocketResponse) => void): void {
     this.onResponseCallback = callback;
+  }
+
+  /**
+   * Définit le callback pour la fermeture de la connexion.
+   */
+  public setOnClose(callback: () => void): void {
+    this.onCloseCallback = callback;
   }
 
   /**

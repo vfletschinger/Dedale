@@ -2,18 +2,19 @@ import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 interface Team {
-    id: number;
+    id: string;
     name: string;
     number: number;
-    event_ids: number[];
+    eventId: string;
 }
 
 interface CreateTeamProps {
+    activeEventId: string;
     onClose: () => void;
     onTeamCreated: (newTeam: Team) => void;
 }
 
-export default function CreateTeam({ onClose, onTeamCreated }: CreateTeamProps) {
+export default function CreateTeam({ activeEventId, onClose, onTeamCreated }: CreateTeamProps) {
     const [name, setName] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -26,11 +27,11 @@ export default function CreateTeam({ onClose, onTeamCreated }: CreateTeamProps) 
         setError(null);
 
         try {
-            const newTeam = await invoke<Team>("create_team", { name });
+            const newTeam = await invoke<Team>("create_team", { name, eventId: activeEventId });
             onTeamCreated(newTeam);
             onClose();
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : "Erreur lors de la création");
+            setError(err instanceof Error ? err.message : "Erreur lors de la création: " + err);
         } finally {
             setLoading(false);
         }

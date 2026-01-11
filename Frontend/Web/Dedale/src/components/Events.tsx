@@ -4,17 +4,14 @@ import { useState, useEffect } from "react";
 
 // Types
 interface Event {
-  id: number;
+  id: string;
   name: string;
-  description: string;
-  dateDebut: string;
-  dateFin: string;
-  statut: string;
-  geometry: string;
+  start_date: string;
+  end_date: string;
 }
 
 interface EventsProps {
-  onEventClick?: (eventId: number) => void;
+  onEventClick?: (eventId: string) => void;
   onEventsLoaded?: (events: Event[]) => void;
 }
 
@@ -25,13 +22,12 @@ const formatDate = (dateStr: string): string => {
     return date.toLocaleDateString("fr-FR", {
       day: "2-digit",
       month: "long",
-      year: "numeric"
+      year: "numeric",
     });
   } catch {
     return dateStr;
   }
 };
-
 
 function Events({ onEventClick, onEventsLoaded }: EventsProps) {
   const [events, setEvents] = useState<Event[]>([]);
@@ -40,16 +36,12 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
-    description: "",
     dateDebut: "",
     dateFin: "",
-    statut: "planned",
-    geometry: ""
   });
 
   // État pour le QR code de réception
   const [receiveQrCode, setReceiveQrCode] = useState<string | null>(null);
-  const [receivingEventId, setReceivingEventId] = useState<number | null>(null);
   const [receiveStatus, setReceiveStatus] = useState<string>("En attente...");
 
   const loadEvents = async () => {
@@ -81,22 +73,21 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
     let isMounted = true;
 
     const setupListeners = async () => {
-      unlistenConnectedFn = await listen('mobile-connected', () => {
+      unlistenConnectedFn = await listen("mobile-connected", () => {
         if (!isMounted) return;
-        console.log('📱 Mobile connecté pour réception !');
-        setReceiveStatus('Mobile connecté ! En attente des données...');
+        console.log("📱 Mobile connecté pour réception !");
+        setReceiveStatus("Mobile connecté ! En attente des données...");
       });
 
-      unlistenPointsUpdatedFn = await listen<number>('points-updated', (event) => {
-        if (!isMounted) return;
-        const eventId = event.payload;
-        console.log('📦 Points mis à jour pour event_id:', eventId);
-        // Si c'est l'événement qu'on est en train de recevoir
-        if (eventId === receivingEventId) {
-          setReceiveStatus(`Points reçus avec succès !`);
-          loadEvents(); // Recharger les événements
-        }
-      });
+      unlistenPointsUpdatedFn = await listen<number>(
+        "points-updated",
+        (event) => {
+          if (!isMounted) return;
+          const eventId = event.payload;
+          console.log("📦 Points mis à jour pour event_id:", eventId);
+          // Si c'est l'événement qu'on est en train de recevoir
+        },
+      );
     };
 
     setupListeners();
@@ -106,30 +97,29 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
       if (unlistenConnectedFn) unlistenConnectedFn();
       if (unlistenPointsUpdatedFn) unlistenPointsUpdatedFn();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [receivingEventId]);
+  }, []);
 
   // Fonction pour démarrer la réception depuis le mobile
-  const handleReceiveFromMobile = async (eventId: number) => {
+  const handleReceiveFromMobile = async (eventId: string) => {
     try {
-      setReceivingEventId(eventId);
-      setReceiveStatus('Génération du QR code...');
+      setReceiveStatus("Génération du QR code...");
 
-      console.log('📱 Démarrage serveur de réception pour event:', eventId);
-      const qrCodeBase64 = await invoke<string>('start_receive_server', { eventId });
+      console.log("📱 Démarrage serveur de réception pour event:", eventId);
+      const qrCodeBase64 = await invoke<string>("start_receive_server", {
+        eventId,
+      });
 
       setReceiveQrCode(qrCodeBase64);
-      setReceiveStatus('Scannez le QR code avec le mobile');
+      setReceiveStatus("Scannez le QR code avec le mobile");
     } catch (err) {
-      console.error('❌ Erreur démarrage serveur réception:', err);
+      console.error("❌ Erreur démarrage serveur réception:", err);
       setReceiveStatus(`Erreur: ${err}`);
     }
   };
 
   const closeReceiveModal = () => {
     setReceiveQrCode(null);
-    setReceivingEventId(null);
-    setReceiveStatus('En attente...');
+    setReceiveStatus("En attente...");
   };
 
   const handleCreateEvent = async () => {
@@ -144,28 +134,37 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
         return;
       }
 
+      // Vérifier que les dates ne sont pas dans le passé
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD d'aujourd'hui
+      if (formData.dateDebut < today) {
+        alert("La date de début ne peut pas être dans le passé !");
+        return;
+      }
+
+      if (formData.dateFin < today) {
+        alert("La date de fin ne peut pas être dans le passé !");
+        return;
+      }
+
       if (new Date(formData.dateDebut) >= new Date(formData.dateFin)) {
         alert("La date de fin doit être postérieure à la date de début !");
         return;
       }
 
       const newEvent = {
-        ...formData,
-        timestamp: new Date().toISOString()
+        name: formData.name.trim(),
+        start_date: formData.dateDebut, // <--- Renommé pour matcher Rust
+        end_date: formData.dateFin,
       };
 
       console.log(" Création d'un nouvel événement...", newEvent);
       await invoke("insert_event", { event: newEvent });
       console.log(" Événement créé avec succès");
 
-      // Réinitialiser le formulaire
       setFormData({
         name: "",
-        description: "",
         dateDebut: "",
-        dateFin: "",
-        statut: "planned",
-        geometry: ""
+        dateFin: ""
       });
       setShowCreateForm(false);
       loadEvents();
@@ -174,12 +173,16 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >,
+  ) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleDeleteEvent = async (eventId: number) => {
+  const handleDeleteEvent = async (eventId: string) => {
     if (!confirm("Êtes-vous sûr de vouloir supprimer cet événement ?")) {
       return;
     }
@@ -250,27 +253,13 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Statut
-              </label>
-              <select
-                name="statut"
-                value={formData.statut}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="planned">Planifié</option>
-                <option value="active">Actif</option>
-                <option value="completed">Terminé</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
                 Date de début *
               </label>
               <input
                 type="date"
                 name="dateDebut"
                 value={formData.dateDebut}
+                min={new Date().toISOString().split('T')[0]} // Empêche la sélection de dates passées
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
@@ -283,34 +272,9 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
                 type="date"
                 name="dateFin"
                 value={formData.dateFin}
+                min={new Date().toISOString().split('T')[0]} // Empêche la sélection de dates passées
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Description
-              </label>
-              <textarea
-                name="description"
-                value={formData.description}
-                onChange={handleInputChange}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Description de l'événement"
-              />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Géométrie (GeoJSON)
-              </label>
-              <textarea
-                name="geometry"
-                value={formData.geometry}
-                onChange={handleInputChange}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder='Exemple: {"type": "Point", "coordinates": [7.75, 48.58]}'
               />
             </div>
           </div>
@@ -336,7 +300,9 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
         {events.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             <p>Aucun événement trouvé.</p>
-            <p className="text-sm">Créez votre premier événement pour commencer !</p>
+            <p className="text-sm">
+              Créez votre premier événement pour commencer !
+            </p>
           </div>
         ) : (
           events.map((event) => (
@@ -350,20 +316,11 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
                   <h3 className="text-lg font-semibold text-gray-800">
                     {event.name}
                   </h3>
-                  {event.description && (
-                    <p className="text-gray-600 mt-1">{event.description}</p>
-                  )}
                   <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
-                    <span>Sélectionné
-                      Du {formatDate(event.dateDebut)} au {formatDate(event.dateFin)}</span>
-                    <span className={`px-2 py-1 rounded-full text-xs ${event.statut === 'active'
-                      ? 'bg-green-100 text-green-800'
-                      : event.statut === 'planned'
-                        ? 'bg-blue-100 text-blue-800'
-                        : 'bg-gray-100 text-gray-800'
-                      }`}>
-                      {event.statut}
+                    <span>
+                      📅 Du {formatDate(event.start_date)} au {formatDate(event.end_date)}
                     </span>
+
                   </div>
                 </div>
                 <div className="ml-4 flex gap-2">
@@ -409,7 +366,8 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
               📱 Recevoir depuis le mobile
             </h3>
             <p className="text-gray-600 text-center mb-4">
-              Scannez ce QR code avec l'application mobile pour envoyer les points de l'événement.
+              Scannez ce QR code avec l'application mobile pour envoyer les
+              points de l'événement.
             </p>
 
             <div className="flex justify-center mb-4">

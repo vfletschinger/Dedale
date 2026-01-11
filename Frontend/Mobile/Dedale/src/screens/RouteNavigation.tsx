@@ -10,13 +10,59 @@ import MapView, {
 } from "react-native-maps";
 import * as Location from "expo-location";
 
+export function checkPointVisibility(
+  point: { x: number; y: number },
+  region: Region
+): boolean {
+  const latMin = region.latitude - region.latitudeDelta / 2;
+  const latMax = region.latitude + region.latitudeDelta / 2;
+  const lngMin = region.longitude - region.longitudeDelta / 2;
+  const lngMax = region.longitude + region.longitudeDelta / 2;
+
+  return (
+    point.y >= latMin &&
+    point.y <= latMax &&
+    point.x >= lngMin &&
+    point.x <= lngMax
+  );
+}
+
+export async function fetchRouteCoordinates(
+  points: { x: number; y: number }[]
+): Promise<{ latitude: number; longitude: number }[]> {
+  if (points.length < 2) {
+    return points.map((p) => ({ latitude: p.y, longitude: p.x }));
+  }
+
+  try {
+    const coordinates = points.map((point) => `${point.x},${point.y}`).join(";");
+    const url = `https://router.project-osrm.org/route/v1/foot/${coordinates}?overview=full&geometries=geojson`;
+    
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (data.routes && data.routes.length > 0) {
+      return data.routes[0].geometry.coordinates.map(
+        (coord: [number, number]) => ({
+          latitude: coord[1],
+          longitude: coord[0],
+        })
+      );
+    }
+  } catch (error) {
+    console.error("Error fetching route:", error);
+  }
+
+  return points.map((p) => ({ latitude: p.y, longitude: p.x }));
+}
+
 export default function RouteNavigation() {
   const route = useRoute();
   const navigation = useNavigation();
   const points = useMemo(
     () => (route.params as any)?.points ?? [],
     [route.params]
-  );
+  ) as { x: number; y: number; id: number }[];
 
   const [currentRegion, setCurrentRegion] = useState<Region | undefined>();
   const [, setCurrentLocation] = useState<{
@@ -30,58 +76,12 @@ export default function RouteNavigation() {
   const [isPointVisible, setIsPointVisible] = useState(true);
   const mapRef = useRef<MapView | null>(null);
 
-  // Fetch route following roads between points
   useEffect(() => {
-    const fetchRoute = async () => {
-      if (points.length < 2) {
-        // If only one point, no route needed
-        if (points.length === 1) {
-          setRouteCoordinates([
-            { latitude: points[0].y, longitude: points[0].x },
-          ]);
-        }
-        return;
-      }
-
-      try {
-        // Build coordinates string for OSRM API
-        const coordinates = points
-          .map((point) => `${point.x},${point.y}`)
-          .join(";");
-
-        // Use OSRM demo server (consider self-hosting for production)
-        const response = await fetch(
-          `https://router.project-osrm.org/route/v1/driving/${coordinates}?overview=full&geometries=geojson`
-        );
-
-        const data = await response.json();
-
-        if (data.code === "Ok" && data.routes && data.routes.length > 0) {
-          // Convert GeoJSON coordinates to React Native Maps format
-          const coords = data.routes[0].geometry.coordinates.map(
-            (coord: [number, number]) => ({
-              longitude: coord[0],
-              latitude: coord[1],
-            })
-          );
-          setRouteCoordinates(coords);
-        } else {
-          // Fallback to straight lines if routing fails
-          console.warn("Routing failed, using straight lines");
-          setRouteCoordinates(
-            points.map((point) => ({ latitude: point.y, longitude: point.x }))
-          );
-        }
-      } catch (error) {
-        console.error("Error fetching route:", error);
-        // Fallback to straight lines
-        setRouteCoordinates(
-          points.map((point) => ({ latitude: point.y, longitude: point.x }))
-        );
-      }
+    const loadRoute = async () => {
+        const coords = await fetchRouteCoordinates(points);
+        setRouteCoordinates(coords);
     };
-
-    fetchRoute();
+    loadRoute();
   }, [points]);
 
   useEffect(() => {
@@ -107,7 +107,6 @@ export default function RouteNavigation() {
 
         setCurrentLocation(userLocation);
 
-        // Center on first point or user location
         if (points.length > 0) {
           setCurrentRegion({
             latitude: points[0].y,
@@ -129,7 +128,6 @@ export default function RouteNavigation() {
 
     initializeLocation();
 
-    // Watch user position
     const watchLocation = Location.watchPositionAsync(
       {
         accuracy: Location.Accuracy.High,
@@ -185,21 +183,14 @@ export default function RouteNavigation() {
   };
 
   const handleRegionChangeComplete = (region: Region) => {
-    // Check if current point is visible in the map region
+    if (points.length === 0) return;
     const currentPoint = points[currentPointIndex];
-    const latDelta = region.latitudeDelta / 2;
-    const lonDelta = region.longitudeDelta / 2;
-
-    const isVisible =
-      currentPoint.y >= region.latitude - latDelta &&
-      currentPoint.y <= region.latitude + latDelta &&
-      currentPoint.x >= region.longitude - lonDelta &&
-      currentPoint.x <= region.longitude + lonDelta;
-
+    const isVisible = checkPointVisibility(currentPoint, region);
     setIsPointVisible(isVisible);
   };
 
   const centerOnCurrentPoint = () => {
+    if (points.length === 0) return;
     const currentPoint = points[currentPointIndex];
     mapRef.current?.animateToRegion({
       latitude: currentPoint.y,
@@ -213,7 +204,7 @@ export default function RouteNavigation() {
   if (!currentRegion || points.length === 0) {
     return (
       <View className="center">
-        <Text className="text-gray-500">Chargement de la carte...</Text>
+        <Text>Chargement de la carte...</Text>
       </View>
     );
   }
@@ -222,6 +213,7 @@ export default function RouteNavigation() {
     <View className="container-white">
       <MapView
         ref={mapRef}
+        testID="map-view"
         className="flex-1"
         provider={PROVIDER_DEFAULT}
         initialRegion={currentRegion}
@@ -229,7 +221,6 @@ export default function RouteNavigation() {
         showsMyLocationButton={false}
         onRegionChangeComplete={handleRegionChangeComplete}
       >
-        {/* Draw route polyline following roads */}
         {routeCoordinates.length > 0 && (
           <Polyline
             coordinates={routeCoordinates}
@@ -238,7 +229,6 @@ export default function RouteNavigation() {
           />
         )}
 
-        {/* Show all points as markers */}
         {points.map((point, index) => (
           <Marker
             key={point.id}
@@ -254,7 +244,6 @@ export default function RouteNavigation() {
         ))}
       </MapView>
 
-      {/* Recenter button - only shown when current point is not visible */}
       {!isPointVisible && (
         <Pressable
           onPress={centerOnCurrentPoint}
@@ -264,14 +253,12 @@ export default function RouteNavigation() {
         </Pressable>
       )}
 
-      {/* Back button */}
       <Pressable onPress={() => navigation.goBack()} className="back-btn">
         <View className="back-btn-gray">
           <Text className="back-btn-gray-text">←</Text>
         </View>
       </Pressable>
 
-      {/* Navigation controls */}
       <View className="nav-controls">
         <View className="nav-info">
           <Text className="nav-info-text">
@@ -298,7 +285,6 @@ export default function RouteNavigation() {
                 ? "nav-btn-disabled"
                 : "nav-btn"
             }
-            disabled={currentPointIndex === points.length - 1}
           >
             <Text className="nav-btn-text">Suivant →</Text>
           </Pressable>

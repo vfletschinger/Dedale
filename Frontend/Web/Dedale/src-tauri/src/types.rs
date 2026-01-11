@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use sqlx::FromRow; // <--- 1. IMPORTANT : Importer ceci
+use sqlx::FromRow;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Event {
@@ -8,24 +8,50 @@ pub struct Event {
     pub name: Option<String>,
     pub start_date: Option<String>,
     pub end_date: Option<String>,
+    pub zone: Option<String>,
+    pub parcours: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Zone {
+    #[serde(default)]
+    pub id: String,
+    pub event_id: String,
+    pub name: Option<String>,
+    pub color: Option<String>,
+    pub geometry_json: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Parcours {
+    #[serde(default)]
+    pub id: String,
+    pub event_id: String,
+    pub name: Option<String>,
+    pub color: Option<String>,
+    pub start_time: Option<i64>,
+    pub speed_low: Option<f64>,
+    pub speed_high: Option<f64>,
+    pub geometry_json: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Team {
     #[serde(default)]
-    pub id: i64,
+    pub id: String,
     pub name: Option<String>,
-    #[serde(default)]
-    pub event_ids: Vec<i64>,
+    pub number: i64,
+    pub event_id: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Member {
-    pub id: i64,
-    pub team_id: i64,
-    pub person_id: i64,
+    pub id: String,
+    pub team_id: String,
+    pub person_id: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Equipement {
     pub id: String,
@@ -37,23 +63,27 @@ pub struct Equipement {
     pub hour_depose: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(sqlx::FromRow, Debug, Clone, Serialize, Deserialize)]
 pub struct EquipementCoordinate {
     pub id: String,
     pub equipement_id: String,
     pub x: f64,
     pub y: f64,
+    pub order_index: Option<i64>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Type {
     pub id: String,
     pub name: Option<String>,
     pub description: Option<String>,
     pub width: Option<f64>,
+    pub length: Option<f64>,
     pub height: Option<f64>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Course {
     pub id: String,
@@ -74,30 +104,53 @@ pub struct User {
     pub role: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Point {
     pub id: String,
     pub x: f64,
     pub y: f64,
+    pub name: Option<String>,
     pub comment: Option<String>,
     pub r#type: Option<String>,
     pub status: Option<bool>,
-    pub event_id: Option<i64>,
+    pub event_id: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Interest {
+    pub id: String,
+    pub x: f64,
+    pub y: f64,
+    pub description: Option<String>,
+    pub event_id: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PointWithDetails {
+    pub id: String,
+    pub x: f64,
+    pub y: f64,
+    pub name: Option<String>,
+    pub event_id: Option<String>,
+    pub status: Option<bool>,
+    pub comment: Option<String>,
+    pub r#type: Option<String>,
+    #[serde(default)]
+    pub pictures: Vec<Picture>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Person {
-    pub id: i64,
+    pub id: String,
     pub firstname: Option<String>,
     pub lastname: Option<String>,
-    pub address: Option<String>,
     pub email: Option<String>,
     pub phone_number: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Picture {
-    pub id: i64,
+    pub id: i64, // INTEGER PRIMARY KEY dans la base SQLite
     pub point_id: Option<String>,
     pub image: Option<String>,
 }
@@ -111,7 +164,7 @@ pub struct Comment {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ObstacleType {
-    pub id: i64,
+    pub id: String,
     pub name: Option<String>,
     pub description: Option<String>,
     pub width: Option<f64>,
@@ -122,7 +175,7 @@ pub struct ObstacleType {
 pub struct Obstacle {
     pub id: String,
     pub point_id: String,
-    pub type_id: i64,
+    pub type_id: String,
     pub number: Option<i32>,
     pub name: Option<String>,
     pub description: Option<String>,
@@ -132,9 +185,11 @@ pub struct Obstacle {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Geometry {
-    pub id: i64,
-    pub event_id: i64,
+    pub id: String,
+    pub event_id: String,
     pub geom: String,
+    pub geom_type: String, // "point", "parcours", ou "zone"
+    pub name: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -166,14 +221,23 @@ pub struct EquipementComplet {
     pub hour_pose: Option<String>,
     pub date_depose: Option<String>,
     pub hour_depose: Option<String>,
-    pub coordinates: Vec<Coordinate>,
+    pub coordinates: Vec<EquipementCoordinate>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Action {
+    pub id: String,
+    pub team_id: String,
+    pub equipement_id: String,
+    pub action_type: Option<String>,
+    pub scheduled_time: Option<String>,
+    pub is_done: Option<bool>,
+}
 
-// 2. Ajouter FromRow dans la liste des derives
-#[derive(Debug, Serialize, Deserialize, FromRow)]
-pub struct Coordinate {
-    pub x: f64,
-    pub y: f64,
-    pub order_index: i32,
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EquipementActionComplet {
+    pub equipement: EquipementComplet,
+    pub event_id: Option<String>,
+    pub action_id: Option<String>,
+    pub action_type: Option<String>,
 }
