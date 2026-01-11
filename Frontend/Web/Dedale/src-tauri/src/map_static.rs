@@ -4,8 +4,8 @@ use std::path::Path;
 const MAP_BYTES: &[u8] = include_bytes!("../assets/strasbourg_map.png");
 
 const MAP_NORD: f64 = 48.6300;
-const MAP_SUD: f64 = 48.5300;
-const MAP_OUEST: f64 = 7.6800;
+const MAP_SUD: f64 = 48.5100;
+const MAP_OUEST: f64 = 7.6600;
 const MAP_EST: f64 = 7.8200;
 
 pub struct CroppedMap {

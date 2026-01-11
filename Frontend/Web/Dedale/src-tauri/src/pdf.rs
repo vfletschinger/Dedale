@@ -2,7 +2,6 @@ use crate::db;
 use crate::db::fetch_equipement_coordinates;
 use crate::db::EquipementActionComplet;
 use crate::db::EquipementComplet;
-use crate::db::PointWithDetails;
 use crate::map_static;
 use crate::utils;
 use sqlx::Row;
@@ -86,20 +85,13 @@ pub async fn create_pdf(app: AppHandle, event_id: Option<String>) -> Result<(), 
             let pct_y = (map.bounds.max_y - p.y) / height_geo;
 
             if (0.0..=1.0).contains(&pct_x) && (0.0..=1.0).contains(&pct_y) {
-                let dx_pct = (pct_x * 100.0) as i32;
-                let dy_pct = (pct_y * 100.0) as i32;
                 typst_src.push_str(&format!(
-                    r#"
-                    #place(top + left, dx: {}%, dy: {}%)[
-                      #place(center + horizon)[
-                        #circle(radius: 4pt, fill: red, stroke: white)
-                        #rect(fill: white.transparentize(30%), inset: 1pt, radius: 2pt)[
-                           #text(size: 6pt, weight: "bold")[{}]
-                        ]
-                      ]
-                    ]
-                    "#,
-                    dx_pct, dy_pct, p.id
+                    r#"#place(top + left, dx: {}%, dy: {}%)[
+  #circle(radius: 3pt, fill: red, stroke: 1pt + white)
+]
+"#,
+                    pct_x * 100.0,
+                    pct_y * 100.0
                 ));
             }
         }
@@ -113,15 +105,21 @@ pub async fn create_pdf(app: AppHandle, event_id: Option<String>) -> Result<(), 
         writeln!(typst_src, "{}", heading).unwrap();
         typst_src.push_str("#v(0.5em)\n");
 
-        // Point n'a plus de champ obstacles
-        let obs_str = "N/A".to_string();
-        writeln!(typst_src, "*Equipements:* {}.", obs_str).unwrap();
-
-        // Point a un champ comment (Option<String>) au lieu de comments (Vec)
         let com_str = p.comment.as_deref().unwrap_or("None");
         writeln!(typst_src, "*Commentaires:* {}.", com_str).unwrap();
 
-        // Point n'a plus de champ pictures - code supprimé
+        // Add pictures if available
+        /*if !p.pictures.is_empty() {
+            typst_src.push_str("#v(0.5em)\n*Images:* \n");
+            for pic in &p.pictures {
+                if let Some(image_path) = &pic.image {
+                    typst_src.push_str(&format!(
+                        "#image(\"{}\", width: 80%)\n#v(0.3em)\n",
+                        image_path
+                    ));
+                }
+            }
+        }*/
 
         typst_src.push_str("#v(1cm)\n#line(length: 100%, stroke: gray)\n#v(1cm)\n");
     }
@@ -197,15 +195,12 @@ pub async fn create_team_mission_pdf(
 ) -> Result<(), String> {
     let pool = db::get_db_pool(&app).await?;
 
-    // 1. Fetch Team metadata
     let team_name: String = sqlx::query_scalar("SELECT name FROM team WHERE id = ?")
         .bind(&team_id)
         .fetch_one(&pool)
         .await
         .map_err(|e| e.to_string())?;
 
-    // 2. Fetch specific actions for this team with equipment details
-    // We join 'action', 'equipement', and 'type' to get the full picture
     let query = r#"
         SELECT 
             a.id as action_id,
@@ -248,7 +243,6 @@ pub async fn create_team_mission_pdf(
         });
     }
 
-    // 3. Setup Temp Directory and Fonts
     let temp_dir = std::env::temp_dir().join(format!("mission_gen_{}", team_id));
     if temp_dir.exists() {
         fs::remove_dir_all(&temp_dir).ok();
@@ -257,7 +251,6 @@ pub async fn create_team_mission_pdf(
 
     let font_bytes = crate::pdf::load_fonts_from_directory(Path::new("./fonts"))?;
 
-    // 4. Build Typst Source
     let mut typst_src = String::new();
     typst_src.push_str(
         r#"
@@ -281,40 +274,6 @@ pub async fn create_team_mission_pdf(
     "#,
     );
 
-    // 5. Team Map (Showing only their assigned equipments)
-    let map_data_points: Vec<PointWithDetails> = mission_data
-        .iter()
-        .filter_map(|m| {
-            // We take the first coordinate of the equipment to place a marker
-            m.equipement.coordinates.first().map(|coord| {
-                PointWithDetails {
-                    id: m.equipement.id.clone(),
-                    x: coord.x,
-                    y: coord.y,
-                    name: m.equipement.type_name.clone(), // This is already an Option<String>
-                    event_id: m.event_id.clone(),
-                    comment: None,
-                    status: Some(false), // Provide default status
-                    r#type: None,        // Use raw identifier for the reserved word 'type'
-                    pictures: Vec::<crate::types::Picture>::new(), // Provide an empty list of pictures
-                }
-            })
-        })
-        .collect();
-
-    // 2. Now call the generator with the correct type
-    let map_res = map_static::generate_cropped_map(&temp_dir, &map_data_points);
-
-    if let Ok(map) = map_res {
-        typst_src.push_str("== Secteur d'intervention\n#v(0.5em)\n");
-        typst_src.push_str(&format!(
-            r#"#block(width: 100%, stroke: 1pt + black, radius: 4pt, clip: true)[#image("{}", width: 100%)]"#,
-            map.image_path
-        ));
-        typst_src.push_str("#v(1cm)\n");
-    }
-
-    // 6. Chronological Planning Table
     typst_src.push_str("== Planning des Missions\n#v(0.5em)\n");
     typst_src.push_str(
         r#"#table(
@@ -322,11 +281,10 @@ pub async fn create_team_mission_pdf(
         inset: 7pt,
         align: (col, row) => if row == 0 { center } else { left },
         fill: (x, y) => if y == 0 { luma(240) },
-        [*Heure*], [*Action*], [*Équipement / Localisation*], [*Fait*],
+        [*Date*], [*Action*], [*Équipement / Localisation*], [*Fait*],
     "#,
     );
 
-    // Sort by scheduled time (pose or retrait date)
     mission_data.sort_by_key(|m| {
         if m.action_type.as_deref() == Some("pose") {
             m.equipement.date_pose.clone()
@@ -338,30 +296,35 @@ pub async fn create_team_mission_pdf(
     for m in mission_data {
         let is_pose = m.action_type.as_deref() == Some("pose");
 
-        // 1. Safely get the date string as an Option<&String>
         let date_opt = if is_pose {
             &m.equipement.date_pose
         } else {
             &m.equipement.date_depose
         };
 
-        // 2. Convert the Option<&String> into a clean String for display
         let display_date = match date_opt {
-            Some(d) => d.replace("T", " à "), // Use "T" (string) not 'T' (char)
+            Some(d) => d.replace("T", " à "),
             None => "Non planifié".to_string(),
         };
 
-        let action_label = if is_pose { "🟦 POSE" } else { "🟥 RETRAIT" };
+        let action_label = if is_pose { "POSE" } else { "RETRAIT" };
 
         let type_name = m.equipement.type_name.as_deref().unwrap_or("Inconnu");
         let length = m.equipement.length.unwrap_or(0);
-        let equip_label = format!("{} ({}m)", type_name, length);
 
-        // 3. Write to Typst source
+        let coords_str = if let Some(first_coord) = m.equipement.coordinates.first() {
+            format!(
+                "{} ({}m) - {:.4}, {:.4}",
+                type_name, length, first_coord.x, first_coord.y
+            )
+        } else {
+            format!("{} ({}m)", type_name, length)
+        };
+
         writeln!(
             typst_src,
             "[{}], [{}], [{}], [ ],",
-            display_date, action_label, equip_label
+            display_date, action_label, coords_str
         )
         .unwrap();
     }
@@ -369,13 +332,12 @@ pub async fn create_team_mission_pdf(
 
     typst_src.push_str(
         r#"
-        #v(auto)
+        #v(2cm)
         #line(length: 100%, stroke: 0.5pt + gray)
         #text(8pt, gray)[Document généré le #datetime.today().display()]
     "#,
     );
 
-    // 7. Compile PDF
     let template = TypstEngine::builder()
         .main_file(typst_src)
         .fonts(font_bytes)
@@ -389,8 +351,6 @@ pub async fn create_team_mission_pdf(
 
     let pdf_bytes = typst_pdf::pdf(&doc, &PdfOptions::default())
         .map_err(|e| format!("PDF export failed: {:?}", e))?;
-
-    // 8. Save Dialog
 
     let (dir_path, file_name) =
         utils::create_file_name(format!("Planning_{}_{}.pdf", team_name, event_id));
