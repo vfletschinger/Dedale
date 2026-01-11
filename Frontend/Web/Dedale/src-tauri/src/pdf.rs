@@ -36,33 +36,27 @@ pub async fn create_pdf(app: AppHandle, event_id: Option<String>) -> Result<(), 
     if let Some(eid) = event_id {
         let pool = db::get_db_pool(&app).await?;
 
-        let row = sqlx::query(
-            "SELECT name, description, date_debut, date_fin, statut FROM event WHERE id = ?",
-        )
-        .bind(eid)
-        .fetch_optional(&pool)
-        .await
-        .map_err(|e| e.to_string())?;
+        let row = sqlx::query("SELECT name, start_date, end_date FROM event WHERE id = ?")
+            .bind(eid)
+            .fetch_optional(&pool)
+            .await
+            .map_err(|e| e.to_string())?;
 
         if let Some(r) = row {
             let name: String = r.get("name");
-            let description: String = r.get("description");
-            let start: String = r.get("date_debut");
-            let end: String = r.get("date_fin");
-            let status: String = r.get("statut");
+            let start: String = r.get("start_date");
+            let end: String = r.get("end_date");
 
             typst_src.push_str(&format!(
                 r#"
                 #block(fill: luma(240), inset: 8pt, radius: 4pt, width: 100%)[
                   #text(14pt, weight: "bold")[{}] \
                   #v(0.3em)
-                  *Statut :* {} \
-                  *Dates :* {} au {} \
-                  *Description :* {}
+                  *Dates :* {} au {}
                 ]
                 #v(0.5cm)
                 "#,
-                name, status, start, end, description
+                name, start, end
             ));
         }
     }
