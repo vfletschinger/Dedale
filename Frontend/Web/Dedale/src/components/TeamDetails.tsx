@@ -42,7 +42,6 @@ interface TeamDetailsProps {
     onClose: () => void;
     onDelete: (teamId: string) => void;
     onMemberClick: (person: Person) => void;
-    activeEventId: string,
 }
 
 export default function TeamDetails({ teamId, teamName, data, onClose, onDelete, onMemberClick, activeEventId }: TeamDetailsProps) {
