@@ -23,7 +23,7 @@ pub struct Bounds {
 
 pub fn generate_cropped_map(
     output_dir: &Path,
-    points: &[crate::db::Point],
+    points: &[crate::db::PointWithDetails],
 ) -> Result<CroppedMap, String> {
     if points.is_empty() {
         return Err("Aucun point à afficher".to_string());

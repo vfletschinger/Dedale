@@ -6,13 +6,16 @@ interface NavigationProps {
   onNavigate: (page: PageKey) => void;
   canGoBack?: boolean;
   onGoBack?: () => void;
+  eventSelected: boolean;
+  deselectEvent: () => void;
 }
 
-const navItems: { key: PageKey; label: string }[] = [
+const NAV_ITEMS: { key: PageKey; label: string }[] = [
   { key: "event", label: "Événements" },
   { key: "map", label: "Carte" },
   { key: "team", label: "Équipes" },
   { key: "person", label: "Personnes" },
+  { key: "planning", label: "Planning" },
   { key: "data", label: "Données" },
 ];
 
@@ -21,23 +24,27 @@ export default function Navigation({
   onNavigate,
   canGoBack,
   onGoBack,
+  eventSelected,
+  deselectEvent,
 }: NavigationProps) {
   return (
-    <nav className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 backdrop-blur-lg border-b border-white/10 shadow-2xl">
-      <div className="mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex h-20 items-center justify-between">
-          {/* Left side - Logo + Back button */}
-          <div className="flex items-center space-x-3">
+    <nav className="sticky top-0 z-[100] w-full border-b border-gray-200 bg-slate-700 shadow-lg">
+      {/* Barre d'accentuation supérieure */}
+      <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-blue-500/60 to-transparent"></div>
+
+      <div className="w-full px-2 sm:px-4">
+        <div className="flex h-14 items-center gap-6">
+          {/* Section Gauche : Terminal Branding */}
+          <div className="flex items-center gap-6 flex-shrink-0">
             {canGoBack && onGoBack && (
               <button
-                type="button"
                 onClick={onGoBack}
-                className="p-2 rounded-xl text-white/80 hover:text-white bg-white/10 hover:bg-white/20 transition-all duration-200"
-                title="Retour"
+                className="group flex h-8 w-8 items-center justify-center rounded-lg bg-slate-600 text-slate-300 hover:text-white transition-all border border-slate-500 hover:border-blue-400 hover:bg-slate-500 cursor-pointer"
+                aria-label="Retour"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5"
+                  className="h-4 w-4"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -45,53 +52,74 @@ export default function Navigation({
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    strokeWidth={2}
+                    strokeWidth={3}
                     d="M15 19l-7-7 7-7"
                   />
                 </svg>
               </button>
             )}
-            <div className="relative">
-              <div className="absolute -inset-1 bg-gradient-to-r from-blue-400 to-purple-600 rounded-full blur opacity-30"></div>
-              <img
-                src={logoStrasbourg}
-                alt="Logo"
-                className="relative h-12 w-auto rounded-full shadow-lg ring-2 ring-white/20"
-              />
-            </div>
-            <div className="hidden sm:block">
-              <h1 className="text-xl font-bold bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">
-                Dedale
-              </h1>
+
+            <div
+              className="flex items-center gap-3 cursor-pointer group"
+              onClick={() => onNavigate("event")}
+            >
+              <div className="relative flex items-center justify-center">
+                <div className="absolute inset-0 bg-blue-500/20 blur-md rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <img
+                  src={logoStrasbourg}
+                  alt="Logo"
+                  className="relative h-7 w-auto object-contain brightness-110 group-hover:brightness-125 transition-all duration-300"
+                />
+              </div>
+              <div className="flex flex-col leading-none">
+                <span className="text-sm font-bold tracking-wider text-white uppercase">
+                  Dedale
+                </span>
+                <span className="text-[9px] font-medium text-slate-400 tracking-wide uppercase mt-0.5">
+                  Gestion Événements
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* Center - Navigation Buttons */}
-          <div className="flex items-center space-x-2">
-            {navItems.map((item) => (
-              <button
-                key={item.key}
-                type="button"
-                className={`group relative px-4 py-2 rounded-2xl font-medium transition-all duration-300 transform hover:scale-105 ${currentPage === item.key
-                  ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg shadow-blue-500/30 ring-2 ring-white/20"
-                  : "text-white/80 hover:text-white bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/10 hover:border-white/30"
-                  }`}
-                onClick={() => onNavigate(item.key)}
-              >
-                <span className="flex items-center space-x-2">
-                  <span>{item.label}</span>
-                </span>
-                {currentPage === item.key && (
-                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-white rounded-full"></div>
-                )}
-              </button>
-            ))}
+          {/* Section Centre : Navigation */}
+          <div className="flex-1 flex justify-center">
+            <div className="flex items-center gap-2 px-2 py-1.5 bg-slate-800 rounded-lg border border-slate-600 shadow-md">
+              {NAV_ITEMS.map(({ key, label }) => {
+                const isActive = currentPage === key;
+                const requiresEvent = key !== "event";
+                const isDisabled = requiresEvent && !eventSelected;
+
+                return (
+                  <button
+                    key={key}
+                    onClick={() => onNavigate(key)}
+                    disabled={isDisabled}
+                    className={`relative px-4 py-2 text-[11px] font-semibold tracking-wide uppercase transition-all duration-200 rounded-md
+                    ${isActive
+                        ? "text-white bg-blue-600 shadow-md"
+                        : isDisabled
+                          ? "text-slate-500 bg-slate-800 cursor-not-allowed opacity-50"
+                          : "text-slate-300 hover:text-white hover:bg-slate-700"
+                      }`}
+                    title={isDisabled ? "Sélectionnez d'abord un événement" : ""}
+                  >
+                    <span className="relative z-10">{label}</span>
+                    {isActive && (
+                      <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent rounded-md"></div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div hidden={!eventSelected} className="flex items-center gap-2 px-2 py-1.5 bg-slate-800 rounded-lg border border-slate-600 shadow-md">
+            <button onClick={deselectEvent} className={`relative px-4 py-2 text-[11px] font-semibold tracking-wide uppercase transition-all duration-200 rounded-md cursor-pointer text-slate-300 hover:text-white hover:bg-slate-700`}>
+              Déselectionner l'événement
+            </button>
           </div>
         </div>
       </div>
-
-      {/* Glow effect at the bottom */}
-      <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-400 to-transparent opacity-50"></div>
     </nav>
   );
 }

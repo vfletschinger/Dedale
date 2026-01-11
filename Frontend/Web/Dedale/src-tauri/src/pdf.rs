@@ -1,7 +1,6 @@
 use crate::db;
 use crate::map_static;
 use crate::utils;
-use base64::{engine::general_purpose, Engine as _};
 use sqlx::Row;
 use std::fmt::Write;
 use std::fs;
@@ -11,8 +10,8 @@ use typst_as_lib::TypstEngine;
 use typst_pdf::PdfOptions;
 
 #[tauri::command]
-pub async fn create_pdf(app: AppHandle, event_id: Option<i64>) -> Result<(), String> {
-    let data = db::retrieve_data_by_event(&app, event_id).await?;
+pub async fn create_pdf(app: AppHandle, event_id: Option<String>) -> Result<(), String> {
+    let data = db::retrieve_data_by_event(&app, &event_id).await?;
 
     let temp_dir = std::env::temp_dir().join("my_app_pdf_gen");
     if temp_dir.exists() {
@@ -111,91 +110,20 @@ pub async fn create_pdf(app: AppHandle, event_id: Option<i64>) -> Result<(), Str
         eprintln!("Erreur génération map statique : {}", e);
     }
 
-    for (point_index, p) in data.iter().enumerate() {
+    for (_point_index, p) in data.iter().enumerate() {
         let heading = format!("== Point {} (X: {}, Y: {})", p.id, p.x, p.y);
         writeln!(typst_src, "{}", heading).unwrap();
         typst_src.push_str("#v(0.5em)\n");
 
-        let obs_str = if p.obstacles.is_empty() {
-            "None".to_string()
-        } else {
-            p.obstacles
-                .iter()
-                .map(|o| {
-                    let name = o.name.as_deref().unwrap_or("N/A");
-                    let number = o.number.unwrap_or(0);
-                    format!("{} (x{})", name, number)
-                })
-                .collect::<Vec<String>>()
-                .join(", ")
-        };
+        // Point n'a plus de champ obstacles
+        let obs_str = "N/A".to_string();
         writeln!(typst_src, "*Equipements:* {}.", obs_str).unwrap();
 
-        let com_str = if p.comments.is_empty() {
-            "None".to_string()
-        } else {
-            p.comments
-                .iter()
-                .map(|c| c.value.to_string())
-                .collect::<Vec<String>>()
-                .join(", ")
-        };
+        // Point a un champ comment (Option<String>) au lieu de comments (Vec)
+        let com_str = p.comment.as_deref().unwrap_or("None");
         writeln!(typst_src, "*Commentaires:* {}.", com_str).unwrap();
 
-        if !p.pictures.is_empty() {
-            writeln!(typst_src, "\n*Images:*").unwrap();
-
-            typst_src.push_str("#v(0.5em)\n#grid(\n  columns: (1fr, 1fr, 1fr),\n  gutter: 5pt,\n");
-
-            for (img_index, pic) in p.pictures.iter().enumerate() {
-                let raw_base64 = if let Some(index) = pic.image.find(',') {
-                    &pic.image[index + 1..]
-                } else {
-                    &pic.image
-                };
-
-                let clean_base64 = raw_base64.replace(['\n', '\r', ' '], "");
-
-                let image_bytes = match general_purpose::STANDARD.decode(&clean_base64) {
-                    Ok(b) => Some(b),
-                    Err(_) => match general_purpose::STANDARD_NO_PAD.decode(&clean_base64) {
-                        Ok(b) => Some(b),
-                        Err(e) => {
-                            eprintln!(
-                                "❌ Failed to decode Base64 for img {}_{}: {}",
-                                point_index, img_index, e
-                            );
-                            None
-                        }
-                    },
-                };
-
-                if let Some(bytes) = image_bytes {
-                    match image::load_from_memory(&bytes) {
-                        Ok(dynamic_image) => {
-                            let img_filename = format!("img_{}_{}.png", point_index, img_index);
-                            let img_path = temp_dir.join(&img_filename);
-
-                            if let Err(e) =
-                                dynamic_image.save_with_format(&img_path, image::ImageFormat::Png)
-                            {
-                                eprintln!("❌ Failed to save image to disk: {}", e);
-                            } else {
-                                writeln!(typst_src, "  image(\"{}\", width: 100%),", img_filename)
-                                    .unwrap();
-                            }
-                        }
-                        Err(e) => {
-                            eprintln!(
-                                "❌ Image crate failed to load bytes (corrupt image?): {}",
-                                e
-                            );
-                        }
-                    }
-                }
-            }
-            typst_src.push_str(")\n");
-        }
+        // Point n'a plus de champ pictures - code supprimé
 
         typst_src.push_str("#v(1cm)\n#line(length: 100%, stroke: gray)\n#v(1cm)\n");
     }

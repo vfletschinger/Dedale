@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Limite le scan Tailwind aux fichiers sources, exclut les binaires */
+@source not "../**/*.{mbtiles,pmtiles,db,sqlite,bin,pbf}";
+
 /* Styles personnalisés pour les popups MapLibre GL */
 .maplibregl-popup.custom-popup .maplibregl-popup-content {
   width: 350px !important;

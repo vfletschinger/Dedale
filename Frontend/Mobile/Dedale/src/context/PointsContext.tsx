@@ -10,7 +10,7 @@ import { InterestPointsType } from "../types/database";
 import { getDatabase } from "../../assets/migrations";
 
 interface PointsContextType {
-  pointsByEvent: { [key: number]: InterestPointsType[] };
+  pointsByEvent: { [key: string]: InterestPointsType[] };
   loading: boolean;
   refreshPoints: () => Promise<void>;
 }
@@ -19,7 +19,7 @@ const PointsContext = createContext<PointsContextType | undefined>(undefined);
 
 export function PointsProvider({ children }: { children: ReactNode }) {
   const [pointsByEvent, setPointsByEvent] = useState<{
-    [key: number]: InterestPointsType[];
+    [key: string]: InterestPointsType[];
   }>({});
   const [loading, setLoading] = useState(true);
 
@@ -27,13 +27,11 @@ export function PointsProvider({ children }: { children: ReactNode }) {
     try {
       setLoading(true);
       const db = getDatabase();
-      // Query points with their event associations via junction table
+      // Query points with event_id directly from point table
       const allPoints = await db.getAllAsync<InterestPointsType>(
-        `SELECT p.id, p.x, p.y, pe.event_id 
-         FROM point p 
-         LEFT JOIN point_event pe ON p.id = pe.point_id`
+        `SELECT p.* FROM point p`
       );
-      const groupedPoints: { [key: number]: InterestPointsType[] } = {};
+      const groupedPoints: { [key: string]: InterestPointsType[] } = {};
       for (const point of allPoints) {
         if (point.event_id) {
           // Ensure event_id is not null

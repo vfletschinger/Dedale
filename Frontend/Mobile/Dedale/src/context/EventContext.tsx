@@ -18,8 +18,8 @@ export type EventWithStatus = EventType & {
 };
 
 interface EventContextType {
-  selectedEventId: number | null;
-  setSelectedEventId: (id: number | null) => void;
+  selectedEventId: string | null;
+  setSelectedEventId: (id: string | null) => void;
   events: EventWithStatus[];
   loading: boolean;
   refreshEvents: () => void;
@@ -35,8 +35,8 @@ function calculateEventStatus(event: EventType): EventStatus {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-  const dateDebut = new Date(event.dateDebut);
-  const dateFin = new Date(event.dateFin);
+  const dateDebut = new Date(event.dateDebut || event.startDate || "");
+  const dateFin = new Date(event.dateFin || event.endDate || "");
 
   // Normaliser les dates pour comparer uniquement les jours
   const startDate = new Date(
@@ -92,7 +92,7 @@ function sortEvents(events: EventWithStatus[]): EventWithStatus[] {
 }
 
 export function EventProvider({ children }: { children: ReactNode }) {
-  const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [events, setEvents] = useState<EventWithStatus[]>([]);
   const [loading, setLoading] = useState(true);
 

@@ -1,15 +1,16 @@
-use crate::db::{self, Point};
+use crate::db::{self};
+use crate::types::PointWithDetails;
 use crate::utils;
 use rust_xlsxwriter::{Color, Format, Workbook};
 use sqlx::Row;
 use tauri::AppHandle;
 
 #[tauri::command]
-pub async fn export_points_excel(app: AppHandle, event_id: Option<i64>) -> Result<(), String> {
-    let points: Vec<Point> = db::retrieve_data_by_event(&app, event_id).await?;
+pub async fn export_points_excel(app: AppHandle, event_id: Option<String>) -> Result<(), String> {
+    let points: Vec<PointWithDetails> = db::retrieve_data_by_event(&app, &event_id).await?;
     println!("📊 Export Excel : {} points récupérés", points.len());
 
-    let event_name = if let Some(eid) = event_id {
+    let event_name = if let Some(eid) = &event_id {
         let pool = db::get_db_pool(&app).await?;
         let row = sqlx::query("SELECT name FROM event WHERE id = ?")
             .bind(eid)
@@ -58,81 +59,39 @@ pub async fn export_points_excel(app: AppHandle, event_id: Option<i64>) -> Resul
         let row_event_name = if event_id.is_some() {
             event_name.clone()
         } else {
-            if !p.event_ids.is_empty() { "Lié" } else { "" }.to_string()
+            if p.event_id.is_some() { "Lié" } else { "" }.to_string()
         };
 
-        if !p.obstacles.is_empty() {
-            for obstacle in &p.obstacles {
-                worksheet
-                    .write_string(current_row, 0, &p.id)
-                    .map_err(|e| e.to_string())?;
-                worksheet
-                    .write_number(current_row, 1, p.x)
-                    .map_err(|e| e.to_string())?;
-                worksheet
-                    .write_number(current_row, 2, p.y)
-                    .map_err(|e| e.to_string())?;
+        // Version simplifiée : Point n'a plus de champ obstacles
+        worksheet
+            .write_string(current_row, 0, &p.id)
+            .map_err(|e| e.to_string())?;
+        worksheet
+            .write_number(current_row, 1, p.x)
+            .map_err(|e| e.to_string())?;
+        worksheet
+            .write_number(current_row, 2, p.y)
+            .map_err(|e| e.to_string())?;
+        worksheet
+            .write_string(current_row, 3, "")
+            .map_err(|e| e.to_string())?;
+        worksheet
+            .write_string(current_row, 4, "")
+            .map_err(|e| e.to_string())?;
+        worksheet
+            .write_number(current_row, 5, 0.0)
+            .map_err(|e| e.to_string())?;
+        worksheet
+            .write_number(current_row, 6, 0.0)
+            .map_err(|e| e.to_string())?;
+        worksheet
+            .write_number(current_row, 7, 0.0)
+            .map_err(|e| e.to_string())?;
+        worksheet
+            .write_string(current_row, 8, &row_event_name)
+            .map_err(|e| e.to_string())?;
 
-                let name = obstacle.name.as_deref().unwrap_or("");
-                let description = obstacle.description.as_deref().unwrap_or("");
-                let number = obstacle.number.unwrap_or(0) as f64;
-                let width = obstacle.width.unwrap_or(0.0);
-                let length = obstacle.length.unwrap_or(0.0);
-
-                worksheet
-                    .write_string(current_row, 3, name)
-                    .map_err(|e| e.to_string())?;
-                worksheet
-                    .write_string(current_row, 4, description)
-                    .map_err(|e| e.to_string())?;
-                worksheet
-                    .write_number(current_row, 5, number)
-                    .map_err(|e| e.to_string())?;
-                worksheet
-                    .write_number(current_row, 6, width)
-                    .map_err(|e| e.to_string())?;
-                worksheet
-                    .write_number(current_row, 7, length)
-                    .map_err(|e| e.to_string())?;
-
-                worksheet
-                    .write_string(current_row, 8, &row_event_name)
-                    .map_err(|e| e.to_string())?;
-
-                current_row += 1;
-            }
-        } else {
-            worksheet
-                .write_string(current_row, 0, &p.id)
-                .map_err(|e| e.to_string())?;
-            worksheet
-                .write_number(current_row, 1, p.x)
-                .map_err(|e| e.to_string())?;
-            worksheet
-                .write_number(current_row, 2, p.y)
-                .map_err(|e| e.to_string())?;
-
-            worksheet
-                .write_string(current_row, 3, "")
-                .map_err(|e| e.to_string())?;
-            worksheet
-                .write_string(current_row, 4, "")
-                .map_err(|e| e.to_string())?;
-            worksheet
-                .write_number(current_row, 5, 0.0)
-                .map_err(|e| e.to_string())?;
-            worksheet
-                .write_number(current_row, 6, 0.0)
-                .map_err(|e| e.to_string())?;
-            worksheet
-                .write_number(current_row, 7, 0.0)
-                .map_err(|e| e.to_string())?;
-            worksheet
-                .write_string(current_row, 8, &row_event_name)
-                .map_err(|e| e.to_string())?;
-
-            current_row += 1;
-        }
+        current_row += 1;
     }
 
     let (dir_path, file_name) = utils::create_file_name("xlsx".to_string());
