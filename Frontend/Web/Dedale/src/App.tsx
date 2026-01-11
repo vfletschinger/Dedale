@@ -10,6 +10,7 @@ import Map from "./components/Map";
 import Event from "./components/Events";
 import AdminForm from "./components/AdminForm";
 import Persons from "./components/Persons";
+import Planning from "./components/Planning";
 
 // Wrapper pour cacher une page tout en la gardant montée
 function PageWrapper({
@@ -145,8 +146,8 @@ function App() {
         <Navigation
           currentPage={currentPage}
           onNavigate={(page) => {
-            // Empêcher la navigation vers map, team, person ou data si aucun événement sélectionné
-            if (!selectedEventId && (page === "map" || page === "team" || page === "person" || page === "data")) {
+            // Empêcher la navigation vers map, team, person, data ou planning si aucun événement sélectionné
+            if (!selectedEventId && (page === "map" || page === "team" || page === "person" || page === "data" || page === "planning")) {
               alert("Veuillez sélectionner un événement avant d'accéder à cette page.");
               return;
             }
@@ -200,6 +201,13 @@ function App() {
           {hasVisited("data") && (
             <PageWrapper isVisible={currentPage === "data"}>
               <Data />
+            </PageWrapper>
+          )}
+
+          {/* Planning - kept mounted once visited */}
+          {selectedEventId && hasVisited("planning") && (
+            <PageWrapper isVisible={currentPage === "planning"}>
+              <Planning activeEventId={selectedEventId} />
             </PageWrapper>
           )}
         </div>

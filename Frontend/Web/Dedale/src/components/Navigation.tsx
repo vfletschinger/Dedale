@@ -15,6 +15,7 @@ const NAV_ITEMS: { key: PageKey; label: string }[] = [
   { key: "map", label: "Carte" },
   { key: "team", label: "Équipes" },
   { key: "person", label: "Personnes" },
+  { key: "planning", label: "Planning" },
   { key: "data", label: "Données" },
 ];
 

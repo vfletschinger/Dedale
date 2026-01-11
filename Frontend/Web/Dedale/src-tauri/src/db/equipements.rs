@@ -3,6 +3,7 @@ use crate::types::*;
 use sqlx::Row;
 use tauri::AppHandle;
 use uuid::Uuid;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 // ============================================
 // TYPES D'ÉQUIPEMENTS
@@ -343,14 +344,23 @@ pub async fn add_action(
 ) -> Result<String, String> {
     let pool = get_db_pool(&app).await?;
     let action_id = Uuid::new_v4().to_string();
+    
+    // Utiliser SQLite pour générer la timestamp au format ISO 8601
+    let scheduled_time: String = sqlx::query_scalar(
+        "SELECT strftime('%Y-%m-%dT%H:%M:%SZ', 'now')"
+    )
+    .fetch_one(&pool)
+    .await
+    .map_err(|e| e.to_string())?;
 
     sqlx::query(
-        "INSERT INTO action (id, team_id, equipement_id, type, is_done) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO action (id, team_id, equipement_id, type, scheduled_time, is_done) VALUES (?, ?, ?, ?, ?, ?)",
     )
     .bind(&action_id)
     .bind(&team_id)
     .bind(&equipement_id)
     .bind(&action_type)
+    .bind(&scheduled_time)
     .bind(false)
     .execute(&pool)
     .await
