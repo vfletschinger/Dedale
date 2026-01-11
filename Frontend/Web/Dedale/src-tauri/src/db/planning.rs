@@ -1,8 +1,8 @@
 use sqlx::Row;
-use tauri::AppHandle;
-use tauri::Manager;
 use std::fs::File;
 use std::io::Write;
+use tauri::AppHandle;
+use tauri::Manager;
 
 use crate::db::get_db_pool;
 
@@ -201,10 +201,7 @@ pub async fn export_planning_excel(
 
 /// Crée un PDF du planning
 #[tauri::command]
-pub async fn create_planning_pdf(
-    app: AppHandle,
-    event_id: Option<String>,
-) -> Result<(), String> {
+pub async fn create_planning_pdf(app: AppHandle, event_id: Option<String>) -> Result<(), String> {
     let pool = get_db_pool(&app).await?;
 
     // Récupérer les équipes et actions
@@ -213,7 +210,7 @@ pub async fn create_planning_pdf(
             r#"
             SELECT DISTINCT t.id, t.name
             FROM team t
-            JOIN team te ON te.team_id = t.id
+            JOIN team te ON te.id = t.id
             WHERE te.event_id = '{}'
             ORDER BY t.name ASC
         "#,
@@ -233,10 +230,7 @@ pub async fn create_planning_pdf(
         .await
         .map_err(|e| e.to_string())?;
 
-    let app_data = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| e.to_string())?;
+    let app_data = app.path().app_data_dir().map_err(|e| e.to_string())?;
 
     let pdf_path = app_data.join("planning.pdf");
 

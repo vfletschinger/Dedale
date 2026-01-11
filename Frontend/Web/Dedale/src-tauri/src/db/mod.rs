@@ -260,6 +260,14 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
     .await
     .map_err(|e| format!("Error creating action: {}", e))?;
 
+    sqlx::query(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_action_per_equipement 
+         ON action (equipement_id, type);",
+    )
+    .execute(&pool)
+    .await
+    .map_err(|e| format!("Error creating unique action index: {}", e))?;
+
     println!("[DB] Toutes les tables ont été synchronisées avec le diagramme ER.");
 
     Ok(pool)

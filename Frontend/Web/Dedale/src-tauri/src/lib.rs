@@ -51,6 +51,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             excel::export_points_excel,
             pdf::create_pdf,
+            pdf::create_team_mission_pdf,
             map::get_points,
             socket::start_server,
             socket::send_event_to_mobile,
