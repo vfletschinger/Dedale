@@ -1,8 +1,9 @@
 // Type pour les géométries de la DB
 export interface GeometryData {
-  id: number;
-  event_id: number;
+  id: string;
+  event_id: string;
   geom: string;
+  name?: string;
 }
 export interface Zone {
   id: string;
