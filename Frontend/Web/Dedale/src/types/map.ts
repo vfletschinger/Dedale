@@ -39,6 +39,7 @@ export interface MapPoint {
   id: string;
   x: number;
   y: number;
+  name?: string;
   event_id: string | null;
   status?: boolean;
   comment?: string;

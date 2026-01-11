@@ -14,132 +14,72 @@ export async function seedDatabase(db: SQLiteDatabase) {
       return;
     }
 
-    // 1. Seed events
+    // Helper to generate UUID
+    const generateUUID = () => {
+      return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        const v = c === "x" ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+      });
+    };
+
+    // 1. Seed events (avec UUIDs)
     console.log("Insertion des événements...");
     const events = [
       {
-        id: 1,
+        id: generateUUID(),
         name: "Marché de Noël 2025",
         description: "Marché de Noël de Strasbourg",
         dateDebut: "2025-11-22",
         dateFin: "2025-12-30",
         statut: "actif",
-        geometry: null,
       },
       {
-        id: 2,
+        id: generateUUID(),
         name: "Festival d'été Illkirch 2025",
         description: "Festival d'été à Illkirch-Graffenstaden",
         dateDebut: "2025-07-01",
         dateFin: "2025-07-15",
         statut: "passé",
-        geometry: null,
       },
       {
-        id: 3,
+        id: generateUUID(),
         name: "Fête de la Musique 2026",
         description: "Grande fête de la musique à Strasbourg",
         dateDebut: "2026-06-21",
         dateFin: "2026-06-21",
         statut: "planifié",
-        geometry: null,
       },
       {
-        id: 4,
+        id: generateUUID(),
         name: "!Marathon de Strasbourg 2025",
         description: "Course à pied à travers la ville",
         dateDebut: "2025-10-15",
         dateFin: "2025-10-15",
         statut: "passé",
-        geometry: null,
       },
       {
-        id: 5,
+        id: generateUUID(),
         name: "!Carnaval de Printemps 2026",
         description: "Défilé et festivités printanières",
         dateDebut: "2026-03-20",
         dateFin: "2026-03-22",
         statut: "planifié",
-        geometry: null,
       },
       {
-        id: 6,
+        id: generateUUID(),
         name: "!Festival du Film 2026",
         description: "Projections en plein air et avant-premières",
         dateDebut: "2026-08-10",
         dateFin: "2026-08-20",
         statut: "planifié",
-        geometry: null,
-      },
-      {
-        id: 7,
-        name: "!Foire Européenne 2025",
-        description: "Grande foire commerciale et culturelle",
-        dateDebut: "2025-09-01",
-        dateFin: "2025-09-15",
-        statut: "passé",
-        geometry: null,
-      },
-      {
-        id: 8,
-        name: "!Nuit des Musées 2026",
-        description: "Ouverture nocturne exceptionnelle des musées",
-        dateDebut: "2026-05-16",
-        dateFin: "2026-05-16",
-        statut: "planifié",
-        geometry: null,
-      },
-      {
-        id: 9,
-        name: "!Festival Jazz 2026",
-        description: "Concerts de jazz dans différents lieux de la ville",
-        dateDebut: "2026-07-05",
-        dateFin: "2026-07-12",
-        statut: "planifié",
-        geometry: null,
-      },
-      {
-        id: 10,
-        name: "!Salon du Livre 2025",
-        description: "Rencontres avec des auteurs et dédicaces",
-        dateDebut: "2025-11-10",
-        dateFin: "2025-11-12",
-        statut: "passé",
-        geometry: null,
-      },
-      {
-        id: 11,
-        name: "!Halloween Party 2025",
-        description: "Fête d'Halloween dans le centre-ville",
-        dateDebut: "2025-10-31",
-        dateFin: "2025-10-31",
-        statut: "passé",
-        geometry: null,
-      },
-      {
-        id: 12,
-        name: "!Réveillon du Nouvel An 2026",
-        description: "Célébration du passage à la nouvelle année",
-        dateDebut: "2025-12-31",
-        dateFin: "2026-01-01",
-        statut: "planifié",
-        geometry: null,
-      },
-      {
-        id: 13,
-        name: "!Journée Portes Ouvertes 2026",
-        description: "Découverte des institutions locales",
-        dateDebut: "2026-04-15",
-        dateFin: "2026-04-15",
-        statut: "planifié",
-        geometry: null,
       },
     ];
 
-    const eventIds: number[] = [];
+    const eventIds: string[] = [];
     events.forEach((event) => {
-      const result = db.runSync(
-        "INSERT INTO event (id, name, description, dateDebut, dateFin, statut, geometry) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      db.runSync(
+        "INSERT INTO event (id, name, description, dateDebut, dateFin, statut) VALUES (?, ?, ?, ?, ?, ?)",
         [
           event.id,
           event.name,
@@ -147,15 +87,14 @@ export async function seedDatabase(db: SQLiteDatabase) {
           event.dateDebut,
           event.dateFin,
           event.statut,
-          event.geometry,
         ]
       );
-      eventIds.push(result.lastInsertRowId);
+      eventIds.push(event.id);
     });
 
-    // 2. Seed obstacle_types
-    console.log("Insertion des types d'obstacles...");
-    const obstacleTypes = [
+    // 2. Seed equipement_types (anciennement obstacle_types)
+    console.log("Insertion des types d'équipements...");
+    const equipementTypes = [
       {
         id: 1,
         name: "Glissière 2m",
@@ -257,231 +196,149 @@ export async function seedDatabase(db: SQLiteDatabase) {
     ];
 
     const typeIds: number[] = [];
-    obstacleTypes.forEach((type) => {
+    equipementTypes.forEach((type) => {
       const result = db.runSync(
-        "INSERT INTO obstacle_type (id, name, description, width, length) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO equipement_type (id, name, description, width, length) VALUES (?, ?, ?, ?, ?)",
         [type.id, type.name, type.description, type.width, type.length]
       );
       typeIds.push(result.lastInsertRowId);
     });
 
-    // 3. Seed points (coordinates without event association yet)
+    // 3. Seed points avec event_id direct et UUIDs
     console.log("Insertion des points d'intérêt...");
     const pointsData = [
-      // Strasbourg points
-      { x: 7.7521, y: 48.5734 }, // Centre-ville Strasbourg
-      { x: 7.7475, y: 48.5708 }, // Quartier de la cathédrale
-      { x: 7.7601, y: 48.5745 }, // Place Kléber
-      { x: 7.755, y: 48.58 }, // Petite France
-      // Illkirch points
-      { x: 7.7189, y: 48.5297 }, // Centre Illkirch
-      { x: 7.7245, y: 48.532 }, // Parc de l'Ill
-      { x: 7.715, y: 48.528 }, // Zone commerciale
-      { x: 7.721, y: 48.5305 }, // Mairie Illkirch
-      { x: 7.7175, y: 48.5265 }, // Stade municipal
-      // Fête de la Musique 2026 points
-      { x: 7.75, y: 48.58 }, // Place de la République
-      { x: 7.755, y: 48.582 }, // Parc de l'Orangerie
-      { x: 7.748, y: 48.579 }, // Place Gutenberg
-    ];
-
-    const pointIds: number[] = [];
-    pointsData.forEach((point) => {
-      const result = db.runSync("INSERT INTO point (x, y) VALUES (?, ?)", [
-        point.x,
-        point.y,
-      ]);
-      pointIds.push(result.lastInsertRowId);
-    });
-
-    // 4. Create point-event associations (many-to-many)
-    console.log("Création des associations points-événements...");
-    const pointEventAssociations = [
-      // Strasbourg Marché de Noël (points 0-3)
-      { point_id: pointIds[0], event_id: eventIds[0] },
-      { point_id: pointIds[1], event_id: eventIds[0] },
-      { point_id: pointIds[2], event_id: eventIds[0] },
-      { point_id: pointIds[3], event_id: eventIds[0] },
-      // Illkirch Festival (points 4-8)
-      { point_id: pointIds[4], event_id: eventIds[1] },
-      { point_id: pointIds[5], event_id: eventIds[1] },
-      { point_id: pointIds[6], event_id: eventIds[1] },
-      { point_id: pointIds[7], event_id: eventIds[1] },
-      { point_id: pointIds[8], event_id: eventIds[1] },
-      // Fête de la Musique 2026 (points 9-11)
-      { point_id: pointIds[9], event_id: eventIds[2] },
-      { point_id: pointIds[10], event_id: eventIds[2] },
-      { point_id: pointIds[11], event_id: eventIds[2] },
-      // Exemple: un point peut être associé à plusieurs événements
-      // Point 2 (Place Kléber) est aussi utilisé pour la Fête de la Musique
-      { point_id: pointIds[2], event_id: eventIds[2] },
-    ];
-
-    pointEventAssociations.forEach((assoc) => {
-      db.runSync("INSERT INTO point_event (point_id, event_id) VALUES (?, ?)", [
-        assoc.point_id,
-        assoc.event_id,
-      ]);
-    });
-
-    // 5. Seed geometries for events (only for events with points, not starting with "!")
-    console.log("Insertion des géométries...");
-    const geometries = [
-      // Marché de Noël 2025 (event_id: eventIds[0]) - Grande zone englobant tout le centre de Strasbourg
+      // Strasbourg points pour Marché de Noël
       {
+        x: 7.7521,
+        y: 48.5734,
         event_id: eventIds[0],
-        wkt: "POLYGON((7.765 48.5775, 7.7641 48.5818, 7.7615 48.5855, 7.7576 48.5882, 7.7529 48.5895, 7.7479 48.5895, 7.7432 48.5882, 7.7393 48.5855, 7.7367 48.5818, 7.7358 48.5775, 7.7367 48.5732, 7.7393 48.5695, 7.7432 48.5668, 7.7479 48.5655, 7.7529 48.5655, 7.7576 48.5668, 7.7615 48.5695, 7.7641 48.5732, 7.765 48.5775))",
+        comment: "Stand central",
       },
-      // Marché de Noël 2025 - Zone de la cathédrale
       {
+        x: 7.7475,
+        y: 48.5708,
         event_id: eventIds[0],
-        wkt: "POLYGON((7.746 48.5805, 7.7505 48.5805, 7.7505 48.583, 7.746 48.583, 7.746 48.5805))",
+        comment: "Zone cathédrale",
       },
-      // Marché de Noël 2025 - Zone Place Kléber
+      { x: 7.7601, y: 48.5745, event_id: eventIds[0], comment: "Place Kléber" },
+      { x: 7.755, y: 48.58, event_id: eventIds[0], comment: "Petite France" },
+      // Illkirch points pour Festival d'été
       {
-        event_id: eventIds[0],
-        wkt: "POLYGON((7.7435 48.5835, 7.7485 48.5835, 7.7485 48.586, 7.7435 48.586, 7.7435 48.5835))",
-      },
-      // Marché de Noël 2025 - Zone Petite France
-      {
-        event_id: eventIds[0],
-        wkt: "POLYGON((7.7375 48.579, 7.7425 48.579, 7.74 48.582, 7.7375 48.579))",
-      },
-      // Marché de Noël 2025 - Parcours à travers Strasbourg
-      {
-        event_id: eventIds[0],
-        wkt: "LINESTRING(7.7405 48.5795, 7.7445 48.5815, 7.7475 48.5830, 7.7510 48.5845, 7.7545 48.5855, 7.7580 48.5840, 7.7605 48.5820, 7.7590 48.5785, 7.7565 48.5760, 7.7530 48.5745, 7.7495 48.5735, 7.7460 48.5750, 7.7430 48.5770)",
-      },
-      // Festival d'été Illkirch 2025 (event_id: eventIds[1]) - Zone du festival
-      {
+        x: 7.7189,
+        y: 48.5297,
         event_id: eventIds[1],
-        wkt: "POLYGON((7.715 48.528, 7.7245 48.532, 7.721 48.5305, 7.7175 48.5265, 7.715 48.528))",
+        comment: "Scène principale",
       },
-      // Fête de la Musique 2026 (event_id: eventIds[2]) - Zone des concerts
+      { x: 7.7245, y: 48.532, event_id: eventIds[1], comment: "Parc de l'Ill" },
       {
-        event_id: eventIds[2],
-        wkt: "POLYGON((7.748 48.579, 7.755 48.582, 7.75 48.58, 7.748 48.579))",
+        x: 7.715,
+        y: 48.528,
+        event_id: eventIds[1],
+        comment: "Zone food trucks",
       },
-      // Fête de la Musique 2026 - Parcours des animations
       {
-        event_id: eventIds[2],
-        wkt: "LINESTRING(7.748 48.579, 7.75 48.58, 7.755 48.582)",
+        x: 7.721,
+        y: 48.5305,
+        event_id: eventIds[1],
+        comment: "Accueil Mairie",
       },
+      {
+        x: 7.7175,
+        y: 48.5265,
+        event_id: eventIds[1],
+        comment: "Parking stade",
+      },
+      // Fête de la Musique 2026 points
+      { x: 7.75, y: 48.58, event_id: eventIds[2], comment: "Scène République" },
+      { x: 7.755, y: 48.582, event_id: eventIds[2], comment: "Orangerie" },
+      { x: 7.748, y: 48.579, event_id: eventIds[2], comment: "Gutenberg" },
     ];
 
-    geometries.forEach((geom) => {
-      db.runSync("INSERT INTO geometry (event_id, wkt) VALUES (?, ?)", [
-        geom.event_id,
-        geom.wkt,
-      ]);
-    });
-
-    // 6. Seed comments (for Strasbourg points)
-    console.log("Insertion des commentaires...");
-    const comments = [
-      {
-        point_id: pointIds[0],
-        value: "Zone très fréquentée, attention aux piétons",
-      },
-      { point_id: pointIds[0], value: "Passage étroit" },
-      { point_id: pointIds[1], value: "Belle vue sur la cathédrale" },
-      { point_id: pointIds[2], value: "Place principale du marché" },
-      { point_id: pointIds[3], value: "Quartier pittoresque" },
-      // Comments for Illkirch points
-      { point_id: pointIds[4], value: "Scène principale du festival" },
-      { point_id: pointIds[5], value: "Zone de restauration" },
-      { point_id: pointIds[6], value: "Parking disponible" },
-      // Comments for Fête de la Musique 2026 points
-      {
-        point_id: pointIds[9],
-        value: "Scène principale de la Fête de la Musique",
-      },
-      { point_id: pointIds[10], value: "Concerts en plein air" },
-      { point_id: pointIds[11], value: "Podium pour groupes locaux" },
-    ];
-
-    comments.forEach((comment) => {
-      db.runSync("INSERT INTO comment (point_id, value) VALUES (?, ?)", [
-        comment.point_id,
-        comment.value,
-      ]);
-    });
-
-    // 6. Seed pictures
-    console.log("Insertion des photos...");
-    const pictures = [
-      {
-        point_id: pointIds[0],
-        image:
-          "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAIAQMAAAD+wSzIAAAABlBMVEX///+/v7+jQ3Y5AAAADklEQVQI12P4AIX8EAgALgAD/aNpbtEAAAAASUVORK5CYII",
-      },
-      {
-        point_id: pointIds[1],
-        image:
-          "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAIAQMAAAD+wSzIAAAABlBMVEX///+/v7+jQ3Y5AAAADklEQVQI12P4AIX8EAgALgAD/aNpbtEAAAAASUVORK5CYII",
-      },
-      {
-        point_id: pointIds[2],
-        image:
-          "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAIAQMAAAD+wSzIAAAABlBMVEX///+/v7+jQ3Y5AAAADklEQVQI12P4AIX8EAgALgAD/aNpbtEAAAAASUVORK5CYII",
-      },
-      {
-        point_id: pointIds[4],
-        image:
-          "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAIAQMAAAD+wSzIAAAABlBMVEX///+/v7+jQ3Y5AAAADklEQVQI12P4AIX8EAgALgAD/aNpbtEAAAAASUVORK5CYII",
-      },
-      {
-        point_id: pointIds[6],
-        image:
-          "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAIAQMAAAD+wSzIAAAABlBMVEX///+/v7+jQ3Y5AAAADklEQVQI12P4AIX8EAgALgAD/aNpbtEAAAAASUVORK5CYII",
-      },
-    ];
-    pictures.forEach((picture) => {
-      db.runSync("INSERT INTO picture (point_id, image) VALUES (?, ?)", [
-        picture.point_id,
-        picture.image,
-      ]);
-    });
-
-    // 7. Seed obstacles
-    console.log("Insertion des obstacles...");
-    const obstacles = [
-      // Strasbourg obstacles
-      { point_id: pointIds[0], type_id: typeIds[0], nombre: 2 },
-      { point_id: pointIds[0], type_id: typeIds[4], nombre: 1 },
-      { point_id: pointIds[1], type_id: typeIds[2], nombre: 1 },
-      { point_id: pointIds[2], type_id: typeIds[1], nombre: 3 },
-      { point_id: pointIds[3], type_id: typeIds[3], nombre: 2 },
-      // Illkirch obstacles
-      { point_id: pointIds[4], type_id: typeIds[5], nombre: 10 },
-      { point_id: pointIds[5], type_id: typeIds[6], nombre: 8 },
-      { point_id: pointIds[6], type_id: typeIds[0], nombre: 5 },
-      { point_id: pointIds[7], type_id: typeIds[4], nombre: 3 },
-      { point_id: pointIds[8], type_id: typeIds[7], nombre: 4 },
-      // Fête de la Musique 2026 obstacles
-      { point_id: pointIds[9], type_id: typeIds[5], nombre: 15 },
-      { point_id: pointIds[10], type_id: typeIds[6], nombre: 12 },
-      { point_id: pointIds[11], type_id: typeIds[4], nombre: 6 },
-    ];
-
-    obstacles.forEach((obstacle) => {
+    const pointIds: string[] = [];
+    pointsData.forEach((point) => {
+      const pointId = generateUUID();
       db.runSync(
-        "INSERT INTO obstacle (point_id, type_id, number) VALUES (?, ?, ?)",
-        [obstacle.point_id, obstacle.type_id, obstacle.nombre]
+        "INSERT INTO point (id, event_id, x, y, comment) VALUES (?, ?, ?, ?, ?)",
+        [pointId, point.event_id, point.x, point.y, point.comment]
+      );
+      pointIds.push(pointId);
+    });
+
+    // 4. Seed parcours et zones pour les events (plus de table point_event ni geometry unique)
+    console.log("Insertion des parcours et zones...");
+
+    // Parcours pour Marché de Noël 2025
+    db.runSync("INSERT INTO parcours (id, event_id, wkt) VALUES (?, ?, ?)", [
+      generateUUID(),
+      eventIds[0],
+      "LINESTRING(7.7405 48.5795, 7.7445 48.5815, 7.7475 48.5830, 7.7510 48.5845, 7.7545 48.5855, 7.7580 48.5840, 7.7605 48.5820, 7.7590 48.5785, 7.7565 48.5760, 7.7530 48.5745, 7.7495 48.5735, 7.7460 48.5750, 7.7430 48.5770)",
+    ]);
+
+    // Zones pour Marché de Noël 2025
+    const marcheZones = [
+      "POLYGON((7.765 48.5775, 7.7641 48.5818, 7.7615 48.5855, 7.7576 48.5882, 7.7529 48.5895, 7.7479 48.5895, 7.7432 48.5882, 7.7393 48.5855, 7.7367 48.5818, 7.7358 48.5775, 7.7367 48.5732, 7.7393 48.5695, 7.7432 48.5668, 7.7479 48.5655, 7.7529 48.5655, 7.7576 48.5668, 7.7615 48.5695, 7.7641 48.5732, 7.765 48.5775))",
+      "POLYGON((7.746 48.5805, 7.7505 48.5805, 7.7505 48.583, 7.746 48.583, 7.746 48.5805))",
+      "POLYGON((7.7435 48.5835, 7.7485 48.5835, 7.7485 48.586, 7.7435 48.586, 7.7435 48.5835))",
+      "POLYGON((7.7375 48.579, 7.7425 48.579, 7.74 48.582, 7.7375 48.579))",
+    ];
+
+    marcheZones.forEach((wkt) => {
+      db.runSync("INSERT INTO zone (id, event_id, wkt) VALUES (?, ?, ?)", [
+        generateUUID(),
+        eventIds[0],
+        wkt,
+      ]);
+    });
+
+    // Zones et parcours pour Festival Illkirch
+    db.runSync("INSERT INTO zone (id, event_id, wkt) VALUES (?, ?, ?)", [
+      generateUUID(),
+      eventIds[1],
+      "POLYGON((7.715 48.528, 7.7245 48.532, 7.721 48.5305, 7.7175 48.5265, 7.715 48.528))",
+    ]);
+
+    // Zones pour Fête de la Musique
+    db.runSync("INSERT INTO zone (id, event_id, wkt) VALUES (?, ?, ?)", [
+      generateUUID(),
+      eventIds[2],
+      "POLYGON((7.748 48.579, 7.755 48.582, 7.75 48.58, 7.748 48.579))",
+    ]);
+
+    db.runSync("INSERT INTO parcours (id, event_id, wkt) VALUES (?, ?, ?)", [
+      generateUUID(),
+      eventIds[2],
+      "LINESTRING(7.748 48.579, 7.75 48.58, 7.755 48.582)",
+    ]);
+
+    // 5. Seed equipements (quelques exemples)
+    console.log("Insertion des équipements...");
+    const equipements = [
+      { point_id: pointIds[0], type_id: typeIds[0], quantity: 2 },
+      { point_id: pointIds[0], type_id: typeIds[4], quantity: 1 },
+      { point_id: pointIds[1], type_id: typeIds[2], quantity: 1 },
+      { point_id: pointIds[2], type_id: typeIds[1], quantity: 3 },
+      { point_id: pointIds[4], type_id: typeIds[5], quantity: 10 },
+      { point_id: pointIds[5], type_id: typeIds[6], quantity: 8 },
+    ];
+
+    equipements.forEach((equipement) => {
+      const equipementId = generateUUID();
+      db.runSync(
+        "INSERT INTO equipement (id, point_id, type_id, quantity) VALUES (?, ?, ?, ?)",
+        [
+          equipementId,
+          equipement.point_id,
+          equipement.type_id,
+          equipement.quantity,
+        ]
       );
     });
 
     console.log("Seeding terminé avec succès !");
     console.log(`   - ${events.length} événements`);
-    console.log(`   - ${obstacleTypes.length} types d'obstacles`);
+    console.log(`   - ${equipementTypes.length} types d'équipements`);
     console.log(`   - ${pointsData.length} points d'intérêt`);
-    console.log(
-      `   - ${pointEventAssociations.length} associations point-événement`
-    );
-    console.log(`   - ${geometries.length} géométries`);
-    console.log(`   - ${comments.length} commentaires`);
-    console.log(`   - ${pictures.length} photos`);
-    console.log(`   - ${obstacles.length} obstacles`);
+    console.log(`   - ${equipements.length} équipements`);
   } catch (error) {
     console.error("Erreur lors du seeding:", error);
     throw error;
@@ -493,22 +350,76 @@ export function clearDatabase(db: SQLiteDatabase): void {
   console.log("Suppression de toutes les données...");
 
   try {
+    // Helper function to check if table exists
+    const tableExists = (tableName: string): boolean => {
+      const result = db.getFirstSync<{ name: string }>(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+        [tableName]
+      );
+      return !!result;
+    };
+
     // Delete in order of dependencies (foreign keys)
-    db.execSync("DELETE FROM obstacle");
-    db.execSync("DELETE FROM picture");
-    db.execSync("DELETE FROM comment");
-    db.execSync("DELETE FROM point_event");
-    db.execSync("DELETE FROM point");
-    db.execSync("DELETE FROM obstacle_type");
+    // Handle both old and new schema
+    if (tableExists("equipement")) {
+      db.execSync("DELETE FROM equipement");
+    }
+    if (tableExists("obstacle")) {
+      db.execSync("DELETE FROM obstacle");
+    }
 
-    // Check if event and session tables exist before deleting
-    const eventTableExists = db.getFirstSync<{ name: string }>(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name='event'"
-    );
+    if (tableExists("picture")) {
+      db.execSync("DELETE FROM picture");
+    }
 
-    if (eventTableExists) {
+    if (tableExists("comment")) {
+      db.execSync("DELETE FROM comment");
+    }
+
+    if (tableExists("point_event")) {
+      db.execSync("DELETE FROM point_event");
+    }
+
+    if (tableExists("point")) {
+      db.execSync("DELETE FROM point");
+    }
+
+    if (tableExists("equipement_type")) {
+      db.execSync("DELETE FROM equipement_type");
+    }
+    if (tableExists("obstacle_type")) {
+      db.execSync("DELETE FROM obstacle_type");
+    }
+
+    // New schema: parcours and zone
+    if (tableExists("parcours")) {
+      db.execSync("DELETE FROM parcours");
+    }
+    if (tableExists("zone")) {
+      db.execSync("DELETE FROM zone");
+    }
+
+    // Old schema: geometry
+    if (tableExists("geometry")) {
       db.execSync("DELETE FROM geometry");
+    }
+
+    // Team system
+    if (tableExists("member")) {
+      db.execSync("DELETE FROM member");
+    }
+    if (tableExists("person")) {
+      db.execSync("DELETE FROM person");
+    }
+    if (tableExists("team")) {
+      db.execSync("DELETE FROM team");
+    }
+
+    if (tableExists("session")) {
       db.execSync("DELETE FROM session");
+    }
+
+    if (tableExists("event")) {
       db.execSync("DELETE FROM event");
     }
 

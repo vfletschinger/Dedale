@@ -10,6 +10,14 @@ import { InterestPointsType } from "../types/database";
 import PointCard from "../components/PointCard";
 import DragList, { DragListRenderItemInfo } from "react-native-draglist";
 
+// Fonction utilitaire exportée pour les tests
+export function reorderList<T>(list: T[], fromIndex: number, toIndex: number): T[] {
+  const copy = [...list];
+  const [moved] = copy.splice(fromIndex, 1);
+  copy.splice(toIndex, 0, moved);
+  return copy;
+}
+
 interface CreateRouteProps {
   points?: InterestPointsType[];
 }

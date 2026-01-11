@@ -15,6 +15,48 @@ import { useEvent } from "../context/EventContext";
 import { usePoints } from "../context/PointsContext";
 import { useGeometries } from "../context/GeometriesContext";
 
+// Fonction utilitaire exportée pour les tests
+export const parseWKT = (wkt: string) => {
+  if (!wkt || wkt.trim() === '') return null;
+  
+  const trimmed = wkt.trim();
+
+  if (trimmed.startsWith("POLYGON")) {
+    const coordsMatch = trimmed.match(/\(\((.+?)\)\)/);
+    if (!coordsMatch) return null;
+
+    const coords = coordsMatch[1].split(",").map((pair) => {
+      const [lng, lat] = pair.trim().split(" ").map(Number);
+      return { latitude: lat, longitude: lng };
+    });
+    return { type: "polygon", coordinates: coords };
+  }
+
+  if (trimmed.startsWith("LINESTRING")) {
+    const coordsMatch = trimmed.match(/\((.+?)\)/);
+    if (!coordsMatch) return null;
+
+    const coords = coordsMatch[1].split(",").map((pair) => {
+      const [lng, lat] = pair.trim().split(" ").map(Number);
+      return { latitude: lat, longitude: lng };
+    });
+    return { type: "linestring", coordinates: coords };
+  }
+
+  if (trimmed.startsWith("POINT")) {
+    const coordsMatch = trimmed.match(/\((.+?)\)/);
+    if (!coordsMatch) return null;
+
+    const [lng, lat] = coordsMatch[1].trim().split(" ").map(Number);
+    return {
+      type: "point",
+      coordinates: [{ latitude: lat, longitude: lng }],
+    };
+  }
+
+  return null;
+};
+
 interface OfflineMapProps {
   initialRegion?: Region;
   onMapPress?: (event: MapPressEvent) => void;
@@ -153,45 +195,6 @@ export default function OfflineMap({
     initialize();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const parseWKT = (wkt: string) => {
-    const trimmed = wkt.trim();
-
-    if (trimmed.startsWith("POLYGON")) {
-      const coordsMatch = trimmed.match(/\(\((.+?)\)\)/);
-      if (!coordsMatch) return null;
-
-      const coords = coordsMatch[1].split(",").map((pair) => {
-        const [lng, lat] = pair.trim().split(" ").map(Number);
-        return { latitude: lat, longitude: lng };
-      });
-      return { type: "polygon", coordinates: coords };
-    }
-
-    if (trimmed.startsWith("LINESTRING")) {
-      const coordsMatch = trimmed.match(/\((.+?)\)/);
-      if (!coordsMatch) return null;
-
-      const coords = coordsMatch[1].split(",").map((pair) => {
-        const [lng, lat] = pair.trim().split(" ").map(Number);
-        return { latitude: lat, longitude: lng };
-      });
-      return { type: "linestring", coordinates: coords };
-    }
-
-    if (trimmed.startsWith("POINT")) {
-      const coordsMatch = trimmed.match(/\((.+?)\)/);
-      if (!coordsMatch) return null;
-
-      const [lng, lat] = coordsMatch[1].trim().split(" ").map(Number);
-      return {
-        type: "point",
-        coordinates: [{ latitude: lat, longitude: lng }],
-      };
-    }
-
-    return null;
-  };
 
   const centerOnUserLocation = () => {
     if (mapRef.current && currentRegion) {
