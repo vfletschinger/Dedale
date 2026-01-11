@@ -1,5 +1,5 @@
-import { invoke } from "@tauri-apps/api/core";
-import type { Event, EventInput, EventGeometryInput } from "../types/event";
+import { invoke } from '@tauri-apps/api/core';
+import type { Event, EventInput, EventGeometryInput } from '../types/event';
 
 // ========== SERVICES POUR LES ÉVÉNEMENTS ==========
 
@@ -19,53 +19,48 @@ export async function fetchEvents(): Promise<Event[]> {
  * Récupère un événement par son ID avec ses géométries
  */
 export async function fetchEventById(eventId: string): Promise<Event | null> {
-  try {
-    return await invoke("fetch_event_by_id", { eventId });
-  } catch (error) {
-    console.error("Erreur lors de la récupération de l'événement:", error);
-    throw new Error(`Impossible de récupérer l'événement ${eventId}: ${error}`);
-  }
+    try {
+        return await invoke('fetch_event_by_id', { eventId });
+    } catch (error) {
+        console.error('Erreur lors de la récupération de l\'événement:', error);
+        throw new Error(`Impossible de récupérer l'événement ${eventId}: ${error}`);
+    }
 }
 
 /**
  * Crée un nouvel événement
  */
 export async function createEvent(event: EventInput): Promise<string> {
-  try {
-    return await invoke("create_event", { event });
-  } catch (error) {
-    console.error("Erreur lors de la création de l'événement:", error);
-    throw new Error(`Impossible de créer l'événement: ${error}`);
-  }
+    try {
+        return await invoke('create_event', { event });
+    } catch (error) {
+        console.error('Erreur lors de la création de l\'événement:', error);
+        throw new Error(`Impossible de créer l'événement: ${error}`);
+    }
 }
 
 /**
  * Met à jour un événement existant
  */
-export async function updateEvent(
-  eventId: string,
-  event: EventInput,
-): Promise<void> {
-  try {
-    await invoke("update_event", { eventId, event });
-  } catch (error) {
-    console.error("Erreur lors de la mise à jour de l'événement:", error);
-    throw new Error(
-      `Impossible de mettre à jour l'événement ${eventId}: ${error}`,
-    );
-  }
+export async function updateEvent(eventId: string, event: EventInput): Promise<void> {
+    try {
+        await invoke('update_event', { eventId, event });
+    } catch (error) {
+        console.error('Erreur lors de la mise à jour de l\'événement:', error);
+        throw new Error(`Impossible de mettre à jour l'événement ${eventId}: ${error}`);
+    }
 }
 
 /**
  * Supprime un événement
  */
 export async function deleteEvent(eventId: string): Promise<void> {
-  try {
-    await invoke("delete_event", { eventId });
-  } catch (error) {
-    console.error("Erreur lors de la suppression de l'événement:", error);
-    throw new Error(`Impossible de supprimer l'événement ${eventId}: ${error}`);
-  }
+    try {
+        await invoke('delete_event', { eventId });
+    } catch (error) {
+        console.error('Erreur lors de la suppression de l\'événement:', error);
+        throw new Error(`Impossible de supprimer l'événement ${eventId}: ${error}`);
+    }
 }
 
 // ========== SERVICES POUR LES GÉOMÉTRIES D'ÉVÉNEMENTS ==========
@@ -120,17 +115,15 @@ export async function deleteEventGeometry(geometryId: string): Promise<void> {
 /**
  * Parse les propriétés de style d'une géométrie (JSON)
  */
-export function parseStyleProperties(
-  stylePropertiesJson?: string,
-): Record<string, unknown> | null {
-  if (!stylePropertiesJson) return null;
+export function parseStyleProperties(stylePropertiesJson?: string): Record<string, unknown> | null {
+    if (!stylePropertiesJson) return null;
 
-  try {
-    return JSON.parse(stylePropertiesJson);
-  } catch (error) {
-    console.error("Erreur lors du parsing des propriétés de style:", error);
-    return null;
-  }
+    try {
+        return JSON.parse(stylePropertiesJson);
+    } catch (error) {
+        console.error('Erreur lors du parsing des propriétés de style:', error);
+        return null;
+    }
 }
 
 /**
@@ -145,40 +138,35 @@ export function stringifyStyleProperties(
 /**
  * Génère une couleur par défaut pour un type de géométrie
  */
-export function getDefaultColorForGeometryType(geometryTypeId: string): string {
-  const colorMap: Record<string, string> = {
-    "1": "#4CAF50", // Zone de couverture - Vert
-    "2": "#2196F3", // Tracé de course - Bleu
-    "3": "#F44336", // Zone interdite - Rouge
-    "4": "#FF9800", // Zone de sécurité - Orange
-    "5": "#9C27B0", // Point de contrôle - Violet
-    "6": "#00BCD4", // Zone d'accueil public - Cyan
-    "7": "#FFEB3B", // Ligne de départ/arrivée - Jaune
-    "8": "#795548", // Zone logistique - Marron
-  };
+export function getDefaultColorForGeometryType(geometryTypeId: number): string {
+    const colorMap: Record<number, string> = {
+        1: '#4CAF50', // Zone de couverture - Vert
+        2: '#2196F3', // Tracé de course - Bleu
+        3: '#F44336', // Zone interdite - Rouge
+        4: '#FF9800', // Zone de sécurité - Orange
+        5: '#9C27B0', // Point de contrôle - Violet
+        6: '#00BCD4', // Zone d'accueil public - Cyan
+        7: '#FFEB3B', // Ligne de départ/arrivée - Jaune
+        8: '#795548', // Zone logistique - Marron
+    };
 
-  return colorMap[geometryTypeId] || "#000000";
+    return colorMap[geometryTypeId] || '#000000';
 }
 
 /**
  * Valide qu'une géométrie WKT est correcte (basique)
  */
 export function validateWKT(wkt: string): boolean {
-  if (!wkt || wkt.trim().length === 0) {
-    return false;
-  }
+    if (!wkt || wkt.trim().length === 0) {
+        return false;
+    }
 
-  // Vérifications basiques pour les formats WKT courants
-  const wktUpper = wkt.trim().toUpperCase();
-  const validTypes = [
-    "POINT",
-    "LINESTRING",
-    "POLYGON",
-    "MULTIPOINT",
-    "MULTILINESTRING",
-    "MULTIPOLYGON",
-    "GEOMETRYCOLLECTION",
-  ];
+    // Vérifications basiques pour les formats WKT courants
+    const wktUpper = wkt.trim().toUpperCase();
+    const validTypes = [
+        'POINT', 'LINESTRING', 'POLYGON', 'MULTIPOINT',
+        'MULTILINESTRING', 'MULTIPOLYGON', 'GEOMETRYCOLLECTION'
+    ];
 
-  return validTypes.some((type) => wktUpper.startsWith(type));
+    return validTypes.some(type => wktUpper.startsWith(type));
 }

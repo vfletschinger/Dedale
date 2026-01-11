@@ -297,3 +297,78 @@ pub async fn update_equipement(
     println!("[DB] ✅ Équipement {} mis à jour", equipement_id);
     Ok(())
 }
+
+#[tauri::command]
+pub async fn fetch_actions(app: AppHandle, event_id: String) -> Result<Vec<Action>, String> {
+    let pool = get_db_pool(&app).await?;
+
+    let rows = sqlx::query(
+        "SELECT a.id, a.team_id, a.equipement_id, a.type, a.scheduled_time, a.is_done
+         FROM action a
+         JOIN equipement e ON a.equipement_id = e.id
+         WHERE e.event_id = ?
+         ORDER BY a.scheduled_time DESC",
+    )
+    .bind(&event_id)
+    .fetch_all(&pool)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let actions: Vec<Action> = rows
+        .into_iter()
+        .map(|row| Action {
+            id: row.get("id"),
+            team_id: row.get("team_id"),
+            equipement_id: row.get("equipement_id"),
+            action_type: row.get("type"),
+            scheduled_time: row.get("scheduled_time"),
+            is_done: row.get("is_done"),
+        })
+        .collect();
+
+    println!(
+        "[DB] 📋 {} action(s) récupérée(s) pour l'événement {}",
+        actions.len(),
+        event_id
+    );
+    Ok(actions)
+}
+
+#[tauri::command]
+pub async fn add_action(
+    app: AppHandle,
+    team_id: String,
+    equipement_id: String,
+    action_type: String,
+) -> Result<String, String> {
+    let pool = get_db_pool(&app).await?;
+    let action_id = Uuid::new_v4().to_string();
+
+    sqlx::query(
+        "INSERT INTO action (id, team_id, equipement_id, type, is_done) VALUES (?, ?, ?, ?, ?)",
+    )
+    .bind(&action_id)
+    .bind(&team_id)
+    .bind(&equipement_id)
+    .bind(&action_type)
+    .bind(false)
+    .execute(&pool)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(action_id)
+}
+
+#[tauri::command]
+pub async fn delete_action(app: AppHandle, action_id: String) -> Result<(), String> {
+    let pool = get_db_pool(&app).await?;
+
+    sqlx::query("DELETE FROM action WHERE id = ?")
+        .bind(&action_id)
+        .execute(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    println!("[DB] 🗑️ Action {} supprimée", action_id);
+    Ok(())
+}

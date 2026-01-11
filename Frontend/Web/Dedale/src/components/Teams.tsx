@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useState, useEffect, useMemo, useCallback } from "react";
-import TeamDetails, { TeamDetailData, Person, Event } from "./TeamDetails";
+import TeamDetails, { TeamDetailData, Person, Event, EquipementAction } from "./TeamDetails";
 import CreateTeam from "./CreateTeam";
 import { listen } from "@tauri-apps/api/event";
 import MultiRangeSlider from "./MultiRangeSlider";
@@ -115,13 +115,34 @@ function Teams({ activeEventId }: { activeEventId: string }) {
     teamId: string
   ): Promise<TeamDetailData> => {
     if (detailsCache[teamId]) return detailsCache[teamId];
-    const [members, events] = await Promise.all([
-      invoke<Person[]>("fetch_team_members", { teamId }),
-      invoke<Event[]>("fetch_team_events", { teamId }),
-    ]);
-    const data = { members, events };
-    setDetailsCache((prev) => ({ ...prev, [teamId]: data }));
-    return data;
+
+    try {
+      const [members, events, rawActions] = await Promise.all([
+        invoke<Person[]>("fetch_team_members", { teamId }),
+        invoke<Event[]>("fetch_team_events", { teamId }),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        invoke<any[]>("fetch_team_actions", { teamId }),
+      ]);
+
+      const actions: EquipementAction[] = rawActions.map(item => ({
+        ...item.equipement,
+        action_id: item.action_id,
+        action_type: item.action_type,
+        event_id: item.event_id
+      }));
+
+      const data: TeamDetailData = {
+        members,
+        events,
+        actions
+      };
+
+      setDetailsCache(prev => ({ ...prev, [teamId]: data }));
+      return data;
+    } catch (error) {
+      console.error("Failed to fetch team details:", error);
+      throw error;
+    }
   };
 
   const handleMouseEnter = (teamId: string) => {
@@ -178,6 +199,7 @@ function Teams({ activeEventId }: { activeEventId: string }) {
             onClose={() => setSelectedTeamData(null)}
             onDelete={handleTeamDeleted}
             onMemberClick={(person) => setViewingPerson(person)}
+            activeEventId={activeEventId}
           />
           <div
             className="absolute inset-0 -z-10"

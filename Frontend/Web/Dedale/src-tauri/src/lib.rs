@@ -108,7 +108,11 @@ pub fn run() {
             db::create_equipement,
             db::fetch_equipements_for_event,
             db::delete_equipement,
-            db::update_equipement,
+            db::update_equipement,     
+            db::add_action,
+            db::fetch_actions,
+            db::delete_action,
+            db::fetch_team_actions,
             // Géocodage local
             geocoding::search_address,
         ])
