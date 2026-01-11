@@ -311,6 +311,12 @@ const QRCodeScanner = ({
           }
         );
 
+        // Configurer le callback de fermeture
+        client.setOnClose(() => {
+          console.log("🚪 Connexion fermée par le serveur");
+          handleCloseConnection();
+        });
+
         client.setOnResponse((response: WebSocketResponse) => {
           console.log("📨 Réponse serveur:", response);
           if (response.code === 3) {
@@ -376,6 +382,12 @@ const QRCodeScanner = ({
             setTransferStatus(`Erreur: ${error}`);
           }
         };
+
+        // Configurer le callback de fermeture
+        client.setOnClose(() => {
+          console.log("🚪 Connexion fermée par le serveur");
+          handleCloseConnection();
+        });
 
         client
           .connect(onEventsReceived)

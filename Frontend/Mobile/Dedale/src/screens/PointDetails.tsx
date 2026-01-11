@@ -347,7 +347,7 @@ export default function PointDetails() {
 
         <View className="p-4">
           <Text className="text-3xl font-bold mb-4">
-            Point #{shortId(pointData.point.id)}
+            {pointData.point.name || `Point #${shortId(pointData.point.id)}`}
           </Text>
 
           {/* Coordonnées */}
@@ -378,7 +378,10 @@ export default function PointDetails() {
                     latitude: pointData.point.y,
                     longitude: pointData.point.x,
                   }}
-                  title={`Point #${shortId(pointData.point.id)}`}
+                  title={
+                    pointData.point.name ||
+                    `Point #${shortId(pointData.point.id)}`
+                  }
                 />
               </MapView>
             </View>

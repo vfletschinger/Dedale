@@ -147,7 +147,7 @@ pub struct Person {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Picture {
-    pub id: String,
+    pub id: i64, // INTEGER PRIMARY KEY dans la base SQLite
     pub point_id: Option<String>,
     pub image: Option<String>,
 }

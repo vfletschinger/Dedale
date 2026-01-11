@@ -20,7 +20,9 @@ class WebSocketClient {
   private onFinishedCallback?: () => void;
   private onErrorCallback?: (error: string) => void;
   private onLoadingChangeCallback?: (isLoading: boolean) => void;
+  private onCloseCallback?: () => void;
   private finishedSuccessfully: boolean = false;
+  private expectedClose: boolean = false;
   private onMessageCallback?: (
     events: (EventType | TransferEventType)[]
   ) => void;
@@ -144,6 +146,12 @@ class WebSocketClient {
                 break;
               case "goodbye":
                 console.log("👋 Serveur a fermé la connexion");
+                this.expectedClose = true;
+                if (this.onCloseCallback) {
+                  this.onCloseCallback();
+                }
+                // Ne pas appeler ws.close() ici, le serveur ferme déjà la connexion
+                // L'événement onclose sera déclenché automatiquement
                 break;
               default:
                 console.log("🤔 Type de message inconnu:", data.type);
@@ -196,10 +204,15 @@ class WebSocketClient {
       };
 
       this.ws.onerror = (e: Event) => {
-        console.error("❌ Erreur WebSocket:", e);
+        // Ne pas traiter comme erreur si on attend la fermeture
+        if (!this.expectedClose) {
+          console.error("❌ Erreur WebSocket - Type:", e.type);
+        }
         this.isConnected = false;
         this.setLoading(false);
-        reject("Erreur de connexion WebSocket");
+        if (!this.expectedClose) {
+          reject("Erreur de connexion WebSocket");
+        }
       };
 
       this.ws.onclose = (e: CloseEvent) => {
@@ -213,15 +226,15 @@ class WebSocketClient {
             this.isConnected = false;
             return; // Pas d'erreur pour les fermetures normales
           case 1006:
-            console.log(
-              "❌ Fermeture anormale - Problème de connexion/serveur"
-            );
-            // Ne pas traiter comme une erreur si on a déjà reçu "fini"
-            if (this.finishedSuccessfully) {
-              console.log("ℹ️ Fermeture après succès - pas d'erreur");
+            // Ne pas traiter comme une erreur si on attend la fermeture ou si terminé avec succès
+            if (this.expectedClose || this.finishedSuccessfully) {
+              console.log("ℹ️ Fermeture normale après goodbye/succès");
               this.isConnected = false;
               return;
             }
+            console.log(
+              "❌ Fermeture anormale - Problème de connexion/serveur"
+            );
             errorMessage =
               "Connexion perdue - Vérifiez que l'application Tauri est démarrée";
             break;
@@ -238,6 +251,11 @@ class WebSocketClient {
         this.isConnected = false;
         this.setLoading(false);
 
+        // Appeler le callback de fermeture
+        if (this.onCloseCallback) {
+          this.onCloseCallback();
+        }
+
         // Déclencher l'erreur seulement si nécessaire
         if (this.onErrorCallback && errorMessage) {
           this.onErrorCallback(errorMessage);
@@ -251,6 +269,13 @@ class WebSocketClient {
    */
   public setOnResponse(callback: (response: WebSocketResponse) => void): void {
     this.onResponseCallback = callback;
+  }
+
+  /**
+   * Définit le callback pour la fermeture de la connexion.
+   */
+  public setOnClose(callback: () => void): void {
+    this.onCloseCallback = callback;
   }
 
   /**

@@ -20,7 +20,7 @@ function Data() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<{
-    type: "success" | "error";
+    type: "success" | "error" | "info";
     text: string;
   } | null>(null);
 
@@ -40,14 +40,21 @@ function Data() {
 
   // Écouter l'événement de connexion mobile
   useEffect(() => {
-    const unlisten = listen("mobile-connected", () => {
+    const unlistenConnect = listen("mobile-connected", () => {
       console.log("📱 Mobile connecté !");
       setTransferPhase("connected");
       setMessage({ type: "success", text: "Mobile connecté !" });
     });
 
+    const unlistenDisconnect = listen("mobile-disconnected", () => {
+      console.log("👋 Mobile déconnecté !");
+      setTransferPhase("idle");
+      setMessage({ type: "info", text: "Mobile déconnecté" });
+    });
+
     return () => {
-      unlisten.then((fn) => fn());
+      unlistenConnect.then((fn) => fn());
+      unlistenDisconnect.then((fn) => fn());
     };
   }, []);
 
@@ -169,6 +176,15 @@ function Data() {
   }, []);
 
   const terminateTransfer = useCallback(async () => {
+    try {
+      // Envoyer le message de fermeture au mobile
+      await invoke("terminate_server");
+      console.log("✅ Serveur fermé, message envoyé au mobile");
+    } catch (err) {
+      console.error("Erreur fermeture serveur:", err);
+      // Continuer même en cas d'erreur
+    }
+
     setQrCodeBase64(null);
     setTransferPhase("idle");
     setSentEventIds(new Set());
@@ -192,18 +208,26 @@ function Data() {
     type,
     text,
   }: {
-    type: "success" | "error";
+    type: "success" | "error" | "info";
     text: string;
   }) => {
     const classes =
       type === "success"
         ? "bg-green-100 border-green-500 text-green-700"
+        : type === "info"
+        ? "bg-blue-100 border-blue-500 text-blue-700"
         : "bg-red-100 border-red-500 text-red-700";
+    const title =
+      type === "success"
+        ? "Succès"
+        : type === "info"
+        ? "Information"
+        : "Erreur";
     return (
       <div
         className={`p-4 border-l-4 ${classes} rounded-lg shadow-inner mt-4 w-full max-w-lg mx-auto`}
       >
-        <p className="font-bold">{type === "success" ? "Succès" : "Erreur"}</p>
+        <p className="font-bold">{title}</p>
         <p className="text-sm break-all">{text}</p>
       </div>
     );
