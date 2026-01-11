@@ -15,7 +15,7 @@ pub async fn fetch_geometries_for_event(
     let mut geometries: Vec<Geometry> = Vec::new();
 
     // 1. Récupérer les points (géométrie POINT)
-    let point_rows = sqlx::query("SELECT id, event_id, x, y FROM point WHERE event_id = ?")
+    let point_rows = sqlx::query("SELECT id, event_id, x, y, name FROM point WHERE event_id = ?")
         .bind(&event_id)
         .fetch_all(&pool)
         .await
@@ -31,7 +31,7 @@ pub async fn fetch_geometries_for_event(
             event_id: row.get("event_id"),
             geom: wkt,
             geom_type: "point".to_string(),
-            name: None,
+            name: row.get("name"),
         });
     }
 

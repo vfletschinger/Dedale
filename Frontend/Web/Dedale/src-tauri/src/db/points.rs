@@ -72,9 +72,10 @@ pub async fn fetch_points(
 #[tauri::command]
 pub async fn update_point(app: AppHandle, point: Point) -> Result<Point, String> {
     let pool = get_db_pool(&app).await?;
-    sqlx::query("UPDATE point SET x = ?, y = ?, comment = ?, type = ?, status = ?, event_id = ? WHERE id = ?")
+    sqlx::query("UPDATE point SET x = ?, y = ?, name = ?, comment = ?, type = ?, status = ?, event_id = ? WHERE id = ?")
         .bind(point.x)
         .bind(point.y)
+        .bind(&point.name)
         .bind(&point.comment)
         .bind(&point.r#type)
         .bind(point.status)

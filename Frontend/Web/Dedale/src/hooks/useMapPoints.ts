@@ -276,12 +276,12 @@ export function useMapPoints(
     if (map.isStyleLoaded()) {
       initializeMapResources();
     } else {
-      map.once('style.load', initializeMapResources);
+      map.once('load', initializeMapResources);
     }
 
     // Cleanup : on retire l'écouteur si le composant est démonté avant le chargement
     return () => {
-      map.off('style.load', initializeMapResources);
+      map.off('load', initializeMapResources);
     };
 
   }, [map, selectedEventId]); // Ajouter selectedEventId aux dépendances
