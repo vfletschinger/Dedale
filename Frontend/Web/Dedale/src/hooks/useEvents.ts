@@ -16,23 +16,23 @@ export interface UseEventsReturn {
     events: Event[];
     selectedEvent: Event | null;
     geometryTypes: GeometryType[];
-    
+
     // États de chargement et d'erreur
     isLoading: boolean;
     error: string | null;
-    
+
     // Actions pour les événements
     loadEvents: () => Promise<void>;
-    selectEvent: (eventId: number) => Promise<void>;
+    selectEvent: (eventId: string) => Promise<void>;
     addEvent: (event: EventInput) => Promise<Event | null>;
-    editEvent: (eventId: number, event: EventInput) => Promise<void>;
-    removeEvent: (eventId: number) => Promise<void>;
-    
+    editEvent: (eventId: string, event: EventInput) => Promise<void>;
+    removeEvent: (eventId: string) => Promise<void>;
+
     // Actions pour les géométries
     addGeometry: (geometry: EventGeometryInput) => Promise<void>;
     editGeometry: (geometryId: number, geometry: EventGeometryInput) => Promise<void>;
     removeGeometry: (geometryId: number) => Promise<void>;
-    
+
     // Utilitaires
     clearError: () => void;
     clearSelection: () => void;
@@ -65,7 +65,7 @@ export function useEvents(): UseEventsReturn {
     }, []);
 
     // Sélectionner un événement
-    const selectEvent = useCallback(async (eventId: number) => {
+    const selectEvent = useCallback(async (eventId: string) => {
         setError(null);
         try {
             const event = await fetchEventById(eventId);
@@ -83,7 +83,7 @@ export function useEvents(): UseEventsReturn {
         try {
             const eventId = await createEvent(event);
             await loadEvents();
-            
+
             // Retourner le nouvel événement créé
             const newEvent = await fetchEventById(eventId);
             return newEvent;
@@ -96,12 +96,12 @@ export function useEvents(): UseEventsReturn {
     }, [loadEvents]);
 
     // Modifier un événement
-    const editEvent = useCallback(async (eventId: number, event: EventInput) => {
+    const editEvent = useCallback(async (eventId: string, event: EventInput) => {
         setError(null);
         try {
             await updateEvent(eventId, event);
             await loadEvents();
-            
+
             // Recharger l'événement sélectionné s'il s'agit du même
             if (selectedEvent?.id === eventId) {
                 await selectEvent(eventId);
@@ -114,12 +114,12 @@ export function useEvents(): UseEventsReturn {
     }, [loadEvents, selectedEvent, selectEvent]);
 
     // Supprimer un événement
-    const removeEvent = useCallback(async (eventId: number) => {
+    const removeEvent = useCallback(async (eventId: string) => {
         setError(null);
         try {
             await deleteEvent(eventId);
             await loadEvents();
-            
+
             // Désélectionner si c'était l'événement sélectionné
             if (selectedEvent?.id === eventId) {
                 setSelectedEvent(null);
@@ -136,7 +136,7 @@ export function useEvents(): UseEventsReturn {
         setError(null);
         try {
             await createEventGeometry(geometry);
-            
+
             // Recharger l'événement sélectionné
             if (selectedEvent && selectedEvent.id === geometry.event_id) {
                 await selectEvent(selectedEvent.id);
@@ -153,7 +153,7 @@ export function useEvents(): UseEventsReturn {
         setError(null);
         try {
             await updateEventGeometry(geometryId, geometry);
-            
+
             // Recharger l'événement sélectionné
             if (selectedEvent && selectedEvent.id === geometry.event_id) {
                 await selectEvent(selectedEvent.id);
@@ -170,7 +170,7 @@ export function useEvents(): UseEventsReturn {
         setError(null);
         try {
             await deleteEventGeometry(geometryId);
-            
+
             // Recharger l'événement sélectionné
             if (selectedEvent) {
                 await selectEvent(selectedEvent.id);
@@ -202,23 +202,23 @@ export function useEvents(): UseEventsReturn {
         events,
         selectedEvent,
         geometryTypes,
-        
+
         // États de chargement et d'erreur
         isLoading,
         error,
-        
+
         // Actions pour les événements
         loadEvents,
         selectEvent,
         addEvent,
         editEvent,
         removeEvent,
-        
+
         // Actions pour les géométries
         addGeometry,
         editGeometry,
         removeGeometry,
-        
+
         // Utilitaires
         clearError,
         clearSelection,
