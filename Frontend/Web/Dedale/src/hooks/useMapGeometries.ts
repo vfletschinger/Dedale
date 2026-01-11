@@ -43,6 +43,8 @@ function calculateLineLength(coordinates: [number, number][]): number {
 export function useMapGeometries(
   map: maplibregl.Map | null,
   selectedEventId: string | null,
+  timelineFilterDate: Date | null = null,
+  equipementTypeFilter: string[] | null = null, // Filtre par type d'équipement (IDs des types)
 ) {
   // --- ÉTATS ---
   const [zones, setZones] = useState<Zone[]>([]);
@@ -79,6 +81,7 @@ export function useMapGeometries(
   const drawRef = useRef<MapboxDraw | null>(null);
   // Ref pour accéder à l'ID dans les event listeners sans déclencher de re-render
   const selectedEventIdRef = useRef<string | null>(selectedEventId);
+  const timelineFilterDateRef = useRef<Date | null>(timelineFilterDate);
   const mountedRef = useRef(true);
   const drawingModeRef = useRef<"none" | "zone" | "parcours" | "interest" | "equipment">(
     "none"
@@ -90,6 +93,15 @@ export function useMapGeometries(
   }, [selectedEventId]);
 
   useEffect(() => {
+    timelineFilterDateRef.current = timelineFilterDate;
+  }, [timelineFilterDate]);
+
+  const equipementTypeFilterRef = useRef<string[] | null>(equipementTypeFilter);
+  useEffect(() => {
+    equipementTypeFilterRef.current = equipementTypeFilter;
+  }, [equipementTypeFilter]);
+
+  useEffect(() => {
     drawingModeRef.current = drawingMode;
   }, [drawingMode]);
 
@@ -99,7 +111,9 @@ export function useMapGeometries(
       mapObj: maplibregl.Map,
       currentZones: Zone[],
       currentParcours: Parcours[],
-      currentEquipements: Equipement[] = []
+      currentEquipements: Equipement[] = [],
+      filterDate: Date | null = null,
+      typeFilter: string[] | null = null // Filtre par type d'équipement
     ) => {
       // Nettoyage
       const layersToRemove = [
@@ -188,9 +202,66 @@ export function useMapGeometries(
         });
       }
 
-      // Affichage des équipements
+      // Affichage des équipements (avec filtre temporel et filtre par type optionnels)
       if (currentEquipements.length > 0) {
-        const equipementFeatures = currentEquipements
+        // D'abord filtrer par type si un filtre est actif et non-null
+        // null = pas encore initialisé = afficher tous
+        // [] = aucun sélectionné = afficher aucun
+        // [...ids] = filtrer par les types sélectionnés
+        let filteredEquipements: Equipement[];
+        if (typeFilter === null) {
+          // Pas de filtre défini = tous les équipements
+          filteredEquipements = currentEquipements;
+        } else if (typeFilter.length === 0) {
+          // Filtre vide = aucun équipement
+          filteredEquipements = [];
+        } else {
+          // Filtrer par les types sélectionnés
+          filteredEquipements = currentEquipements.filter((eq) => {
+            // Si l'équipement n'a pas de type_id, on l'affiche (équipement sans type)
+            if (!eq.type_id) return true;
+            return typeFilter.includes(eq.type_id);
+          });
+        }
+
+        // Ensuite filtrer par date du curseur si un filtre temporel est actif
+        if (filterDate) {
+          filteredEquipements = filteredEquipements.filter((eq) => {
+            // Fonction pour parser une date+heure depuis les champs de l'équipement
+            const parseDateTime = (dateStr?: string, timeStr?: string): Date | null => {
+              if (!dateStr) return null;
+              if (dateStr.includes('T')) return new Date(dateStr);
+              if (timeStr) return new Date(`${dateStr}T${timeStr}`);
+              return new Date(`${dateStr}T00:00:00`);
+            };
+
+            const poseDate = parseDateTime(eq.date_pose, eq.hour_pose);
+            const deposeDate = parseDateTime(eq.date_depose, eq.hour_depose);
+            const cursor = filterDate.getTime();
+
+            // Cas 1: L'équipement n'a ni date de pose ni de dépose -> on l'affiche toujours
+            if (!poseDate && !deposeDate) return true;
+
+            // Cas 2: Seulement date de pose -> l'équipement est visible si le curseur est >= date de pose
+            if (poseDate && !deposeDate) {
+              return cursor >= poseDate.getTime();
+            }
+
+            // Cas 3: Seulement date de dépose -> l'équipement est visible si le curseur est <= date de dépose
+            if (!poseDate && deposeDate) {
+              return cursor <= deposeDate.getTime();
+            }
+
+            // Cas 4: Les deux dates -> l'équipement est visible si le curseur est entre les deux
+            if (poseDate && deposeDate) {
+              return cursor >= poseDate.getTime() && cursor <= deposeDate.getTime();
+            }
+
+            return true;
+          });
+        }
+
+        const equipementFeatures = filteredEquipements
           .map((eq) => {
             if (!eq.coordinates || eq.coordinates.length < 2) return null;
             const coords = eq.coordinates
@@ -257,7 +328,9 @@ export function useMapGeometries(
           map,
           fetchedZones,
           fetchedParcours,
-          fetchedEquipements
+          fetchedEquipements,
+          timelineFilterDateRef.current,
+          equipementTypeFilterRef.current
         );
       }
     } catch (err) {
@@ -276,6 +349,14 @@ export function useMapGeometries(
 
     return () => clearTimeout(timeoutId);
   }, [map, selectedEventId, loadGeometries]);
+
+  // ✅ Rafraîchir l'affichage quand le filtre temporel ou le filtre de type change
+  useEffect(() => {
+    if (!map) return;
+    
+    // Redessiner les géométries avec les nouveaux filtres
+    refreshGeometriesOnMap(map, zones, parcours, equipements, timelineFilterDate, equipementTypeFilter);
+  }, [map, timelineFilterDate, equipementTypeFilter, zones, parcours, equipements, refreshGeometriesOnMap]);
 
   // --- Initialisation Draw & Listeners ---
   useEffect(() => {

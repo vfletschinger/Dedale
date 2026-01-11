@@ -17,7 +17,7 @@ pub async fn fetch_points(
     let rows = if let Some(eid) = event_id {
         println!("[DB] Récupération des points pour event_id: {}", eid);
         sqlx::query(
-            "SELECT id, x, y, event_id, comment, status, type FROM point WHERE event_id = ?",
+            "SELECT id, x, y, name, event_id, comment, status, type FROM point WHERE event_id = ?",
         )
         .bind(eid)
         .fetch_all(&pool)
@@ -25,7 +25,7 @@ pub async fn fetch_points(
         .map_err(|e| e.to_string())?
     } else {
         println!("[DB] Récupération de tous les points");
-        sqlx::query("SELECT id, x, y, event_id, comment, status, type FROM point")
+        sqlx::query("SELECT id, x, y, name, event_id, comment, status, type FROM point")
             .fetch_all(&pool)
             .await
             .map_err(|e| e.to_string())?
@@ -55,6 +55,7 @@ pub async fn fetch_points(
             id: point_id,
             x: row.get("x"),
             y: row.get("y"),
+            name: row.get("name"),
             event_id: row.get("event_id"),
             status: row.get("status"),
             comment: row.get("comment"),
@@ -305,7 +306,7 @@ pub async fn retrieve_data_by_event(
             id,
             x: row.get("x"),
             y: row.get("y"),
-           // name: row.get("name"),
+            name: row.get("name"),
             comment: row.get("comment"),
             status: row.get("status"),
             event_id: row.get("event_id"),

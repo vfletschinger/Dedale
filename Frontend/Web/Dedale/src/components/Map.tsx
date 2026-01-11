@@ -11,6 +11,7 @@ import AddressSearch from "./AdressSearch";
 import ParcoursForm from "./ParcoursForm";
 import InterestForm from "./InterestForm";
 import EquipementForm from "./EquipementForm";
+import EquipementTypeFilter from "./EquipementTypeFilter";
 
 // Hooks personnalisés
 import { useMapPoints } from "../hooks/useMapPoints";
@@ -18,7 +19,7 @@ import { useMapGeometries } from "../hooks/useMapGeometries";
 import { useEvents } from "../hooks/useEvents";
 
 // Types et Utils
-import { SearchResult, MapEvent } from "../types/map";
+import { SearchResult, MapEvent, Equipement } from "../types/map";
 
 function OfflineMapLibre({ selectedEventId }: { selectedEventId: string | null; }) {
   // --- ÉTATS GLOBAUX DU COMPOSANT ---
@@ -30,6 +31,13 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: string | null; 
 
   // État pour le filtre spatial (limites visibles de la carte)
   const [mapBounds, setMapBounds] = useState<{ north: number; south: number; east: number; west: number } | null>(null);
+
+  // État pour le filtre temporel de la timeline (date du curseur)
+  const [timelineFilterDate, setTimelineFilterDate] = useState<Date | null>(null);
+
+  // État pour le filtre des types d'équipements (IDs des types sélectionnés)
+  // null = pas encore initialisé (afficher tous), [] = aucun sélectionné (afficher aucun)
+  const [selectedEquipementTypes, setSelectedEquipementTypes] = useState<string[] | null>(null);
 
   // Gestion du marqueur d'adresse (Recherche)
   const [currentMarker, setCurrentMarker] = useState<maplibregl.Marker | null>(
@@ -81,7 +89,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: string | null; 
     saveEquipmentWithDetails,
     cancelEquipmentForm,
     handleDeleteEquipement,
-  } = useMapGeometries(map, selectedEventId);
+  } = useMapGeometries(map, selectedEventId, timelineFilterDate, selectedEquipementTypes);
 
   // 3. Logique des ÉVÉNEMENTS
   const { events } = useEvents();
@@ -97,7 +105,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: string | null; 
 
     const mapInstance = new maplibregl.Map({
       container: mapContainer.current,
-      style: "http://localhost:8080/styles/basic-preview/style.json",
+      style: "http://localhost:8082/styles/basic-preview/style.json",
       center: [7.7635, 48.5465],
       zoom: 13,
     });
@@ -159,6 +167,42 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: string | null; 
 
   // --- GESTIONNAIRES D'INTERFACE ---
 
+  // Fonction pour centrer et zoomer la carte sur un équipement
+  const focusOnEquipement = (equipement: Equipement) => {
+    if (!map || !equipement.coordinates || equipement.coordinates.length === 0) return;
+
+    // Calculer les bornes (bounding box) de l'équipement
+    const coords = equipement.coordinates;
+    let minLng = coords[0].x;
+    let maxLng = coords[0].x;
+    let minLat = coords[0].y;
+    let maxLat = coords[0].y;
+
+    coords.forEach((coord) => {
+      minLng = Math.min(minLng, coord.x);
+      maxLng = Math.max(maxLng, coord.x);
+      minLat = Math.min(minLat, coord.y);
+      maxLat = Math.max(maxLat, coord.y);
+    });
+
+    // Ajouter un peu de padding
+    const padding = 0.001; // ~100m environ
+    minLng -= padding;
+    maxLng += padding;
+    minLat -= padding;
+    maxLat += padding;
+
+    // Utiliser fitBounds pour centrer et zoomer
+    map.fitBounds(
+      [[minLng, minLat], [maxLng, maxLat]],
+      {
+        padding: 50,
+        maxZoom: 18,
+        duration: 1000
+      }
+    );
+  };
+
   const handleAddressSelect = (place: SearchResult) => {
     if (!map) return;
     const { lon, lat, display_name } = place;
@@ -189,7 +233,10 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: string | null; 
         {/* Onglets Navigation */}
         <div className="flex items-center gap-2 px-4 mt-3 border-t border-slate-600">
           <button
-            onClick={() => setViewMode("points")}
+            onClick={() => {
+              setTimelineFilterDate(null); // Réinitialiser le filtre temporel
+              setViewMode("points");
+            }}
             className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${viewMode === "points"
               ? "text-white border-blue-400"
               : "text-slate-400 border-transparent hover:text-slate-200"
@@ -215,6 +262,15 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: string | null; 
               <span>Frise chronologique</span>
             </span>
           </button>
+          
+          {/* Filtre des types d'équipements - Aligné à droite */}
+          <div className="ml-auto">
+            <EquipementTypeFilter
+              selectedTypes={selectedEquipementTypes}
+              onFilterChange={setSelectedEquipementTypes}
+              variant="header"
+            />
+          </div>
         </div>
       </div>
 
@@ -267,7 +323,7 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: string | null; 
                       >
                         <div className="flex justify-between items-center mb-1">
                           <span className="font-bold text-gray-800 text-sm flex gap-2">
-                            <span>📍</span> Point #{p.id}
+                            <span>📍</span> {p.name || `Point #${p.id.slice(0, 8)}`}
                           </span>
                           <button className="text-blue-600 text-xs font-semibold px-2 py-1 rounded hover:bg-blue-50">
                             Voir →
@@ -305,10 +361,19 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: string | null; 
                 <TimelineBar
                   event={currentEvent}
                   points={points}
-                  equipements={equipements}
+                  equipements={selectedEquipementTypes === null
+                    ? equipements  // Pas encore initialisé = tous
+                    : selectedEquipementTypes.length === 0 
+                      ? []  // Filtre vide = aucun
+                      : equipements.filter(eq => !eq.type_id || selectedEquipementTypes.includes(eq.type_id))
+                  }
                   onPointClick={openPopupForPoint}
-                  onClose={() => setViewMode("points")}
-                  onDateChange={() => { }}
+                  onEquipementClick={focusOnEquipement}
+                  onClose={() => {
+                    setTimelineFilterDate(null); // Réinitialiser le filtre temporel
+                    setViewMode("points");
+                  }}
+                  onDateChange={setTimelineFilterDate}
                   mapBounds={mapBounds}
                 />
               ) : (
@@ -572,7 +637,8 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: string | null; 
                             {equipements.map((eq) => (
                               <div
                                 key={`equipement-${eq.id}`}
-                                className="p-2 border-b border-gray-200 last:border-0 hover:bg-orange-50"
+                                className="p-2 border-b border-gray-200 last:border-0 hover:bg-orange-50 cursor-pointer"
+                                onClick={() => focusOnEquipement(eq)}
                               >
                                 <div className="flex items-center justify-between">
                                   <div className="flex-1">
@@ -584,7 +650,10 @@ function OfflineMapLibre({ selectedEventId }: { selectedEventId: string | null; 
                                     </div>
                                   </div>
                                   <button
-                                    onClick={() => handleDeleteEquipement(eq.id)}
+                                    onClick={(e) => {
+                                      e.stopPropagation(); // Empêcher le focus sur l'équipement
+                                      handleDeleteEquipement(eq.id);
+                                    }}
                                     className="p-1 text-red-600 hover:bg-red-100 rounded"
                                     title="Supprimer"
                                   >

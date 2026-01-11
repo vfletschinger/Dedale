@@ -128,6 +128,7 @@ pub struct PointWithDetails {
     pub id: String,
     pub x: f64,
     pub y: f64,
+    pub name: Option<String>,
     pub event_id: Option<String>,
     pub status: Option<bool>,
     pub comment: Option<String>,
