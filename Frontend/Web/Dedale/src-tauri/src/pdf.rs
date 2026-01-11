@@ -1,4 +1,8 @@
 use crate::db;
+use crate::db::fetch_equipement_coordinates;
+use crate::db::EquipementActionComplet;
+use crate::db::EquipementComplet;
+use crate::db::PointWithDetails;
 use crate::map_static;
 use crate::utils;
 use sqlx::Row;
@@ -183,4 +187,217 @@ fn load_fonts_from_directory(fonts_dir: &Path) -> Result<Vec<Vec<u8>>, String> {
     }
 
     Ok(fonts)
+}
+
+#[tauri::command]
+pub async fn create_team_mission_pdf(
+    app: AppHandle,
+    team_id: String,
+    event_id: String,
+) -> Result<(), String> {
+    let pool = db::get_db_pool(&app).await?;
+
+    // 1. Fetch Team metadata
+    let team_name: String = sqlx::query_scalar("SELECT name FROM team WHERE id = ?")
+        .bind(&team_id)
+        .fetch_one(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // 2. Fetch specific actions for this team with equipment details
+    // We join 'action', 'equipement', and 'type' to get the full picture
+    let query = r#"
+        SELECT 
+            a.id as action_id,
+            a.type as action_type,
+            e.id as equip_id,
+            e.length_per_unit,
+            e.date_pose,
+            e.date_depose,
+            t.name as type_name
+        FROM action a
+        JOIN equipement e ON a.equipement_id = e.id
+        LEFT JOIN type t ON e.type_id = t.id
+        WHERE a.team_id = ?
+    "#;
+
+    let rows = sqlx::query(query)
+        .bind(&team_id)
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let mut mission_data = Vec::new();
+    for row in rows {
+        let equip_id: String = row.get("equip_id");
+        let coords = fetch_equipement_coordinates(&pool, &equip_id).await?;
+
+        mission_data.push(EquipementActionComplet {
+            equipement: EquipementComplet {
+                id: equip_id,
+                type_name: row.get("type_name"),
+                length: row.get("length_per_unit"),
+                date_pose: row.get("date_pose"),
+                date_depose: row.get("date_depose"),
+                coordinates: coords,
+                ..Default::default()
+            },
+            action_id: Some(row.get("action_id")),
+            action_type: Some(row.get("action_type")),
+            event_id: Some(event_id.clone()),
+        });
+    }
+
+    // 3. Setup Temp Directory and Fonts
+    let temp_dir = std::env::temp_dir().join(format!("mission_gen_{}", team_id));
+    if temp_dir.exists() {
+        fs::remove_dir_all(&temp_dir).ok();
+    }
+    fs::create_dir_all(&temp_dir).map_err(|e| e.to_string())?;
+
+    let font_bytes = crate::pdf::load_fonts_from_directory(Path::new("./fonts"))?;
+
+    // 4. Build Typst Source
+    let mut typst_src = String::new();
+    typst_src.push_str(
+        r#"
+        #set page(paper: "a4", margin: 1.5cm)
+        #set text(font: "Liberation Sans", size: 11pt)
+        #set table(stroke: 0.5pt + gray)
+
+        #align(center)[
+            #rect(stroke: 2pt + blue, inset: 10pt)[
+                #text(18pt, weight: "bold")[FEUILLE DE ROUTE OPÉRATIONNELLE] \
+                #text(14pt, blue)[Équipe : "#,
+    );
+
+    typst_src.push_str(&team_name.to_uppercase());
+
+    typst_src.push_str(
+        r#"]
+            ]
+        ]
+        #v(1cm)
+    "#,
+    );
+
+    // 5. Team Map (Showing only their assigned equipments)
+    let map_data_points: Vec<PointWithDetails> = mission_data
+        .iter()
+        .filter_map(|m| {
+            // We take the first coordinate of the equipment to place a marker
+            m.equipement.coordinates.first().map(|coord| {
+                PointWithDetails {
+                    id: m.equipement.id.clone(),
+                    x: coord.x,
+                    y: coord.y,
+                    name: m.equipement.type_name.clone(), // This is already an Option<String>
+                    event_id: m.event_id.clone(),
+                    comment: None,
+                    status: Some(false), // Provide default status
+                    r#type: None,        // Use raw identifier for the reserved word 'type'
+                    pictures: Vec::<crate::types::Picture>::new(), // Provide an empty list of pictures
+                }
+            })
+        })
+        .collect();
+
+    // 2. Now call the generator with the correct type
+    let map_res = map_static::generate_cropped_map(&temp_dir, &map_data_points);
+
+    if let Ok(map) = map_res {
+        typst_src.push_str("== Secteur d'intervention\n#v(0.5em)\n");
+        typst_src.push_str(&format!(
+            r#"#block(width: 100%, stroke: 1pt + black, radius: 4pt, clip: true)[#image("{}", width: 100%)]"#,
+            map.image_path
+        ));
+        typst_src.push_str("#v(1cm)\n");
+    }
+
+    // 6. Chronological Planning Table
+    typst_src.push_str("== Planning des Missions\n#v(0.5em)\n");
+    typst_src.push_str(
+        r#"#table(
+        columns: (auto, auto, 1fr, 40pt),
+        inset: 7pt,
+        align: (col, row) => if row == 0 { center } else { left },
+        fill: (x, y) => if y == 0 { luma(240) },
+        [*Heure*], [*Action*], [*Équipement / Localisation*], [*Fait*],
+    "#,
+    );
+
+    // Sort by scheduled time (pose or retrait date)
+    mission_data.sort_by_key(|m| {
+        if m.action_type.as_deref() == Some("pose") {
+            m.equipement.date_pose.clone()
+        } else {
+            m.equipement.date_depose.clone()
+        }
+    });
+
+    for m in mission_data {
+        let is_pose = m.action_type.as_deref() == Some("pose");
+
+        // 1. Safely get the date string as an Option<&String>
+        let date_opt = if is_pose {
+            &m.equipement.date_pose
+        } else {
+            &m.equipement.date_depose
+        };
+
+        // 2. Convert the Option<&String> into a clean String for display
+        let display_date = match date_opt {
+            Some(d) => d.replace("T", " à "), // Use "T" (string) not 'T' (char)
+            None => "Non planifié".to_string(),
+        };
+
+        let action_label = if is_pose { "🟦 POSE" } else { "🟥 RETRAIT" };
+
+        let type_name = m.equipement.type_name.as_deref().unwrap_or("Inconnu");
+        let length = m.equipement.length.unwrap_or(0);
+        let equip_label = format!("{} ({}m)", type_name, length);
+
+        // 3. Write to Typst source
+        writeln!(
+            typst_src,
+            "[{}], [{}], [{}], [ ],",
+            display_date, action_label, equip_label
+        )
+        .unwrap();
+    }
+    typst_src.push_str(")\n");
+
+    typst_src.push_str(
+        r#"
+        #v(auto)
+        #line(length: 100%, stroke: 0.5pt + gray)
+        #text(8pt, gray)[Document généré le #datetime.today().display()]
+    "#,
+    );
+
+    // 7. Compile PDF
+    let template = TypstEngine::builder()
+        .main_file(typst_src)
+        .fonts(font_bytes)
+        .with_file_system_resolver(temp_dir.clone())
+        .build();
+
+    let doc = template
+        .compile()
+        .output
+        .map_err(|e| format!("Typst failed: {:?}", e))?;
+
+    let pdf_bytes = typst_pdf::pdf(&doc, &PdfOptions::default())
+        .map_err(|e| format!("PDF export failed: {:?}", e))?;
+
+    // 8. Save Dialog
+
+    let (dir_path, file_name) =
+        utils::create_file_name(format!("Planning_{}_{}.pdf", team_name, event_id));
+    if let Some(save_path) = utils::show_save_dialog(&file_name, &dir_path, "pdf".to_string()) {
+        fs::write(save_path, pdf_bytes).map_err(|e| e.to_string())?;
+    }
+
+    let _ = fs::remove_dir_all(&temp_dir);
+    Ok(())
 }

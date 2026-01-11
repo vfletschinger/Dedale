@@ -208,7 +208,7 @@ pub struct PictureInput {
     pub image: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct EquipementComplet {
     pub id: String,
     pub type_id: Option<String>,
@@ -220,4 +220,12 @@ pub struct EquipementComplet {
     pub date_depose: Option<String>,
     pub hour_depose: Option<String>,
     pub coordinates: Vec<EquipementCoordinate>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EquipementActionComplet {
+    pub equipement: EquipementComplet,
+    pub event_id: Option<String>,
+    pub action_id: Option<String>,
+    pub action_type: Option<String>,
 }

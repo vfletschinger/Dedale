@@ -178,6 +178,7 @@ function Teams({ activeEventId }: { activeEventId: string }) {
             onClose={() => setSelectedTeamData(null)}
             onDelete={handleTeamDeleted}
             onMemberClick={(person) => setViewingPerson(person)}
+            activeEventId={activeEventId}
           />
           <div
             className="absolute inset-0 -z-10"
