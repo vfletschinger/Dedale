@@ -20,6 +20,8 @@ import { useEvents } from "../hooks/useEvents";
 
 // Types et Utils
 import { SearchResult, MapEvent, Equipement } from "../types/map";
+import { getMapStyle } from "../utils/mapStyles";
+import { Protocol } from "pmtiles";
 
 function OfflineMapLibre({
   selectedEventId,
@@ -105,12 +107,20 @@ function OfflineMapLibre({
   // Initialisation de la carte MapLibre
   useEffect(() => {
     if (map || !mapContainer.current) return;
+    // Enregistrer le protocole PMTiles
+    const protocol = new Protocol();
+    maplibregl.addProtocol("pmtiles", protocol.tile);
+
+    // Utilisation du style externe avec les nouvelles couleurs
+    const mapStyle = getMapStyle();
 
     const mapInstance = new maplibregl.Map({
       container: mapContainer.current,
-      style: "http://localhost:8082/styles/basic-preview/style.json",
+      style: mapStyle,
       center: [7.7635, 48.5465],
-      zoom: 13,
+      zoom: 17, // Zoom initial plus proche pour voir le détail
+      minZoom: 13, // Zoom minimum
+      maxZoom: 19, // Permettre le zoom très proche
     });
 
     const initialMarker = new maplibregl.Marker()
@@ -122,6 +132,7 @@ function OfflineMapLibre({
     setMap(mapInstance);
 
     return () => {
+      maplibregl.removeProtocol("pmtiles");
       mapInstance.remove();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -256,8 +267,8 @@ function OfflineMapLibre({
           <button
             onClick={() => setViewMode("timeline")}
             className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${viewMode === "timeline"
-                ? "text-white border-blue-400"
-                : "text-slate-400 border-transparent hover:text-slate-200"
+              ? "text-white border-blue-400"
+              : "text-slate-400 border-transparent hover:text-slate-200"
               }`}
           >
             <span className="flex items-center gap-2">
@@ -415,8 +426,8 @@ function OfflineMapLibre({
                 <button
                   onClick={handleAddPointClick}
                   className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${awaitingMapClick
-                      ? "bg-amber-500 text-white animate-pulse"
-                      : "bg-white hover:bg-gray-50 text-gray-700"
+                    ? "bg-amber-500 text-white animate-pulse"
+                    : "bg-white hover:bg-gray-50 text-gray-700"
                     }`}
                   title="Ajouter un point"
                 >
@@ -426,8 +437,8 @@ function OfflineMapLibre({
                 <button
                   onClick={startDrawPolygon}
                   className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${drawingMode === "zone"
-                      ? "bg-blue-600 text-white"
-                      : "bg-white hover:bg-gray-50 text-gray-700"
+                    ? "bg-blue-600 text-white"
+                    : "bg-white hover:bg-gray-50 text-gray-700"
                     }`}
                   title="Zone (Polygone)"
                 >
@@ -437,8 +448,8 @@ function OfflineMapLibre({
                 <button
                   onClick={startDrawLine}
                   className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${drawingMode === "parcours"
-                      ? "bg-red-500 text-white"
-                      : "bg-white hover:bg-gray-50 text-gray-700"
+                    ? "bg-red-500 text-white"
+                    : "bg-white hover:bg-gray-50 text-gray-700"
                     }`}
                   title="Parcours (Ligne)"
                 >
@@ -447,8 +458,8 @@ function OfflineMapLibre({
                 <button
                   onClick={startDrawInterest}
                   className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${drawingMode === "interest"
-                      ? "bg-purple-600 text-white"
-                      : "bg-black/30 hover:bg-black/40 backdrop-blur-sm text-white"
+                    ? "bg-purple-600 text-white"
+                    : "bg-black/30 hover:bg-black/40 backdrop-blur-sm text-white"
                     }`}
                   title="Point d'intérêt"
                 >
@@ -458,8 +469,8 @@ function OfflineMapLibre({
                 <button
                   onClick={startDrawEquipment}
                   className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${drawingMode === "equipment"
-                      ? "bg-green-600 text-white"
-                      : "bg-white hover:bg-gray-50 text-gray-700"
+                    ? "bg-green-600 text-white"
+                    : "bg-white hover:bg-gray-50 text-gray-700"
                     }`}
                   title="Équipement"
                 >
@@ -525,10 +536,10 @@ function OfflineMapLibre({
                                 <div
                                   key={`zone-${zone.id}`}
                                   className={`p-2 border-b border-gray-200 last:border-0 hover:bg-blue-50 cursor-pointer transition-colors ${isSelected
-                                      ? "bg-blue-100 border-l-4 border-l-blue-500"
-                                      : isEditing
-                                        ? "bg-amber-50"
-                                        : ""
+                                    ? "bg-blue-100 border-l-4 border-l-blue-500"
+                                    : isEditing
+                                      ? "bg-amber-50"
+                                      : ""
                                     }`}
                                   onClick={() =>
                                     highlightGeometry(
@@ -599,10 +610,10 @@ function OfflineMapLibre({
                                 <div
                                   key={`parcours-${p.id}`}
                                   className={`p-2 border-b border-gray-200 last:border-0 hover:bg-blue-50 cursor-pointer transition-colors ${isSelected
-                                      ? "bg-blue-100 border-l-4 border-l-green-500"
-                                      : isEditing
-                                        ? "bg-amber-50"
-                                        : ""
+                                    ? "bg-blue-100 border-l-4 border-l-green-500"
+                                    : isEditing
+                                      ? "bg-amber-50"
+                                      : ""
                                     }`}
                                   onClick={() =>
                                     highlightGeometry(

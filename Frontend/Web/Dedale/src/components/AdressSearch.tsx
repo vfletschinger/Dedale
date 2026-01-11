@@ -11,8 +11,10 @@ export default function AddressSearch({ onSelect }: AddressSearchProps) {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const isSelectingRef = useRef(false);
 
   const handleSelect = (place: SearchResult) => {
+    isSelectingRef.current = true;
     setQuery(place.display_name);
     setResults([]);
     onSelect(place);
@@ -25,6 +27,11 @@ export default function AddressSearch({ onSelect }: AddressSearchProps) {
   };
 
   useEffect(() => {
+    if (isSelectingRef.current) {
+      isSelectingRef.current = false;
+      return;
+    }
+
     const timeout = setTimeout(async () => {
       if (query.trim().length < 2) {
         setResults([]);
@@ -48,9 +55,8 @@ export default function AddressSearch({ onSelect }: AddressSearchProps) {
     <div className="relative w-full z-50">
       {/* Container style Google Maps */}
       <div
-        className={`flex items-center w-full bg-white rounded-full shadow-md transition-all duration-200 border border-transparent ${
-          isFocused ? "shadow-lg ring-2 ring-blue-500/50" : "hover:shadow-lg"
-        }`}
+        className={`flex items-center w-full bg-white rounded-full shadow-md transition-all duration-200 border border-transparent ${isFocused ? "shadow-lg ring-2 ring-blue-500/50" : "hover:shadow-lg"
+          }`}
       >
         {/* Icône de recherche */}
         <div className="pl-4 text-gray-400">

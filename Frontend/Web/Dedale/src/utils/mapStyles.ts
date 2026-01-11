@@ -30,10 +30,8 @@ export const getMapStyle = (): StyleSpecification =>
       // Source Raster (Tuiles PNG depuis PMTiles)
       "raster-tiles": {
         type: "raster",
-        tiles: ["pmtiles:///eurometropole_strasbourg.pmtiles/{z}/{x}/{y}"],
+        url: "pmtiles:///eurometropole_strasbourg.pmtiles",
         tileSize: 256,
-        minzoom: 0,
-        maxzoom: 19,
       },
     },
     layers: [
