@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo, useCallback } from "react"
 
 export interface SelectableItem {
     id: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     [key: string]: any;
 }
 
@@ -23,6 +24,7 @@ const SelectableRow = React.memo(({
     onMouseEnter,
     renderItem,
     className
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
 }: any) => {
     return (
         <div

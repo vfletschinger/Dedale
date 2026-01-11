@@ -171,6 +171,7 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
         setIsAddingEquipementAction(true);
         try {
             const allEquipements = await invoke<Equipement[]>("fetch_equipements_for_event", { eventId: activeEventId });
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const allEventActions = await invoke<any[]>("fetch_actions", { eventId: activeEventId });
 
             const takenSet = new Set(allEventActions.map(a => `${a.equipement_id}-${a.action_type}`));
@@ -205,6 +206,7 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
                 }
             });
 
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             setavailableEquipements(actionsList as any);
         } catch (e) { console.error(e); }
     };
@@ -454,11 +456,14 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
                                 <div className="flex gap-2">
                                     <select value={selectedEquipementId} onChange={(e) => setSelectedEquipementId(e.target.value)} className="flex-1 text-sm border border-blue-200 rounded px-2 py-1 outline-none cursor-pointer">
                                         <option value="">Choisir...</option>
-                                        {availableEquipements.map((action: any) => (
-                                            <option key={`${action.id}-${action.temp_type}`} value={`${action.id}|${action.temp_type}`}>
-                                                {action.label}
-                                            </option>
-                                        ))}
+                                        {availableEquipements.map((action) => {
+                                            const item = action as unknown as AvailableActionOption;
+                                            return (
+                                                <option key={`${item.id}-${item.temp_type}`} value={`${item.id}|${item.temp_type}`}>
+                                                    {item.label}
+                                                </option>
+                                            );
+                                        })}
                                     </select>
                                     <button onClick={confirmAddEquipementAction} disabled={!selectedEquipementId} className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 cursor-pointer">OK</button>
                                     <button onClick={() => setIsAddingEquipementAction(false)} className="text-gray-500 px-2 cursor-pointer">✕</button>
@@ -525,8 +530,13 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
                             Annuler
                         </button>
                         <button
-                            onClick={() => { activeTab == "members" ? handleRemoveSelectedMembers() : activeTab == "equipements" ? handleRemoveSelectedEquipements() : ""; }}
-                            className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-bold"
+                            onClick={() => {
+                                if (activeTab === "members") {
+                                    handleRemoveSelectedMembers();
+                                } else if (activeTab === "equipements") {
+                                    handleRemoveSelectedEquipements();
+                                }
+                            }} className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-bold"
                         >
                             Confirmer
                         </button>

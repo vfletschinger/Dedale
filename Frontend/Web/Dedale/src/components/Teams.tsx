@@ -120,6 +120,7 @@ function Teams({ activeEventId }: { activeEventId: string }) {
       const [members, events, rawActions] = await Promise.all([
         invoke<Person[]>("fetch_team_members", { teamId }),
         invoke<Event[]>("fetch_team_events", { teamId }),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         invoke<any[]>("fetch_team_actions", { teamId }),
       ]);
 
