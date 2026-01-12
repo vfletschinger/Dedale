@@ -38,7 +38,7 @@ interface TeamDetailsProps {
     teamId: string;
     teamName: string;
     data?: TeamDetailData;
-    activeEventId: string;
+    activeEventId: string | null;
     onClose: () => void;
     onDelete: (teamId: string) => void;
     onMemberClick: (person: Person) => void;

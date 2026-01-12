@@ -89,6 +89,7 @@ export default function Persons({ activeEventId }: { activeEventId: string | nul
                     <TeamDetails
                         teamId={viewingTeam.id}
                         teamName={viewingTeam.name}
+                        activeEventId={activeEventId}
                         onClose={() => setViewingTeam(null)}
                         onDelete={() => {
                             setViewingTeam(null);
@@ -96,7 +97,8 @@ export default function Persons({ activeEventId }: { activeEventId: string | nul
                         onMemberClick={(member) => {
                             setViewingTeam(null);
                             setSelectedPerson(member);
-                        }}
+                        }
+                    }
                     />
                     <div className="absolute inset-0 -z-10" onClick={() => setViewingTeam(null)}></div>
                 </div>
