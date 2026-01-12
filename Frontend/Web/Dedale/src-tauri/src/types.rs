@@ -18,6 +18,7 @@ pub struct Zone {
     pub event_id: String,
     pub name: Option<String>,
     pub color: Option<String>,
+    pub description: Option<String>,
     pub geometry_json: Option<String>,
 }
 
@@ -55,6 +56,7 @@ pub struct Equipement {
     pub id: String,
     pub type_id: Option<String>,
     pub length: Option<i32>,
+    pub description: Option<String>,
     pub date_pose: Option<String>,
     pub hour_pose: Option<String>,
     pub date_depose: Option<String>,
@@ -215,6 +217,7 @@ pub struct EquipementComplet {
     pub type_name: Option<String>,
     pub type_description: Option<String>,
     pub length: Option<i32>,
+    pub description: Option<String>,
     pub date_pose: Option<String>,
     pub hour_pose: Option<String>,
     pub date_depose: Option<String>,

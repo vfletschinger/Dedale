@@ -146,8 +146,8 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
         return;
       }
 
-      if (new Date(formData.dateDebut) >= new Date(formData.dateFin)) {
-        alert("La date de fin doit être postérieure à la date de début !");
+      if (new Date(formData.dateDebut) > new Date(formData.dateFin)) {
+        alert("La date de fin ne peut pas être antérieure à la date de début !");
         return;
       }
 

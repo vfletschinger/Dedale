@@ -14,9 +14,9 @@ export default function AddPointForm({
   onSaved?: () => void;
   eventId?: string | null;
 }) {
-  const [x, setX] = useState<number>(initialCoords.lng);
-  const [y, setY] = useState<number>(initialCoords.lat);
-  const [name, setName] = useState<string>("Nouveau point");
+  const [x] = useState<number>(initialCoords.lng);
+  const [y] = useState<number>(initialCoords.lat);
+  const [name, setName] = useState<string>("");
   const [comment, setComment] = useState<string>("");
   const [type, setType] = useState<string>("info");
   const [status, setStatus] = useState<boolean>(false);
@@ -33,16 +33,16 @@ export default function AddPointForm({
 
     setSaving(true);
     try {
-      // Structure simple correspondant au schéma : id, event_id, x, y, comment, type, status
+      // Structure simple correspondant au schéma : id, event_id, x, y, comment, type, status, name
       const point = {
         id: "",
         event_id: eventId,
         x: Number(x),
         y: Number(y),
+        name: name.trim() || null,
         comment: comment || null,
         type: type || null,
         status: status,
-
       };
 
       console.log("📍 Envoi du point:", JSON.stringify(point, null, 2));
@@ -101,39 +101,7 @@ export default function AddPointForm({
           </div>
         </div>
 
-        {/* Coordonnées Section */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-4 py-3 bg-linear-to-r from-indigo-50 to-blue-50 border-b border-indigo-100 flex items-center gap-2">
-            <span className="text-xl">📍</span>
-            <span className="font-semibold text-gray-800">Coordonnées</span>
-          </div>
-          <div className="p-4">
-            <div className="flex gap-3">
-              <div className="flex-1">
-                <label className="block text-xs font-medium text-gray-500 mb-1">Longitude</label>
-                <input
-                  type="number"
-                  step="0.000001"
-                  value={x}
-                  onChange={(e) => setX(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-gray-50 transition-all"
-                />
-              </div>
-              <div className="flex-1">
-                <label className="block text-xs font-medium text-gray-500 mb-1">Latitude</label>
-                <input
-                  type="number"
-                  step="0.000001"
-                  value={y}
-                  onChange={(e) => setY(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-gray-50 transition-all"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Dates Pose/Dépose Section */}
+        {/* Type et Statut Section */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-4 py-3 bg-linear-to-r from-purple-50 to-pink-50 border-b border-purple-100 flex items-center gap-2">
             <span className="text-xl">🏷️</span>
