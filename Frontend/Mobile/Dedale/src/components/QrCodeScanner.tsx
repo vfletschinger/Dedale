@@ -44,6 +44,72 @@ type EventExportData = {
   points: PointWithDetails[];
 };
 
+// Nouveau type pour les données reçues du desktop
+interface IncomingEventData {
+  type: "event";
+  data: {
+    id: string;
+    name: string;
+    startDate: string;
+    endDate: string;
+    points: Array<{
+      id: string;
+      eventId: string;
+      x: number;
+      y: number;
+      name: string;
+      comment: string | null;
+      type: string | null;
+      status: boolean;
+    }>;
+    parcours: Array<{
+      id: string;
+      eventId: string;
+      geometryJson?: string;
+      wkt?: string;
+    }>;
+    zones: Array<{
+      id: string;
+      eventId: string;
+      geometryJson?: string;
+      wkt?: string;
+    }>;
+    teams: Array<{
+      id: string;
+      eventId: string;
+      name: string;
+      members: any[];
+    }>;
+    actions: Array<{
+      id: string;
+      teamId: string;
+      equipementId: string;
+      actionType?: string;
+      type?: string;
+      scheduledTime?: string;
+      scheduled_time?: string;
+      isDone?: boolean;
+      is_done?: number;
+    }>;
+    equipements: Array<{
+      id: string;
+      eventId: string;
+      typeId: string;
+      quantity: number;
+      lengthPerUnit: number;
+      datePose: string;
+      dateDepose: string;
+      coordinates: Array<{
+        id: string;
+        equipementId: string;
+        x: number;
+        y: number;
+        orderIndex: number;
+      }>;
+    }>;
+  };
+}
+
 interface QRCodeScannerProps {
   setScanQR: (value: boolean) => void;
   mode?: "receive" | "send"; // Mode: recevoir des events ou envoyer
@@ -88,15 +154,26 @@ const QRCodeScanner = ({
     );
   }
 
-  const insertEvents = (events: (EventType | TransferEventType)[]) => {
+  const insertEvents = (eventsData: (EventType | TransferEventType | IncomingEventData)[]) => {
     try {
       let insertedCount = 0;
       let updatedCount = 0;
       let parcoursCount = 0;
       let zonesCount = 0;
       let pointsCount = 0;
+      let teamsCount = 0;
+      let actionsCount = 0;
+      let equipementsCount = 0;
 
-      for (const eventData of events) {
+      for (const incomingData of eventsData) {
+        // Vérifier si c'est le nouveau format {type: "event", data: {...}}
+        let eventData: any;
+        if ((incomingData as IncomingEventData).type === "event" && (incomingData as IncomingEventData).data) {
+          eventData = (incomingData as IncomingEventData).data;
+        } else {
+          eventData = incomingData;
+        }
+
         // Normaliser les noms de champs (camelCase vers snake_case)
         const event: EventType = {
           id: eventData.id,
@@ -107,6 +184,8 @@ const QRCodeScanner = ({
           statut: eventData.statut || "actif",
         };
 
+        console.log("📦 Traitement événement:", event.name);
+
         const existing = db.getFirstSync<EventType>(
           "SELECT id FROM event WHERE id = ?",
           [event.id]
@@ -116,11 +195,11 @@ const QRCodeScanner = ({
           db.runSync(
             "UPDATE event SET name = ?, description = ?, dateDebut = ?, dateFin = ?, statut = ? WHERE id = ?",
             [
-              event.name,
-              event.description,
-              event.dateDebut,
-              event.dateFin,
-              event.statut,
+              event.name || "",
+              event.description || "",
+              event.dateDebut || "",
+              event.dateFin || "",
+              event.statut || "actif",
               event.id,
             ]
           );
@@ -130,20 +209,19 @@ const QRCodeScanner = ({
             "INSERT INTO event (id, name, description, dateDebut, dateFin, statut) VALUES (?, ?, ?, ?, ?, ?)",
             [
               event.id,
-              event.name,
-              event.description,
-              event.dateDebut,
-              event.dateFin,
-              event.statut,
+              event.name || "",
+              event.description || "",
+              event.dateDebut || "",
+              event.dateFin || "",
+              event.statut || "actif",
             ]
           );
           insertedCount++;
         }
 
         // Insérer les parcours si présents
-        const transferEvent = eventData as TransferEventType;
-        if (transferEvent.parcours && Array.isArray(transferEvent.parcours)) {
-          for (const parcours of transferEvent.parcours) {
+        if (eventData.parcours && Array.isArray(eventData.parcours)) {
+          for (const parcours of eventData.parcours) {
             const existingParcours = db.getFirstSync(
               "SELECT id FROM parcours WHERE id = ?",
               [parcours.id]
@@ -167,8 +245,8 @@ const QRCodeScanner = ({
         }
 
         // Insérer les zones si présentes
-        if (transferEvent.zones && Array.isArray(transferEvent.zones)) {
-          for (const zone of transferEvent.zones) {
+        if (eventData.zones && Array.isArray(eventData.zones)) {
+          for (const zone of eventData.zones) {
             const existingZone = db.getFirstSync(
               "SELECT id FROM zone WHERE id = ?",
               [zone.id]
@@ -192,8 +270,8 @@ const QRCodeScanner = ({
         }
 
         // Insérer les points si présents
-        if (transferEvent.points && Array.isArray(transferEvent.points)) {
-          for (const point of transferEvent.points) {
+        if (eventData.points && Array.isArray(eventData.points)) {
+          for (const point of eventData.points) {
             const existingPoint = db.getFirstSync(
               "SELECT id FROM point WHERE id = ?",
               [point.id]
@@ -230,16 +308,190 @@ const QRCodeScanner = ({
             }
           }
         }
+
+        // Insérer les équipes si présentes
+        if (eventData.teams && Array.isArray(eventData.teams)) {
+          for (const team of eventData.teams) {
+            const teamEventId = team.eventId || team.event_id || event.id;
+            
+            const existingTeam = db.getFirstSync(
+              "SELECT id FROM team WHERE id = ?",
+              [team.id]
+            );
+
+            if (!existingTeam) {
+              db.runSync(
+                "INSERT INTO team (id, event_id, name) VALUES (?, ?, ?)",
+                [team.id, teamEventId, team.name]
+              );
+              teamsCount++;
+            } else {
+              db.runSync("UPDATE team SET name = ? WHERE id = ?", [
+                team.name,
+                team.id,
+              ]);
+            }
+          }
+        }
+
+        // Insérer les équipements si présents (nouveau format)
+        if (eventData.equipements && Array.isArray(eventData.equipements)) {
+          for (const equipement of eventData.equipements) {
+            const existingEquipement = db.getFirstSync(
+              "SELECT id FROM equipement WHERE id = ?",
+              [equipement.id]
+            );
+
+            // Calculer le point_id à partir de la première coordonnée ou null
+            let pointId = null;
+            if (equipement.coordinates && equipement.coordinates.length > 0) {
+              // Créer un point à partir de la première coordonnée de l'équipement
+              const firstCoord = equipement.coordinates[0];
+              pointId = firstCoord.id;
+              
+              // Insérer ce point s'il n'existe pas
+              const existingCoordPoint = db.getFirstSync(
+                "SELECT id FROM point WHERE id = ?",
+                [firstCoord.id]
+              );
+              
+              if (!existingCoordPoint) {
+                db.runSync(
+                  "INSERT INTO point (id, event_id, x, y, name, comment, type, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                  [
+                    firstCoord.id,
+                    event.id,
+                    firstCoord.x,
+                    firstCoord.y,
+                    `Équipement - Coord ${firstCoord.orderIndex + 1}`,
+                    null,
+                    "equipement",
+                    0,
+                  ]
+                );
+                pointsCount++;
+              }
+            }
+
+            if (!existingEquipement) {
+              db.runSync(
+                "INSERT INTO equipement (id, point_id, type_id, quantity, length) VALUES (?, ?, ?, ?, ?)",
+                [
+                  equipement.id,
+                  pointId,
+                  equipement.typeId,
+                  equipement.quantity || 1,
+                  equipement.lengthPerUnit || 0,
+                ]
+              );
+              equipementsCount++;
+            } else {
+              db.runSync(
+                "UPDATE equipement SET point_id = ?, type_id = ?, quantity = ?, length = ? WHERE id = ?",
+                [
+                  pointId,
+                  equipement.typeId,
+                  equipement.quantity || 1,
+                  equipement.lengthPerUnit || 0,
+                  equipement.id,
+                ]
+              );
+            }
+
+            // Insérer les coordonnées supplémentaires comme points
+            if (equipement.coordinates && equipement.coordinates.length > 1) {
+              for (let i = 1; i < equipement.coordinates.length; i++) {
+                const coord = equipement.coordinates[i];
+                const existingCoord = db.getFirstSync(
+                  "SELECT id FROM point WHERE id = ?",
+                  [coord.id]
+                );
+                
+                if (!existingCoord) {
+                  db.runSync(
+                    "INSERT INTO point (id, event_id, x, y, name, comment, type, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    [
+                      coord.id,
+                      event.id,
+                      coord.x,
+                      coord.y,
+                      `Équipement - Coord ${coord.orderIndex + 1}`,
+                      null,
+                      "equipement",
+                      0,
+                    ]
+                  );
+                  pointsCount++;
+                }
+              }
+            }
+          }
+        }
+
+        // Insérer les actions si présentes
+        if (eventData.actions && Array.isArray(eventData.actions)) {
+          for (const actionData of eventData.actions) {
+            const action = {
+              id: actionData.id,
+              team_id: actionData.teamId || actionData.team_id,
+              equipement_id: actionData.equipementId || actionData.equipement_id,
+              type: actionData.actionType || actionData.type || null,
+              scheduled_time: actionData.scheduledTime || actionData.scheduled_time || null,
+              is_done: actionData.isDone !== undefined 
+                ? (actionData.isDone ? 1 : 0) 
+                : (actionData.is_done !== undefined ? actionData.is_done : 0),
+            };
+            
+            console.log("📝 Insertion action:", action);
+            
+            const existingAction = db.getFirstSync(
+              "SELECT id FROM action WHERE id = ?",
+              [action.id]
+            );
+
+            if (!existingAction) {
+              db.runSync(
+                "INSERT INTO action (id, team_id, equipement_id, type, scheduled_time, is_done) VALUES (?, ?, ?, ?, ?, ?)",
+                [
+                  action.id,
+                  action.team_id,
+                  action.equipement_id,
+                  action.type,
+                  action.scheduled_time,
+                  action.is_done,
+                ]
+              );
+              actionsCount++;
+            } else {
+              db.runSync(
+                "UPDATE action SET team_id = ?, equipement_id = ?, type = ?, scheduled_time = ?, is_done = ? WHERE id = ?",
+                [
+                  action.team_id,
+                  action.equipement_id,
+                  action.type,
+                  action.scheduled_time,
+                  action.is_done,
+                  action.id,
+                ]
+              );
+            }
+          }
+        }
+
+        console.log(`✅ Équipes: ${teamsCount}, Actions: ${actionsCount}, Équipements: ${equipementsCount}`);
       }
 
       console.log(
         `✅ ${insertedCount} événement(s) inséré(s), ${updatedCount} mis à jour`
       );
       console.log(
-        `✅ ${parcoursCount} parcours, ${zonesCount} zones, ${pointsCount} points ajoutés`
+        `✅ ${parcoursCount} parcours, ${zonesCount} zones, ${pointsCount} points`
+      );
+      console.log(
+        `✅ ${equipementsCount} équipements, ${teamsCount} équipes, ${actionsCount} actions`
       );
       setTransferStatus(
-        `${insertedCount} événement(s) ajouté(s), ${updatedCount} mis à jour\n${parcoursCount} parcours, ${zonesCount} zones, ${pointsCount} points`
+        `${insertedCount + updatedCount} événement(s)\n${pointsCount} points, ${equipementsCount} équipements\n${teamsCount} équipes, ${actionsCount} actions`
       );
     } catch (error) {
       console.error("❌ Erreur lors de l'insertion des événements:", error);
@@ -367,16 +619,28 @@ const QRCodeScanner = ({
           });
       } else {
         // Mode RÉCEPTION: attendre les événements du desktop
-        const onEventsReceived = (events: EventType[]) => {
-          console.log("📦 Événements reçus:", events.length);
+        const onEventsReceived = (data: any) => {
+          console.log("📦 Données reçues:", JSON.stringify(data).substring(0, 200));
           try {
-            insertEvents(events);
+            // Normaliser les données reçues en tableau
+            let eventsArray: any[];
+            if (Array.isArray(data)) {
+              eventsArray = data;
+            } else if (data.type === "event" && data.data) {
+              // Nouveau format: {type: "event", data: {...}}
+              eventsArray = [data];
+            } else {
+              // Ancien format: objet événement unique
+              eventsArray = [data];
+            }
+            
+            insertEvents(eventsArray);
             // Rafraîchir tous les contextes pour afficher immédiatement les données
             refreshEvents();
             refreshPoints();
             refreshGeometries();
-            setReceivedCount((prev) => prev + events.length);
-            setTransferStatus(`${events.length} événement(s) reçu(s) !`);
+            setReceivedCount((prev) => prev + eventsArray.length);
+            setTransferStatus(`Événement reçu avec succès !`);
           } catch (error) {
             console.error("Erreur insertion:", error);
             setTransferStatus(`Erreur: ${error}`);

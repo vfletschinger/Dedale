@@ -652,4 +652,33 @@ export const migrations: Migration[] = [
       console.log("✅ Migration v4 terminée");
     },
   },
+  {
+    version: 5,
+    name: "create_action_table",
+    up: (db: SQLiteDatabase) => {
+      console.log("🔄 Migration v5: Création de la table action");
+
+      db.execSync(`
+        CREATE TABLE IF NOT EXISTS action (
+          id TEXT PRIMARY KEY,
+          team_id TEXT NOT NULL,
+          equipement_id TEXT NOT NULL,
+          type TEXT,
+          scheduled_time DATETIME,
+          is_done INTEGER DEFAULT 0,
+          FOREIGN KEY (team_id) REFERENCES team (id) ON DELETE CASCADE,
+          FOREIGN KEY (equipement_id) REFERENCES equipement (id) ON DELETE CASCADE
+        )
+      `);
+
+      db.execSync(
+        "CREATE INDEX IF NOT EXISTS idx_action_team_id ON action(team_id)"
+      );
+      db.execSync(
+        "CREATE INDEX IF NOT EXISTS idx_action_equipement_id ON action(equipement_id)"
+      );
+
+      console.log("✅ Migration v5 terminée");
+    },
+  },
 ];

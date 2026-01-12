@@ -58,6 +58,8 @@ export type TransferEventType = EventType & {
   parcours?: ParcoursType[];
   zones?: ZoneType[];
   points?: InterestPointsType[];
+  teams?: TeamType[];
+  actions?: ActionType[];
 };
 
 export type EventWithGeometries = EventType & {
@@ -103,6 +105,15 @@ export type MemberType = {
   team_id: string; // UUID reference
   person_id: string; // UUID reference
   role?: string;
+};
+
+export type ActionType = {
+  id: string; // UUID
+  team_id: string; // UUID reference
+  equipement_id: string; // UUID reference
+  type?: string | null;
+  scheduled_time?: string | null;
+  is_done?: number; // SQLite BOOLEAN as INTEGER 0/1
 };
 
 export type PointDetailType = {

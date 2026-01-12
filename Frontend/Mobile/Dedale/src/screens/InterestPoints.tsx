@@ -174,6 +174,7 @@ export default function InterestPointsScreen() {
     navigation.navigate("CreateRoute", { points: selectedPoints });
   };
 
+
   if (pointsLoading) {
     return (
       <View className="flex-1 items-center justify-center bg-gray-50">

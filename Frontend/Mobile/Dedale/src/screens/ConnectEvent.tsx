@@ -101,6 +101,7 @@ export default function ConnectEvent() {
     console.log("Équipes:", teamCount?.count ?? 0);
     console.log("Photos:", pictureCount?.count ?? 0);
     console.log("Équipements:", equipementCount?.count ?? 0);
+    console.log("actions:", (event as any).actionCount ?? 0);
     console.log("--- DONNÉES COMPLÈTES ---");
     console.log(JSON.stringify(event, null, 2));
     console.log("========================");
