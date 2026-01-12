@@ -4,6 +4,7 @@ use sqlx::Row;
 use sqlx::Sqlite;
 use tauri::AppHandle;
 
+use crate::db::fetch_equipement_coordinates;
 use crate::db::get_db_pool;
 
 #[tauri::command]
@@ -258,4 +259,70 @@ pub async fn fetch_person_teams(
         .collect();
 
     Ok(teams)
+}
+
+#[tauri::command]
+pub async fn fetch_team_actions(
+    app: AppHandle,
+    team_id: String,
+) -> Result<Vec<EquipementActionComplet>, String> {
+    let pool = get_db_pool(&app).await?;
+
+    let query = r#"
+        SELECT 
+            a.id as action_id,
+            a.type as action_type,
+            e.id as equip_id,
+            e.type_id,
+            e.length_per_unit,
+            e.date_pose,
+            e.date_depose,
+            e.event_id,
+            t.name as type_name,
+            t.description as type_description
+        FROM action a
+        JOIN equipement e ON a.equipement_id = e.id
+        LEFT JOIN type t ON e.type_id = t.id
+        WHERE a.team_id = ?
+    "#;
+
+    let rows = sqlx::query(query)
+        .bind(&team_id)
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let mut results = Vec::new();
+
+    for row in rows {
+        let equip_id: String = row.get("equip_id");
+
+        // Fetch mandatory coordinates
+        let coordinates = fetch_equipement_coordinates(&pool, &equip_id).await?;
+
+        // 1. Build the original struct
+        let base_equipement = EquipementComplet {
+            id: equip_id,
+            type_id: row.get("type_id"),
+            type_name: row.get("type_name"),
+            type_description: row.get("type_description"),
+            length: row.get("length_per_unit"),
+            description: None,
+            date_pose: row.get("date_pose"),
+            hour_pose: None,
+            date_depose: row.get("date_depose"),
+            hour_depose: None,
+            coordinates,
+        };
+
+        // 2. Wrap it in the new Action-specific struct
+        results.push(EquipementActionComplet {
+            equipement: base_equipement,
+            event_id: row.get("event_id"),
+            action_id: Some(row.get("action_id")),
+            action_type: Some(row.get("action_type")),
+        });
+    }
+
+    Ok(results)
 }

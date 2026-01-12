@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use sqlx::FromRow;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Event {
@@ -34,6 +35,7 @@ pub struct Parcours {
     pub speed_high: Option<f64>,
     pub geometry_json: Option<String>,
 }
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Team {
     #[serde(default)]
@@ -210,7 +212,7 @@ pub struct PictureInput {
     pub image: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct EquipementComplet {
     pub id: String,
     pub type_id: Option<String>,
@@ -223,4 +225,22 @@ pub struct EquipementComplet {
     pub date_depose: Option<String>,
     pub hour_depose: Option<String>,
     pub coordinates: Vec<EquipementCoordinate>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Action {
+    pub id: String,
+    pub team_id: String,
+    pub equipement_id: String,
+    pub action_type: Option<String>,
+    pub scheduled_time: Option<String>,
+    pub is_done: Option<bool>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EquipementActionComplet {
+    pub equipement: EquipementComplet,
+    pub event_id: Option<String>,
+    pub action_id: Option<String>,
+    pub action_type: Option<String>,
 }

@@ -119,6 +119,11 @@ export function useMapGeometries(
       filterDate: Date | null = null,
       typeFilter: string[] | null = null // Filtre par type d'équipement
     ) => {
+      // Vérifier que le style est chargé avant de manipuler les sources/layers
+      if (!mapObj.isStyleLoaded()) {
+        return;
+      }
+
       // Nettoyage
       const layersToRemove = [
         "event-geometries-fill",
@@ -341,18 +346,27 @@ export function useMapGeometries(
   useEffect(() => {
     if (!map || !selectedEventId) return;
 
-    // Utiliser un timeout pour éviter l'appel synchrone de setState dans l'effet
-    const timeoutId = setTimeout(() => {
+    const doLoad = () => {
       loadGeometries();
-    }, 0);
+    };
 
-    return () => clearTimeout(timeoutId);
+    // Si le style est déjà chargé, charger immédiatement
+    if (map.isStyleLoaded()) {
+      const timeoutId = setTimeout(doLoad, 0);
+      return () => clearTimeout(timeoutId);
+    } else {
+      // Sinon, attendre que le style soit chargé
+      map.once("load", doLoad);
+      return () => {
+        map.off("load", doLoad);
+      };
+    }
   }, [map, selectedEventId, loadGeometries]);
 
   // ✅ Rafraîchir l'affichage quand le filtre temporel ou le filtre de type change
   useEffect(() => {
     if (!map) return;
-    
+
     // Redessiner les géométries avec les nouveaux filtres
     refreshGeometriesOnMap(map, zones, parcours, equipements, timelineFilterDate, equipementTypeFilter);
   }, [map, timelineFilterDate, equipementTypeFilter, zones, parcours, equipements, refreshGeometriesOnMap]);

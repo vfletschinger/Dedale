@@ -72,9 +72,10 @@ pub async fn fetch_points(
 #[tauri::command]
 pub async fn update_point(app: AppHandle, point: Point) -> Result<Point, String> {
     let pool = get_db_pool(&app).await?;
-    sqlx::query("UPDATE point SET x = ?, y = ?, comment = ?, type = ?, status = ?, event_id = ? WHERE id = ?")
+    sqlx::query("UPDATE point SET x = ?, y = ?, name = ?, comment = ?, type = ?, status = ?, event_id = ? WHERE id = ?")
         .bind(point.x)
         .bind(point.y)
+        .bind(&point.name)
         .bind(&point.comment)
         .bind(&point.r#type)
         .bind(point.status)
@@ -88,7 +89,7 @@ pub async fn update_point(app: AppHandle, point: Point) -> Result<Point, String>
 }
 #[tauri::command]
 pub async fn fetch_pictures(app: AppHandle, point_id: String) -> Result<Vec<Picture>, String> {
-    let rows = sqlx::query("SELECT id, image, point_id FROM picture WHERE point_id = ?")
+    let rows = sqlx::query("SELECT id, image_data, point_id FROM picture WHERE point_id = ?")
         .bind(point_id)
         .fetch_all(&get_db_pool(&app).await?)
         .await
@@ -98,7 +99,7 @@ pub async fn fetch_pictures(app: AppHandle, point_id: String) -> Result<Vec<Pict
         .into_iter()
         .map(|row| Picture {
             id: row.get("id"),
-            image: row.get("image"),
+            image: row.get("image_data"),
             point_id: row.get("point_id"),
         })
         .collect();
@@ -291,18 +292,19 @@ pub async fn retrieve_data_by_event(
         let id: String = row.get("id");
 
         // Récupérer les photos pour ce point
-        let pictures = sqlx::query(r#"SELECT id, point_id, image FROM picture WHERE point_id = ?"#)
-            .bind(&id)
-            .fetch_all(&pool)
-            .await
-            .map_err(|e| e.to_string())?
-            .into_iter()
-            .map(|pic_row| Picture {
-                id: pic_row.get("id"),
-                point_id: pic_row.get("point_id"),
-                image: pic_row.get("image"),
-            })
-            .collect();
+        let pictures =
+            sqlx::query(r#"SELECT id, point_id, image_data FROM picture WHERE point_id = ?"#)
+                .bind(&id)
+                .fetch_all(&pool)
+                .await
+                .map_err(|e| e.to_string())?
+                .into_iter()
+                .map(|pic_row| Picture {
+                    id: pic_row.get("id"),
+                    point_id: pic_row.get("point_id"),
+                    image: pic_row.get("image_data"),
+                })
+                .collect();
 
         points.push(PointWithDetails {
             id,

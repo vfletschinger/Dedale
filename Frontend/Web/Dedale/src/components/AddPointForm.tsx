@@ -1,8 +1,6 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
-
-
 export default function AddPointForm({
   initialCoords,
   onClose,
@@ -14,15 +12,13 @@ export default function AddPointForm({
   onSaved?: () => void;
   eventId?: string | null;
 }) {
-  const [x] = useState<number>(initialCoords.lng);
-  const [y] = useState<number>(initialCoords.lat);
+  const [x, setX] = useState<number>(initialCoords.lng);
+  const [y, setY] = useState<number>(initialCoords.lat);
   const [name, setName] = useState<string>("");
   const [comment, setComment] = useState<string>("");
   const [type, setType] = useState<string>("info");
   const [status, setStatus] = useState<boolean>(false);
   const [saving, setSaving] = useState(false);
-
-  // Pas d'appels asynchrones initiaux car le schéma est simple
 
   async function handleSave() {
     if (!eventId) {
@@ -33,7 +29,6 @@ export default function AddPointForm({
 
     setSaving(true);
     try {
-      // Structure simple correspondant au schéma : id, event_id, x, y, comment, type, status, name
       const point = {
         id: "",
         event_id: eventId,
@@ -63,19 +58,19 @@ export default function AddPointForm({
   }
 
   return (
-    <div className="h-full flex flex-col bg-linear-to-b from-white to-gray-50">
+    <div className="h-full flex flex-col bg-white">
       {/* Header */}
-      <div className="p-4 bg-linear-to-r from-emerald-500 to-teal-600 text-white">
+      <div className="p-6 border-b border-gray-200 bg-white">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-bold">➕ Nouveau Point</h2>
-            <div className="text-white/80 text-sm mt-1">
-              Ajoutez un point d'intérêt sur la carte
-            </div>
+            <h2 className="text-2xl font-bold text-gray-900">Nouveau point</h2>
+            <p className="text-gray-500 text-sm mt-1">
+              Créer un nouveau point d'intérêt
+            </p>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
           >
             ✕
           </button>
@@ -83,92 +78,118 @@ export default function AddPointForm({
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {/* Nom du point Section */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-4 py-3 bg-linear-to-r from-emerald-50 to-teal-50 border-b border-emerald-100 flex items-center gap-2">
-            <span className="text-xl">🏷️</span>
-            <span className="font-semibold text-gray-800">Nom du point</span>
-          </div>
-          <div className="p-4">
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Nouveau point"
-              className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-gray-50 transition-all"
-            />
+      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        {/* Nom du point */}
+        <div>
+          <label className="block text-sm font-semibold text-gray-900 mb-2">
+            Nom du point
+          </label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Entrer le nom du point"
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+          />
+        </div>
+
+        {/* Coordonnées */}
+        <div>
+          <label className="block text-sm font-semibold text-gray-900 mb-3">
+            Coordonnées
+          </label>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">Longitude</label>
+              <input
+                type="number"
+                step="0.000001"
+                value={x}
+                onChange={(e) => setX(Number(e.target.value))}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">Latitude</label>
+              <input
+                type="number"
+                step="0.000001"
+                value={y}
+                onChange={(e) => setY(Number(e.target.value))}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+              />
+            </div>
           </div>
         </div>
 
         {/* Type et Statut Section */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-4 py-3 bg-linear-to-r from-purple-50 to-pink-50 border-b border-purple-100 flex items-center gap-2">
+          <div className="px-4 py-3 bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple-100 flex items-center gap-2">
             <span className="text-xl">🏷️</span>
             <span className="font-semibold text-gray-800">Type et Statut</span>
           </div>
           <div className="p-4 space-y-3">
+            {/* Type */}
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Type</label>
+              <label className="block text-sm font-semibold text-gray-900 mb-2">
+                Type
+              </label>
               <select
                 value={type}
                 onChange={(e) => setType(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-gray-50 transition-all"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
               >
-                <option value="info">ℹ️ Information</option>
-                <option value="danger">⚠️ Danger</option>
-                <option value="obstacle">🚧 Obstacle</option>
-                <option value="point">📍 Point</option>
+                <option value="info">Information</option>
+                <option value="danger">Danger</option>
+                <option value="obstacle">Obstacle</option>
+                <option value="point">Point</option>
               </select>
             </div>
-            <div className="flex items-center gap-3">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={status}
-                  onChange={(e) => setStatus(e.target.checked)}
-                  className="w-4 h-4 accent-purple-600 rounded"
-                />
-                <span className="text-sm font-medium text-gray-700">Marquer comme traité</span>
-              </label>
-            </div>
+
+            {/* Statut */}
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={status}
+                onChange={(e) => setStatus(e.target.checked)}
+                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <span className="text-sm font-medium text-gray-700">Marquer comme traité</span>
+            </label>
           </div>
         </div>
 
-        {/* Commentaire Section */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-4 py-3 bg-linear-to-r from-blue-50 to-indigo-50 border-b border-blue-100 flex items-center gap-2">
-            <span className="text-xl">💬</span>
-            <span className="font-semibold text-gray-800">Commentaire</span>
-          </div>
-          <div className="p-4">
-            <textarea
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              placeholder="Ajouter un commentaire (optionnel)"
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 resize-none transition-all"
-            />
-          </div>
+        {/* Commentaire */}
+        <div>
+          <label className="block text-sm font-semibold text-gray-900 mb-2">
+            Commentaire (optionnel)
+          </label>
+          <textarea
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            placeholder="Ajouter un commentaire..."
+            rows={4}
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white resize-none"
+          />
         </div>
+      </div>
 
-        {/* Footer Actions */}
-        <div className="p-4 border-t border-gray-100 bg-white flex gap-3">
-          <button
-            onClick={onClose}
-            disabled={saving}
-            className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl transition-colors disabled:opacity-50"
-          >
-            Annuler
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex-1 px-4 py-3 bg-linear-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-semibold rounded-xl transition-all shadow-sm hover:shadow-md disabled:opacity-50"
-          >
-            {saving ? "⏳ Enregistrement..." : "✓ Ajouter le point"}
-          </button>
-        </div>
+      {/* Footer Actions */}
+      <div className="p-6 border-t border-gray-200 bg-gray-50 flex gap-3">
+        <button
+          onClick={onClose}
+          disabled={saving}
+          className="flex-1 px-4 py-2.5 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Annuler
+        </button>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {saving ? "Enregistrement..." : "Ajouter le point"}
+        </button>
       </div>
     </div>
   );

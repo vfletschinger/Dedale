@@ -11,12 +11,14 @@ pub mod geos;
 pub mod persons;
 pub mod points;
 pub mod teams;
+pub mod planning;
 pub use equipements::*;
 pub use events::*;
 pub use geos::*;
 pub use persons::*;
 pub use points::*;
 pub use teams::*;
+pub use planning::*;
 // Réexporter les types depuis le module types
 pub use crate::types::*;
 
@@ -269,6 +271,13 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
     let _ = sqlx::query("ALTER TABLE equipement ADD COLUMN description TEXT")
         .execute(&pool)
         .await; // Ignore l'erreur si la colonne existe déjà
+    sqlx::query(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_action_per_equipement 
+         ON action (equipement_id, type);",
+    )
+    .execute(&pool)
+    .await
+    .map_err(|e| format!("Error creating unique action index: {}", e))?;
 
     println!("[DB] Toutes les tables ont été synchronisées avec le diagramme ER.");
 

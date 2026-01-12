@@ -3,11 +3,12 @@ import { listen } from "@tauri-apps/api/event";
 import { useState, useEffect } from "react";
 
 // Types
-interface Event {
+export interface Event {
   id: string;
   name: string;
   start_date: string;
   end_date: string;
+  statut: string;
 }
 
 interface EventsProps {
