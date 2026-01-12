@@ -3,8 +3,33 @@ use crate::types::*;
 use sqlx::Row;
 use tauri::AppHandle;
 use uuid::Uuid;
-use std::time::{SystemTime, UNIX_EPOCH};
+use serde::Serialize;
 
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TransferEquipement {
+    pub id: String,
+    pub event_id: String,
+    pub type_id: String,
+    pub quantity: i32,
+    pub length_per_unit: f64,
+    pub date_pose: Option<String>,
+    pub date_depose: Option<String>,
+    pub coordinates: Vec<TransferEquipementCoordinate>,
+}
+
+
+/// Structure pour un event envoyé au mobile (avec noms camelCase pour compatibilité)
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TransferEquipementCoordinate {
+    pub id: String,
+    pub equipement_id: String,
+    pub x: f64,
+    pub y: f64,
+    pub order_index: Option<i32>,
+}
 // ============================================
 // TYPES D'ÉQUIPEMENTS
 // ============================================
@@ -381,4 +406,63 @@ pub async fn delete_action(app: AppHandle, action_id: String) -> Result<(), Stri
 
     println!("[DB] 🗑️ Action {} supprimée", action_id);
     Ok(())
+}
+
+#[tauri::command]
+pub async fn send_equipements_to_mobile(
+    event_id: String,
+    app: AppHandle
+) -> Result<Vec<TransferEquipement>, String> {
+    let pool = get_db_pool(&app).await?;
+
+    // Récupérer tous les équipements de l'événement
+    let equipements = sqlx::query_as::<_, (String, String, String, Option<i32>, Option<i32>, Option<String>, Option<String>)>(
+        "SELECT id, event_id, type_id, quantity, length_per_unit, date_pose, date_depose 
+         FROM equipement 
+         WHERE event_id = ?"
+    )
+    .bind(&event_id)
+    .fetch_all(&pool)
+    .await
+    .map_err(|e| format!("Erreur récupération équipements: {}", e))?;
+
+    // Pour chaque équipement, récupérer ses coordonnées
+    let mut equipements_with_coords: Vec<TransferEquipement> = Vec::new();
+
+    for (id, event_id, type_id, quantity, length_per_unit, date_pose, date_depose) in equipements {
+        let coordinates = sqlx::query_as::<_, (String, f64, f64, Option<i32>)>(
+            "SELECT id, x, y, order_index 
+             FROM equipement_coordinate 
+             WHERE equipement_id = ? 
+             ORDER BY order_index ASC"
+        )
+        .bind(&id)
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| format!("Erreur récupération coordonnées: {}", e))?
+        .into_iter()
+        .map(|(coord_id, x, y, order_index)| {
+            TransferEquipementCoordinate {
+                id: coord_id,
+                equipement_id: id.clone(),
+                x,
+                y,
+                order_index,
+            }
+        })
+        .collect::<Vec<_>>();
+
+        equipements_with_coords.push(TransferEquipement {
+            id,
+            event_id,
+            type_id,
+            quantity: quantity.unwrap_or(0),
+            length_per_unit: length_per_unit.unwrap_or(0) as f64,
+            date_pose,
+            date_depose,
+            coordinates,
+        });
+    }
+
+    Ok(equipements_with_coords)
 }

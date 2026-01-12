@@ -101,56 +101,6 @@ export default function Planning({
     };
   }, [activeEventId, loadTeamsWithActions]);
 
-  // Exporter en Excel
-  const exportToExcel = useCallback(async () => {
-    setMessage(null);
-    try {
-      const appDataPath = await path.appDataDir();
-      if (!appDataPath) throw new Error("Impossible de récupérer AppData");
-
-      const db_url = await path.join(appDataPath, "mydatabase.db");
-      const filename = `planning_${activeEventId || "all"}.xlsx`;
-      const excel_path_str = await path.join(appDataPath, filename);
-
-      await invoke("export_planning_excel", {
-        dbUrl: db_url,
-        excelPathStr: excel_path_str,
-        eventId: activeEventId || null,
-      });
-
-      setMessage({
-        type: "success",
-        text: `Planning exporté avec succès : ${filename}`,
-      });
-    } catch (error) {
-      console.error("Erreur export Excel:", error);
-      setMessage({
-        type: "error",
-        text: `Erreur export: ${String(error)}`,
-      });
-    }
-  }, [activeEventId]);
-
-  // Générer PDF
-  const generatePDF = useCallback(async () => {
-    setMessage(null);
-    try {
-      await invoke("create_planning_pdf", {
-        eventId: activeEventId || null,
-      });
-
-      setMessage({
-        type: "success",
-        text: "PDF de planning généré avec succès",
-      });
-    } catch (error) {
-      console.error("Erreur PDF:", error);
-      setMessage({
-        type: "error",
-        text: `Erreur PDF: ${String(error)}`,
-      });
-    }
-  }, [activeEventId]);
 
   // Générer PDF pour une équipe spécifique
   const generateTeamPDF = useCallback(async (teamId: string, teamName: string) => {

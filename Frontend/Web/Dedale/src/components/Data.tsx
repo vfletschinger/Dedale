@@ -387,6 +387,49 @@ function Data() {
               </div>
             )}
         </div>
+
+        {/* Section: Export des données */}
+        <div className="bg-white border border-gray-200 rounded-xl p-10 shadow-sm mt-8">
+          <h2 className="text-2xl font-bold text-gray-900 mb-8">
+            Export des Données
+          </h2>
+
+          {/* Sélection d'événement */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Événement (optionnel)
+            </label>
+            <select
+              value={selectedEventId}
+              onChange={(e) => setSelectedEventId(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">Tous les événements</option>
+              {events.map((event) => (
+                <option key={event.id} value={event.id}>
+                  {event.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Boutons d'export */}
+          <div className="grid md:grid-cols-2 gap-4">
+            <button
+              onClick={generate_excel}
+              className={exportBtnClass}
+            >
+              📊 Exporter en Excel
+            </button>
+            <button
+              onClick={createPdf}
+              className={pdfBtnClass}
+            >
+              📄 Générer PDF
+            </button>
+          </div>
+        </div>
+
       </div>
     </div>
   );
