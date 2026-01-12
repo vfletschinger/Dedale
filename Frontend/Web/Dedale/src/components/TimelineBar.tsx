@@ -347,13 +347,6 @@ function TimelineBar({
               const endP = getPositionPercent(eq.date_depose, eq.hour_depose);
               const hasStart = startP >= 0;
               const hasEnd = endP >= 0;
-              let left = 0, width = 0;
-
-              if (hasStart && hasEnd) {
-                left = startP;
-                width = Math.max(0.2, endP - startP);
-              } else if (hasStart) { left = startP; } 
-              else if (hasEnd) { left = endP; }
 
               return (
                 <div 
@@ -362,20 +355,34 @@ function TimelineBar({
                   onClick={() => onEquipementClick?.(eq)}
                 >
                   {/* Label Equipement */}
-                  <div className="sticky left-0 z-20 w-32 truncate text-[10px] font-medium text-slate-500 group-hover:text-blue-600 bg-slate-50/90 group-hover:bg-white px-2 py-0.5 rounded backdrop-blur-sm border-r border-transparent group-hover:border-slate-100">
+                  <div className="shrink-0 z-20 w-32 truncate text-[10px] font-medium text-slate-500 group-hover:text-blue-600 bg-slate-50/90 group-hover:bg-white px-2 py-0.5 rounded backdrop-blur-sm border-r border-transparent group-hover:border-slate-100">
                      {eq.type_name || `EQ #${eq.id}`}
                   </div>
 
-                  {/* Barre */}
-                  <div className="absolute left-0 w-full h-full pointer-events-none">
+                  {/* Barre - commence après le label */}
+                  <div className="relative flex-1 h-full">
+                    {/* Barre bleue entre pose et dépose */}
                     {hasStart && hasEnd && (
-                      <div className="absolute h-1.5 top-1/2 -translate-y-1/2 bg-blue-300/60 rounded-full group-hover:bg-blue-400" style={{ left: `${left}%`, width: `${width}%` }} />
+                      <div 
+                        className="absolute h-1.5 top-1/2 -translate-y-1/2 bg-blue-300/60 rounded-full group-hover:bg-blue-400" 
+                        style={{ left: `${startP}%`, width: `${Math.max(0.5, endP - startP)}%` }} 
+                      />
                     )}
+                    {/* Point de Pose (vert) */}
                     {hasStart && (
-                      <div className="absolute w-2 h-2 top-1/2 -translate-y-1/2 -translate-x-1/2 bg-green-500 rounded-full z-10" style={{ left: `${startP}%` }} title="Pose" />
+                      <div 
+                        className="absolute w-3 h-3 top-1/2 -translate-y-1/2 -translate-x-1/2 bg-green-500 rounded-full z-20 border border-white shadow-sm" 
+                        style={{ left: `${startP}%` }} 
+                        title="Pose" 
+                      />
                     )}
+                    {/* Point de Dépose (rouge) */}
                     {hasEnd && (
-                      <div className="absolute w-2 h-2 top-1/2 -translate-y-1/2 -translate-x-1/2 bg-red-500 rounded-full z-10" style={{ left: `${endP}%` }} title="Dépose" />
+                      <div 
+                        className="absolute w-3 h-3 top-1/2 -translate-y-1/2 -translate-x-1/2 bg-red-500 rounded-full z-20 border border-white shadow-sm" 
+                        style={{ left: `${endP}%` }} 
+                        title="Dépose" 
+                      />
                     )}
                   </div>
                 </div>

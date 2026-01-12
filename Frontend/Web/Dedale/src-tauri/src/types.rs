@@ -210,7 +210,7 @@ pub struct PictureInput {
     pub image: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct EquipementComplet {
     pub id: String,
     pub type_id: Option<String>,

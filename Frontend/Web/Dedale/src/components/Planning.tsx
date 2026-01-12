@@ -29,6 +29,7 @@ export default function Planning({
 }) {
   const [teams, setTeams] = useState<TeamWithActions[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [generatingPdfForTeam, setGeneratingPdfForTeam] = useState<string | null>(null);
   const [message, setMessage] = useState<{
     type: "success" | "error" | "info";
     text: string;
@@ -100,54 +101,29 @@ export default function Planning({
     };
   }, [activeEventId, loadTeamsWithActions]);
 
-  // Exporter en Excel
-  const exportToExcel = useCallback(async () => {
+
+  // Générer PDF pour une équipe spécifique
+  const generateTeamPDF = useCallback(async (teamId: string, teamName: string) => {
     setMessage(null);
+    setGeneratingPdfForTeam(teamId);
     try {
-      const appDataPath = await path.appDataDir();
-      if (!appDataPath) throw new Error("Impossible de récupérer AppData");
-
-      const db_url = await path.join(appDataPath, "mydatabase.db");
-      const filename = `planning_${activeEventId || "all"}.xlsx`;
-      const excel_path_str = await path.join(appDataPath, filename);
-
-      await invoke("export_planning_excel", {
-        dbUrl: db_url,
-        excelPathStr: excel_path_str,
-        eventId: activeEventId || null,
+      await invoke("create_team_mission_pdf", {
+        teamId,
+        eventId: activeEventId,
       });
 
       setMessage({
         type: "success",
-        text: `Planning exporté avec succès : ${filename}`,
+        text: `PDF généré avec succès pour ${teamName}`,
       });
     } catch (error) {
-      console.error("Erreur export Excel:", error);
-      setMessage({
-        type: "error",
-        text: `Erreur export: ${String(error)}`,
-      });
-    }
-  }, [activeEventId]);
-
-  // Générer PDF
-  const generatePDF = useCallback(async () => {
-    setMessage(null);
-    try {
-      await invoke("create_planning_pdf", {
-        eventId: activeEventId || null,
-      });
-
-      setMessage({
-        type: "success",
-        text: "PDF de planning généré avec succès",
-      });
-    } catch (error) {
-      console.error("Erreur PDF:", error);
+      console.error("Erreur PDF équipe:", error);
       setMessage({
         type: "error",
         text: `Erreur PDF: ${String(error)}`,
       });
+    } finally {
+      setGeneratingPdfForTeam(null);
     }
   }, [activeEventId]);
 
@@ -218,24 +194,6 @@ export default function Planning({
           </div>
         )}
 
-        {/* Actions Export */}
-        <div className="grid md:grid-cols-2 gap-4 mb-8">
-          <button
-            onClick={exportToExcel}
-            disabled={isLoading}
-            className="px-6 py-2.5 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
-          >
-            Exporter en Excel
-          </button>
-          <button
-            onClick={generatePDF}
-            disabled={isLoading}
-            className="px-6 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-          >
-            Générer PDF
-          </button>
-        </div>
-
         {/* Loading */}
         {isLoading ? (
           <div className="text-center py-12">
@@ -252,14 +210,39 @@ export default function Planning({
                 key={team.id}
                 className="bg-white border border-gray-200 rounded-lg overflow-hidden"
               >
-                {/* Team Header */}
-                <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-                  <h2 className="text-lg font-bold text-gray-900">
-                    {team.name}
-                  </h2>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {team.actions.length} action(s)
-                  </p>
+                {/* Team Header avec bouton PDF */}
+                <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-bold text-gray-900">
+                      {team.name}
+                    </h2>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {team.actions.length} action(s)
+                    </p>
+                  </div>
+                  {/* Bouton PDF pour cette équipe */}
+                  <button
+                    onClick={() => generateTeamPDF(team.id, team.name)}
+                    disabled={generatingPdfForTeam === team.id}
+                    className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {generatingPdfForTeam === team.id ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        Génération...
+                      </>
+                    ) : (
+                      <>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        📥 PDF Équipe
+                      </>
+                    )}
+                  </button>
                 </div>
 
                 {/* Actions List */}

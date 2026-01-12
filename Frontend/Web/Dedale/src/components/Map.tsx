@@ -80,8 +80,6 @@ function OfflineMapLibre({
     startDrawEquipment,
     cancelDrawing,
     saveEditGeometry,
-    handleDeleteGeometry,
-    startEditGeometry,
     cancelEditGeometry,
     highlightGeometry,
     pendingParcoursGeometry,
