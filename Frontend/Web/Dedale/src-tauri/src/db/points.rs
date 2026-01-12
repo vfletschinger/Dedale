@@ -131,6 +131,7 @@ pub async fn fetch_equipement_details(
             e.id,
             e.type_id,
             e.length,
+            e.description,
             e.date_pose,
             e.hour_pose,
             e.date_depose,
@@ -161,6 +162,7 @@ pub async fn fetch_equipement_details(
                 type_name: row.get("type_name"),
                 type_description: row.get("type_description"),
                 length: row.get("length"),
+                description: row.get("description"),
                 // Attention aux types de dates:
                 // Si stocké en TEXT (ISO 8601), .get::<String, _> fonctionne.
                 // Si vous utilisez chrono, utilisez .get::<NaiveDate, _>
@@ -327,19 +329,20 @@ pub async fn insert_point(app: AppHandle, point: PointWithDetails) -> Result<Vec
 
     let id = Uuid::new_v4().to_string();
     sqlx::query(
-        "INSERT OR IGNORE INTO point (id, event_id,x,y,comment,type,status) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT OR IGNORE INTO point (id, event_id, x, y, name, comment, type, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     )
-    .bind(id)
+    .bind(&id)
     .bind(point.event_id.clone())
     .bind(point.x)
     .bind(point.y)
+    .bind(point.name.clone())
     .bind(point.comment.clone())
     .bind(point.r#type.clone())
     .bind(point.status.clone())
     .execute(&pool)
     .await
-    .map_err(|e| format!("Failed to link point to event: {}", e))?;
-    Ok(vec![point.id.clone()])
+    .map_err(|e| format!("Failed to insert point: {}", e))?;
+    Ok(vec![id])
 }
 
 #[tauri::command]

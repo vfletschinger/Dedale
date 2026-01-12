@@ -103,6 +103,7 @@ pub async fn seed_default_equipment_types(app: AppHandle) -> Result<(), String> 
         let default_types = vec![
             ("Barrière", "Barrière de sécurité standard"),
             ("Bloc de béton", "Bloc de béton pour sécurisation"),
+            ("Véhicule", "Véhicule de blocage ou de sécurisation"),
         ];
 
         for (name, description) in default_types {
@@ -133,6 +134,7 @@ pub async fn create_equipement(
     type_id: String,
     quantity: i32,
     length_per_unit: i32,
+    description: Option<String>,
     date_pose: String,
     date_depose: String,
     coordinates: Vec<(f64, f64)>, // Liste de (x, y) représentant la ligne
@@ -142,14 +144,15 @@ pub async fn create_equipement(
 
     // 1. Créer l'équipement
     sqlx::query(
-        "INSERT INTO equipement (id, event_id, type_id, quantity, length_per_unit, date_pose, date_depose) 
-         VALUES (?, ?, ?, ?, ?, ?, ?)"
+        "INSERT INTO equipement (id, event_id, type_id, quantity, length_per_unit, description, date_pose, date_depose) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
     )
     .bind(&equipement_id)
     .bind(&event_id)
     .bind(&type_id)
     .bind(quantity)
     .bind(length_per_unit)
+    .bind(&description)
     .bind(&date_pose)
     .bind(&date_depose)
     .execute(&pool)
@@ -201,6 +204,7 @@ pub async fn create_equipement(
         type_name,
         type_description,
         length: Some(length_per_unit),
+        description,
         date_pose: Some(date_pose.clone()),
         hour_pose: None,
         date_depose: Some(date_depose.clone()),
@@ -218,7 +222,7 @@ pub async fn fetch_equipements_for_event(
 
     // Récupérer tous les équipements de l'événement avec le nom du type
     let rows = sqlx::query(
-        "SELECT e.id, e.type_id, e.quantity, e.length_per_unit, e.date_pose, e.date_depose,
+        "SELECT e.id, e.type_id, e.quantity, e.length_per_unit, e.description, e.date_pose, e.date_depose,
                 t.name as type_name, t.description as type_description
          FROM equipement e
          LEFT JOIN type t ON e.type_id = t.id
@@ -263,6 +267,7 @@ pub async fn fetch_equipements_for_event(
             type_name: row.get("type_name"),
             type_description: row.get("type_description"),
             length: row.get("length_per_unit"),
+            description: row.get("description"),
             date_pose: row.get("date_pose"),
             hour_pose: None,
             date_depose: row.get("date_depose"),
@@ -302,17 +307,19 @@ pub async fn update_equipement(
     type_id: String,
     quantity: i32,
     length_per_unit: i32,
+    description: Option<String>,
     date_pose: String,
     date_depose: String,
 ) -> Result<(), String> {
     let pool = get_db_pool(&app).await?;
 
     sqlx::query(
-        "UPDATE equipement SET type_id = ?, quantity = ?, length_per_unit = ?, date_pose = ?, date_depose = ? WHERE id = ?"
+        "UPDATE equipement SET type_id = ?, quantity = ?, length_per_unit = ?, description = ?, date_pose = ?, date_depose = ? WHERE id = ?"
     )
     .bind(&type_id)
     .bind(quantity)
     .bind(length_per_unit)
+    .bind(&description)
     .bind(&date_pose)
     .bind(&date_depose)
     .bind(&equipement_id)

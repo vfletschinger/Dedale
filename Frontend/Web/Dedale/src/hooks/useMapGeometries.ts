@@ -59,6 +59,10 @@ export function useMapGeometries(
   const [pendingInterestGeometry, setPendingInterestGeometry] = useState<
     string | null
   >(null);
+  // État pour stocker la géométrie d'une zone en attente de validation
+  const [pendingZoneGeometry, setPendingZoneGeometry] = useState<
+    string | null
+  >(null);
   // État pour stocker les coordonnées d'un équipement en attente de validation
   const [pendingEquipmentData, setPendingEquipmentData] = useState<{
     coordinates: [number, number][];
@@ -150,7 +154,7 @@ export function useMapGeometries(
           return {
             type: "Feature",
             geometry,
-            properties: { id: z.id, type: "zone", event_id: z.event_id },
+            properties: { id: z.id, type: "zone", event_id: z.event_id, color: z.color || "#6366f1" },
           } as GeoJSON.Feature;
         })
         .filter((f): f is GeoJSON.Feature => f !== null);
@@ -183,7 +187,7 @@ export function useMapGeometries(
           type: "fill",
           source: "event-geometries",
           filter: ["==", ["geometry-type"], "Polygon"],
-          paint: { "fill-color": "#6366f1", "fill-opacity": 0.3 },
+          paint: { "fill-color": ["get", "color"], "fill-opacity": 0.3 },
         });
 
         mapObj.addLayer({
@@ -196,12 +200,7 @@ export function useMapGeometries(
             ["==", ["geometry-type"], "Polygon"],
           ],
           paint: {
-            "line-color": [
-              "case",
-              ["==", ["get", "type"], "parcours"],
-              "#ef4444", // Rouge Parcours
-              "#4f46e5", // Bleu Zones
-            ],
+            "line-color": ["get", "color"],
             "line-width": 3,
           },
         });
@@ -429,16 +428,10 @@ export function useMapGeometries(
         const geomType = feature.geometry.type;
 
         if (geomType === "Polygon") {
-          await invoke("create_zone", {
-            eventId: String(currentEventId),
-            geom: wkt,
-            name: "Nouvelle Zone",
-            color: "#6366f1",
-          });
+          // Pour les zones, on stocke la géométrie et on attend le formulaire
+          setPendingZoneGeometry(wkt);
           draw.deleteAll();
           draw.changeMode("simple_select");
-          await loadGeometries();
-          setDrawingMode("none");
         } else if (geomType === "LineString") {
           // Différencier entre parcours et équipement selon le mode de dessin
           if (currentDrawingMode === "equipment") {
@@ -741,20 +734,20 @@ export function useMapGeometries(
       // On redirige vers la bonne commande Rust selon le type
       if (editingGeometry.type === "zone") {
         await invoke("update_zone", {
-          geometry_id: editingGeometry.id,
+          geometryId: editingGeometry.id,
           geom: wkt,
           name: "Zone",
           color: "#6366f1",
         });
       } else {
         await invoke("update_parcours", {
-          geometry_id: editingGeometry.id,
+          geometryId: editingGeometry.id,
           geom: wkt,
           name: "Parcours",
           color: "#ef4444",
-          start_time: null,
-          speed_low: null,
-          speed_high: null,
+          startTime: null,
+          speedLow: null,
+          speedHigh: null,
         });
       }
 
@@ -861,11 +854,43 @@ export function useMapGeometries(
     setDrawingMode("none");
   };
 
+  // Fonction pour sauvegarder la zone avec les détails du formulaire
+  const saveZoneWithDetails = async (data: {
+    name: string;
+    color: string;
+    description: string;
+  }) => {
+    if (!pendingZoneGeometry || !selectedEventId) return;
+
+    try {
+      await invoke("create_zone", {
+        eventId: String(selectedEventId),
+        geom: pendingZoneGeometry,
+        name: data.name,
+        color: data.color,
+        description: data.description || null,
+      });
+
+      setPendingZoneGeometry(null);
+      setDrawingMode("none");
+      loadGeometries();
+    } catch (err) {
+      console.error("Erreur création zone:", err);
+      alert("Erreur lors de la création de la zone");
+    }
+  };
+
+  const cancelZoneForm = () => {
+    setPendingZoneGeometry(null);
+    setDrawingMode("none");
+  };
+
   // Fonction pour sauvegarder l'équipement avec les détails du formulaire
   const saveEquipmentWithDetails = async (data: {
     type_id: string;
     length_per_unit: number;
     quantity: number;
+    description: string;
     date_pose: string;
     date_depose: string;
   }) => {
@@ -877,6 +902,7 @@ export function useMapGeometries(
         typeId: data.type_id,
         quantity: data.quantity,
         lengthPerUnit: data.length_per_unit,
+        description: data.description || null,
         datePose: data.date_pose,
         dateDepose: data.date_depose,
         coordinates: pendingEquipmentData.coordinates.map(([x, y]) => [x, y]),
@@ -928,10 +954,13 @@ export function useMapGeometries(
     highlightGeometry,
     pendingParcoursGeometry,
     pendingInterestGeometry,
+    pendingZoneGeometry,
     saveParcoursWithDetails,
     saveInterestWithDetails,
+    saveZoneWithDetails,
     cancelInterestForm,
     cancelParcoursForm,
+    cancelZoneForm,
     // Équipements
     pendingEquipmentData,
     saveEquipmentWithDetails,

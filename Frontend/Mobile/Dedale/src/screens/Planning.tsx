@@ -406,18 +406,3 @@ export default function PlanningScreen() {
     </SafeAreaView>
   );
 }
-
-function invoke(arg0: string, arg1: { teamId: string; eventId: any; }) {
-  throw new Error("Function not implemented.");
-}
-
-const invoke = async (
-  command: string,
-  args: Record<string, any>
-): Promise<void> => {
-  try {
-    if (command === "create_team_mission_pdf") {
-function invoke(arg0: string, arg1: { teamId: string; eventId: any; }) {
-  throw new Error("Function not implemented.");
-}
-

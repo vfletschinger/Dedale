@@ -11,6 +11,8 @@ export function useMapPoints(
   // --- ÉTATS ---
   const [points, setPoints] = useState<MapPoint[]>([]);
   const pointsRef = useRef<MapPoint[]>([]);
+  const [interests, setInterests] = useState<MapInterest[]>([]);
+  const interestsRef = useRef<MapInterest[]>([]);
   const [selectedPoint, setSelectedPoint] = useState<MapPoint | null>(null);
 
   // États pour l'ajout de point
@@ -64,6 +66,8 @@ export function useMapPoints(
       });
 
       console.log(`${freshInterests.length} point(s) d'intérêt récupéré(s)`);
+      interestsRef.current = freshInterests;
+      setInterests(freshInterests);
 
       // Mettre à jour la source de la carte directement
       if (map && map.getSource("db-interests")) {
@@ -374,6 +378,7 @@ export function useMapPoints(
 
   return {
     points,
+    interests,
     selectedPoint,
     setSelectedPoint,
     addingPointCoords,

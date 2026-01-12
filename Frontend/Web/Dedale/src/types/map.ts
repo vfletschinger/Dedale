@@ -10,6 +10,7 @@ export interface Zone {
   name: string;
   event_id: string;
   color: string;
+  description?: string;
   geometry_json: string;
 }
 
@@ -96,6 +97,7 @@ export interface Equipement {
   type_name?: string;
   type_description?: string;
   length?: number;
+  description?: string;
   date_pose?: string;
   hour_pose?: string;
   date_depose?: string;

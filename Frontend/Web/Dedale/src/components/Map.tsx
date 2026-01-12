@@ -12,6 +12,7 @@ import ParcoursForm from "./ParcoursForm";
 import InterestForm from "./InterestForm";
 import EquipementForm from "./EquipementForm";
 import EquipementTypeFilter from "./EquipementTypeFilter";
+import ZoneForm from "./ZoneForm";
 
 // Hooks personnalisés
 import { useMapPoints } from "../hooks/useMapPoints";
@@ -19,7 +20,7 @@ import { useMapGeometries } from "../hooks/useMapGeometries";
 import { useEvents } from "../hooks/useEvents";
 
 // Types et Utils
-import { SearchResult, MapEvent, Equipement } from "../types/map";
+import { SearchResult, MapEvent, Equipement, MapInterest } from "../types/map";
 import { getMapStyle } from "../utils/mapStyles";
 import { Protocol } from "pmtiles";
 
@@ -53,6 +54,7 @@ function OfflineMapLibre({
   // 1. Logique des POINTS
   const {
     points,
+    interests,
     selectedPoint,
     setSelectedPoint,
     addingPointCoords,
@@ -92,6 +94,9 @@ function OfflineMapLibre({
     saveEquipmentWithDetails,
     cancelEquipmentForm,
     handleDeleteEquipement,
+    pendingZoneGeometry,
+    saveZoneWithDetails,
+    cancelZoneForm,
   } = useMapGeometries(map, selectedEventId, timelineFilterDate, selectedEquipementTypes);
 
   // 3. Logique des ÉVÉNEMENTS
@@ -121,12 +126,6 @@ function OfflineMapLibre({
       maxZoom: 19, // Permettre le zoom très proche
     });
 
-    const initialMarker = new maplibregl.Marker()
-      .setLngLat([7.7635, 48.5465])
-      .setPopup(new maplibregl.Popup().setText("Bienvenue à Strasbourg !"))
-      .addTo(mapInstance);
-
-    setCurrentMarker(initialMarker);
     setMap(mapInstance);
 
     return () => {
@@ -213,6 +212,37 @@ function OfflineMapLibre({
         duration: 1000
       }
     );
+  };
+
+  // Fonction pour centrer et afficher la popup d'un point d'intérêt
+  const focusOnInterest = (interest: MapInterest) => {
+    if (!map) return;
+
+    // Fermer toute popup existante
+    const existingPopups = document.querySelectorAll('.maplibregl-popup');
+    existingPopups.forEach(popup => popup.remove());
+
+    // Centrer la carte sur le point
+    map.flyTo({ 
+      center: [Number(interest.x), Number(interest.y)], 
+      zoom: 17,
+      duration: 1000
+    });
+
+    // Créer et afficher la popup après le déplacement
+    setTimeout(() => {
+      new maplibregl.Popup({ closeOnClick: true, maxWidth: '300px' })
+        .setLngLat([Number(interest.x), Number(interest.y)])
+        .setHTML(`
+          <div class="p-2">
+            <div class="font-bold text-purple-700 mb-2 flex items-center gap-1">
+              <span>❓</span> Point d'intérêt
+            </div>
+            <p class="text-sm text-gray-700">${interest.description || 'Aucune description'}</p>
+          </div>
+        `)
+        .addTo(map);
+    }, 1000);
   };
 
   const handleAddressSelect = (place: SearchResult) => {
@@ -495,23 +525,25 @@ function OfflineMapLibre({
               {/* Liste des Zones et Parcours (Dropdown) */}
               {(zones.length > 0 ||
                 parcours.length > 0 ||
-                equipements.length > 0) && (
-                  <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden max-w-sm mt-2">
-                    <button
-                      onClick={() => setIsGeometryListOpen(!isGeometryListOpen)}
-                      className="w-full px-4 py-2 flex justify-between items-center text-sm font-semibold hover:bg-gray-50"
+                equipements.length > 0 ||
+                interests.length > 0) && (
+                <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden max-w-sm mt-2">
+                  <button
+                    onClick={() => setIsGeometryListOpen(!isGeometryListOpen)}
+                    className="w-full px-4 py-2 flex justify-between items-center text-sm font-semibold hover:bg-gray-50"
+                  >
+                    <span>
+                      📐 {zones.length + parcours.length + equipements.length + interests.length}{" "}
+                      élément(s)
+                    </span>
+                    <span
+                      className={`transform transition-transform ${
+                        isGeometryListOpen ? "rotate-180" : ""
+                      }`}
                     >
-                      <span>
-                        📐 {zones.length + parcours.length + equipements.length}{" "}
-                        élément(s)
-                      </span>
-                      <span
-                        className={`transform transition-transform ${isGeometryListOpen ? "rotate-180" : ""
-                          }`}
-                      >
-                        ▼
-                      </span>
-                    </button>
+                      ▼
+                    </span>
+                  </button>
 
                     {isGeometryListOpen && (
                       <div className="max-h-60 overflow-y-auto bg-gray-50 border-t border-gray-200">
@@ -695,6 +727,33 @@ function OfflineMapLibre({
                             ))}
                           </div>
                         )}
+
+                        {/* --- SECTION POINTS D'INTÉRÊT --- */}
+                        {interests.length > 0 && (
+                          <div>
+                            <div className="px-3 py-1 bg-purple-100 text-xs font-bold text-purple-700 uppercase tracking-wider">
+                              ❓ Points d'intérêt
+                            </div>
+                            {interests.map((interest) => (
+                              <div
+                                key={`interest-${interest.id}`}
+                                className="p-2 border-b border-gray-200 last:border-0 hover:bg-purple-50 cursor-pointer"
+                                onClick={() => focusOnInterest(interest)}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="text-base text-purple-600 font-bold">?</span>
+                                  <span className="text-xs font-medium truncate flex-1 text-gray-700">
+                                    {interest.description 
+                                      ? (interest.description.length > 30 
+                                          ? `${interest.description.slice(0, 30)}...` 
+                                          : interest.description)
+                                      : `Point #${interest.id.slice(0, 8)}`}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -712,6 +771,14 @@ function OfflineMapLibre({
         <ParcoursForm
           onSubmit={saveParcoursWithDetails}
           onCancel={cancelParcoursForm}
+        />
+      )}
+
+      {/* Formulaire de création de zone */}
+      {pendingZoneGeometry && (
+        <ZoneForm
+          onSubmit={saveZoneWithDetails}
+          onCancel={cancelZoneForm}
         />
       )}
 

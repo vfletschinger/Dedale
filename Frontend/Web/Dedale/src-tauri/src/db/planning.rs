@@ -274,7 +274,6 @@ pub async fn create_planning_pdf(app: AppHandle, event_id: Option<String>) -> Re
         content.push_str(&format!("({}) Tj\n", team_name));
         content.push_str("0 -15 Td\n");
         y_offset += 15;
-
         let actions_query = r#"
             SELECT 
                 type,
