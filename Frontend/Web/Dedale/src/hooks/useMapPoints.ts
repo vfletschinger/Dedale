@@ -190,7 +190,7 @@ export function useMapPoints(
             type: "symbol",
             source: "db-interests",
             layout: {
-              "text-field": "?",
+              "text-field": "!",
               "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
               "text-size": 18,
               "text-anchor": "center",

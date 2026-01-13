@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faQuestionCircle, faCheck } from "@fortawesome/free-solid-svg-icons";
+import { faExclamationCircle, faCheck } from "@fortawesome/free-solid-svg-icons";
 
 interface InterestFormProps {
   onSubmit: (data: {
@@ -31,7 +31,7 @@ export default function InterestForm({ onSubmit, onCancel }: InterestFormProps) 
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
         <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-          <span className="text-2xl"><FontAwesomeIcon icon={faQuestionCircle} /></span>
+          <span className="text-2xl"><FontAwesomeIcon icon={faExclamationCircle} /></span>
           Nouveau Point d'Intérêt
         </h3>
 

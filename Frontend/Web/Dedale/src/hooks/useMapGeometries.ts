@@ -265,6 +265,26 @@ export function useMapGeometries(
           });
         }
 
+        // Fonction pour déterminer l'épaisseur du trait selon le type d'équipement
+        const getLineWidth = (typeName?: string): number => {
+          if (!typeName) return 3;
+          const name = typeName.toLowerCase();
+          // Véhicules et engins de blocage : trait très épais
+          if (name.includes("véhicule") || name.includes("vehicule") || name.includes("engin")) {
+            return 8;
+          }
+          // Blocs de béton et glissières : trait épais
+          if (name.includes("bloc") || name.includes("glissière") || name.includes("glissiere")) {
+            return 5;
+          }
+          // Barrières : trait fin
+          if (name.includes("barrière") || name.includes("barriere")) {
+            return 2;
+          }
+          // Par défaut : trait moyen
+          return 3;
+        };
+
         const equipementFeatures = filteredEquipements
           .map((eq) => {
             if (!eq.coordinates || eq.coordinates.length < 2) return null;
@@ -278,6 +298,7 @@ export function useMapGeometries(
                 id: eq.id,
                 type: "equipement",
                 type_name: eq.type_name,
+                line_width: getLineWidth(eq.type_name),
               },
             } as GeoJSON.Feature;
           })
@@ -294,9 +315,8 @@ export function useMapGeometries(
             type: "line",
             source: "event-equipements",
             paint: {
-              "line-color": "#f97316", // Orange pour les équipements
-              "line-width": 4,
-              "line-dasharray": [3, 2],
+              "line-color": "#000000", // Noir pour tous les équipements
+              "line-width": ["get", "line_width"], // Épaisseur variable selon le type
             },
           });
         }

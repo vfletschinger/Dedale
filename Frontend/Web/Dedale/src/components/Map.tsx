@@ -28,7 +28,7 @@ import {
   faMapMarkerAlt,
   faDrawPolygon,
   faRoute,
-  faQuestionCircle,
+  faExclamationCircle,
   faTools,
   faTimes,
   faList,
@@ -634,7 +634,7 @@ function OfflineMapLibre({
                     {interests.length > 0 && (
                       <div>
                         <div className="px-4 py-2 bg-purple-50 text-sm font-bold text-purple-700 uppercase tracking-wider flex items-center gap-2">
-                          <FontAwesomeIcon icon={faQuestionCircle} /> Points d'intérêt ({interests.length})
+                          <FontAwesomeIcon icon={faExclamationCircle} /> Points d'intérêt ({interests.length})
                         </div>
                         {interests.map((interest) => (
                           <div
@@ -643,7 +643,7 @@ function OfflineMapLibre({
                             onClick={() => focusOnInterest(interest)}
                           >
                             <div className="flex items-center gap-2">
-                              <span className="text-lg text-purple-600"><FontAwesomeIcon icon={faQuestionCircle} /></span>
+                              <span className="text-lg text-purple-600"><FontAwesomeIcon icon={faExclamationCircle} /></span>
                               <span className="text-sm font-medium truncate flex-1 text-gray-700">
                                 {interest.description
                                   ? (interest.description.length > 40
@@ -755,11 +755,11 @@ function OfflineMapLibre({
                   onClick={startDrawInterest}
                   className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${drawingMode === "interest"
                     ? "bg-purple-600 text-white"
-                    : "bg-black/30 hover:bg-black/40 backdrop-blur-sm text-white"
+                    : "bg-white hover:bg-gray-50 text-gray-700"
                     }`}
                   title="Point d'intérêt"
                 >
-                  <span className="text-base font-bold"><FontAwesomeIcon icon={faQuestionCircle} /></span>
+                  <span className="text-base"><FontAwesomeIcon icon={faExclamationCircle} /></span>
                 </button>
 
                 <button
