@@ -46,7 +46,7 @@ export default function Navigation({
                 alt="Logo"
                 className="h-16 w-auto "
               />
-              <span className="text-3xl font-bold text-white tracking-tight -ml-8">
+              <span className="text-3xl font-bold text-white tracking-tight ">
                 Dedale
               </span>
             </div>
