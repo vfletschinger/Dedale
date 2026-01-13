@@ -56,7 +56,7 @@ export default function CreateTeam({ activeEventId, onClose, onTeamCreated }: Cr
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             placeholder="Ex: Équipe Alpha"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all"
                             autoFocus
                         />
                     </div>
@@ -74,7 +74,7 @@ export default function CreateTeam({ activeEventId, onClose, onTeamCreated }: Cr
                         <button
                             type="submit"
                             disabled={loading || !name.trim()}
-                            className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            className="px-4 py-2 text-sm text-white bg-secondary hover:bg-secondary/90 rounded-lg shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                         >
                             {loading && <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>}
                             Créer

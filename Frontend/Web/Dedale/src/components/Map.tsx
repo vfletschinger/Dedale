@@ -23,6 +23,27 @@ import { useEvents } from "../hooks/useEvents";
 import { SearchResult, MapEvent, Equipement, MapInterest } from "../types/map";
 import { getMapStyle } from "../utils/mapStyles";
 import { Protocol } from "pmtiles";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faMapMarkerAlt,
+  faDrawPolygon,
+  faRoute,
+  faQuestionCircle,
+  faTools,
+  faTimes,
+  faList,
+  faCalendarAlt,
+  faLayerGroup,
+  faSquare,
+  faWaveSquare,
+  faEye,
+  faTrash,
+  faCamera,
+  faCheck,
+  faComment,
+  faCaretDown,
+  faInbox
+} from "@fortawesome/free-solid-svg-icons";
 
 function OfflineMapLibre({
   selectedEventId,
@@ -223,8 +244,8 @@ function OfflineMapLibre({
     existingPopups.forEach(popup => popup.remove());
 
     // Centrer la carte sur le point
-    map.flyTo({ 
-      center: [Number(interest.x), Number(interest.y)], 
+    map.flyTo({
+      center: [Number(interest.x), Number(interest.y)],
       zoom: 17,
       duration: 1000
     });
@@ -236,7 +257,7 @@ function OfflineMapLibre({
         .setHTML(`
           <div class="p-2">
             <div class="font-bold text-purple-700 mb-2 flex items-center gap-1">
-              <span>❓</span> Point d'intérêt
+              <span>Point d'intérêt</span>
             </div>
             <p class="text-sm text-gray-700">${interest.description || 'Aucune description'}</p>
           </div>
@@ -280,12 +301,12 @@ function OfflineMapLibre({
               setViewMode("points");
             }}
             className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${viewMode === "points"
-              ? "text-white border-blue-400"
+              ? "text-white border-primary"
               : "text-slate-400 border-transparent hover:text-slate-200"
               }`}
           >
             <span className="flex items-center gap-2">
-              <span>📋</span>
+              <FontAwesomeIcon icon={faList} />
               <span>Liste des points</span>
               <span className="text-xs bg-slate-600 px-2 py-0.5 rounded-full">
                 {points.length}
@@ -295,12 +316,12 @@ function OfflineMapLibre({
           <button
             onClick={() => setViewMode("timeline")}
             className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${viewMode === "timeline"
-              ? "text-white border-blue-400"
+              ? "text-white border-primary"
               : "text-slate-400 border-transparent hover:text-slate-200"
               }`}
           >
             <span className="flex items-center gap-2">
-              <span>📅</span>
+              <FontAwesomeIcon icon={faCalendarAlt} />
               <span>Frise chronologique</span>
             </span>
           </button>
@@ -349,7 +370,7 @@ function OfflineMapLibre({
                 <div className="flex-1 overflow-y-auto p-2 space-y-2">
                   {points.length === 0 ? (
                     <div className="text-center text-gray-500 py-8">
-                      <p className="text-5xl mb-3">📭</p>
+                      <p className="text-5xl mb-3"><FontAwesomeIcon icon={faInbox} className="text-gray-300" /></p>
                       <p className="font-semibold text-gray-700">Aucun point</p>
                       <p className="text-sm mt-2">
                         Sélectionnez un événement et ajoutez des points sur la
@@ -361,29 +382,29 @@ function OfflineMapLibre({
                       <div
                         key={p.id}
                         onClick={() => openPopupForPoint(p)}
-                        className="p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-400 hover:shadow-md cursor-pointer group"
+                        className="p-3 bg-white rounded-lg border border-gray-200 hover:border-primary hover:shadow-md cursor-pointer group"
                       >
                         <div className="flex justify-between items-center mb-1">
-                          <span className="font-bold text-gray-800 text-sm flex gap-2">
-                            <span>📍</span> {p.name || `Point #${p.id.slice(0, 8)}`}
+                          <span className="font-bold text-gray-800 text-sm flex gap-2 items-center">
+                            <FontAwesomeIcon icon={faMapMarkerAlt} className="text-red-500" /> {p.name || `Point #${p.id.slice(0, 8)}`}
                           </span>
-                          <button className="text-blue-600 text-xs font-semibold px-2 py-1 rounded hover:bg-blue-50">
-                            Voir →
-                          </button>
+                          <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1 border border-primary/20">
+                            <FontAwesomeIcon icon={faEye} /> Voir
+                          </span>
                         </div>
                         <div className="flex gap-2 text-xs">
-                          <span className="bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-200">
-                            📷 {p.pictures?.length || 0}
+                          <span className="bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-200 flex items-center gap-1">
+                            <FontAwesomeIcon icon={faCamera} /> {p.pictures?.length || 0}
                           </span>
                           {p.status && (
-                            <span className="bg-green-50 text-green-700 px-1.5 py-0.5 rounded border border-green-200">
-                              ✓ Traité
+                            <span className="bg-green-50 text-green-700 px-1.5 py-0.5 rounded border border-green-200 flex items-center gap-1">
+                              <FontAwesomeIcon icon={faCheck} /> Traité
                             </span>
                           )}
                         </div>
                         {p.comment && (
-                          <div className="text-xs text-gray-500 mt-2 line-clamp-1">
-                            💬 {p.comment}
+                          <div className="text-xs text-gray-500 mt-2 line-clamp-1 flex items-center gap-1">
+                            <FontAwesomeIcon icon={faComment} /> {p.comment}
                           </div>
                         )}
                       </div>
@@ -421,7 +442,7 @@ function OfflineMapLibre({
               ) : (
                 <div className="p-4 bg-gray-100 text-center flex items-center justify-center h-full">
                   <div>
-                    <p className="text-5xl mb-3">📅</p>
+                    <p className="text-5xl mb-3"><FontAwesomeIcon icon={faCalendarAlt} className="text-gray-300" /></p>
                     <p className="font-semibold text-gray-700">Aucun événement sélectionné</p>
                     <p className="text-sm mt-2 text-gray-500">
                       Sélectionnez un événement pour voir la frise chronologique
@@ -442,9 +463,9 @@ function OfflineMapLibre({
             <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
               {/* Message d'aide */}
               {(drawingMode !== "none" || awaitingMapClick) && (
-                <div className="bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-medium animate-fade-in">
+                <div className="bg-primary text-white px-4 py-2 rounded-lg shadow-lg text-sm font-medium animate-fade-in">
                   {awaitingMapClick
-                    ? "📍 Cliquez sur la carte pour placer le point"
+                    ? <span><FontAwesomeIcon icon={faMapMarkerAlt} /> Cliquez sur la carte pour placer le point</span>
                     : "Double-cliquez pour terminer le dessin"}
                 </div>
               )}
@@ -459,18 +480,18 @@ function OfflineMapLibre({
                     }`}
                   title="Ajouter un point"
                 >
-                  <span className="text-base">📍</span>
+                  <span className="text-base"><FontAwesomeIcon icon={faMapMarkerAlt} /></span>
                 </button>
 
                 <button
                   onClick={startDrawPolygon}
                   className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${drawingMode === "zone"
-                    ? "bg-blue-600 text-white"
+                    ? "bg-primary text-white"
                     : "bg-white hover:bg-gray-50 text-gray-700"
                     }`}
                   title="Zone (Polygone)"
                 >
-                  <span className="text-base">⬡</span>
+                  <span className="text-base"><FontAwesomeIcon icon={faDrawPolygon} /></span>
                 </button>
 
                 <button
@@ -481,7 +502,7 @@ function OfflineMapLibre({
                     }`}
                   title="Parcours (Ligne)"
                 >
-                  <span className="text-base">╱</span>
+                  <span className="text-base"><FontAwesomeIcon icon={faRoute} /></span>
                 </button>
                 <button
                   onClick={startDrawInterest}
@@ -491,7 +512,7 @@ function OfflineMapLibre({
                     }`}
                   title="Point d'intérêt"
                 >
-                  <span className="text-base font-bold">?</span>
+                  <span className="text-base font-bold"><FontAwesomeIcon icon={faQuestionCircle} /></span>
                 </button>
 
                 <button
@@ -502,7 +523,7 @@ function OfflineMapLibre({
                     }`}
                   title="Équipement"
                 >
-                  <span className="text-base">🚧</span>
+                  <span className="text-base"><FontAwesomeIcon icon={faTools} /></span>
                 </button>
 
                 {(drawingMode !== "none" || awaitingMapClick) && (
@@ -511,13 +532,12 @@ function OfflineMapLibre({
                       if (drawingMode !== "none") cancelDrawing();
                       if (awaitingMapClick) {
                         setAddingPointCoords(null);
-                        // Hack pour forcer l'annulation si le state awaitingMapClick n'est pas exposé directement
                         window.dispatchEvent(new Event("cancel-map-action"));
                       }
                     }}
                     className="px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg shadow-lg text-sm font-semibold flex items-center gap-1"
                   >
-                    <span>✕ Annuler</span>
+                    <span><FontAwesomeIcon icon={faTimes} /> Annuler</span>
                   </button>
                 )}
               </div>
@@ -527,23 +547,22 @@ function OfflineMapLibre({
                 parcours.length > 0 ||
                 equipements.length > 0 ||
                 interests.length > 0) && (
-                <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden max-w-sm mt-2">
-                  <button
-                    onClick={() => setIsGeometryListOpen(!isGeometryListOpen)}
-                    className="w-full px-4 py-2 flex justify-between items-center text-sm font-semibold hover:bg-gray-50"
-                  >
-                    <span>
-                      📐 {zones.length + parcours.length + equipements.length + interests.length}{" "}
-                      élément(s)
-                    </span>
-                    <span
-                      className={`transform transition-transform ${
-                        isGeometryListOpen ? "rotate-180" : ""
-                      }`}
+                  <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden max-w-sm mt-2">
+                    <button
+                      onClick={() => setIsGeometryListOpen(!isGeometryListOpen)}
+                      className="w-full px-4 py-2 flex justify-between items-center text-sm font-semibold hover:bg-gray-50"
                     >
-                      ▼
-                    </span>
-                  </button>
+                      <span>
+                        <FontAwesomeIcon icon={faLayerGroup} /> {zones.length + parcours.length + equipements.length + interests.length}{" "}
+                        élément(s)
+                      </span>
+                      <span
+                        className={`transform transition-transform ${isGeometryListOpen ? "rotate-180" : ""
+                          }`}
+                      >
+                        <FontAwesomeIcon icon={faCaretDown} />
+                      </span>
+                    </button>
 
                     {isGeometryListOpen && (
                       <div className="max-h-60 overflow-y-auto bg-gray-50 border-t border-gray-200">
@@ -565,8 +584,8 @@ function OfflineMapLibre({
                               return (
                                 <div
                                   key={`zone-${zone.id}`}
-                                  className={`p-2 border-b border-gray-200 last:border-0 hover:bg-blue-50 cursor-pointer transition-colors ${isSelected
-                                    ? "bg-blue-100 border-l-4 border-l-blue-500"
+                                  className={`p-2 border-b border-gray-200 last:border-0 hover:bg-primary/10 cursor-pointer transition-colors ${isSelected
+                                    ? "bg-primary/20 border-l-4 border-l-primary"
                                     : isEditing
                                       ? "bg-amber-50"
                                       : ""
@@ -578,14 +597,14 @@ function OfflineMapLibre({
                                   }
                                 >
                                   <div className="flex items-center gap-2">
-                                    <span className="text-base">🟦</span>
+                                    <span className="text-base text-primary"><FontAwesomeIcon icon={faSquare} /></span>
                                     <span className="text-xs font-medium truncate flex-1">
                                       {zone.name ||
                                         `Zone #${zone.id.slice(0, 8)}`}
                                     </span>
                                     {isSelected && (
-                                      <span className="text-blue-500 text-xs">
-                                        👁️
+                                      <span className="text-primary text-xs">
+                                        <FontAwesomeIcon icon={faEye} />
                                       </span>
                                     )}
                                   </div>
@@ -639,8 +658,8 @@ function OfflineMapLibre({
                               return (
                                 <div
                                   key={`parcours-${p.id}`}
-                                  className={`p-2 border-b border-gray-200 last:border-0 hover:bg-blue-50 cursor-pointer transition-colors ${isSelected
-                                    ? "bg-blue-100 border-l-4 border-l-green-500"
+                                  className={`p-2 border-b border-gray-200 last:border-0 hover:bg-primary/10 cursor-pointer transition-colors ${isSelected
+                                    ? "bg-primary/20 border-l-4 border-l-green-500"
                                     : isEditing
                                       ? "bg-amber-50"
                                       : ""
@@ -652,13 +671,13 @@ function OfflineMapLibre({
                                   }
                                 >
                                   <div className="flex items-center gap-2">
-                                    <span className="text-base">〰️</span>
+                                    <span className="text-base text-green-600"><FontAwesomeIcon icon={faWaveSquare} /></span>
                                     <span className="text-xs font-medium truncate flex-1">
                                       {p.name || `Parcours #${p.id.slice(0, 8)}`}
                                     </span>
                                     {isSelected && (
                                       <span className="text-green-500 text-xs">
-                                        👁️
+                                        <FontAwesomeIcon icon={faEye} />
                                       </span>
                                     )}
                                   </div>
@@ -695,7 +714,7 @@ function OfflineMapLibre({
                         {equipements.length > 0 && (
                           <div>
                             <div className="px-3 py-1 bg-orange-100 text-xs font-bold text-orange-700 uppercase tracking-wider">
-                              🚧 Équipements
+                              <FontAwesomeIcon icon={faTools} /> Équipements
                             </div>
                             {equipements.map((eq) => (
                               <div
@@ -720,7 +739,7 @@ function OfflineMapLibre({
                                     className="p-1 text-red-600 hover:bg-red-100 rounded"
                                     title="Supprimer"
                                   >
-                                    🗑️
+                                    <FontAwesomeIcon icon={faTrash} />
                                   </button>
                                 </div>
                               </div>
@@ -732,7 +751,7 @@ function OfflineMapLibre({
                         {interests.length > 0 && (
                           <div>
                             <div className="px-3 py-1 bg-purple-100 text-xs font-bold text-purple-700 uppercase tracking-wider">
-                              ❓ Points d'intérêt
+                              <FontAwesomeIcon icon={faQuestionCircle} /> Points d'intérêt
                             </div>
                             {interests.map((interest) => (
                               <div
@@ -741,12 +760,12 @@ function OfflineMapLibre({
                                 onClick={() => focusOnInterest(interest)}
                               >
                                 <div className="flex items-center gap-2">
-                                  <span className="text-base text-purple-600 font-bold">?</span>
+                                  <span className="text-base text-purple-600 font-bold"><FontAwesomeIcon icon={faQuestionCircle} /></span>
                                   <span className="text-xs font-medium truncate flex-1 text-gray-700">
-                                    {interest.description 
-                                      ? (interest.description.length > 30 
-                                          ? `${interest.description.slice(0, 30)}...` 
-                                          : interest.description)
+                                    {interest.description
+                                      ? (interest.description.length > 30
+                                        ? `${interest.description.slice(0, 30)}...`
+                                        : interest.description)
                                       : `Point #${interest.id.slice(0, 8)}`}
                                   </span>
                                 </div>

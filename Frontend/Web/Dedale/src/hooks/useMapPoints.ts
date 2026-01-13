@@ -24,7 +24,7 @@ export function useMapPoints(
 
   const refreshPoints = useCallback(async () => {
     try {
-      console.log("🔄 Chargement des points pour event_id:", selectedEventId);
+      console.log("[Points] Chargement des points pour event_id:", selectedEventId);
       const freshPoints = await invoke<MapPoint[]>("fetch_points", {
         eventId: selectedEventId ? String(selectedEventId) : null,
       });
@@ -60,7 +60,7 @@ export function useMapPoints(
 
   const refreshInterest = useCallback(async () => {
     try {
-      console.log("🔄 Chargement des points d'intérêt pour event_id:", selectedEventId);
+      console.log("[Points] Chargement des points d'intérêt pour event_id:", selectedEventId);
       const freshInterests = await invoke<MapInterest[]>("fetch_interest_points", {
         eventId: selectedEventId ? String(selectedEventId) : null,
       });
@@ -119,7 +119,7 @@ export function useMapPoints(
     }
 
     try {
-      console.log("💾 Sauvegarde du point pour l'event :", selectedEventId);
+      console.log("[Points] Sauvegarde du point pour l'event :", selectedEventId);
 
       // 2. Appel au Backend Rust
       // Assurez-vous que les noms des champs correspondent à votre struct Rust
@@ -241,7 +241,7 @@ export function useMapPoints(
 
         // Charger les points immédiatement après la création de la source
         if (selectedEventId) {
-          console.log("🔄 Chargement initial des points pour event_id:", selectedEventId);
+          console.log("[Points] Chargement initial des points pour event_id:", selectedEventId);
           invoke<MapPoint[]>("fetch_points", {
             eventId: String(selectedEventId),
           })
@@ -297,7 +297,7 @@ export function useMapPoints(
     // Charger les points directement ici pour éviter le warning
     const loadPoints = async () => {
       try {
-        console.log("🔄 Chargement des points pour event_id:", selectedEventId);
+        console.log("[Points] Chargement des points pour event_id:", selectedEventId);
         const freshPoints = await invoke<MapPoint[]>("fetch_points", {
           eventId: selectedEventId ? String(selectedEventId) : null,
         });
@@ -353,7 +353,7 @@ export function useMapPoints(
   // 4. Écoute des mises à jour temps réel
   useEffect(() => {
     const unlisten = listen<string>("points-updated", (event) => {
-      console.log("📥 Points mis à jour via socket, event_id:", event.payload);
+      console.log("[Points] Points mis à jour via socket, event_id:", event.payload);
       if (!selectedEventId || selectedEventId === event.payload) {
         if (map) refreshPoints();
       }
@@ -367,7 +367,7 @@ export function useMapPoints(
   // 4. Recharger les points quand l'événement sélectionné change
   useEffect(() => {
     if (map && map.getSource("db-points")) {
-      console.log("🔄 Changement d'événement, rechargement des points...");
+      console.log("[Points] Changement d'événement, rechargement des points...");
       // Defer the refresh to avoid synchronous setState in effect
       const timeoutId = setTimeout(() => {
         refreshPoints();

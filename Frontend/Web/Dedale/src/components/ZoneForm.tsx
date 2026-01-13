@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faSquare } from "@fortawesome/free-solid-svg-icons";
 
 interface ZoneFormProps {
   onSubmit: (data: {
@@ -33,7 +35,7 @@ export default function ZoneForm({ onSubmit, onCancel }: ZoneFormProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
         <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-          <span className="text-2xl">🟦</span>
+          <span className="text-2xl text-blue-500"><FontAwesomeIcon icon={faSquare} /></span>
           Nouvelle Zone
         </h3>
 
@@ -48,7 +50,7 @@ export default function ZoneForm({ onSubmit, onCancel }: ZoneFormProps) {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Ex: Zone de sécurité"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
               required
             />
           </div>
@@ -78,7 +80,7 @@ export default function ZoneForm({ onSubmit, onCancel }: ZoneFormProps) {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Ajoutez une description pour cette zone..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
               rows={3}
             />
           </div>
