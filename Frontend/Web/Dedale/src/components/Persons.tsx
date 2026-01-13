@@ -4,6 +4,8 @@ import CreatePerson, { Person } from "./CreatePerson";
 import PersonDetails from "./PersonDetails";
 import { listen } from "@tauri-apps/api/event";
 import TeamDetails from "./TeamDetails";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faSearch, faUser, faPlus } from "@fortawesome/free-solid-svg-icons";
 
 interface Team { id: string; name: string; }
 
@@ -89,6 +91,7 @@ export default function Persons({ activeEventId }: { activeEventId: string | nul
                     <TeamDetails
                         teamId={viewingTeam.id}
                         teamName={viewingTeam.name}
+                        activeEventId={activeEventId}
                         onClose={() => setViewingTeam(null)}
                         onDelete={() => {
                             setViewingTeam(null);
@@ -96,7 +99,8 @@ export default function Persons({ activeEventId }: { activeEventId: string | nul
                         onMemberClick={(member) => {
                             setViewingTeam(null);
                             setSelectedPerson(member);
-                        }}
+                        }
+                        }
                     />
                     <div className="absolute inset-0 -z-10" onClick={() => setViewingTeam(null)}></div>
                 </div>
@@ -104,7 +108,7 @@ export default function Persons({ activeEventId }: { activeEventId: string | nul
 
             {/* --- SIDEBAR FILTRES --- */}
             <div className="w-64 p-6 bg-white rounded-lg shadow-lg shrink-0 flex flex-col gap-6">
-                <h2 className="text-xl font-bold text-gray-800 border-b pb-2">🔍 Filtres</h2>
+                <h2 className="text-xl font-bold text-gray-800 border-b pb-2 flex items-center gap-2"><FontAwesomeIcon icon={faSearch} /> Filtres</h2>
                 <div>
                     <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase">Recherche</label>
                     <input
@@ -112,7 +116,7 @@ export default function Persons({ activeEventId }: { activeEventId: string | nul
                         placeholder="Nom, prénom, email..."
                         value={filterName}
                         onChange={(e) => setFilterName(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary outline-none"
                     />
                 </div>
                 <div className="mt-auto text-center text-xs text-gray-400">
@@ -122,10 +126,10 @@ export default function Persons({ activeEventId }: { activeEventId: string | nul
 
             {/* --- CONTENU --- */}
             <div className="flex-1 p-6 bg-white rounded-lg shadow-lg flex flex-col max-h-screen relative overflow-hidden">
-                <h2 className="text-xl font-bold text-gray-800 mb-6">👤 Personnes</h2>
+                <h2 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2"><FontAwesomeIcon icon={faUser} /> Personnes</h2>
 
                 {loading ? (
-                    <div className="flex justify-center items-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div></div>
+                    <div className="flex justify-center items-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div></div>
                 ) : (
                     <div className="overflow-y-auto flex-1 pb-20">
                         <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 pr-2 p-1">
@@ -136,9 +140,9 @@ export default function Persons({ activeEventId }: { activeEventId: string | nul
                                     <div
                                         key={person.id}
                                         onClick={() => setSelectedPerson(person)}
-                                        className="p-4 bg-white border border-gray-300 rounded-xl hover:shadow-md hover:border-blue-200 transition-all cursor-pointer flex items-center gap-4 group"
+                                        className="p-4 bg-white border border-gray-300 rounded-xl hover:shadow-md hover:border-primary/50 transition-all cursor-pointer flex items-center gap-4 group"
                                     >
-                                        <div className="w-10 h-10 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center font-bold text-sm group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                                        <div className="w-10 h-10 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center font-bold text-sm group-hover:bg-primary/10 group-hover:text-primary transition-colors">
                                             {person.firstname[0].toUpperCase()}{person.lastname[0].toUpperCase()}
                                         </div>
                                         <div className="overflow-hidden">
@@ -155,11 +159,9 @@ export default function Persons({ activeEventId }: { activeEventId: string | nul
                 {/* FAB AJOUT */}
                 <button
                     onClick={() => setIsCreateOpen(true)}
-                    className="absolute bottom-8 right-8 w-10 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg hover:shadow-xl hover:scale-110 cursor-pointer active:scale-95 transition-all duration-200 flex items-center justify-center z-10 group"
+                    className="absolute bottom-8 right-8 w-10 h-10 bg-primary hover:opacity-90 text-white rounded-full shadow-lg hover:shadow-xl hover:scale-110 cursor-pointer active:scale-95 transition-all duration-200 flex items-center justify-center z-10 group"
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 transition-transform group-hover:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
+                    <FontAwesomeIcon icon={faPlus} className="h-6 w-6 transition-transform group-hover:rotate-90" />
                 </button>
             </div>
         </div>

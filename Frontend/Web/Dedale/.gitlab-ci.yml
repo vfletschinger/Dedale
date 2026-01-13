@@ -6,6 +6,7 @@ variables:
 
 image: $CI_REGISTRY_IMAGE:latest
 
+
 stages:
   - build-image
   - quality

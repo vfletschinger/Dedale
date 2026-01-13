@@ -1,13 +1,28 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useState, useEffect } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faCalendarAlt,
+  faPlus,
+  faTrash,
+  faMapMarkedAlt,
+  faFileImport,
+  faMobileAlt,
+  faTimes,
+  faCheck,
+  faSpinner,
+  faExclamationTriangle,
+  faGhost
+} from "@fortawesome/free-solid-svg-icons";
 
 // Types
-interface Event {
+export interface Event {
   id: string;
   name: string;
   start_date: string;
   end_date: string;
+  statut: string;
 }
 
 interface EventsProps {
@@ -48,13 +63,13 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
     setLoading(true);
     setError(null);
     try {
-      console.log("🔄 Chargement des événements...");
+      console.log("Flux: Chargement des événements...");
       const eventsData = await invoke<Event[]>("fetch_events");
-      console.log("📊 Événements reçus:", eventsData);
+      console.log("Flux: Événements reçus:", eventsData);
       setEvents(eventsData);
       if (onEventsLoaded) onEventsLoaded(eventsData);
     } catch (err: unknown) {
-      console.error("❌ Erreur lors du chargement des événements:", err);
+      console.error("Erreur lors du chargement des événements:", err);
       setError(err instanceof Error ? err.message : "Erreur inconnue");
     } finally {
       setLoading(false);
@@ -75,7 +90,7 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
     const setupListeners = async () => {
       unlistenConnectedFn = await listen("mobile-connected", () => {
         if (!isMounted) return;
-        console.log("📱 Mobile connecté pour réception !");
+        console.log("Mobile connecté pour réception !");
         setReceiveStatus("Mobile connecté ! En attente des données...");
       });
 
@@ -84,7 +99,7 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
         (event) => {
           if (!isMounted) return;
           const eventId = event.payload;
-          console.log("📦 Points mis à jour pour event_id:", eventId);
+          console.log("Points mis à jour pour event_id:", eventId);
           // Si c'est l'événement qu'on est en train de recevoir
         },
       );
@@ -104,7 +119,7 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
     try {
       setReceiveStatus("Génération du QR code...");
 
-      console.log("📱 Démarrage serveur de réception pour event:", eventId);
+      console.log("Démarrage serveur de réception pour event:", eventId);
       const qrCodeBase64 = await invoke<string>("start_receive_server", {
         eventId,
       });
@@ -112,7 +127,7 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
       setReceiveQrCode(qrCodeBase64);
       setReceiveStatus("Scannez le QR code avec le mobile");
     } catch (err) {
-      console.error("❌ Erreur démarrage serveur réception:", err);
+      console.error("Erreur démarrage serveur réception:", err);
       setReceiveStatus(`Erreur: ${err}`);
     }
   };
@@ -146,8 +161,8 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
         return;
       }
 
-      if (new Date(formData.dateDebut) >= new Date(formData.dateFin)) {
-        alert("La date de fin doit être postérieure à la date de début !");
+      if (new Date(formData.dateDebut) > new Date(formData.dateFin)) {
+        alert("La date de fin ne peut pas être antérieure à la date de début !");
         return;
       }
 
@@ -157,9 +172,9 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
         end_date: formData.dateFin,
       };
 
-      console.log(" Création d'un nouvel événement...", newEvent);
+      console.log("Création d'un nouvel événement...", newEvent);
       await invoke("insert_event", { event: newEvent });
-      console.log(" Événement créé avec succès");
+      console.log("Événement créé avec succès");
 
       setFormData({
         name: "",
@@ -169,7 +184,7 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
       setShowCreateForm(false);
       loadEvents();
     } catch (err) {
-      console.error("❌ Erreur lors de la création:", err);
+      console.error("Erreur lors de la création:", err);
     }
   };
 
@@ -187,12 +202,12 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
       return;
     }
     try {
-      console.log(" Suppression de l'événement:", eventId);
+      console.log("Suppression de l'événement:", eventId);
       await invoke("delete_event", { eventId });
-      console.log("✅ Événement supprimé");
+      console.log("Événement supprimé");
       loadEvents();
     } catch (err) {
-      console.error("❌ Erreur lors de la suppression:", err);
+      console.error("Erreur lors de la suppression:", err);
       alert("Erreur lors de la suppression de l'événement");
     }
   };
@@ -200,7 +215,7 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
   if (loading) {
     return (
       <div className="flex justify-center items-center p-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+        <FontAwesomeIcon icon={faSpinner} spin className="text-primary h-8 w-8" />
         <span className="ml-2">Chargement des événements...</span>
       </div>
     );
@@ -209,7 +224,9 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
   if (error) {
     return (
       <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-        <h3 className="font-bold">Erreur</h3>
+        <h3 className="font-bold flex items-center gap-2">
+          <FontAwesomeIcon icon={faExclamationTriangle} /> Erreur
+        </h3>
         <p>{error}</p>
         <button
           onClick={loadEvents}
@@ -224,12 +241,14 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
   return (
     <div className="p-6 bg-white rounded-lg shadow-lg">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-800"> Événements</h2>
+        <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+          <FontAwesomeIcon icon={faCalendarAlt} className="text-primary" /> Événements
+        </h2>
         <button
           onClick={() => setShowCreateForm(!showCreateForm)}
-          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+          className="px-4 py-2 bg-primary text-white rounded-lg hover:opacity-90 transition-colors flex items-center gap-2"
         >
-          {showCreateForm ? "Annuler" : "Créer un événement"}
+          {showCreateForm ? <><FontAwesomeIcon icon={faTimes} /> Annuler</> : <><FontAwesomeIcon icon={faPlus} /> Créer un événement</>}
         </button>
       </div>
 
@@ -247,7 +266,7 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
                 name="name"
                 value={formData.name}
                 onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                 placeholder="Nom de l'événement"
               />
             </div>
@@ -261,7 +280,7 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
                 value={formData.dateDebut}
                 min={new Date().toISOString().split('T')[0]} // Empêche la sélection de dates passées
                 onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
             <div>
@@ -274,22 +293,22 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
                 value={formData.dateFin}
                 min={new Date().toISOString().split('T')[0]} // Empêche la sélection de dates passées
                 onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
           </div>
           <div className="mt-4 flex gap-2">
             <button
               onClick={handleCreateEvent}
-              className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors"
+              className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors flex items-center gap-2"
             >
-              Créer l'événement
+              <FontAwesomeIcon icon={faCheck} /> Créer l'événement
             </button>
             <button
               onClick={() => setShowCreateForm(false)}
-              className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
+              className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors flex items-center gap-2"
             >
-              Annuler
+              <FontAwesomeIcon icon={faTimes} /> Annuler
             </button>
           </div>
         </div>
@@ -299,6 +318,7 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
       <div className="space-y-4">
         {events.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
+            <p className="text-5xl mb-3"><FontAwesomeIcon icon={faGhost} className="text-gray-300" /></p>
             <p>Aucun événement trouvé.</p>
             <p className="text-sm">
               Créez votre premier événement pour commencer !
@@ -318,7 +338,7 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
                   </h3>
                   <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
                     <span>
-                      📅 Du {formatDate(event.start_date)} au {formatDate(event.end_date)}
+                      <FontAwesomeIcon icon={faCalendarAlt} className="mr-1" /> Du {formatDate(event.start_date)} au {formatDate(event.end_date)}
                     </span>
 
                   </div>
@@ -329,27 +349,30 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
                       e.stopPropagation();
                       handleReceiveFromMobile(event.id);
                     }}
-                    className="px-3 py-1 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
+                    className="px-3 py-1 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors flex items-center gap-1"
+                    title="Importer depuis mobile"
                   >
-                    Import
+                    <FontAwesomeIcon icon={faFileImport} /> Import
                   </button>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       onEventClick?.(event.id);
                     }}
-                    className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                    className="px-3 py-1 text-sm bg-primary/10 text-primary rounded hover:bg-primary/20 transition-colors flex items-center gap-1"
+                    title="Voir sur la carte"
                   >
-                    Voir sur la carte
+                    <FontAwesomeIcon icon={faMapMarkedAlt} /> Voir
                   </button>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       handleDeleteEvent(event.id);
                     }}
-                    className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+                    className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors flex items-center gap-1"
+                    title="Supprimer"
                   >
-                    Supprimer
+                    <FontAwesomeIcon icon={faTrash} />
                   </button>
                 </div>
               </div>
@@ -362,8 +385,8 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
       {receiveQrCode && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl">
-            <h3 className="text-xl font-bold text-center mb-4">
-              📱 Recevoir depuis le mobile
+            <h3 className="text-xl font-bold text-center mb-4 flex items-center justify-center gap-2">
+              <FontAwesomeIcon icon={faMobileAlt} /> Recevoir depuis le mobile
             </h3>
             <p className="text-gray-600 text-center mb-4">
               Scannez ce QR code avec l'application mobile pour envoyer les

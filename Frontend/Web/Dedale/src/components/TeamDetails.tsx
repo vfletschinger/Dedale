@@ -3,6 +3,8 @@ import { useState, useEffect } from "react";
 import { emit } from "@tauri-apps/api/event";
 import SelectableList from "./SelectableList";
 import { Equipement } from "../types/map";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faUsers, faTools, faPen, faTrash, faTimes } from "@fortawesome/free-solid-svg-icons";
 
 interface AvailableActionOption extends Equipement {
     temp_type: 'pose' | 'retrait';
@@ -38,7 +40,7 @@ interface TeamDetailsProps {
     teamId: string;
     teamName: string;
     data?: TeamDetailData;
-    activeEventId: string;
+    activeEventId: string | null;
     onClose: () => void;
     onDelete: (teamId: string) => void;
     onMemberClick: (person: Person) => void;
@@ -298,7 +300,7 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
             {showConfirm && (
                 <div className="absolute inset-0 z-50 bg-white/95 backdrop-blur-sm flex flex-col items-center justify-center p-6 animate-in fade-in duration-200">
                     <div className="bg-red-50 p-4 rounded-full mb-4">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        <FontAwesomeIcon icon={faTrash} className="h-8 w-8 text-red-600" />
                     </div>
                     <h3 className="text-lg font-bold text-gray-800 mb-2">Supprimer l'équipe ?</h3>
                     <div className="flex gap-3 w-full mt-4">
@@ -329,7 +331,7 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
                     {!isEditing && (
                         <button
                             onClick={() => invoke("create_team_mission_pdf", { teamId: teamId, eventId: activeEventId })}
-                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                            className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-colors cursor-pointer"
                             title="Créer pdf avec planning"
                         >
                             Créer pdf
@@ -339,12 +341,10 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
                     {!isEditing && (
                         <button
                             onClick={() => setIsEditing(true)}
-                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                            className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-colors cursor-pointer"
                             title="Modifier le nom"
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                            </svg>
+                            <FontAwesomeIcon icon={faPen} className="h-4 w-4" />
                         </button>
                     )}
                     <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-200 text-gray-400 cursor-pointer">✕</button>
@@ -353,11 +353,11 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
 
             {/* ONGLETS */}
             <div className="flex border-b border-gray-100 shrink-0">
-                <button onClick={() => { if (!isEditing) setActiveTab('members'); setSelectedItemIds([]); }} className={`flex-1 py-3 text-sm font-medium transition-colors ${activeTab === 'members' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-gray-500 hover:text-gray-700'}`}>
-                    👥 Membres ({currentMembers.length})
+                <button onClick={() => { if (!isEditing) setActiveTab('members'); setSelectedItemIds([]); }} className={`flex-1 py-3 text-sm font-medium transition-colors ${activeTab === 'members' ? 'text-primary border-b-2 border-primary bg-primary/5' : 'text-gray-500 hover:text-gray-700'}`}>
+                    <FontAwesomeIcon icon={faUsers} /> Membres ({currentMembers.length})
                 </button>
-                <button onClick={() => { if (!isEditing) setActiveTab('equipements'); setSelectedItemIds([]); }} className={`flex-1 py-3 text-sm font-medium transition-colors ${activeTab === 'equipements' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-gray-500 hover:text-gray-700'}`}>
-                    👥 Equipements ({currentActions.length})
+                <button onClick={() => { if (!isEditing) setActiveTab('equipements'); setSelectedItemIds([]); }} className={`flex-1 py-3 text-sm font-medium transition-colors ${activeTab === 'equipements' ? 'text-primary border-b-2 border-primary bg-primary/5' : 'text-gray-500 hover:text-gray-700'}`}>
+                    <FontAwesomeIcon icon={faTools} /> Equipements ({currentActions.length})
                 </button>
             </div>
 
@@ -391,7 +391,7 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
                     {selectedItemIds.length} élément(s) sélectionné(s)
                 </span>
                 {loading ?
-                    <div className="flex justify-center items-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div></div>
+                    <div className="flex justify-center items-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div></div>
                     :
                     activeTab == "members"
                     &&
@@ -404,12 +404,12 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
                                         <option value="">Choisir...</option>
                                         {availablePeople.map(p => <option key={p.id} value={p.id}>{p.firstname} {p.lastname}</option>)}
                                     </select>
-                                    <button onClick={confirmAddMember} disabled={!selectedPersonId} className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 cursor-pointer">OK</button>
+                                    <button onClick={confirmAddMember} disabled={!selectedPersonId} className="bg-secondary text-white px-3 py-1 rounded text-sm hover:bg-secondary/90 cursor-pointer">OK</button>
                                     <button onClick={() => setIsAddingMember(false)} className="text-gray-500 px-2 cursor-pointer">✕</button>
                                 </div>
                             </div>
                         ) : (
-                            <button onClick={startAddingMember} className="w-full py-2 mt-2 border border-dashed border-gray-300 rounded-lg text-gray-500 text-xs hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all flex items-center justify-center gap-1 cursor-pointer">
+                            <button onClick={startAddingMember} className="w-full py-2 mt-2 border border-dashed border-gray-300 rounded-lg text-gray-500 text-xs hover:border-primary/50 hover:text-primary hover:bg-primary/5 transition-all flex items-center justify-center gap-1 cursor-pointer">
                                 <span>+</span> Ajouter un membre
                             </button>
                         ))}
@@ -433,7 +433,7 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
                                                         onMemberClick(member);
                                                     }
                                                 }}>
-                                                <p className="hover:text-blue-600 transition-colors cursor-pointer text-sm font-medium text-gray-800 truncate text-transform: capitalize">
+                                                <p className="hover:text-primary transition-colors cursor-pointer text-sm font-medium text-gray-800 truncate text-transform: capitalize">
                                                     {member.firstname} {member.lastname}
                                                 </p>
                                             </button>
@@ -449,7 +449,7 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
                                         }}
                                         className="text-gray-300 hover:text-red-500 p-1 cursor-pointer"
                                     >
-                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                        <FontAwesomeIcon icon={faTimes} className="w-4 h-4" />
                                     </button>
                                 </div>
                             )}
@@ -474,12 +474,12 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
                                             );
                                         })}
                                     </select>
-                                    <button onClick={confirmAddEquipementAction} disabled={!selectedEquipementId} className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 cursor-pointer">OK</button>
+                                    <button onClick={confirmAddEquipementAction} disabled={!selectedEquipementId} className="bg-secondary text-white px-3 py-1 rounded text-sm hover:bg-secondary/90 cursor-pointer">OK</button>
                                     <button onClick={() => setIsAddingEquipementAction(false)} className="text-gray-500 px-2 cursor-pointer">✕</button>
                                 </div>
                             </div>
                         ) : (
-                            <button onClick={startAddingEquipementAction} className="w-full py-2 mt-2 border border-dashed border-gray-300 rounded-lg text-gray-500 text-xs hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all flex items-center justify-center gap-1 cursor-pointer">
+                            <button onClick={startAddingEquipementAction} className="w-full py-2 mt-2 border border-dashed border-gray-300 rounded-lg text-gray-500 text-xs hover:border-primary/50 hover:text-primary hover:bg-primary/5 transition-all flex items-center justify-center gap-1 cursor-pointer">
                                 <span>+</span> Ajouter un Equipement
                             </button>
                         ))}
@@ -492,7 +492,7 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
                                     <div className="flex items-center gap-3 overflow-hidden flex-1">
                                         <input type="checkbox" checked={isSelected} readOnly />
                                         <div className="overflow-hidden">
-                                            <p className="hover:text-blue-600 transition-colors cursor-pointer text-sm font-medium text-gray-800 truncate text-transform: capitalize">
+                                            <p className="hover:text-primary transition-colors cursor-pointer text-sm font-medium text-gray-800 truncate text-transform: capitalize">
                                                 {equipement.type_name}
                                                 <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 uppercase">
                                                     {equipement.action_type}
@@ -510,7 +510,7 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
                                         }}
                                         className="text-gray-300 hover:text-red-500 p-1 cursor-pointer"
                                     >
-                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                        <FontAwesomeIcon icon={faTimes} className="w-4 h-4" />
                                     </button>
                                 </div>
                             )}
@@ -566,7 +566,7 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
                 ) : (
                     <>
                         <button onClick={() => setShowConfirm(true)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg cursor-pointer">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            <FontAwesomeIcon icon={faTrash} className="h-5 w-5" />
                         </button>
                         <button onClick={onClose} className="px-4 py-2 bg-white border border-gray-300 rounded text-xs font-medium text-gray-700 hover:bg-gray-100 cursor-pointer">Fermer</button>
                     </>

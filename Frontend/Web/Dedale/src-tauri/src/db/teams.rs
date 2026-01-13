@@ -307,6 +307,7 @@ pub async fn fetch_team_actions(
             type_name: row.get("type_name"),
             type_description: row.get("type_description"),
             length: row.get("length_per_unit"),
+            description: None,
             date_pose: row.get("date_pose"),
             hour_pose: None,
             date_depose: row.get("date_depose"),

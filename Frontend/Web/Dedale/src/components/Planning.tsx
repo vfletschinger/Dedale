@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import * as path from "@tauri-apps/api/path";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faFilePdf } from "@fortawesome/free-solid-svg-icons";
 
 type Action = {
   id: string;
@@ -29,6 +30,7 @@ export default function Planning({
 }) {
   const [teams, setTeams] = useState<TeamWithActions[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [generatingPdfForTeam, setGeneratingPdfForTeam] = useState<string | null>(null);
   const [message, setMessage] = useState<{
     type: "success" | "error" | "info";
     text: string;
@@ -94,60 +96,35 @@ export default function Planning({
     });
 
     return () => {
-      unlistenTeamCreated.then(f => f()).catch(() => {});
-      unlistenTeamDeleted.then(f => f()).catch(() => {});
-      unlistenTeamUpdate.then(f => f()).catch(() => {});
+      unlistenTeamCreated.then(f => f()).catch(() => { });
+      unlistenTeamDeleted.then(f => f()).catch(() => { });
+      unlistenTeamUpdate.then(f => f()).catch(() => { });
     };
   }, [activeEventId, loadTeamsWithActions]);
 
-  // Exporter en Excel
-  const exportToExcel = useCallback(async () => {
+
+  // Générer PDF pour une équipe spécifique
+  const generateTeamPDF = useCallback(async (teamId: string, teamName: string) => {
     setMessage(null);
+    setGeneratingPdfForTeam(teamId);
     try {
-      const appDataPath = await path.appDataDir();
-      if (!appDataPath) throw new Error("Impossible de récupérer AppData");
-
-      const db_url = await path.join(appDataPath, "mydatabase.db");
-      const filename = `planning_${activeEventId || "all"}.xlsx`;
-      const excel_path_str = await path.join(appDataPath, filename);
-
-      await invoke("export_planning_excel", {
-        dbUrl: db_url,
-        excelPathStr: excel_path_str,
-        eventId: activeEventId || null,
+      await invoke("create_team_mission_pdf", {
+        teamId,
+        eventId: activeEventId,
       });
 
       setMessage({
         type: "success",
-        text: `Planning exporté avec succès : ${filename}`,
+        text: `PDF généré avec succès pour ${teamName}`,
       });
     } catch (error) {
-      console.error("Erreur export Excel:", error);
-      setMessage({
-        type: "error",
-        text: `Erreur export: ${String(error)}`,
-      });
-    }
-  }, [activeEventId]);
-
-  // Générer PDF
-  const generatePDF = useCallback(async () => {
-    setMessage(null);
-    try {
-      await invoke("create_planning_pdf", {
-        eventId: activeEventId || null,
-      });
-
-      setMessage({
-        type: "success",
-        text: "PDF de planning généré avec succès",
-      });
-    } catch (error) {
-      console.error("Erreur PDF:", error);
+      console.error("Erreur PDF équipe:", error);
       setMessage({
         type: "error",
         text: `Erreur PDF: ${String(error)}`,
       });
+    } finally {
+      setGeneratingPdfForTeam(null);
     }
   }, [activeEventId]);
 
@@ -206,35 +183,16 @@ export default function Planning({
         {/* Messages */}
         {message && (
           <div
-            className={`p-4 rounded-lg mb-6 border-l-4 ${
-              message.type === "success"
-                ? "bg-green-50 border-green-300 text-green-700"
-                : message.type === "info"
+            className={`p-4 rounded-lg mb-6 border-l-4 ${message.type === "success"
+              ? "bg-green-50 border-green-300 text-green-700"
+              : message.type === "info"
                 ? "bg-blue-50 border-blue-300 text-blue-700"
                 : "bg-red-50 border-red-300 text-red-700"
-            }`}
+              }`}
           >
             <p className="font-medium text-sm">{message.text}</p>
           </div>
         )}
-
-        {/* Actions Export */}
-        <div className="grid md:grid-cols-2 gap-4 mb-8">
-          <button
-            onClick={exportToExcel}
-            disabled={isLoading}
-            className="px-6 py-2.5 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
-          >
-            Exporter en Excel
-          </button>
-          <button
-            onClick={generatePDF}
-            disabled={isLoading}
-            className="px-6 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-          >
-            Générer PDF
-          </button>
-        </div>
 
         {/* Loading */}
         {isLoading ? (
@@ -252,14 +210,37 @@ export default function Planning({
                 key={team.id}
                 className="bg-white border border-gray-200 rounded-lg overflow-hidden"
               >
-                {/* Team Header */}
-                <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-                  <h2 className="text-lg font-bold text-gray-900">
-                    {team.name}
-                  </h2>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {team.actions.length} action(s)
-                  </p>
+                {/* Team Header avec bouton PDF */}
+                <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-bold text-gray-900">
+                      {team.name}
+                    </h2>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {team.actions.length} action(s)
+                    </p>
+                  </div>
+                  {/* Bouton PDF pour cette équipe */}
+                  <button
+                    onClick={() => generateTeamPDF(team.id, team.name)}
+                    disabled={generatingPdfForTeam === team.id}
+                    className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {generatingPdfForTeam === team.id ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        Génération...
+                      </>
+                    ) : (
+                      <>
+                        <FontAwesomeIcon icon={faFilePdf} className="h-4 w-4" />
+                        PDF Équipe
+                      </>
+                    )}
+                  </button>
                 </div>
 
                 {/* Actions List */}
@@ -272,9 +253,8 @@ export default function Planning({
                     {team.actions.map((action) => (
                       <div
                         key={action.id}
-                        className={`px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors ${
-                          action.is_done ? "bg-green-50" : ""
-                        }`}
+                        className={`px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors ${action.is_done ? "bg-green-50" : ""
+                          }`}
                       >
                         <div className="flex-1">
                           <div className="flex items-center gap-3">
@@ -286,11 +266,10 @@ export default function Planning({
                             />
                             <div>
                               <p
-                                className={`font-medium ${
-                                  action.is_done
-                                    ? "text-gray-500 line-through"
-                                    : "text-gray-900"
-                                }`}
+                                className={`font-medium ${action.is_done
+                                  ? "text-gray-500 line-through"
+                                  : "text-gray-900"
+                                  }`}
                               >
                                 {action.type || "Action sans type"}
                               </p>
@@ -306,11 +285,10 @@ export default function Planning({
                               {formatDateTime(action.scheduled_time)}
                             </p>
                             <p
-                              className={`text-sm font-medium ${
-                                action.is_done
-                                  ? "text-green-600"
-                                  : "text-gray-500"
-                              }`}
+                              className={`text-sm font-medium ${action.is_done
+                                ? "text-green-600"
+                                : "text-gray-500"
+                                }`}
                             >
                               {action.is_done ? "✓ Complétée" : "En attente"}
                             </p>

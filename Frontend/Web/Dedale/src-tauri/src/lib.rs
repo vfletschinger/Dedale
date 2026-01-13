@@ -122,6 +122,7 @@ pub fn run() {
             db::update_action_status,
             db::export_planning_excel,
             db::create_planning_pdf,
+            db::send_equipements_to_mobile,
         ])
         .run(tauri::generate_context!())
         .expect("Erreur lors de l'exécution de l'application Tauri");

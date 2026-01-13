@@ -80,7 +80,7 @@ export default function SelectableList<T extends SelectableItem>({
         setIsSelecting(true);
     }, [items, selectedIds, onSelectionChange]);
 
-    const handleMouseEnter = useCallback((itemId: string, index: number) => {
+    const handleMouseEnter = useCallback((_itemId: string, index: number) => {
         if (!isSelecting || lastSelectedIndex.current === null) return;
 
         const start = Math.min(lastSelectedIndex.current, index);

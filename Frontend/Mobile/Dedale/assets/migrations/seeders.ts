@@ -193,6 +193,13 @@ export async function seedDatabase(db: SQLiteDatabase) {
         width: 2,
         length: 16,
       },
+      {
+        id: 14,
+        name: "Véhicule",
+        description: "Véhicule de blocage ou de sécurisation",
+        width: 2,
+        length: 5,
+      },
     ];
 
     const typeIds: number[] = [];

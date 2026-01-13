@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-
-
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faTag } from "@fortawesome/free-solid-svg-icons";
 
 export default function AddPointForm({
   initialCoords,
@@ -16,13 +16,11 @@ export default function AddPointForm({
 }) {
   const [x, setX] = useState<number>(initialCoords.lng);
   const [y, setY] = useState<number>(initialCoords.lat);
-  const [name, setName] = useState<string>("Nouveau point");
+  const [name, setName] = useState<string>("");
   const [comment, setComment] = useState<string>("");
   const [type, setType] = useState<string>("info");
   const [status, setStatus] = useState<boolean>(false);
   const [saving, setSaving] = useState(false);
-
-  // Pas d'appels asynchrones initiaux car le schéma est simple
 
   async function handleSave() {
     if (!eventId) {
@@ -33,24 +31,23 @@ export default function AddPointForm({
 
     setSaving(true);
     try {
-      // Structure simple correspondant au schéma : id, event_id, x, y, comment, type, status
       const point = {
         id: "",
         event_id: eventId,
         x: Number(x),
         y: Number(y),
+        name: name.trim() || null,
         comment: comment || null,
         type: type || null,
         status: status,
-
       };
 
-      console.log("📍 Envoi du point:", JSON.stringify(point, null, 2));
-      console.log("🎯 Event ID:", eventId);
+      console.log("[AddPoint] Envoi du point:", JSON.stringify(point, null, 2));
+      console.log("[AddPoint] Event ID:", eventId);
       const insertedIds = await invoke<string[]>("insert_point", {
         point
       });
-      console.log("✅ Point inséré avec succès, IDs:", insertedIds);
+      console.log("[AddPoint] Point inséré avec succès, IDs:", insertedIds);
 
       if (onSaved) onSaved();
       if (onClose) onClose();
@@ -94,7 +91,7 @@ export default function AddPointForm({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Entrer le nom du point"
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
           />
         </div>
 
@@ -111,7 +108,7 @@ export default function AddPointForm({
                 step="0.000001"
                 value={x}
                 onChange={(e) => setX(Number(e.target.value))}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
               />
             </div>
             <div>
@@ -121,38 +118,47 @@ export default function AddPointForm({
                 step="0.000001"
                 value={y}
                 onChange={(e) => setY(Number(e.target.value))}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
               />
             </div>
           </div>
         </div>
 
-        {/* Type et Statut */}
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-semibold text-gray-900 mb-2">
-              Type
-            </label>
-            <select
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-            >
-              <option value="info">Information</option>
-              <option value="danger">Danger</option>
-              <option value="obstacle">Obstacle</option>
-              <option value="point">Point</option>
-            </select>
+        {/* Type et Statut Section */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-4 py-3 bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple-100 flex items-center gap-2">
+            <span className="text-xl text-purple-600"><FontAwesomeIcon icon={faTag} /></span>
+            <span className="font-semibold text-gray-800">Type et Statut</span>
           </div>
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={status}
-              onChange={(e) => setStatus(e.target.checked)}
-              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-            />
-            <span className="text-sm font-medium text-gray-700">Marquer comme traité</span>
-          </label>
+          <div className="p-4 space-y-3">
+            {/* Type */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-900 mb-2">
+                Type
+              </label>
+              <select
+                value={type}
+                onChange={(e) => setType(e.target.value)}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
+              >
+                <option value="info">Information</option>
+                <option value="danger">Danger</option>
+                <option value="obstacle">Obstacle</option>
+                <option value="point">Point</option>
+              </select>
+            </div>
+
+            {/* Statut */}
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={status}
+                onChange={(e) => setStatus(e.target.checked)}
+                className="w-4 h-4 text-secondary border-gray-300 rounded focus:ring-primary"
+              />
+              <span className="text-sm font-medium text-gray-700">Marquer comme traité</span>
+            </label>
+          </div>
         </div>
 
         {/* Commentaire */}
@@ -165,7 +171,7 @@ export default function AddPointForm({
             onChange={(e) => setComment(e.target.value)}
             placeholder="Ajouter un commentaire..."
             rows={4}
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white resize-none"
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white resize-none"
           />
         </div>
       </div>
@@ -182,7 +188,7 @@ export default function AddPointForm({
         <button
           onClick={handleSave}
           disabled={saving}
-          className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex-1 px-4 py-2.5 bg-secondary hover:bg-secondary/90 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {saving ? "Enregistrement..." : "Ajouter le point"}
         </button>

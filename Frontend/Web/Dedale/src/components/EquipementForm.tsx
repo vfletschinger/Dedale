@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { EquipementType } from "../types/map";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faTools } from "@fortawesome/free-solid-svg-icons";
 
 interface EquipementFormProps {
   lineLength: number; // Longueur totale de la ligne tracée en mètres
@@ -8,6 +10,7 @@ interface EquipementFormProps {
     type_id: string;
     length_per_unit: number;
     quantity: number;
+    description: string;
     date_pose: string;
     date_depose: string;
   }) => void;
@@ -23,7 +26,8 @@ export default function EquipementForm({
   const [selectedTypeId, setSelectedTypeId] = useState<string>("");
   const [lengthPerUnit, setLengthPerUnit] = useState<number>(2); // 2 mètres par défaut
   const [quantity, setQuantity] = useState<number>(1); // Quantité modifiable par l'utilisateur
-  
+  const [description, setDescription] = useState<string>(""); // Description de l'équipement
+
   // Utiliser la date actuelle formatée en ISO comme date par défaut
   const getCurrentDateTimeISO = () => {
     const now = new Date();
@@ -35,7 +39,7 @@ export default function EquipementForm({
     const minutes = String(now.getMinutes()).padStart(2, '0');
     return `${year}-${month}-${day}T${hours}:${minutes}`;
   };
-  
+
   const [datePose, setDatePose] = useState<string>(getCurrentDateTimeISO());
   const [dateDepose, setDateDepose] = useState<string>(getCurrentDateTimeISO());
 
@@ -81,17 +85,17 @@ export default function EquipementForm({
     const now = new Date();
     const poseDate = new Date(datePose);
     const deposeDate = new Date(dateDepose);
-    
+
     if (poseDate < now) {
       alert("La date de pose ne peut pas être dans le passé !");
       return;
     }
-    
+
     if (deposeDate < now) {
       alert("La date de dépose ne peut pas être dans le passé !");
       return;
     }
-    
+
     if (poseDate >= deposeDate) {
       alert("La date de dépose doit être postérieure à la date de pose !");
       return;
@@ -101,29 +105,30 @@ export default function EquipementForm({
       type_id: selectedTypeId,
       length_per_unit: lengthPerUnit,
       quantity: quantity,
+      description: description,
       date_pose: datePose,
       date_depose: dateDepose,
     });
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
-        <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-          <span className="text-2xl">🚧</span>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-2xl p-5 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+          <span className="text-xl"><FontAwesomeIcon icon={faTools} /></span>
           Nouvel Équipement
         </h3>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3">
           {/* Type d'équipement */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-xs font-medium text-gray-700 mb-1">
               Type d'équipement
             </label>
             <select
               value={selectedTypeId}
               onChange={(e) => setSelectedTypeId(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
               required
             >
               <option value="" disabled>
@@ -137,104 +142,119 @@ export default function EquipementForm({
             </select>
           </div>
 
-          {/* Longueur totale tracée (lecture seule) */}
-          <div className="bg-gray-50 p-3 rounded-lg">
-            <label className="block text-sm font-medium text-gray-500 mb-1">
-              Longueur totale tracée
-            </label>
-            <p className="text-lg font-semibold text-gray-800">
-              {lineLength.toFixed(2)} mètres
-            </p>
+          {/* Longueur et quantité sur une ligne */}
+          <div className="grid grid-cols-2 gap-3">
+            {/* Longueur totale tracée */}
+            <div className="bg-gray-50 p-2 rounded-lg">
+              <label className="block text-xs font-medium text-gray-500">
+                Longueur tracée
+              </label>
+              <p className="text-sm font-semibold text-gray-800">
+                {lineLength.toFixed(1)} m
+              </p>
+            </div>
+
+            {/* Quantité suggérée */}
+            <div className="bg-gray-50 p-2 rounded-lg">
+              <label className="block text-xs font-medium text-gray-500">
+                Qté suggérée
+              </label>
+              <p className="text-sm font-semibold text-gray-600">
+                {suggestedQuantity} unité(s)
+              </p>
+            </div>
           </div>
 
-          {/* Longueur unitaire */}
+          {/* Longueur unitaire et Quantité sur une ligne */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Longueur unitaire (m)
+              </label>
+              <input
+                type="number"
+                min="0.1"
+                step="0.1"
+                value={lengthPerUnit}
+                onChange={(e) =>
+                  setLengthPerUnit(parseFloat(e.target.value) || 1)
+                }
+                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Nombre à installer
+              </label>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={quantity}
+                onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                className="w-full px-2 py-1.5 text-sm border border-orange-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 font-semibold"
+                required
+              />
+            </div>
+          </div>
+
+          {/* Description */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Longueur unitaire (mètres)
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Description (optionnel)
             </label>
-            <input
-              type="number"
-              min="0.1"
-              step="0.1"
-              value={lengthPerUnit}
-              onChange={(e) =>
-                setLengthPerUnit(parseFloat(e.target.value) || 1)
-              }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-              required
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Ajoutez une description..."
+              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
+              rows={2}
             />
           </div>
 
-          {/* Indication de quantité suggérée */}
-          <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-            <label className="block text-sm font-medium text-gray-500 mb-1">
-              Quantité suggérée (indication)
-            </label>
-            <p className="text-lg font-semibold text-gray-600">
-              {suggestedQuantity} unité(s)
-            </p>
-            <p className="text-xs text-gray-400 mt-1">
-              = {lineLength.toFixed(2)}m ÷ {lengthPerUnit}m (arrondi au
-              supérieur)
-            </p>
-          </div>
+          {/* Dates sur une ligne */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Date/heure de pose
+              </label>
+              <input
+                type="datetime-local"
+                value={datePose}
+                min={new Date().toISOString().slice(0, 16)}
+                onChange={(e) => setDatePose(e.target.value)}
+                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+              />
+            </div>
 
-          {/* Quantité réelle (modifiable) */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Nombre d'équipements à installer
-            </label>
-            <input
-              type="number"
-              min="1"
-              step="1"
-              value={quantity}
-              onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-              className="w-full px-3 py-2 border border-orange-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-lg font-semibold"
-              required
-            />
-          </div>
-
-          {/* Date et heure de pose */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Date et heure de pose
-            </label>
-            <input
-              type="datetime-local"
-              value={datePose}
-              min={new Date().toISOString().slice(0, 16)} // Empêche la sélection de dates passées
-              onChange={(e) => setDatePose(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-            />
-          </div>
-
-          {/* Date et heure de dépose */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Date et heure de dépose
-            </label>
-            <input
-              type="datetime-local"
-              value={dateDepose}
-              min={new Date().toISOString().slice(0, 16)} // Empêche la sélection de dates passées
-              onChange={(e) => setDateDepose(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-            />
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Date/heure de dépose
+              </label>
+              <input
+                type="datetime-local"
+                value={dateDepose}
+                min={new Date().toISOString().slice(0, 16)}
+                onChange={(e) => setDateDepose(e.target.value)}
+                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+              />
+            </div>
           </div>
 
           {/* Boutons */}
-          <div className="flex gap-3 pt-2">
+          <div className="flex gap-3 pt-1">
             <button
               type="button"
               onClick={onCancel}
-              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors"
+              className="flex-1 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors text-sm"
             >
               Annuler
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 font-medium transition-colors"
+              className="flex-1 px-3 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 font-medium transition-colors text-sm"
             >
               Créer l'équipement
             </button>

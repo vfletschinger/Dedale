@@ -11,6 +11,7 @@ import Event from "./components/Events";
 import AdminForm from "./components/AdminForm";
 import Persons from "./components/Persons";
 import Planning from "./components/Planning";
+import { Event as AppEvent } from "./components/Events";
 
 // Wrapper pour cacher une page tout en la gardant montée
 function PageWrapper({
@@ -42,12 +43,6 @@ function PageWrapper({
       {children}
     </div>
   );
-}
-
-interface AppEvent {
-  id: string;
-  name: string;
-  statut: string;
 }
 
 function App() {

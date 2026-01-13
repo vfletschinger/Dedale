@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use crate::db::{get_db_pool, insert_point, PointWithDetails};
+use crate::db::equipements::{send_equipements_to_mobile, TransferEquipement};
 use base64::{engine::general_purpose, Engine as _};
 use image::codecs::png::PngEncoder;
 use image::{ImageEncoder, Luma};
@@ -227,6 +228,7 @@ pub(crate) struct TransferAction {
     is_done: Option<bool>,
 }
 
+
 /// Structure pour un event envoyé au mobile (avec noms camelCase pour compatibilité)
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -240,6 +242,7 @@ pub(crate) struct TransferEvent {
     points: Vec<TransferPoint>,
     teams: Vec<TransferTeam>,
     actions: Vec<TransferAction>,
+    equipements: Vec<TransferEquipement>,
 }
 
 /// Structure pour un accusé de réception d'event du mobile
@@ -580,6 +583,9 @@ async fn fetch_events_for_transfer(
                 })
                 .collect();
 
+            let equipements = send_equipements_to_mobile(event_id_str.clone(), app.clone()).await?;
+
+
             transfer_events.push(TransferEvent {
                 id: event_id_str.clone(),
                 name: event_row.get("name"),
@@ -590,6 +596,7 @@ async fn fetch_events_for_transfer(
                 points,
                 teams,
                 actions,
+                equipements
             });
 
             println!(
