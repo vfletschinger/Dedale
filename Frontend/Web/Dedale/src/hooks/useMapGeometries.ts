@@ -576,7 +576,7 @@ export function useMapGeometries(
     // Créer le contenu du popup avec boutons d'action
     const name = item.name || `${item.type === "zone" ? "Zone" : "Parcours"} #${item.id.slice(0, 8)}`;
     const description = item.description || "Aucune description";
-    const emoji = item.type === "zone" ? "🟦" : "🟢";
+    const emoji = item.type === "zone" ? "◼" : "●";
     const itemId = item.id;
     const itemType = item.type;
 
@@ -599,7 +599,7 @@ export function useMapGeometries(
             data-type="${itemType}"
             style="flex: 1; padding: 8px 12px; background: #3b82f6; color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;"
           >
-            ✏️ Modifier
+            ✎ Modifier
           </button>
           <button 
             id="geo-delete-btn" 
@@ -607,7 +607,7 @@ export function useMapGeometries(
             data-type="${itemType}"
             style="flex: 1; padding: 8px 12px; background: #ef4444; color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;"
           >
-            🗑️ Supprimer
+            ✕ Supprimer
           </button>
         </div>
       </div>

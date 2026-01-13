@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import * as path from "@tauri-apps/api/path";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faFilePdf } from "@fortawesome/free-solid-svg-icons";
 
 type Action = {
   id: string;
@@ -95,9 +96,9 @@ export default function Planning({
     });
 
     return () => {
-      unlistenTeamCreated.then(f => f()).catch(() => {});
-      unlistenTeamDeleted.then(f => f()).catch(() => {});
-      unlistenTeamUpdate.then(f => f()).catch(() => {});
+      unlistenTeamCreated.then(f => f()).catch(() => { });
+      unlistenTeamDeleted.then(f => f()).catch(() => { });
+      unlistenTeamUpdate.then(f => f()).catch(() => { });
     };
   }, [activeEventId, loadTeamsWithActions]);
 
@@ -182,13 +183,12 @@ export default function Planning({
         {/* Messages */}
         {message && (
           <div
-            className={`p-4 rounded-lg mb-6 border-l-4 ${
-              message.type === "success"
-                ? "bg-green-50 border-green-300 text-green-700"
-                : message.type === "info"
+            className={`p-4 rounded-lg mb-6 border-l-4 ${message.type === "success"
+              ? "bg-green-50 border-green-300 text-green-700"
+              : message.type === "info"
                 ? "bg-blue-50 border-blue-300 text-blue-700"
                 : "bg-red-50 border-red-300 text-red-700"
-            }`}
+              }`}
           >
             <p className="font-medium text-sm">{message.text}</p>
           </div>
@@ -236,10 +236,8 @@ export default function Planning({
                       </>
                     ) : (
                       <>
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        📥 PDF Équipe
+                        <FontAwesomeIcon icon={faFilePdf} className="h-4 w-4" />
+                        PDF Équipe
                       </>
                     )}
                   </button>
@@ -255,9 +253,8 @@ export default function Planning({
                     {team.actions.map((action) => (
                       <div
                         key={action.id}
-                        className={`px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors ${
-                          action.is_done ? "bg-green-50" : ""
-                        }`}
+                        className={`px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors ${action.is_done ? "bg-green-50" : ""
+                          }`}
                       >
                         <div className="flex-1">
                           <div className="flex items-center gap-3">
@@ -269,11 +266,10 @@ export default function Planning({
                             />
                             <div>
                               <p
-                                className={`font-medium ${
-                                  action.is_done
-                                    ? "text-gray-500 line-through"
-                                    : "text-gray-900"
-                                }`}
+                                className={`font-medium ${action.is_done
+                                  ? "text-gray-500 line-through"
+                                  : "text-gray-900"
+                                  }`}
                               >
                                 {action.type || "Action sans type"}
                               </p>
@@ -289,11 +285,10 @@ export default function Planning({
                               {formatDateTime(action.scheduled_time)}
                             </p>
                             <p
-                              className={`text-sm font-medium ${
-                                action.is_done
-                                  ? "text-green-600"
-                                  : "text-gray-500"
-                              }`}
+                              className={`text-sm font-medium ${action.is_done
+                                ? "text-green-600"
+                                : "text-gray-500"
+                                }`}
                             >
                               {action.is_done ? "✓ Complétée" : "En attente"}
                             </p>

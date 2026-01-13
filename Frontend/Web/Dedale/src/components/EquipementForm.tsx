@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { EquipementType } from "../types/map";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faTools } from "@fortawesome/free-solid-svg-icons";
 
 interface EquipementFormProps {
   lineLength: number; // Longueur totale de la ligne tracée en mètres
@@ -25,7 +27,7 @@ export default function EquipementForm({
   const [lengthPerUnit, setLengthPerUnit] = useState<number>(2); // 2 mètres par défaut
   const [quantity, setQuantity] = useState<number>(1); // Quantité modifiable par l'utilisateur
   const [description, setDescription] = useState<string>(""); // Description de l'équipement
-  
+
   // Utiliser la date actuelle formatée en ISO comme date par défaut
   const getCurrentDateTimeISO = () => {
     const now = new Date();
@@ -37,7 +39,7 @@ export default function EquipementForm({
     const minutes = String(now.getMinutes()).padStart(2, '0');
     return `${year}-${month}-${day}T${hours}:${minutes}`;
   };
-  
+
   const [datePose, setDatePose] = useState<string>(getCurrentDateTimeISO());
   const [dateDepose, setDateDepose] = useState<string>(getCurrentDateTimeISO());
 
@@ -83,17 +85,17 @@ export default function EquipementForm({
     const now = new Date();
     const poseDate = new Date(datePose);
     const deposeDate = new Date(dateDepose);
-    
+
     if (poseDate < now) {
       alert("La date de pose ne peut pas être dans le passé !");
       return;
     }
-    
+
     if (deposeDate < now) {
       alert("La date de dépose ne peut pas être dans le passé !");
       return;
     }
-    
+
     if (poseDate >= deposeDate) {
       alert("La date de dépose doit être postérieure à la date de pose !");
       return;
@@ -113,7 +115,7 @@ export default function EquipementForm({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="bg-white rounded-2xl shadow-2xl p-5 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
         <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
-          <span className="text-xl">🚧</span>
+          <span className="text-xl"><FontAwesomeIcon icon={faTools} /></span>
           Nouvel Équipement
         </h3>
 
