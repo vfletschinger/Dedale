@@ -1,4 +1,5 @@
 import { useState } from "react";
+import toast from "react-hot-toast";
 import { invoke } from "@tauri-apps/api/core";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTag } from "@fortawesome/free-solid-svg-icons";
@@ -24,7 +25,7 @@ export default function AddPointForm({
 
   async function handleSave() {
     if (!eventId) {
-      alert("Erreur : Impossible d'enregistrer. Aucun événement n'est sélectionné.");
+      toast.error("Impossible d'enregistrer : aucun événement sélectionné");
       console.error("Tentative d'enregistrement sans eventId");
       return;
     }
@@ -51,9 +52,10 @@ export default function AddPointForm({
 
       if (onSaved) onSaved();
       if (onClose) onClose();
+      toast.success("Point ajouté avec succès");
     } catch (err) {
       console.error("Failed to insert point:", err);
-      alert("Erreur lors de l'enregistrement du point.");
+      toast.error("Erreur lors de l'enregistrement du point");
     } finally {
       setSaving(false);
     }

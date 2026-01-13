@@ -14,9 +14,9 @@ import {
   faCheck,
   faTimes,
   faSpinner,
-  faserver,
   faServer
 } from "@fortawesome/free-solid-svg-icons";
+import toast from 'react-hot-toast';
 
 type Event = {
   id: string;
@@ -32,22 +32,9 @@ type TransferPhase = "idle" | "qr_displayed" | "connected";
 function Data() {
   const [qrCodeBase64, setQrCodeBase64] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<{
-    type: "success" | "error" | "info";
-    text: string;
-  } | null>(null);
-
-  // États pour la sélection d'événements pour le transfert
   const [events, setEvents] = useState<Event[]>([]);
-  const [selectedEventIds, setSelectedEventIds] = useState<Set<string>>(
-    new Set()
-  );
-
-  // Etat pour la sélection d'événement pour l'export/PDF
+  const [selectedEventIds, setSelectedEventIds] = useState<Set<string>>(new Set());
   const [selectedEventId, setSelectedEventId] = useState<string>("");
-
-  // États pour le transfert
   const [transferPhase, setTransferPhase] = useState<TransferPhase>("idle");
   const [sentEventIds, setSentEventIds] = useState<Set<string>>(new Set());
   const [sendingEventId, setSendingEventId] = useState<string | null>(null);
@@ -57,13 +44,13 @@ function Data() {
     const unlistenConnect = listen("mobile-connected", () => {
       console.log("Connecté !");
       setTransferPhase("connected");
-      setMessage({ type: "success", text: "Mobile connecté avec succès !" });
+      toast.success("Mobile connecté avec succès !");
     });
 
     const unlistenDisconnect = listen("mobile-disconnected", () => {
       console.log("Déconnecté !");
       setTransferPhase("idle");
-      setMessage({ type: "info", text: "Connexion mobile interrompue." });
+      toast("Connexion mobile interrompue", { icon: '⚠️' });
     });
 
     return () => {
@@ -80,6 +67,7 @@ function Data() {
         setEvents(evts);
       } catch (e) {
         console.error("Erreur chargement événements:", e);
+        toast.error("Impossible de charger les événements");
       }
     };
     loadEvents();
@@ -87,7 +75,6 @@ function Data() {
 
   // Fonction pour l'export Excel
   const generate_excel = useCallback(async () => {
-    setMessage(null);
     try {
       const appDataPath = await path.appDataDir();
       if (!appDataPath) throw new Error("Impossible de récupérer AppData");
@@ -106,38 +93,29 @@ function Data() {
         eventId: eventIdParam,
       });
 
-      setMessage({
-        type: "success",
-        text: `Export Excel réussi : ${filename}`,
-      });
+      toast.success(`Export Excel réussi : ${filename}`);
     } catch (error) {
       console.error("Erreur export Excel:", error);
-      setMessage({ type: "error", text: `Erreur Export: ${String(error)}` });
+      toast.error(`Erreur Export: ${String(error)}`);
     }
   }, [selectedEventId]);
 
   // Fonction pour la création de PDF
   const createPdf = useCallback(async () => {
-    setMessage(null);
     try {
       const eventIdParam = selectedEventId ? selectedEventId : null;
       await invoke("create_pdf", { eventId: eventIdParam });
-      setMessage({
-        type: "success",
-        text: "Le rapport PDF a été généré avec succès.",
-      });
+      toast.success("Le rapport PDF a été généré avec succès.");
     } catch (error) {
       console.error("Erreur PDF:", error);
-      setMessage({ type: "error", text: `Erreur PDF: ${String(error)}` });
+      toast.error(`Erreur PDF: ${String(error)}`);
     }
   }, [selectedEventId]);
 
   // Fonction QR Code
   const qr_code = useCallback(async () => {
     setIsLoading(true);
-    setError(null);
     setQrCodeBase64(null);
-    setMessage(null);
     try {
       const eventsData = await invoke<Event[]>("fetch_events");
       setEvents(eventsData);
@@ -151,13 +129,10 @@ function Data() {
       setQrCodeBase64(base64String);
       setTransferPhase("qr_displayed");
       setSentEventIds(new Set());
-      setMessage({
-        type: "info",
-        text: `Partage activé. ${allEventIds.length} événements prêts.`,
-      });
+      toast.success(`Partage activé. ${allEventIds.length} événements prêts`);
     } catch (err) {
       console.error("Erreur:", err);
-      setError(String(err));
+      toast.error(`Erreur: ${err}`);
     } finally {
       setIsLoading(false);
     }
@@ -169,15 +144,10 @@ function Data() {
     try {
       await invoke("send_event_to_mobile", { eventId });
       setSentEventIds((prev) => new Set([...prev, eventId]));
-      setMessage({
-        type: "success",
-        text: `Données synchronisées avec le mobile.`,
-      });
-      // Auto-hide success message after 2s
-      setTimeout(() => setMessage(null), 2000);
+      toast.success("Données synchronisées avec le mobile.");
     } catch (err) {
       console.error("Erreur envoi événement:", err);
-      setMessage({ type: "error", text: `Erreur: ${String(err)}` });
+      toast.error(`Erreur: ${String(err)}`);
     } finally {
       setSendingEventId(null);
     }
@@ -192,7 +162,6 @@ function Data() {
     setQrCodeBase64(null);
     setTransferPhase("idle");
     setSentEventIds(new Set());
-    setMessage(null);
   }, []);
 
   const getQrCodeUri = (base64: string | null): string => {
@@ -212,16 +181,6 @@ function Data() {
         </h2>
         <p className="text-gray-500 mt-1 ml-1">Exportations et synchronisation mobile.</p>
       </div>
-
-      {message && (
-        <div className={`p-4 rounded-xl border flex items-center gap-3 animate-in slide-in-from-top-2 shadow-sm ${message.type === "success" ? "bg-green-50 border-green-200 text-green-700" :
-          message.type === "error" ? "bg-red-50 border-red-200 text-red-700" :
-            "bg-blue-50 border-blue-200 text-blue-700"
-          }`}>
-          <FontAwesomeIcon icon={message.type === "error" ? faTimes : faCheck} />
-          {message.text}
-        </div>
-      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 

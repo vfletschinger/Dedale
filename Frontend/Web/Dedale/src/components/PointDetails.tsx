@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useState } from "react";
+import toast from "react-hot-toast";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTimes } from "@fortawesome/free-solid-svg-icons";
 
@@ -61,9 +62,10 @@ export default function PointDetails({
       // Mettre à jour localement pour affichage immédiat
       point.status = newStatus;
       if (onRefresh) await onRefresh();
+      toast.success("Statut mis à jour");
     } catch (error) {
       console.error("Erreur lors de la mise à jour du statut:", error);
-      alert("Erreur lors de la mise à jour du statut.");
+      toast.error("Erreur lors de la mise à jour du statut.");
     } finally {
       setUpdatingStatus(false);
     }
@@ -82,9 +84,10 @@ export default function PointDetails({
       point.comment = newComment || undefined;
       setEditingComment(false);
       if (onRefresh) await onRefresh();
+      toast.success("Commentaire enregistré");
     } catch (error) {
       console.error("Erreur lors de la sauvegarde du commentaire:", error);
-      alert("Erreur lors de la sauvegarde du commentaire.");
+      toast.error("Erreur lors de la sauvegarde du commentaire.");
     }
   }
 
@@ -101,9 +104,10 @@ export default function PointDetails({
       point.name = newName || undefined;
       setEditingName(false);
       if (onRefresh) await onRefresh();
+      toast.success("Nom modifié");
     } catch (error) {
       console.error("Erreur lors de la sauvegarde du nom:", error);
-      alert("Erreur lors de la sauvegarde du nom.");
+      toast.error("Erreur lors de la sauvegarde du nom.");
     }
   }
 
@@ -115,9 +119,10 @@ export default function PointDetails({
       await invoke("delete_point", { pointId: point.id });
       if (onClose) onClose();
       if (onRefresh) await onRefresh();
+      toast.success("Point supprimé");
     } catch (error) {
       console.error("Erreur lors de la suppression:", error);
-      alert("Erreur lors de la suppression du point.");
+      toast.error("Erreur lors de la suppression du point.");
     }
   }
 

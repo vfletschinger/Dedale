@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useState, useEffect } from "react";
+import toast from "react-hot-toast";
 import { emit } from "@tauri-apps/api/event";
 import SelectableList from "./SelectableList";
 import { Equipement } from "../types/map";
@@ -111,7 +112,11 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
             await invoke("remove_member", { teamId, personId });
             setCurrentMembers(currentMembers.filter(m => m.id !== personId));
             await emit("team-update");
-        } catch (e) { console.error(e); }
+            toast.success("Membre retiré");
+        } catch (e) {
+            console.error(e);
+            toast.error("Erreur lors du retrait du membre");
+        }
     };
 
     const startAddingMember = async () => {
@@ -132,7 +137,11 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
             setIsAddingMember(false);
             setSelectedPersonId("");
             await emit("team-update");
-        } catch (e) { console.error(e); }
+            toast.success("Membre ajouté");
+        } catch (e) {
+            console.error(e);
+            toast.error("Erreur lors de l'ajout du membre");
+        }
     };
 
     const handleRemoveSelectedMembers = async () => {
@@ -146,8 +155,10 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
             setSelectedItemIds([]);
             setShowMultiDeleteConfirm(false);
             await emit("team-update");
+            toast.success(`${selectedItemIds.length} membres retirés`);
         } catch (e) {
             console.error(e);
+            toast.error("Erreur lors de la suppression des membres");
         } finally {
             setLoading(false);
         }
@@ -166,7 +177,11 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
             await invoke("delete_action", { actionId });
             setCurrentActions(currentActions.filter(e => e.action_id !== actionId));
             await emit("team-update");
-        } catch (e) { console.error(e); }
+            toast.success("Action supprimée");
+        } catch (e) {
+            console.error(e);
+            toast.error("Erreur lors de la suppression de l'action");
+        }
     };
 
     const startAddingEquipementAction = async () => {
@@ -240,8 +255,10 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
             setIsAddingEquipementAction(false);
             setSelectedEquipementId("");
             await emit("team-update");
+            toast.success("Action ajoutée");
         } catch (e) {
             console.error(e);
+            toast.error("Erreur lors de l'ajout de l'action");
         }
     };
 
@@ -256,8 +273,10 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
             setSelectedItemIds([]);
             setShowMultiDeleteConfirm(false);
             await emit("team-update");
+            toast.success(`${selectedItemIds.length} actions supprimées`);
         } catch (e) {
             console.error(e);
+            toast.error("Erreur lors de la suppression des actions");
         } finally {
             setLoading(false);
         }
@@ -272,8 +291,10 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
             await invoke("delete_team", { teamId });
             onDelete(teamId);
             onClose();
+            toast.success("Équipe supprimée");
         } catch (error) {
             console.error("Erreur suppression:", error);
+            toast.error("Erreur lors de la suppression de l'équipe");
             setIsDeleting(false);
         }
     };
@@ -285,9 +306,10 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
             await invoke("update_team", { id: teamId, name: editedName });
             setIsEditing(false);
             await emit("team-update");
+            toast.success("Nom de l'équipe modifié");
         } catch (e) {
             console.error(e);
-            alert("Erreur lors de la modification");
+            toast.error("Erreur lors de la modification");
         } finally {
             setIsSaving(false);
         }

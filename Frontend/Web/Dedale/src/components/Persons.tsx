@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import toast from "react-hot-toast";
 import { useState, useEffect, useMemo } from "react";
 import CreatePerson, { Person } from "./CreatePerson";
 import PersonDetails from "./PersonDetails";
@@ -26,6 +27,7 @@ export default function Persons({ activeEventId }: { activeEventId: string | nul
             setPeople(data);
         } catch (e) {
             console.error(e);
+            toast.error("Erreur lors du chargement des personnes");
         } finally {
             setLoading(false);
         }

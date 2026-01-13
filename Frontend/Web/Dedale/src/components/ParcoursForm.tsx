@@ -1,4 +1,5 @@
 import { useState } from "react";
+import toast from "react-hot-toast";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faRoute, faCheck, faTimes } from "@fortawesome/free-solid-svg-icons";
 
@@ -28,7 +29,7 @@ export default function ParcoursForm({ onSubmit, onCancel }: ParcoursFormProps) 
     if (startDate) {
       const today = new Date().toISOString().split('T')[0];
       if (startDate < today) {
-        alert("La date de début ne peut pas être dans le passé !");
+        toast.error("La date de début ne peut pas être dans le passé !");
         return;
       }
     }

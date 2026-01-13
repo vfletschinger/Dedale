@@ -14,6 +14,7 @@ import Planning from "./components/Planning";
 import { Event as AppEvent } from "./components/Events";
 
 import LoadingScreen from "./components/LoadingScreen";
+import { Toaster } from 'react-hot-toast';
 
 // Wrapper pour cacher une page tout en la gardant montée
 function PageWrapper({
@@ -147,6 +148,7 @@ function App() {
 
   return (
     <div className="w-full min-h-screen bg-linear-to-br from-slate-50 via-indigo-50 to-purple-50 font-sans relative overflow-hidden">
+      <Toaster position="top-right" reverseOrder={false} />
       <header className="relative z-10">
         <Navigation
           currentPage={currentPage}

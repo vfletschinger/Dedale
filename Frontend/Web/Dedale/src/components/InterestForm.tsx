@@ -1,4 +1,5 @@
 import { useState } from "react";
+import toast from "react-hot-toast";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faExclamationCircle, faCheck } from "@fortawesome/free-solid-svg-icons";
 
@@ -22,6 +23,7 @@ export default function InterestForm({ onSubmit, onCancel }: InterestFormProps) 
       });
     } catch (err) {
       console.error("Erreur création point d'intérêt:", err);
+      toast.error("Erreur lors de la création du point d'intérêt");
     } finally {
       setSaving(false);
     }

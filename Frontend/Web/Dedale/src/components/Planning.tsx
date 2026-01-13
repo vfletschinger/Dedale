@@ -10,10 +10,10 @@ import {
   faCheck,
   faTimes,
   faSpinner,
-  faExclamationTriangle,
-  faClock,
-  faTasks
+  faTasks,
+  faClock
 } from "@fortawesome/free-solid-svg-icons";
+import toast from 'react-hot-toast';
 
 // État pour gérer le processus de sync
 type SyncStep = "idle" | "generating_qr" | "waiting_for_scan" | "sending" | "success" | "error";
@@ -42,11 +42,6 @@ export default function Planning({
   });
 
   const [generatingPdfForTeam, setGeneratingPdfForTeam] = useState<string | null>(null);
-  const [message, setMessage] = useState<{
-    type: "success" | "error" | "info";
-    text: string;
-  } | null>(null);
-
   const [isMobileConnected, setIsMobileConnected] = useState(false);
 
   // 1. Écouter la connexion mobile
@@ -54,6 +49,9 @@ export default function Planning({
     const unlistenConnect = listen("mobile-connected", () => {
       console.log("📱 Mobile connecté !");
       setIsMobileConnected(true);
+      if (syncState.step === "waiting_for_scan") {
+        toast.success("Mobile connecté !");
+      }
     });
 
     const unlistenDisconnect = listen("mobile-disconnected", () => {
@@ -65,7 +63,7 @@ export default function Planning({
       unlistenConnect.then((fn) => fn());
       unlistenDisconnect.then((fn) => fn());
     };
-  }, []);
+  }, [syncState.step]);
 
   // 2. Réagir automatiquement à la connexion pour envoyer le planning
   useEffect(() => {
@@ -103,6 +101,7 @@ export default function Planning({
       setTeams(teamsWithActions);
     } catch (error) {
       console.error("Erreur chargement:", error);
+      toast.error("Erreur lors du chargement des plannings.");
     } finally {
       setIsLoading(false);
     }
@@ -144,6 +143,7 @@ export default function Planning({
         step: "error",
         errorMessage: `Erreur génération QR: ${err}`
       }));
+      toast.error(`Erreur: ${err}`);
     }
   }, []);
 
@@ -161,14 +161,12 @@ export default function Planning({
           step: "error",
           errorMessage: `Aucune action trouvée pour l'équipe ${teamName}.`
         }));
+        toast.error(`Aucune action à envoyer pour ${teamName}.`);
         return;
       }
 
       setSyncState(prev => ({ ...prev, step: "success" }));
-      setMessage({
-        type: "success",
-        text: `Planning envoyé à ${teamName} (${planning.actions.length} actions)`,
-      });
+      toast.success(`Planning envoyé à ${teamName} (${planning.actions.length} actions)`);
 
       setTimeout(() => {
         closeSyncModal();
@@ -181,6 +179,7 @@ export default function Planning({
         step: "error",
         errorMessage: `Erreur envoi: ${String(error)}`
       }));
+      toast.error(`Erreur lors de l'envoi : ${error}`);
     }
   };
 
@@ -193,14 +192,21 @@ export default function Planning({
     setGeneratingPdfForTeam(teamId);
     try {
       await invoke("create_team_mission_pdf", { teamId, eventId: activeEventId });
-      setMessage({ type: "success", text: `PDF généré avec succès pour ${teamName}` });
-    } catch (e) { setMessage({ type: "error", text: "Erreur lors de la génération du PDF" }); }
-    finally { setGeneratingPdfForTeam(null); }
+      toast.success(`PDF généré avec succès pour ${teamName}`);
+    } catch (e) {
+      toast.error("Erreur lors de la génération du PDF");
+    } finally {
+      setGeneratingPdfForTeam(null);
+    }
   }, [activeEventId]);
 
   const toggleActionStatus = async (actionId: string) => {
-    await invoke("update_action_status", { actionId });
-    loadTeamsWithActions();
+    try {
+      await invoke("update_action_status", { actionId });
+      loadTeamsWithActions();
+    } catch (e) {
+      toast.error("Erreur lors de la mise à jour du statut");
+    }
   };
 
   const formatDateTime = (s: string) => {
@@ -231,17 +237,6 @@ export default function Planning({
           <p className="text-gray-500 mt-1 ml-1">Gérez et synchronisez les actions des équipes.</p>
         </div>
       </div>
-
-      {/* Messages */}
-      {message && (
-        <div className={`p-4 rounded-xl border flex items-center gap-3 animate-in slide-in-from-top-2 shadow-sm ${message.type === "success" ? "bg-green-50 border-green-200 text-green-700" :
-          message.type === "error" ? "bg-red-50 border-red-200 text-red-700" :
-            "bg-blue-50 border-blue-200 text-blue-700"
-          }`}>
-          <FontAwesomeIcon icon={message.type === "error" ? faExclamationTriangle : faCheck} />
-          {message.text}
-        </div>
-      )}
 
       {/* Loading */}
       {isLoading && teams.length === 0 ? (

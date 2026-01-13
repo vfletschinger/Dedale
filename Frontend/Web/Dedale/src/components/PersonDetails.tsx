@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useState, useEffect } from "react";
 import { Person } from "./CreatePerson";
+import toast from "react-hot-toast";
 import { emit } from "@tauri-apps/api/event";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPen, faTimes, faTrash } from "@fortawesome/free-solid-svg-icons";
@@ -67,8 +68,10 @@ export default function PersonDetails({
       onDelete(person.id);
       await emit("team-update");
       onClose();
+      toast.success("Personne supprimée");
     } catch (e) {
       console.error(e);
+      toast.error("Erreur lors de la suppression");
     }
   };
 
@@ -77,8 +80,10 @@ export default function PersonDetails({
       await invoke("remove_member", { teamId, personId: person.id });
       setTeams(teams.filter((t) => t.id !== teamId));
       await emit("team-update");
+      toast.success("Retiré de l'équipe");
     } catch (e) {
       console.error(e);
+      toast.error("Erreur lors du retrait de l'équipe");
     }
   };
 
@@ -112,8 +117,10 @@ export default function PersonDetails({
       setIsAddingTeam(false);
       setSelectedTeamId("");
       await emit("team-update");
+      toast.success("Ajouté à l'équipe");
     } catch (e) {
       console.error(e);
+      toast.error("Erreur lors de l'ajout à l'équipe");
     }
   };
 
@@ -131,9 +138,10 @@ export default function PersonDetails({
       onUpdate(editData);
       setIsEditing(false);
       await emit("team-update");
+      toast.success("Profil mis à jour");
     } catch (e) {
       console.error(e);
-      alert("Erreur lors de la sauvegarde : " + e);
+      toast.error("Erreur lors de la sauvegarde : " + e);
     } finally {
       setIsSaving(false);
     }

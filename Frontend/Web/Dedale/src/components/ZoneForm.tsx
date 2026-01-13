@@ -1,4 +1,5 @@
 import { useState } from "react";
+import toast from "react-hot-toast";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faDrawPolygon, faCheck, faTimes } from "@fortawesome/free-solid-svg-icons";
 
@@ -20,7 +21,7 @@ export default function ZoneForm({ onSubmit, onCancel }: ZoneFormProps) {
     e.preventDefault();
 
     if (!name.trim()) {
-      alert("Veuillez saisir un nom pour la zone");
+      toast.error("Veuillez saisir un nom pour la zone");
       return;
     }
 

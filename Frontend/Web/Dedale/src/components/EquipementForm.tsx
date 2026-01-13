@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import toast from "react-hot-toast";
 import { invoke } from "@tauri-apps/api/core";
 import { EquipementType } from "../types/map";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -68,7 +69,7 @@ export default function EquipementForm({
     e.preventDefault();
 
     if (!selectedTypeId) {
-      alert("Veuillez sélectionner un type d'équipement");
+      toast.error("Veuillez sélectionner un type d'équipement");
       return;
     }
 
@@ -77,17 +78,17 @@ export default function EquipementForm({
     const deposeDate = new Date(dateDepose);
 
     if (poseDate < now) {
-      alert("La date de pose ne peut pas être dans le passé !");
+      toast.error("La date de pose ne peut pas être dans le passé !");
       return;
     }
 
     if (deposeDate < now) {
-      alert("La date de dépose ne peut pas être dans le passé !");
+      toast.error("La date de dépose ne peut pas être dans le passé !");
       return;
     }
 
     if (poseDate >= deposeDate) {
-      alert("La date de dépose doit être postérieure à la date de pose !");
+      toast.error("La date de dépose doit être postérieure à la date de pose !");
       return;
     }
 
