@@ -1,4 +1,4 @@
-import logoStrasbourg from "../assets/logo_strasbourg.png";
+import logoStrasbourg from "../../public/dedale.png";
 import type { PageKey } from "../hooks/useNavigation";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faChevronLeft, faCalendarAlt, faTimes } from "@fortawesome/free-solid-svg-icons";
@@ -36,37 +36,19 @@ export default function Navigation({
       <div className="w-full px-6">
         <div className="flex h-16 items-center justify-between">
           {/* Section Gauche : Logo & Branding */}
-          <div className="flex items-center gap-5 flex-shrink-0">
-            {canGoBack && onGoBack && (
-              <button
-                onClick={onGoBack}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:text-yellow-400 hover:bg-white/5 transition-all cursor-pointer"
-                aria-label="Retour"
-              >
-                <FontAwesomeIcon icon={faChevronLeft} className="h-4 w-4" />
-              </button>
-            )}
-
+          <div className="flex items-center ">
             <div
-              className="flex items-center gap-3 cursor-pointer group"
+              className="flex items-center cursor-pointer group"
               onClick={() => onNavigate("event")}
             >
-              <div className="relative">
-                <img
-                  src={logoStrasbourg}
-                  alt="Logo"
-                  className="h-9 w-auto object-contain brightness-0 invert"
-                />
-                <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-yellow-500 rounded-full border border-gray-900"></div>
-              </div>
-              <div className="flex flex-col leading-none">
-                <span className="text-lg font-bold text-white tracking-tight group-hover:text-yellow-400 transition-colors">
-                  Dedale
-                </span>
-                <span className="text-[10px] font-bold text-yellow-500 uppercase tracking-widest bg-yellow-500/10 px-1 py-0.5 rounded-sm w-fit mt-0.5">
-                  Gestion Événements
-                </span>
-              </div>
+              <img
+                src={logoStrasbourg}
+                alt="Logo"
+                className="h-16 w-auto "
+              />
+              <span className="text-3xl font-bold text-white tracking-tight -ml-8">
+                Dedale
+              </span>
             </div>
           </div>
 
