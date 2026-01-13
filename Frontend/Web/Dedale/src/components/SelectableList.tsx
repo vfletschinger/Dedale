@@ -28,7 +28,7 @@ const SelectableRow = React.memo(({
 }: any) => {
     return (
         <div
-            className={`${className} select-none ${isSelected ? "bg-blue-100 border-blue-300 hover:bg-blue-200" : "hover:bg-gray-100 hover:border-gray-200"}`}
+            className={`${className} select-none ${isSelected ? "bg-primary/10 border-primary/30 hover:bg-primary/20" : "hover:bg-gray-100 hover:border-gray-200"}`}
             onMouseDown={(e) => onMouseDown(e, item.id, index)}
             onMouseEnter={() => onMouseEnter(item.id, index)}
         >

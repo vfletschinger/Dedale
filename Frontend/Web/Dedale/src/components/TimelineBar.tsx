@@ -365,7 +365,7 @@ function TimelineBar({
                     {/* Barre bleue entre pose et dépose */}
                     {hasStart && hasEnd && (
                       <div
-                        className="absolute h-1.5 top-1/2 -translate-y-1/2 bg-blue-300/60 rounded-full group-hover:bg-blue-400"
+                        className="absolute h-1.5 top-1/2 -translate-y-1/2 bg-primary/40 rounded-full group-hover:bg-primary/60"
                         style={{ left: `${startP}%`, width: `${Math.max(0.5, endP - startP)}%` }}
                       />
                     )}

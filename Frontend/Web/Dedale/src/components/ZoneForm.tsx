@@ -35,7 +35,7 @@ export default function ZoneForm({ onSubmit, onCancel }: ZoneFormProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4 flex items-center justify-between">
+        <div className="bg-gradient-to-r from-primary to-primary/80 px-6 py-4 flex items-center justify-between">
           <h3 className="text-lg font-bold text-white flex items-center gap-3">
             <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
               <FontAwesomeIcon icon={faDrawPolygon} className="text-xl" />
@@ -62,7 +62,7 @@ export default function ZoneForm({ onSubmit, onCancel }: ZoneFormProps) {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Ex: Zone de sécurité"
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50"
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-gray-50"
               required
             />
           </div>
@@ -83,7 +83,7 @@ export default function ZoneForm({ onSubmit, onCancel }: ZoneFormProps) {
                 type="text"
                 value={color}
                 onChange={(e) => setColor(e.target.value)}
-                className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 font-mono text-sm"
+                className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-gray-50 font-mono text-sm"
               />
             </div>
           </div>
@@ -97,7 +97,7 @@ export default function ZoneForm({ onSubmit, onCancel }: ZoneFormProps) {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Ajoutez une description pour cette zone..."
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none bg-gray-50"
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-none bg-gray-50"
               rows={3}
             />
           </div>
@@ -113,7 +113,7 @@ export default function ZoneForm({ onSubmit, onCancel }: ZoneFormProps) {
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
+              className="flex-1 px-4 py-3 bg-primary hover:bg-primary/80 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
             >
               <FontAwesomeIcon icon={faCheck} />
               Créer la zone

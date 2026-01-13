@@ -175,7 +175,7 @@ export default function PointDetails({
                   setEditingName(true);
                   setNewName(point.name || "");
                 }}
-                className="text-primary hover:text-primary/80 text-sm font-medium"
+                className="text-primary hover:text-white hover:bg-primary border border-primary px-3 py-1 rounded-lg text-sm font-medium transition-all"
               >
                 Modifier
               </button>
@@ -206,11 +206,13 @@ export default function PointDetails({
               </div>
             </div>
           ) : (
-            <p className="text-gray-700">
-              {point.name || (
-                <span className="text-gray-400 italic">Aucun nom</span>
-              )}
-            </p>
+            <div className=" border border-gray-200 rounded-lg px-4 py-3 shadow-sm">
+              <p className="text-gray-700">
+                {point.name || (
+                  <span className="text-gray-400 italic">Aucun nom</span>
+                )}
+              </p>
+            </div>
           )}
         </div>
 
@@ -243,7 +245,7 @@ export default function PointDetails({
                   setEditingComment(true);
                   setNewComment(point.comment || "");
                 }}
-                className="text-primary hover:text-primary/80 text-sm font-medium"
+                className="text-primary hover:text-white hover:bg-primary border border-primary px-3 py-1 rounded-lg text-sm font-medium transition-all"
               >
                 Modifier
               </button>
@@ -274,11 +276,13 @@ export default function PointDetails({
               </div>
             </div>
           ) : (
-            <p className="text-gray-700">
-              {point.comment || (
-                <span className="text-gray-400 italic">Aucun commentaire</span>
-              )}
-            </p>
+            <div className="border border-gray-200 rounded-lg px-4 py-3 shadow-sm">
+              <p className="text-gray-700">
+                {point.comment || (
+                  <span className="text-gray-400 italic">Aucun commentaire</span>
+                )}
+              </p>
+            </div>
           )}
         </div>
 

@@ -70,7 +70,7 @@ export default function AddressSearch({ onSelect }: AddressSearchProps) {
               setTimeout(() => setResults([]), 200);
             }}
             className={`w-full pl-4 pr-10 py-2.5 bg-gray-800 border-2 rounded-lg text-white placeholder-gray-500 focus:outline-none transition-all ${isFocused
-              ? "border-yellow-500 shadow-lg shadow-yellow-500/10"
+              ? "border-secondary shadow-lg shadow-secondary/10"
               : "border-gray-700 hover:border-gray-600"
               }`}
           />
@@ -88,7 +88,7 @@ export default function AddressSearch({ onSelect }: AddressSearchProps) {
         </div>
 
         <button
-          className="px-4 py-2.5 bg-yellow-500 hover:bg-yellow-400 text-gray-900 rounded-lg shadow-lg hover:shadow-yellow-500/20 font-bold transition-all flex items-center justify-center shrink-0"
+          className="px-4 py-2.5 bg-secondary hover:bg-secondary/80 text-gray-900 rounded-lg shadow-lg hover:shadow-secondary/20 font-bold transition-all flex items-center justify-center shrink-0"
         >
           <FontAwesomeIcon icon={faSearch} />
         </button>
@@ -103,7 +103,7 @@ export default function AddressSearch({ onSelect }: AddressSearchProps) {
               className="w-full text-left px-4 py-3 hover:bg-gray-700 flex items-center gap-3 transition-colors duration-150 group border-b border-gray-700/50 last:border-0"
               onClick={() => handleSelect(r)}
             >
-              <div className="bg-gray-700 p-2 rounded-full group-hover:bg-yellow-500/20 group-hover:text-yellow-500 transition-colors text-gray-400">
+              <div className="bg-gray-700 p-2 rounded-full group-hover:bg-secondary/20 group-hover:text-secondary transition-colors text-gray-400">
                 <span className="text-sm"><FontAwesomeIcon icon={faMapMarkerAlt} /></span>
               </div>
               <div className="flex-1 min-w-0">

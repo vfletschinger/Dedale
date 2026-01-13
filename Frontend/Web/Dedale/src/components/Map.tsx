@@ -306,14 +306,14 @@ function OfflineMapLibre({
               setViewMode("points");
             }}
             className={`px-4 py-3 text-sm font-bold border-b-2 transition-all ${viewMode === "points"
-              ? "text-yellow-500 border-yellow-500 bg-white/5"
+              ? "text-secondary border-secondary bg-white/5"
               : "text-gray-400 border-transparent hover:text-white hover:bg-white/5"
               }`}
           >
             <span className="flex items-center gap-2">
               <FontAwesomeIcon icon={faList} />
               <span>Liste des points</span>
-              <span className={`text-xs px-2 py-0.5 rounded-full ${viewMode === 'points' ? 'bg-yellow-500 text-gray-900' : 'bg-gray-700 text-gray-300'}`}>
+              <span className={`text-xs px-2 py-0.5 rounded-full ${viewMode === 'points' ? 'bg-secondary text-gray-900' : 'bg-gray-700 text-gray-300'}`}>
                 {points.length}
               </span>
             </span>
@@ -345,7 +345,7 @@ function OfflineMapLibre({
           <button
             onClick={() => setViewMode("timeline")}
             className={`px-4 py-3 text-sm font-bold border-b-2 transition-all ${viewMode === "timeline"
-              ? "text-yellow-500 border-yellow-500 bg-white/5"
+              ? "text-secondary border-secondary bg-white/5"
               : "text-gray-400 border-transparent hover:text-white hover:bg-white/5"
               }`}
           >

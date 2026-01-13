@@ -161,9 +161,8 @@ function App() {
           canGoBack={canGoBack}
           onGoBack={goBack}
           eventSelected={selectedEventId === null || undefined ? false : true}
-          eventName={events.find(e => e.id === selectedEventId)?.name}
-          deselectEvent={handleDeselection}
           eventName={events.find(e => String(e.id) === selectedEventId)?.name}
+          deselectEvent={handleDeselection}
         />
       </header>
 
@@ -221,15 +220,15 @@ function App() {
       </main>
 
       {currentPage === "event" && (
-        <div className="fixed bottom-6 right-6 z-50 bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-white/30 p-4">
+        <div className="fixed bottom-6 right-6 z-50 bg-gray-900 rounded-2xl shadow-xl border border-gray-800 p-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-linear-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold">
+            <div className="w-10 h-10 bg-secondary rounded-full flex items-center justify-center text-gray-900 font-bold">
               {events.length}
             </div>
             <div>
-              <div className="text-sm font-semibold text-gray-800">Total Events</div>
-              <div className="text-xs text-gray-500">
-                {events.filter((e) => e.statut === 'active' || e.statut === 'Actif').length} actifs
+              <div className="text-sm font-semibold text-white">Événements au total</div>
+              <div className="text-xs text-gray-400">
+                {events.filter((e) => e.statut === 'active' || e.statut === 'Actif').length} actif(s)
               </div>
             </div>
           </div>

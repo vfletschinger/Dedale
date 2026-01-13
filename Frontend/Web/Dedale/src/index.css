@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #eab308;
-  --color-secondary: #475569;
+  --color-primary: #2e4574;
+  --color-secondary: #eab308;
 }
 
 /* Limite le scan Tailwind aux fichiers sources, exclut les binaires */

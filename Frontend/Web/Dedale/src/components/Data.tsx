@@ -215,7 +215,7 @@ function Data() {
       type === "success"
         ? "bg-green-50 border-green-300 text-green-700"
         : type === "info"
-          ? "bg-blue-50 border-blue-300 text-blue-700"
+          ? "bg-primary/10 border-primary/50 text-primary"
           : "bg-red-50 border-red-300 text-red-700";
     const title =
       type === "success"
