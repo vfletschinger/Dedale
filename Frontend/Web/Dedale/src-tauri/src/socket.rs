@@ -1,7 +1,10 @@
 #![allow(dead_code)]
 
+use crate::db::equipements::send_planning;
+use crate::types::*;
 use crate::db::{get_db_pool, insert_point, PointWithDetails};
-use crate::db::equipements::{send_equipements_to_mobile, TransferEquipement};
+use crate::db::equipements::send_equipements_to_mobile;
+use crate::types::TransferEquipement;
 use base64::{engine::general_purpose, Engine as _};
 use image::codecs::png::PngEncoder;
 use image::{ImageEncoder, Luma};
@@ -1151,6 +1154,66 @@ pub fn start_receive_server(app: AppHandle, event_id: String) -> Result<String, 
     Ok(base64_data)
 }
 
+#[tauri::command]
+pub fn start_server_planning(app: AppHandle, team_id : String) -> Result<String, String> {
+    println!(
+        "📥 Démarrage du serveur de réception pour l'envoie des actions {}",
+        team_id
+    );
+
+    let ip = local_ip().map_err(|e| e.to_string())?;
+    let port = random_port();
+    let socket = SocketAddr::new(ip, port);
+
+    let ws_uri = format!("ws://{}:{}", ip, port);
+
+    let code = QrCode::new(ws_uri.as_bytes()).map_err(|e| e.to_string())?;
+    let image = code.render::<Luma<u8>>().min_dimensions(256, 256).build();
+
+    let mut buffer = Vec::new();
+    let mut cursor = Cursor::new(&mut buffer);
+
+    image::DynamicImage::ImageLuma8(image)
+        .write_to(&mut cursor, image::ImageFormat::Png)
+        .map_err(|e| format!("Erreur d'écriture PNG: {}", e))?;
+
+    let base64_data = general_purpose::STANDARD.encode(&buffer);
+
+    let app_for_thread = app.clone();
+
+    thread::spawn(move || {
+        let listener =
+            std::net::TcpListener::bind(socket).expect("Impossible de binder le socket WebSocket");
+        println!("📥 Serveur de réception démarré sur {}", socket);
+
+        for stream in listener.incoming() {
+            match stream {
+                Ok(stream) => match accept(stream) {
+                    Ok(ws) => {
+                        println!("📱 Client mobile connecté pour réception");
+                        let app_clone = app_for_thread.clone();
+                        let team_id_clone = team_id.clone();
+
+                        thread::spawn(move || {
+                            let rt = tokio::runtime::Runtime::new().unwrap();
+                            rt.block_on(async {
+                                if let Err(e) =
+                                    handle_receive_planning(&app_clone, ws, team_id_clone).await
+                                {
+                                    eprintln!("Erreur WebSocket réception: {}", e);
+                                }
+                            });
+                        });
+                    }
+                    Err(e) => eprintln!("Erreur accept WebSocket : {}", e),
+                },
+                Err(e) => eprintln!("Erreur connexion : {}", e),
+            }
+        }
+    });
+
+    Ok(base64_data)
+}
 /// Gère la connexion WebSocket pour recevoir les données du mobile
 async fn handle_receive_websocket(
     app: &AppHandle,
@@ -1256,4 +1319,33 @@ async fn handle_receive_websocket(
             }
         }
     }
+}
+
+async fn handle_receive_planning(
+    app: &AppHandle,
+    mut websocket: tungstenite::WebSocket<std::net::TcpStream>,
+    team_id: String,
+) -> Result<(), String> {
+    println!("📥 Client connecté pour réception, team_id: {}", team_id);
+
+    // Émettre un événement Tauri pour notifier le frontend
+    app.emit("mobile-connected", ()).unwrap_or_else(|e| {
+        eprintln!("⚠️ Erreur émission événement mobile-connected: {}", e);
+    });
+
+    let planning = send_planning(team_id.clone(), app.clone()).await?;
+    let actions = vec![planning];
+
+    // Envoyer un message de bienvenue
+    let message = serde_json::json!({
+        "actions" : actions
+    });
+    websocket
+        .write(Message::Text(message.to_string().into()))
+        .map_err(|e| format!("Erreur envoi message: {}", e))?;
+    websocket
+        .flush()
+        .map_err(|e| format!("Erreur flush: {}", e))?;
+    Ok(())
+
 }

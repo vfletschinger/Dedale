@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faExclamation, faCheck, faTimes } from "@fortawesome/free-solid-svg-icons";
+import { faExclamationCircle, faCheck } from "@fortawesome/free-solid-svg-icons";
 
 interface InterestFormProps {
   onSubmit: (data: {
@@ -29,22 +29,11 @@ export default function InterestForm({ onSubmit, onCancel }: InterestFormProps) 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-purple-500 to-purple-600 px-6 py-4 flex items-center justify-between">
-          <h3 className="text-lg font-bold text-white flex items-center gap-3">
-            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-              <FontAwesomeIcon icon={faExclamation} className="text-xl" />
-            </div>
-            Nouveau Point d'Intérêt
-          </h3>
-          <button
-            onClick={onCancel}
-            className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/20 hover:bg-white/30 text-white transition-colors cursor-pointer"
-          >
-            <FontAwesomeIcon icon={faTimes} />
-          </button>
-        </div>
+      <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
+        <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+          <span className="text-2xl"><FontAwesomeIcon icon={faExclamationCircle} /></span>
+          Nouveau Point d'Intérêt
+        </h3>
 
         {/* Content */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">

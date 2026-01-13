@@ -11,6 +11,7 @@ interface NavigationProps {
   eventSelected: boolean;
   eventName?: string;
   deselectEvent: () => void;
+  eventName?: string;
 }
 
 const NAV_ITEMS: { key: PageKey; label: string }[] = [
@@ -30,6 +31,7 @@ export default function Navigation({
   eventSelected,
   eventName,
   deselectEvent,
+  eventName,
 }: NavigationProps) {
   return (
     <nav className="sticky top-0 z-[100] w-full bg-gray-900 border-b border-gray-800 shadow-xl">
@@ -78,37 +80,10 @@ export default function Navigation({
               );
             })}
           </div>
-
-          {/* Section Droite : Event Selection */}
-          <div className="flex items-center flex-shrink-0">
-            {eventSelected ? (
-              <div className="flex items-center group relative">
-                <div className="flex items-center gap-3 px-5 py-2 bg-gray-800 border border-gray-700 rounded-full pr-12 transition-all hover:border-yellow-500/50">
-                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                  <FontAwesomeIcon icon={faCalendarAlt} className="text-yellow-500 text-sm" />
-                  <span className="text-sm font-medium text-gray-200 max-w-[180px] truncate">
-                    {eventName || "Événement"}
-                  </span>
-                </div>
-                <button
-                  onClick={deselectEvent}
-                  className="absolute right-1 w-8 h-8 flex items-center justify-center rounded-full bg-gray-700 hover:bg-red-500/20 text-gray-400 hover:text-red-500 transition-all cursor-pointer"
-                  title="Désélectionner l'événement"
-                >
-                  <FontAwesomeIcon icon={faTimes} className="text-xs" />
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => onNavigate("event")}
-                className="flex items-center gap-2 px-5 py-2.5 bg-yellow-500 hover:bg-yellow-400 text-gray-900 font-bold rounded-lg shadow-lg hover:shadow-yellow-500/20 transition-all cursor-pointer transform hover:-translate-y-0.5 active:translate-y-0"
-              >
-                <FontAwesomeIcon icon={faCalendarAlt} className="text-sm" />
-                <span className="text-sm">
-                  Créer un événement
-                </span>
-              </button>
-            )}
+          <div hidden={!eventSelected} className="flex items-center gap-2 px-2 py-1.5 bg-slate-800 rounded-lg border border-slate-600 shadow-md">
+            <button onClick={deselectEvent} className={`relative px-4 py-2 text-[11px] font-semibold tracking-wide uppercase transition-all duration-200 rounded-md cursor-pointer text-slate-300 hover:text-white hover:bg-slate-700`}>
+              {eventName || "Événement"}
+            </button>
           </div>
         </div>
       </div>

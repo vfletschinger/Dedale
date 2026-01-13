@@ -57,6 +57,7 @@ pub fn run() {
             socket::send_event_to_mobile,
             socket::terminate_server,
             socket::start_receive_server,
+            socket::start_server_planning,
             db::fetch_obstacle_types,
             db::delete_point,
             db::insert_point,
@@ -114,15 +115,14 @@ pub fn run() {
             db::fetch_actions,
             db::delete_action,
             db::fetch_team_actions,
-            // Géocodage local
             geocoding::search_address,
-            // Planning
             db::fetch_teams_for_event,
             db::fetch_actions_for_team,
             db::update_action_status,
             db::export_planning_excel,
             db::create_planning_pdf,
             db::send_equipements_to_mobile,
+            db::send_planning,
         ])
         .run(tauri::generate_context!())
         .expect("Erreur lors de l'exécution de l'application Tauri");

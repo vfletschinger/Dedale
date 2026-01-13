@@ -163,6 +163,7 @@ function App() {
           eventSelected={selectedEventId === null || undefined ? false : true}
           eventName={events.find(e => e.id === selectedEventId)?.name}
           deselectEvent={handleDeselection}
+          eventName={events.find(e => String(e.id) === selectedEventId)?.name}
         />
       </header>
 
