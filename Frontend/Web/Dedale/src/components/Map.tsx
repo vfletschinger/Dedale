@@ -41,7 +41,6 @@ import {
   faCamera,
   faCheck,
   faComment,
-  faCaretDown,
   faInbox
 } from "@fortawesome/free-solid-svg-icons";
 
@@ -103,8 +102,6 @@ function OfflineMapLibre({
     drawingMode,
     selectedGeometry,
     editingGeometry,
-    isGeometryListOpen,
-    setIsGeometryListOpen,
     startDrawPolygon,
     startDrawLine,
     startDrawInterest,

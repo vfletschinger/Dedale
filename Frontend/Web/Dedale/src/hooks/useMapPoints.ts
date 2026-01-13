@@ -392,7 +392,12 @@ export function useMapPoints(
   // 2b. Charger les points d'intérêt
   useEffect(() => {
     if (!map || !map.getSource("db-interests")) return;
-    refreshInterest();
+    
+    // Appel asynchrone pour éviter le setState synchrone dans useEffect
+    const loadInterests = async () => {
+      await refreshInterest();
+    };
+    loadInterests();
   }, [selectedEventId, map, refreshInterest]);
 
   // 3. Gestion du curseur "crosshair" pour l'ajout
