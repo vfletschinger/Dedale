@@ -3,6 +3,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 // import QRCodeDisplay from "./QrCode"; // Supprimé car on utilise l'image Base64 comme dans Events.tsx
 import { TeamWithActions, Team, Action, Planning as Plan } from "../types/equipement";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faFilePdf, faMobileAlt } from "@fortawesome/free-solid-svg-icons";
 
 // État pour gérer le processus de sync
 type SyncStep = "idle" | "generating_qr" | "waiting_for_scan" | "sending" | "success" | "error";
@@ -104,8 +106,25 @@ export default function Planning({
 
   useEffect(() => {
     loadTeamsWithActions();
-    const unlistenUpdate = listen("team-update", loadTeamsWithActions);
-    return () => { unlistenUpdate.then(f => f()).catch(() => {}); };
+
+    // Écouter les événements de création/suppression de team et mise à jour
+    const unlistenTeamCreated = listen("team-created", () => {
+      loadTeamsWithActions();
+    });
+
+    const unlistenTeamDeleted = listen("team-deleted", () => {
+      loadTeamsWithActions();
+    });
+
+    const unlistenTeamUpdate = listen("team-update", () => {
+      loadTeamsWithActions();
+    });
+
+    return () => {
+      unlistenTeamCreated.then(f => f()).catch(() => { });
+      unlistenTeamDeleted.then(f => f()).catch(() => { });
+      unlistenTeamUpdate.then(f => f()).catch(() => { });
+    };
   }, [activeEventId, loadTeamsWithActions]);
 
 
@@ -361,7 +380,10 @@ export default function Planning({
                     {generatingPdfForTeam === team.id ? (
                       <div className="animate-spin h-4 w-4 border-b-2 border-white rounded-full"></div>
                     ) : (
-                      <i className="fas fa-file-pdf"></i>
+                      <>
+                        <FontAwesomeIcon icon={faFilePdf} className="h-4 w-4" />
+                        PDF Équipe
+                      </>
                     )}
                     PDF
                   </button>
@@ -372,7 +394,8 @@ export default function Planning({
                     disabled={syncState.step !== "idle" && syncState.teamId === team.id}
                     className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center gap-2"
                   >
-                    <i className="fas fa-paper-plane"></i> Envoyer planning
+                    <FontAwesomeIcon icon={faMobileAlt} className="h-4 w-4" />
+                    Envoyer planning
                   </button>
                 </div>
               </div>

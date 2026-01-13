@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faMapMarkerAlt } from "@fortawesome/free-solid-svg-icons";
 
 interface ParcoursFormProps {
   onSubmit: (data: {
@@ -21,7 +23,7 @@ export default function ParcoursForm({ onSubmit, onCancel }: ParcoursFormProps) 
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Vérifier que la date n'est pas dans le passé
     if (startDate) {
       const today = new Date().toISOString().split('T')[0];
@@ -30,10 +32,10 @@ export default function ParcoursForm({ onSubmit, onCancel }: ParcoursFormProps) 
         return;
       }
     }
-    
+
     // Combiner date et heure en un seul datetime string
     const datetime = startDate && startTime ? `${startDate}T${startTime}` : "";
-    
+
     onSubmit({
       name,
       color,
@@ -47,10 +49,10 @@ export default function ParcoursForm({ onSubmit, onCancel }: ParcoursFormProps) 
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
         <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-          <span className="text-2xl">📍</span>
+          <span className="text-2xl"><FontAwesomeIcon icon={faMapMarkerAlt} /></span>
           Nouveau Parcours
         </h3>
-        
+
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Nom */}
           <div>
@@ -61,7 +63,7 @@ export default function ParcoursForm({ onSubmit, onCancel }: ParcoursFormProps) 
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
               required
             />
           </div>
@@ -82,7 +84,7 @@ export default function ParcoursForm({ onSubmit, onCancel }: ParcoursFormProps) 
                 type="text"
                 value={color}
                 onChange={(e) => setColor(e.target.value)}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 font-mono text-sm"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary font-mono text-sm"
               />
             </div>
           </div>
@@ -98,13 +100,13 @@ export default function ParcoursForm({ onSubmit, onCancel }: ParcoursFormProps) 
                 value={startDate}
                 min={new Date().toISOString().split('T')[0]} // Empêche la sélection de dates passées
                 onChange={(e) => setStartDate(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
               />
               <input
                 type="time"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
           </div>
@@ -120,7 +122,7 @@ export default function ParcoursForm({ onSubmit, onCancel }: ParcoursFormProps) 
               min="0"
               value={speedLow}
               onChange={(e) => setSpeedLow(parseFloat(e.target.value) || 0)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
 
@@ -135,7 +137,7 @@ export default function ParcoursForm({ onSubmit, onCancel }: ParcoursFormProps) 
               min="0"
               value={speedHigh}
               onChange={(e) => setSpeedHigh(parseFloat(e.target.value) || 0)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
 

@@ -6,7 +6,8 @@ import { MapInterest, MapPoint } from "../types/map";
 
 export function useMapPoints(
   map: maplibregl.Map | null,
-  selectedEventId: string | null
+  selectedEventId: string | null,
+  showInterests: boolean = true // Filtre de visibilité pour les points d'intérêt
 ) {
   // --- ÉTATS ---
   const [points, setPoints] = useState<MapPoint[]>([]);
@@ -24,7 +25,7 @@ export function useMapPoints(
 
   const refreshPoints = useCallback(async () => {
     try {
-      console.log("🔄 Chargement des points pour event_id:", selectedEventId);
+      console.log("[Points] Chargement des points pour event_id:", selectedEventId);
       const freshPoints = await invoke<MapPoint[]>("fetch_points", {
         eventId: selectedEventId ? String(selectedEventId) : null,
       });
@@ -60,7 +61,7 @@ export function useMapPoints(
 
   const refreshInterest = useCallback(async () => {
     try {
-      console.log("🔄 Chargement des points d'intérêt pour event_id:", selectedEventId);
+      console.log("[Points] Chargement des points d'intérêt pour event_id:", selectedEventId);
       const freshInterests = await invoke<MapInterest[]>("fetch_interest_points", {
         eventId: selectedEventId ? String(selectedEventId) : null,
       });
@@ -119,7 +120,7 @@ export function useMapPoints(
     }
 
     try {
-      console.log("💾 Sauvegarde du point pour l'event :", selectedEventId);
+      console.log("[Points] Sauvegarde du point pour l'event :", selectedEventId);
 
       // 2. Appel au Backend Rust
       // Assurez-vous que les noms des champs correspondent à votre struct Rust
@@ -190,7 +191,7 @@ export function useMapPoints(
             type: "symbol",
             source: "db-interests",
             layout: {
-              "text-field": "?",
+              "text-field": "!",
               "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
               "text-size": 18,
               "text-anchor": "center",
@@ -205,6 +206,32 @@ export function useMapPoints(
           // Interactions pour les points d'intérêt
           map.on("mouseenter", "db-interests-layer", () => (map.getCanvas().style.cursor = "pointer"));
           map.on("mouseleave", "db-interests-layer", () => (map.getCanvas().style.cursor = ""));
+
+          // Clic sur un point d'intérêt existant
+          map.on("click", "db-interests-layer", (e) => {
+            const f = e.features?.[0];
+            if (!f) return;
+
+            const description = f.properties?.description || 'Aucune description';
+            const coords = (f.geometry as GeoJSON.Point).coordinates as [number, number];
+
+            // Fermer toute popup existante
+            const existingPopups = document.querySelectorAll('.maplibregl-popup');
+            existingPopups.forEach(popup => popup.remove());
+
+            // Créer et afficher la popup
+            new maplibregl.Popup({ closeOnClick: true, maxWidth: '300px' })
+              .setLngLat(coords)
+              .setHTML(`
+                <div class="p-2">
+                  <div class="font-bold text-purple-700 mb-2 flex items-center gap-1">
+                    <span>Point d'intérêt</span>
+                  </div>
+                  <p class="text-sm text-gray-700">${description}</p>
+                </div>
+              `)
+              .addTo(map);
+          });
         }
 
         // --- Gestionnaires d'événements liés aux layers ---
@@ -241,7 +268,7 @@ export function useMapPoints(
 
         // Charger les points immédiatement après la création de la source
         if (selectedEventId) {
-          console.log("🔄 Chargement initial des points pour event_id:", selectedEventId);
+          console.log("[Points] Chargement initial des points pour event_id:", selectedEventId);
           invoke<MapPoint[]>("fetch_points", {
             eventId: String(selectedEventId),
           })
@@ -269,6 +296,34 @@ export function useMapPoints(
               (map.getSource("db-points") as maplibregl.GeoJSONSource).setData(geojson);
             })
             .catch((err) => console.error("Erreur chargement initial points:", err));
+
+          // Charger les points d'intérêt immédiatement après la création de la source
+          console.log("[Points] Chargement initial des points d'intérêt pour event_id:", selectedEventId);
+          invoke<MapInterest[]>("fetch_interest_points", {
+            eventId: String(selectedEventId),
+          })
+            .then((freshInterests) => {
+              console.log(`${freshInterests.length} point(s) d'intérêt récupéré(s)`);
+              interestsRef.current = freshInterests;
+              setInterests(freshInterests);
+
+              const geojson: GeoJSON.FeatureCollection<GeoJSON.Point> = {
+                type: "FeatureCollection",
+                features: freshInterests.map((p) => ({
+                  type: "Feature",
+                  geometry: {
+                    type: "Point",
+                    coordinates: [Number(p.x), Number(p.y)],
+                  },
+                  properties: {
+                    id: p.id,
+                    description: p.description,
+                  },
+                })),
+              };
+              (map.getSource("db-interests") as maplibregl.GeoJSONSource).setData(geojson);
+            })
+            .catch((err) => console.error("Erreur chargement initial points d'intérêt:", err));
         }
 
       } catch (error) {
@@ -297,7 +352,7 @@ export function useMapPoints(
     // Charger les points directement ici pour éviter le warning
     const loadPoints = async () => {
       try {
-        console.log("🔄 Chargement des points pour event_id:", selectedEventId);
+        console.log("[Points] Chargement des points pour event_id:", selectedEventId);
         const freshPoints = await invoke<MapPoint[]>("fetch_points", {
           eventId: selectedEventId ? String(selectedEventId) : null,
         });
@@ -337,7 +392,12 @@ export function useMapPoints(
   // 2b. Charger les points d'intérêt
   useEffect(() => {
     if (!map || !map.getSource("db-interests")) return;
-    refreshInterest();
+    
+    // Appel asynchrone pour éviter le setState synchrone dans useEffect
+    const loadInterests = async () => {
+      await refreshInterest();
+    };
+    loadInterests();
   }, [selectedEventId, map, refreshInterest]);
 
   // 3. Gestion du curseur "crosshair" pour l'ajout
@@ -353,7 +413,7 @@ export function useMapPoints(
   // 4. Écoute des mises à jour temps réel
   useEffect(() => {
     const unlisten = listen<string>("points-updated", (event) => {
-      console.log("📥 Points mis à jour via socket, event_id:", event.payload);
+      console.log("[Points] Points mis à jour via socket, event_id:", event.payload);
       if (!selectedEventId || selectedEventId === event.payload) {
         if (map) refreshPoints();
       }
@@ -367,7 +427,7 @@ export function useMapPoints(
   // 4. Recharger les points quand l'événement sélectionné change
   useEffect(() => {
     if (map && map.getSource("db-points")) {
-      console.log("🔄 Changement d'événement, rechargement des points...");
+      console.log("[Points] Changement d'événement, rechargement des points...");
       // Defer the refresh to avoid synchronous setState in effect
       const timeoutId = setTimeout(() => {
         refreshPoints();
@@ -375,6 +435,32 @@ export function useMapPoints(
       return () => clearTimeout(timeoutId);
     }
   }, [selectedEventId, map, refreshPoints]);
+
+  // 5. Recharger les points d'intérêt quand l'événement sélectionné change
+  useEffect(() => {
+    if (map && map.getSource("db-interests")) {
+      console.log("[Points] Changement d'événement, rechargement des points d'intérêt...");
+      // Defer the refresh to avoid synchronous setState in effect
+      const timeoutId = setTimeout(() => {
+        refreshInterest();
+      }, 0);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [selectedEventId, map, refreshInterest]);
+
+  // 6. Contrôler la visibilité du layer de points d'intérêt
+  useEffect(() => {
+    if (!map) return;
+    
+    const layer = map.getLayer("db-interests-layer");
+    if (layer) {
+      map.setLayoutProperty(
+        "db-interests-layer",
+        "visibility",
+        showInterests ? "visible" : "none"
+      );
+    }
+  }, [map, showInterests]);
 
   return {
     points,

@@ -152,6 +152,7 @@ function App() {
           onGoBack={goBack}
           eventSelected={selectedEventId === null || undefined ? false : true}
           deselectEvent={handleDeselection}
+          eventName={events.find(e => String(e.id) === selectedEventId)?.name}
         />
       </header>
 
