@@ -225,7 +225,7 @@ pub async fn create_planning_pdf(app: AppHandle, event_id: Option<String>) -> Re
         .to_string()
     };
 
-    let team_rows = sqlx::query_as::<_, (String, String)>(&teams_query)
+    let _team_rows = sqlx::query_as::<_, (String, String)>(&teams_query)
         .fetch_all(&pool)
         .await
         .map_err(|e| e.to_string())?;

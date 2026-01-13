@@ -18,13 +18,6 @@ export interface EventInput {
   statut?: string;
 }
 
-// Type pour les géométries d'événement
-export interface GeometryType {
-  id: number;
-  name: string;
-  description?: string;
-  color?: string;
-}
 
 // Type pour les inputs lors de la création/modification d'une géométrie
 export interface EventGeometryInput {

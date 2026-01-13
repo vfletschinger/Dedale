@@ -231,12 +231,13 @@ pub struct EquipementComplet {
     pub coordinates: Vec<EquipementCoordinate>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Clone, Deserialize, sqlx::FromRow)]
 pub struct Action {
     pub id: String,
     pub team_id: String,
     pub equipement_id: String,
-    pub action_type: Option<String>,
+    #[sqlx(rename = "type")]
+    pub r#type: Option<String>,
     pub scheduled_time: Option<String>,
     pub is_done: Option<bool>,
 }
@@ -247,4 +248,59 @@ pub struct EquipementActionComplet {
     pub event_id: Option<String>,
     pub action_id: Option<String>,
     pub action_type: Option<String>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct TransferEquipement {
+    pub id: String,
+    pub event_id: String,
+    pub type_id: String,
+    pub quantity: i32,
+    pub length_per_unit: f64,
+    pub date_pose: Option<String>,
+    pub date_depose: Option<String>,
+    pub coordinates: Vec<TransferEquipementCoordinate>,
+}
+
+
+/// Structure pour un event envoyé au mobile (avec noms camelCase pour compatibilité)
+#[derive(Debug, Serialize, Clone, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TransferEquipementCoordinate {
+    pub id: String,
+    pub equipement_id: String,
+    pub x: f64,
+    pub y: f64,
+    pub order_index: Option<i32>,
+}
+
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct TransferTeamInfo {
+    pub id: String,
+    pub name: String,
+    pub event_id: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct Planning {
+    pub team: TransferTeamInfo,
+    pub actions: Vec<Action>,
+    pub equipements: Vec<TransferEquipement>,
+    pub coordonees: Vec<TransferEquipementCoordinate>,
+}
+
+
+#[derive(sqlx::FromRow)]
+pub struct TransferEquipementWithoutCoords {
+    pub id: String,
+    pub event_id: String,
+    pub type_id: String,
+    pub quantity: Option<i32>,
+    pub length_per_unit: Option<i32>,
+    pub date_pose: Option<String>,
+    pub date_depose: Option<String>,
 }
