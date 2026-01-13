@@ -1,57 +1,112 @@
 export type InterestPointsType = {
-  id: string;  // UUID
+  id: string; // UUID
+  event_id: string; // UUID reference to event
   x: number;
   y: number;
-  event_id?: number; // Optional - populated from junction table when querying with event context
-};
-
-export type CommentType = {
-  id: string;  // UUID
-  point_id: string;  // UUID reference
-  value: string;
+  name?: string | null;
+  comment?: string | null; // Integrated comment field
+  type?: string | null;
+  status?: boolean | null;
+  created_at?: string;
+  modified_at?: string;
 };
 
 export type PictureType = {
-  id: string;  // UUID
-  point_id: string;  // UUID reference
+  id: string; // UUID
+  point_id: string; // UUID reference
   image: string;
 };
 
 export type EventType = {
-  id: number;
+  id: string; // UUID
   name: string;
-  description: string;
-  dateDebut: string;
-  dateFin: string;
-  statut: string;
-  geometry: string | null;
+  description?: string;
+  dateDebut?: string;
+  dateFin?: string;
+  startDate?: string; // Alias pour compatibilité avec le serveur
+  endDate?: string; // Alias pour compatibilité avec le serveur
+  statut?: string;
 };
 
-export type GeometryType = {
-  id: number;
-  event_id: number;
-  wkt: string;
+export type ParcoursType = {
+  id: string; // UUID
+  eventId?: string; // Alias camelCase pour compatibilité
+  event_id?: string; // UUID reference
+  name?: string;
+  color?: string;
+  geometryJson?: string; // Format GeoJSON ou WKT
+  wkt?: string; // Alias pour compatibilité
+  speedLow?: number;
+  speedHigh?: number;
+  startTime?: string;
   created_at?: string;
 };
 
-export type EventWithGeometries = EventType & {
-  geometries?: Omit<GeometryType, "id" | "event_id" | "created_at">[];
+export type ZoneType = {
+  id: string; // UUID
+  eventId?: string; // Alias camelCase pour compatibilité
+  event_id?: string; // UUID reference
+  name?: string;
+  color?: string;
+  geometryJson?: string; // Format GeoJSON ou WKT
+  wkt?: string; // Alias pour compatibilité
+  created_at?: string;
 };
 
-export type ObstacleType = {
-  id: string;  // UUID
-  point_id: string;  // UUID reference
-  type_id: number;
-  number: number;
-  name?: string;
+// Type pour les événements reçus du serveur avec toutes les données
+export type TransferEventType = EventType & {
+  parcours?: ParcoursType[];
+  zones?: ZoneType[];
+  points?: InterestPointsType[];
+};
+
+export type EventWithGeometries = EventType & {
+  parcours?: Omit<ParcoursType, "id" | "event_id" | "created_at">[];
+  zones?: Omit<ZoneType, "id" | "event_id" | "created_at">[];
+};
+
+export type EquipementTypeType = {
+  id: number;
+  name: string;
   description?: string;
   width?: number;
   length?: number;
 };
 
+export type EquipementType = {
+  id: string; // UUID
+  point_id: string; // UUID reference
+  type_id: number;
+  quantity: number;
+  name?: string; // From joined equipement_type
+  description?: string;
+  width?: number;
+  length?: number;
+};
+
+export type TeamType = {
+  id: string; // UUID
+  event_id: string; // UUID reference
+  name: string;
+};
+
+export type PersonType = {
+  id: string; // UUID
+  firstname?: string;
+  lastname?: string;
+  email?: string;
+  phone?: string;
+};
+
+export type MemberType = {
+  id: string; // UUID
+  team_id: string; // UUID reference
+  person_id: string; // UUID reference
+  role?: string;
+};
+
 export type PointDetailType = {
   point: InterestPointsType;
-  comments: CommentType[];
   pictures: PictureType[];
-  obstacles: ObstacleType[];
+  equipements: EquipementType[];
 };

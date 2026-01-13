@@ -34,7 +34,7 @@ function TabNavigator() {
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarIcon: ({ color, size }) => {
-          let iconName: string;
+          let iconName: keyof typeof Feather.glyphMap;
 
           if (route.name === "Home") {
             iconName = "home";
@@ -67,10 +67,10 @@ export default function App() {
     async function initDatabase() {
       try {
         const db = getDatabase();
-        //  if (__DEV__) {
-        //    const { resetAndSeed } = await import("./assets/migrations/seeders");
-        //    resetAndSeed(db);
-        //  }
+        // if (__DEV__) {
+        //   const { resetAndSeed } = await import("./assets/migrations/seeders");
+        //   resetAndSeed(db);
+        // }
         setDbReady(true);
       } catch (err) {
         console.error("Erreur initialisation DB:", err);

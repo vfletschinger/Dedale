@@ -2,11 +2,10 @@ import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 export interface Person {
-    id: number;
+    id: string;
     firstname: string;
     lastname: string;
     email: string;
-    address: string;
     phone_number: string;
 }
 
@@ -20,8 +19,7 @@ export default function CreatePerson({ onClose, onPersonCreated }: CreatePersonP
         firstname: "",
         lastname: "",
         email: "",
-        address: "",
-        phoneNumber: ""
+        phoneNumber: null
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -56,27 +54,23 @@ export default function CreatePerson({ onClose, onPersonCreated }: CreatePersonP
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-xs font-medium text-gray-700 mb-1">Prénom *</label>
-                            <input name="firstname" value={formData.firstname} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required />
+                            <input name="firstname" value={formData.firstname} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none" required />
                         </div>
                         <div>
                             <label className="block text-xs font-medium text-gray-700 mb-1">Nom *</label>
-                            <input name="lastname" value={formData.lastname} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required />
+                            <input name="lastname" value={formData.lastname} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none" required />
                         </div>
                     </div>
 
                     <div>
                         <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
-                        <input type="email" name="email" value={formData.email} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                        <input type="email" name="email" value={formData.email} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none" />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-xs font-medium text-gray-700 mb-1">Téléphone</label>
-                            <input name="phone" value={formData.phoneNumber} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">Adresse</label>
-                            <input name="address" value={formData.address} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                            <input type="tel" name="phoneNumber" value={formData.phoneNumber || ""} onChange={handleChange} placeholder="06 12 34 56 78" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none" />
                         </div>
                     </div>
 
@@ -84,7 +78,7 @@ export default function CreatePerson({ onClose, onPersonCreated }: CreatePersonP
 
                     <div className="flex justify-end gap-3 pt-4">
                         <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Annuler</button>
-                        <button type="submit" disabled={loading} className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center gap-2">
+                        <button type="submit" disabled={loading} className="px-4 py-2 text-sm text-white bg-secondary hover:bg-secondary/90 rounded-lg transition-colors flex items-center gap-2">
                             {loading && <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>}
                             Enregistrer
                         </button>
