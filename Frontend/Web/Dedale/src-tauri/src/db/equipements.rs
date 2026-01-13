@@ -1,33 +1,9 @@
 use crate::db::get_db_pool;
 use crate::types::*;
-use serde::Serialize;
 use sqlx::Row;
 use tauri::AppHandle;
 use uuid::Uuid;
 
-#[derive(Debug, Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct TransferEquipement {
-    pub id: String,
-    pub event_id: String,
-    pub type_id: String,
-    pub quantity: i32,
-    pub length_per_unit: f64,
-    pub date_pose: Option<String>,
-    pub date_depose: Option<String>,
-    pub coordinates: Vec<TransferEquipementCoordinate>,
-}
-
-/// Structure pour un event envoyé au mobile (avec noms camelCase pour compatibilité)
-#[derive(Debug, Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct TransferEquipementCoordinate {
-    pub id: String,
-    pub equipement_id: String,
-    pub x: f64,
-    pub y: f64,
-    pub order_index: Option<i32>,
-}
 // ============================================
 // TYPES D'ÉQUIPEMENTS
 // ============================================

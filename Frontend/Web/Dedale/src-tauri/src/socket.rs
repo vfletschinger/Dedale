@@ -1,11 +1,7 @@
 #![allow(dead_code)]
 
-use crate::db::equipements::{send_equipements_to_mobile, TransferEquipement};
+use crate::db::equipements::{send_equipements_to_mobile, send_planning};
 use crate::db::{get_db_pool, insert_point, PointWithDetails};
-use crate::db::equipements::send_planning;
-use crate::types::*;
-use crate::db::{get_db_pool, insert_point, PointWithDetails};
-use crate::db::equipements::send_equipements_to_mobile;
 use crate::types::TransferEquipement;
 use base64::{engine::general_purpose, Engine as _};
 use image::codecs::png::PngEncoder;
