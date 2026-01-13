@@ -6,7 +6,8 @@ import { MapInterest, MapPoint } from "../types/map";
 
 export function useMapPoints(
   map: maplibregl.Map | null,
-  selectedEventId: string | null
+  selectedEventId: string | null,
+  showInterests: boolean = true // Filtre de visibilité pour les points d'intérêt
 ) {
   // --- ÉTATS ---
   const [points, setPoints] = useState<MapPoint[]>([]);
@@ -441,6 +442,20 @@ export function useMapPoints(
       return () => clearTimeout(timeoutId);
     }
   }, [selectedEventId, map, refreshInterest]);
+
+  // 6. Contrôler la visibilité du layer de points d'intérêt
+  useEffect(() => {
+    if (!map) return;
+    
+    const layer = map.getLayer("db-interests-layer");
+    if (layer) {
+      map.setLayoutProperty(
+        "db-interests-layer",
+        "visibility",
+        showInterests ? "visible" : "none"
+      );
+    }
+  }, [map, showInterests]);
 
   return {
     points,
