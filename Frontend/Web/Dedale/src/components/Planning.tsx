@@ -143,7 +143,7 @@ export default function Planning({
         });
       }
     },
-    [activeEventId]
+    [loadTeamsWithActions]
   );
 
   const formatDateTime = (dateTimeString: string) => {

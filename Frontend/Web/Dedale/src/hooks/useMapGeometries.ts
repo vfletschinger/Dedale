@@ -6,6 +6,14 @@ import { invoke } from "@tauri-apps/api/core";
 import { geoJSONtoWKT, parseWKTtoGeoJSON } from "../utils/maputils";
 import { Zone, Parcours, Equipement } from "../types/map";
 
+// Types pour les filtres de visibilité
+export interface VisibilityFilters {
+  showZones: boolean;
+  showParcours: boolean;
+  showInterests: boolean;
+  showEquipements: boolean;
+}
+
 // Extend types to include description property
 type ZoneWithDescription = Zone & { description?: string };
 type ParcoursWithDescription = Parcours & { description?: string };
@@ -45,6 +53,7 @@ export function useMapGeometries(
   selectedEventId: string | null,
   timelineFilterDate: Date | null = null,
   equipementTypeFilter: string[] | null = null, // Filtre par type d'équipement (IDs des types)
+  visibilityFilters: VisibilityFilters = { showZones: true, showParcours: true, showInterests: true, showEquipements: true }, // Filtres de visibilité des éléments
 ) {
   // --- ÉTATS ---
   const [zones, setZones] = useState<Zone[]>([]);
@@ -105,6 +114,11 @@ export function useMapGeometries(
     equipementTypeFilterRef.current = equipementTypeFilter;
   }, [equipementTypeFilter]);
 
+  const visibilityFiltersRef = useRef<VisibilityFilters>(visibilityFilters);
+  useEffect(() => {
+    visibilityFiltersRef.current = visibilityFilters;
+  }, [visibilityFilters]);
+
   useEffect(() => {
     drawingModeRef.current = drawingMode;
   }, [drawingMode]);
@@ -117,7 +131,8 @@ export function useMapGeometries(
       currentParcours: Parcours[],
       currentEquipements: Equipement[] = [],
       filterDate: Date | null = null,
-      typeFilter: string[] | null = null // Filtre par type d'équipement
+      typeFilter: string[] | null = null, // Filtre par type d'équipement
+      visFilters: VisibilityFilters = { showZones: true, showParcours: true, showInterests: true, showEquipements: true } // Filtres de visibilité
     ) => {
       // Vérifier que le style est chargé avant de manipuler les sources/layers
       if (!mapObj.isStyleLoaded()) {
@@ -139,15 +154,20 @@ export function useMapGeometries(
       if (mapObj.getSource("event-equipements"))
         mapObj.removeSource("event-equipements");
 
+      // Filtrer les zones et parcours selon les filtres de visibilité
+      const filteredZones = visFilters.showZones ? currentZones : [];
+      const filteredParcours = visFilters.showParcours ? currentParcours : [];
+      const filteredEquipementsInput = visFilters.showEquipements ? currentEquipements : [];
+
       if (
-        currentZones.length === 0 &&
-        currentParcours.length === 0 &&
-        currentEquipements.length === 0
+        filteredZones.length === 0 &&
+        filteredParcours.length === 0 &&
+        filteredEquipementsInput.length === 0
       )
         return;
 
       // Conversion Zones -> GeoJSON
-      const zoneFeatures = currentZones
+      const zoneFeatures = filteredZones
         .map((z) => {
           const geometry = parseWKTtoGeoJSON(z.geometry_json);
           if (!geometry) return null;
@@ -160,7 +180,7 @@ export function useMapGeometries(
         .filter((f): f is GeoJSON.Feature => f !== null);
 
       // Conversion Parcours -> GeoJSON
-      const parcoursFeatures = currentParcours
+      const parcoursFeatures = filteredParcours
         .map((p) => {
           const geometry = parseWKTtoGeoJSON(p.geometry_json);
           if (!geometry) return null;
@@ -207,7 +227,7 @@ export function useMapGeometries(
       }
 
       // Affichage des équipements (avec filtre temporel et filtre par type optionnels)
-      if (currentEquipements.length > 0) {
+      if (filteredEquipementsInput.length > 0) {
         // D'abord filtrer par type si un filtre est actif et non-null
         // null = pas encore initialisé = afficher tous
         // [] = aucun sélectionné = afficher aucun
@@ -215,13 +235,13 @@ export function useMapGeometries(
         let filteredEquipements: Equipement[];
         if (typeFilter === null) {
           // Pas de filtre défini = tous les équipements
-          filteredEquipements = currentEquipements;
+          filteredEquipements = filteredEquipementsInput;
         } else if (typeFilter.length === 0) {
           // Filtre vide = aucun équipement
           filteredEquipements = [];
         } else {
           // Filtrer par les types sélectionnés
-          filteredEquipements = currentEquipements.filter((eq) => {
+          filteredEquipements = filteredEquipementsInput.filter((eq) => {
             // Si l'équipement n'a pas de type_id, on l'affiche (équipement sans type)
             if (!eq.type_id) return true;
             return typeFilter.includes(eq.type_id);
@@ -265,6 +285,26 @@ export function useMapGeometries(
           });
         }
 
+        // Fonction pour déterminer l'épaisseur du trait selon le type d'équipement
+        const getLineWidth = (typeName?: string): number => {
+          if (!typeName) return 3;
+          const name = typeName.toLowerCase();
+          // Véhicules et engins de blocage : trait très épais
+          if (name.includes("véhicule") || name.includes("vehicule") || name.includes("engin")) {
+            return 8;
+          }
+          // Blocs de béton et glissières : trait épais
+          if (name.includes("bloc") || name.includes("glissière") || name.includes("glissiere")) {
+            return 5;
+          }
+          // Barrières : trait fin
+          if (name.includes("barrière") || name.includes("barriere")) {
+            return 2;
+          }
+          // Par défaut : trait moyen
+          return 3;
+        };
+
         const equipementFeatures = filteredEquipements
           .map((eq) => {
             if (!eq.coordinates || eq.coordinates.length < 2) return null;
@@ -278,6 +318,7 @@ export function useMapGeometries(
                 id: eq.id,
                 type: "equipement",
                 type_name: eq.type_name,
+                line_width: getLineWidth(eq.type_name),
               },
             } as GeoJSON.Feature;
           })
@@ -294,9 +335,8 @@ export function useMapGeometries(
             type: "line",
             source: "event-equipements",
             paint: {
-              "line-color": "#f97316", // Orange pour les équipements
-              "line-width": 4,
-              "line-dasharray": [3, 2],
+              "line-color": "#000000", // Noir pour tous les équipements
+              "line-width": ["get", "line_width"], // Épaisseur variable selon le type
             },
           });
         }
@@ -334,7 +374,8 @@ export function useMapGeometries(
           fetchedParcours,
           fetchedEquipements,
           timelineFilterDateRef.current,
-          equipementTypeFilterRef.current
+          equipementTypeFilterRef.current,
+          visibilityFiltersRef.current
         );
       }
     } catch (err) {
@@ -368,8 +409,8 @@ export function useMapGeometries(
     if (!map) return;
 
     // Redessiner les géométries avec les nouveaux filtres
-    refreshGeometriesOnMap(map, zones, parcours, equipements, timelineFilterDate, equipementTypeFilter);
-  }, [map, timelineFilterDate, equipementTypeFilter, zones, parcours, equipements, refreshGeometriesOnMap]);
+    refreshGeometriesOnMap(map, zones, parcours, equipements, timelineFilterDate, equipementTypeFilter, visibilityFilters);
+  }, [map, timelineFilterDate, equipementTypeFilter, visibilityFilters, zones, parcours, equipements, refreshGeometriesOnMap]);
 
   // --- Initialisation Draw & Listeners ---
   useEffect(() => {
