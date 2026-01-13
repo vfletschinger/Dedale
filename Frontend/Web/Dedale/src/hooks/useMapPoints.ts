@@ -269,6 +269,34 @@ export function useMapPoints(
               (map.getSource("db-points") as maplibregl.GeoJSONSource).setData(geojson);
             })
             .catch((err) => console.error("Erreur chargement initial points:", err));
+
+          // Charger les points d'intérêt immédiatement après la création de la source
+          console.log("[Points] Chargement initial des points d'intérêt pour event_id:", selectedEventId);
+          invoke<MapInterest[]>("fetch_interest_points", {
+            eventId: String(selectedEventId),
+          })
+            .then((freshInterests) => {
+              console.log(`${freshInterests.length} point(s) d'intérêt récupéré(s)`);
+              interestsRef.current = freshInterests;
+              setInterests(freshInterests);
+
+              const geojson: GeoJSON.FeatureCollection<GeoJSON.Point> = {
+                type: "FeatureCollection",
+                features: freshInterests.map((p) => ({
+                  type: "Feature",
+                  geometry: {
+                    type: "Point",
+                    coordinates: [Number(p.x), Number(p.y)],
+                  },
+                  properties: {
+                    id: p.id,
+                    description: p.description,
+                  },
+                })),
+              };
+              (map.getSource("db-interests") as maplibregl.GeoJSONSource).setData(geojson);
+            })
+            .catch((err) => console.error("Erreur chargement initial points d'intérêt:", err));
         }
 
       } catch (error) {
@@ -375,6 +403,18 @@ export function useMapPoints(
       return () => clearTimeout(timeoutId);
     }
   }, [selectedEventId, map, refreshPoints]);
+
+  // 5. Recharger les points d'intérêt quand l'événement sélectionné change
+  useEffect(() => {
+    if (map && map.getSource("db-interests")) {
+      console.log("[Points] Changement d'événement, rechargement des points d'intérêt...");
+      // Defer the refresh to avoid synchronous setState in effect
+      const timeoutId = setTimeout(() => {
+        refreshInterest();
+      }, 0);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [selectedEventId, map, refreshInterest]);
 
   return {
     points,
