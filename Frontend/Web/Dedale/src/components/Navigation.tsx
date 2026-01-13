@@ -10,6 +10,7 @@ interface NavigationProps {
   onGoBack?: () => void;
   eventSelected: boolean;
   deselectEvent: () => void;
+  eventName?: string;
 }
 
 const NAV_ITEMS: { key: PageKey; label: string }[] = [
@@ -28,6 +29,7 @@ export default function Navigation({
   onGoBack,
   eventSelected,
   deselectEvent,
+  eventName,
 }: NavigationProps) {
   return (
     <nav className="sticky top-0 z-[100] w-full border-b border-gray-200 bg-slate-700 shadow-lg">
@@ -104,7 +106,7 @@ export default function Navigation({
           </div>
           <div hidden={!eventSelected} className="flex items-center gap-2 px-2 py-1.5 bg-slate-800 rounded-lg border border-slate-600 shadow-md">
             <button onClick={deselectEvent} className={`relative px-4 py-2 text-[11px] font-semibold tracking-wide uppercase transition-all duration-200 rounded-md cursor-pointer text-slate-300 hover:text-white hover:bg-slate-700`}>
-              Déselectionner l'événement
+              {eventName || "Événement"}
             </button>
           </div>
         </div>
