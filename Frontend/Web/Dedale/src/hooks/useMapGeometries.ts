@@ -576,38 +576,47 @@ export function useMapGeometries(
     // Créer le contenu du popup avec boutons d'action
     const name = item.name || `${item.type === "zone" ? "Zone" : "Parcours"} #${item.id.slice(0, 8)}`;
     const description = item.description || "Aucune description";
-    const emoji = item.type === "zone" ? "◼" : "●";
     const itemId = item.id;
     const itemType = item.type;
 
     const popupContent = `
-      <div style="min-width: 220px; font-family: system-ui, -apple-system, sans-serif;">
-        <div style="font-weight: 700; font-size: 14px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-          <span>${emoji}</span>
-          <span>${name}</span>
+      <div style="min-width: 240px; font-family: system-ui, -apple-system, sans-serif; padding: 4px;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+          <div style="width: 40px; height: 40px; background: ${item.type === "zone" ? "#dbeafe" : "#dcfce7"}; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+            <span style="font-size: 18px; color: ${item.type === "zone" ? "#2563eb" : "#16a34a"};">${item.type === "zone" ? "◼" : "━"}</span>
+          </div>
+          <div style="flex: 1;">
+            <div style="font-weight: 700; font-size: 15px; color: #1e293b; line-height: 1.2;">${name}</div>
+            <div style="font-size: 11px; color: #64748b; margin-top: 2px;">${item.type === "zone" ? "Zone" : "Parcours"}</div>
+          </div>
         </div>
-        <div style="font-size: 12px; color: #64748b; margin-bottom: 10px; line-height: 1.4;">
-          ${description}
-        </div>
-        <div style="display: flex; gap: 8px; font-size: 11px; color: #94a3b8; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid #e2e8f0;">
-          <span>Type: <strong style="color: #475569;">${item.type === "zone" ? "Zone" : "Parcours"}</strong></span>
+        <div style="background: #f8fafc; border-radius: 8px; padding: 10px; margin-bottom: 14px;">
+          <div style="font-size: 12px; color: #475569; line-height: 1.5;">
+            ${description}
+          </div>
         </div>
         <div style="display: flex; gap: 8px;">
           <button 
             id="geo-edit-btn" 
             data-id="${itemId}" 
             data-type="${itemType}"
-            style="flex: 1; padding: 8px 12px; background: #3b82f6; color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;"
+            style="flex: 1; padding: 10px 14px; background: #2563eb; color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: background 0.2s;"
+            onmouseover="this.style.background='#1d4ed8'"
+            onmouseout="this.style.background='#2563eb'"
           >
-            ✎ Modifier
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            Modifier
           </button>
           <button 
             id="geo-delete-btn" 
             data-id="${itemId}" 
             data-type="${itemType}"
-            style="flex: 1; padding: 8px 12px; background: #ef4444; color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;"
+            style="flex: 1; padding: 10px 14px; background: #ef4444; color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: background 0.2s;"
+            onmouseover="this.style.background='#dc2626'"
+            onmouseout="this.style.background='#ef4444'"
           >
-            ✕ Supprimer
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            Supprimer
           </button>
         </div>
       </div>

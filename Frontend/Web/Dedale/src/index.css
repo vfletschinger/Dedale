@@ -1,37 +1,55 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #2563eb;
+  --color-primary: #eab308;
   --color-secondary: #475569;
 }
 
 /* Limite le scan Tailwind aux fichiers sources, exclut les binaires */
 @source not "../**/*.{mbtiles,pmtiles,db,sqlite,bin,pbf}";
 
-/* Styles personnalisés pour les popups MapLibre GL */
+.maplibregl-popup-close-button {
+  font-size: 24px !important;
+  width: 32px !important;
+  height: 32px !important;
+  line-height: 28px !important;
+  padding: 0 !important;
+  color: #64748b !important;
+  background: #f1f5f9 !important;
+  border-radius: 8px !important;
+  margin: 8px !important;
+  transition: all 0.2s ease !important;
+}
+
+.maplibregl-popup-close-button:hover {
+  color: #ef4444 !important;
+  background: #fee2e2 !important;
+}
+
+.maplibregl-popup-content {
+  border-radius: 12px !important;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15) !important;
+  padding: 16px !important;
+}
+
 .maplibregl-popup.custom-popup .maplibregl-popup-content {
   width: 350px !important;
   max-width: none !important;
   padding: 0 !important;
-  /* on gère le padding dans le container React */
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
 }
 
 .maplibregl-popup.custom-popup .maplibregl-popup-tip {
   display: none;
-  /* optionnel : masque la flèche si inutile */
 }
 
-/* au cas où le bouton existe encore */
 .maplibregl-popup.custom-popup .maplibregl-popup-close-button {
   display: none !important;
 }
 
-/* Styles du contenu PointDetails */
 .maplibregl-popup.custom-popup .point-popup {
   font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
   color: #0f172a;
-  /* slate-900 */
   background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
   border-radius: 8px;
   padding: 12px 14px;
@@ -47,8 +65,7 @@
 .point-popup .pp-title {
   font-weight: 700;
   font-size: 16px;
-  color: #0b63d6;
-  /* app blue */
+  color: #ca8a04;
 }
 
 .point-popup .pp-close {
@@ -57,7 +74,6 @@
   font-size: 16px;
   cursor: pointer;
   color: #475569;
-  /* slate-500 */
 }
 
 .point-popup .pp-section {
@@ -67,7 +83,7 @@
 .point-popup .pp-section .pp-section-title {
   font-weight: 600;
   margin-bottom: 6px;
-  color: #0941a4;
+  color: #a16207;
 }
 
 .point-popup .pp-coords {
@@ -114,17 +130,15 @@
 
 .point-popup a.button {
   display: inline-block;
-  background: #0b63d6;
-  color: white;
+  background: #eab308;
+  color: #0f172a;
   padding: 6px 10px;
   border-radius: 6px;
   text-decoration: none;
   font-size: 13px;
+  font-weight: 600;
 }
 
-/* Keep explicit popup width intact (set elsewhere) */
-
-/* Styles for left points panel */
 .left-panel .panel-header {
   display: flex;
   justify-content: space-between;
@@ -135,12 +149,11 @@
 .left-panel .panel-header h3 {
   margin: 0;
   font-size: 16px;
-  color: #0b63d6;
+  color: #ca8a04;
 }
 
 .left-panel .add-btn {
   background: #16a34a;
-  /* green-600 */
   color: #fff;
   border: none;
   padding: 6px 10px;
@@ -185,9 +198,8 @@
 /* Generic button styles used across popups/drawer */
 .button {
   display: inline-block;
-  background: #2563eb;
-  /* matches BTN_STYLE in PointDetails */
-  color: #fff;
+  background: #eab308;
+  color: #0f172a;
   padding: 8px 12px;
   border-radius: 8px;
   border: none;
@@ -202,7 +214,7 @@
 
 /* Small action buttons (used for + / -) */
 .action-primary {
-  background: #0b63d6;
+  background: #ca8a04;
   color: white;
   border: none;
   padding: 6px 8px;
@@ -222,7 +234,6 @@
 /* Upload box */
 .upload-box {
   border: 1px dashed #cbd5e1;
-  /* slate-300 */
   border-radius: 8px;
   padding: 10px;
   text-align: center;
@@ -267,7 +278,7 @@
   height: 18px;
   width: 18px;
   border-radius: 50%;
-  background-color: #2563eb;
+  background-color: #eab308;
   border: 2px solid white;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
   cursor: pointer;
@@ -283,7 +294,7 @@
   height: 18px;
   width: 18px;
   border-radius: 50%;
-  background-color: #2563eb;
+  background-color: #eab308;
   border: 2px solid white;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
   cursor: pointer;

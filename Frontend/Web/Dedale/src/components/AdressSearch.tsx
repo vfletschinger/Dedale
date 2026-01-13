@@ -55,59 +55,62 @@ export default function AddressSearch({ onSelect }: AddressSearchProps) {
 
   return (
     <div className="relative w-full z-50">
-      {/* Container style Google Maps */}
-      <div
-        className={`flex items-center w-full bg-white rounded-full shadow-md transition-all duration-200 border border-transparent ${isFocused ? "shadow-lg ring-2 ring-blue-500/50" : "hover:shadow-lg"
-          }`}
-      >
-        <div className="pl-4 text-gray-400">
-          <FontAwesomeIcon icon={faSearch} className="h-5 w-5" />
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <input
+            ref={inputRef}
+            type="text"
+            placeholder="Rechercher un lieu..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => {
+              setIsFocused(false);
+              // Petit délai pour permettre le clic sur la liste
+              setTimeout(() => setResults([]), 200);
+            }}
+            className={`w-full pl-4 pr-10 py-2.5 bg-gray-800 border-2 rounded-lg text-white placeholder-gray-500 focus:outline-none transition-all ${isFocused
+              ? "border-yellow-500 shadow-lg shadow-yellow-500/10"
+              : "border-gray-700 hover:border-gray-600"
+              }`}
+          />
+
+          {/* Bouton Effacer */}
+          {query.length > 0 && (
+            <button
+              onClick={clearSearch}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+              title="Effacer"
+            >
+              <FontAwesomeIcon icon={faTimes} />
+            </button>
+          )}
         </div>
 
-        <input
-          ref={inputRef}
-          type="text"
-          placeholder="Rechercher un lieu, une adresse..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => {
-            setIsFocused(false);
-            // Petit délai pour permettre le clic sur la liste
-            setTimeout(() => setResults([]), 200);
-          }}
-          className="flex-1 w-full px-3 py-3 bg-transparent border-none rounded-full focus:outline-none focus:ring-0 text-gray-700 text-base placeholder-gray-400"
-        />
-
-        {/* Bouton Effacer (affiché seulement si texte) */}
-        {query.length > 0 && (
-          <button
-            onClick={clearSearch}
-            className="pr-4 text-gray-400 hover:text-gray-600 focus:outline-none transition-colors"
-            title="Effacer la recherche"
-          >
-            <FontAwesomeIcon icon={faTimes} className="h-5 w-5" />
-          </button>
-        )}
+        <button
+          className="px-4 py-2.5 bg-yellow-500 hover:bg-yellow-400 text-gray-900 rounded-lg shadow-lg hover:shadow-yellow-500/20 font-bold transition-all flex items-center justify-center shrink-0"
+        >
+          <FontAwesomeIcon icon={faSearch} />
+        </button>
       </div>
 
       {/* Liste de suggestions */}
       {results.length > 0 && (
-        <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-100 max-h-80 overflow-y-auto py-2 z-50 animate-fade-in-down">
+        <div className="absolute top-full left-0 right-0 mt-2 bg-gray-800 rounded-xl shadow-xl border border-gray-700 max-h-80 overflow-y-auto py-2 z-50">
           {results.map((r, i) => (
             <button
               key={i}
-              className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center gap-3 transition-colors duration-150 group"
+              className="w-full text-left px-4 py-3 hover:bg-gray-700 flex items-center gap-3 transition-colors duration-150 group border-b border-gray-700/50 last:border-0"
               onClick={() => handleSelect(r)}
             >
-              <div className="bg-gray-100 p-2 rounded-full group-hover:bg-blue-100 transition-colors">
-                <span className="text-lg text-gray-600"><FontAwesomeIcon icon={faMapMarkerAlt} /></span>
+              <div className="bg-gray-700 p-2 rounded-full group-hover:bg-yellow-500/20 group-hover:text-yellow-500 transition-colors text-gray-400">
+                <span className="text-sm"><FontAwesomeIcon icon={faMapMarkerAlt} /></span>
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-gray-800 truncate">
+                <div className="text-sm font-bold text-gray-200 truncate group-hover:text-white transition-colors">
                   {r.display_name.split(",")[0]}
                 </div>
-                <div className="text-xs text-gray-500 truncate">
+                <div className="text-xs text-gray-500 truncate group-hover:text-gray-400">
                   {r.display_name}
                 </div>
               </div>

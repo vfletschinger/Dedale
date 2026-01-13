@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faSquare } from "@fortawesome/free-solid-svg-icons";
+import { faDrawPolygon, faCheck, faTimes } from "@fortawesome/free-solid-svg-icons";
 
 interface ZoneFormProps {
   onSubmit: (data: {
@@ -13,7 +13,7 @@ interface ZoneFormProps {
 
 export default function ZoneForm({ onSubmit, onCancel }: ZoneFormProps) {
   const [name, setName] = useState<string>("Nouvelle Zone");
-  const [color, setColor] = useState<string>("#6366f1");
+  const [color, setColor] = useState<string>("#2563eb");
   const [description, setDescription] = useState<string>("");
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -33,16 +33,28 @@ export default function ZoneForm({ onSubmit, onCancel }: ZoneFormProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
-        <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-          <span className="text-2xl text-blue-500"><FontAwesomeIcon icon={faSquare} /></span>
-          Nouvelle Zone
-        </h3>
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4 flex items-center justify-between">
+          <h3 className="text-lg font-bold text-white flex items-center gap-3">
+            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+              <FontAwesomeIcon icon={faDrawPolygon} className="text-xl" />
+            </div>
+            Nouvelle Zone
+          </h3>
+          <button
+            onClick={onCancel}
+            className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/20 hover:bg-white/30 text-white transition-colors cursor-pointer"
+          >
+            <FontAwesomeIcon icon={faTimes} />
+          </button>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Content */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {/* Nom de la zone */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
               Nom de la zone
             </label>
             <input
@@ -50,37 +62,42 @@ export default function ZoneForm({ onSubmit, onCancel }: ZoneFormProps) {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Ex: Zone de sécurité"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50"
               required
             />
           </div>
 
           {/* Couleur */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
               Couleur
             </label>
-            <div className="flex gap-2 items-center">
+            <div className="flex gap-3 items-center">
               <input
                 type="color"
                 value={color}
                 onChange={(e) => setColor(e.target.value)}
-                className="w-12 h-10 rounded border border-gray-300 cursor-pointer"
+                className="w-14 h-12 rounded-xl border-2 border-gray-200 cursor-pointer"
               />
-              <span className="text-sm text-gray-500">{color}</span>
+              <input
+                type="text"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 font-mono text-sm"
+              />
             </div>
           </div>
 
           {/* Description */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
               Description (optionnel)
             </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Ajoutez une description pour cette zone..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none bg-gray-50"
               rows={3}
             />
           </div>
@@ -90,14 +107,15 @@ export default function ZoneForm({ onSubmit, onCancel }: ZoneFormProps) {
             <button
               type="button"
               onClick={onCancel}
-              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors"
+              className="flex-1 px-4 py-3 border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 font-medium transition-colors"
             >
               Annuler
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 font-medium transition-colors"
+              className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
             >
+              <FontAwesomeIcon icon={faCheck} />
               Créer la zone
             </button>
           </div>

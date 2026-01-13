@@ -28,7 +28,7 @@ import {
   faMapMarkerAlt,
   faDrawPolygon,
   faRoute,
-  faQuestionCircle,
+  faExclamation,
   faTools,
   faTimes,
   faList,
@@ -285,7 +285,7 @@ function OfflineMapLibre({
   return (
     <div className="h-full flex flex-col bg-gray-50 overflow-hidden">
       {/* --- HEADER --- */}
-      <div className="bg-slate-700 shadow-lg shrink-0">
+      <div className="bg-gray-900 shadow-lg shrink-0 relative z-30">
         <div className="p-4 pb-0">
           <div className="flex items-center gap-3">
             {/* Barre de recherche */}
@@ -294,30 +294,30 @@ function OfflineMapLibre({
         </div>
 
         {/* Onglets Navigation */}
-        <div className="flex items-center gap-2 px-4 mt-3 border-t border-slate-600">
+        <div className="flex items-center gap-2 px-4 mt-4 border-t border-gray-800">
           <button
             onClick={() => {
               setTimelineFilterDate(null); // Réinitialiser le filtre temporel
               setViewMode("points");
             }}
-            className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${viewMode === "points"
-              ? "text-white border-primary"
-              : "text-slate-400 border-transparent hover:text-slate-200"
+            className={`px-4 py-3 text-sm font-bold border-b-2 transition-all ${viewMode === "points"
+              ? "text-yellow-500 border-yellow-500 bg-white/5"
+              : "text-gray-400 border-transparent hover:text-white hover:bg-white/5"
               }`}
           >
             <span className="flex items-center gap-2">
               <FontAwesomeIcon icon={faList} />
               <span>Liste des points</span>
-              <span className="text-xs bg-slate-600 px-2 py-0.5 rounded-full">
+              <span className={`text-xs px-2 py-0.5 rounded-full ${viewMode === 'points' ? 'bg-yellow-500 text-gray-900' : 'bg-gray-700 text-gray-300'}`}>
                 {points.length}
               </span>
             </span>
           </button>
           <button
             onClick={() => setViewMode("timeline")}
-            className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${viewMode === "timeline"
-              ? "text-white border-primary"
-              : "text-slate-400 border-transparent hover:text-slate-200"
+            className={`px-4 py-3 text-sm font-bold border-b-2 transition-all ${viewMode === "timeline"
+              ? "text-yellow-500 border-yellow-500 bg-white/5"
+              : "text-gray-400 border-transparent hover:text-white hover:bg-white/5"
               }`}
           >
             <span className="flex items-center gap-2">
@@ -389,7 +389,7 @@ function OfflineMapLibre({
                             <FontAwesomeIcon icon={faMapMarkerAlt} className="text-red-500" /> {p.name || `Point #${p.id.slice(0, 8)}`}
                           </span>
                           <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1 border border-primary/20">
-                            <FontAwesomeIcon icon={faEye} /> Voir
+                            Voir
                           </span>
                         </div>
                         <div className="flex gap-2 text-xs">
@@ -508,11 +508,11 @@ function OfflineMapLibre({
                   onClick={startDrawInterest}
                   className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${drawingMode === "interest"
                     ? "bg-purple-600 text-white"
-                    : "bg-black/30 hover:bg-black/40 backdrop-blur-sm text-white"
+                    : "bg-white hover:bg-gray-50 "
                     }`}
                   title="Point d'intérêt"
                 >
-                  <span className="text-base font-bold"><FontAwesomeIcon icon={faQuestionCircle} /></span>
+                  <span className="text-base"><FontAwesomeIcon icon={faExclamation} /></span>
                 </button>
 
                 <button
@@ -751,7 +751,7 @@ function OfflineMapLibre({
                         {interests.length > 0 && (
                           <div>
                             <div className="px-3 py-1 bg-purple-100 text-xs font-bold text-purple-700 uppercase tracking-wider">
-                              <FontAwesomeIcon icon={faQuestionCircle} /> Points d'intérêt
+                              <FontAwesomeIcon icon={faExclamation} /> Points d'intérêt
                             </div>
                             {interests.map((interest) => (
                               <div
@@ -760,7 +760,7 @@ function OfflineMapLibre({
                                 onClick={() => focusOnInterest(interest)}
                               >
                                 <div className="flex items-center gap-2">
-                                  <span className="text-base text-purple-600 font-bold"><FontAwesomeIcon icon={faQuestionCircle} /></span>
+                                  <span className="text-base text-purple-600 font-bold"><FontAwesomeIcon icon={faExclamation} /></span>
                                   <span className="text-xs font-medium truncate flex-1 text-gray-700">
                                     {interest.description
                                       ? (interest.description.length > 30

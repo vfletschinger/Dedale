@@ -13,6 +13,8 @@ import Persons from "./components/Persons";
 import Planning from "./components/Planning";
 import { Event as AppEvent } from "./components/Events";
 
+import LoadingScreen from "./components/LoadingScreen";
+
 // Wrapper pour cacher une page tout en la gardant montée
 function PageWrapper({
   isVisible,
@@ -50,6 +52,7 @@ function App() {
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [events, setEvents] = useState<AppEvent[]>([]);
   const [firstLaunch, setFirstLaunch] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   const handleEventClick = (eventId: string) => {
     setSelectedEventId(eventId);
@@ -60,6 +63,7 @@ function App() {
   useEffect(() => {
     const unlisten = listen('first-launch', () => {
       setFirstLaunch(true);
+      setIsInitializing(false);
     });
 
     (async () => {
@@ -70,11 +74,15 @@ function App() {
         }
       } catch {
         // ignore
+      } finally {
+        setTimeout(() => {
+          setIsInitializing(false);
+        }, 500);
       }
     })();
 
     return () => {
-      unlisten.then(f => f()).catch(() => { });
+      unlisten.then(f => typeof f === 'function' && f()).catch(() => { });
     };
   }, []);
 
@@ -97,9 +105,9 @@ function App() {
     });
 
     return () => {
-      unlistenTeam.then(f => f());
-      unlistenPerson.then(f => f());
-      unlistenMap.then(f => f());
+      unlistenTeam.then(f => typeof f === 'function' && f());
+      unlistenPerson.then(f => typeof f === 'function' && f());
+      unlistenMap.then(f => typeof f === 'function' && f());
     };
   }, [navigate]);
 
@@ -118,7 +126,9 @@ function App() {
     reset();
   }
 
-
+  if (isInitializing) {
+    return <LoadingScreen />;
+  }
 
   // Si c'est le premier lancement, afficher le formulaire admin
   if (firstLaunch) {
@@ -151,6 +161,7 @@ function App() {
           canGoBack={canGoBack}
           onGoBack={goBack}
           eventSelected={selectedEventId === null || undefined ? false : true}
+          eventName={events.find(e => e.id === selectedEventId)?.name}
           deselectEvent={handleDeselection}
         />
       </header>
