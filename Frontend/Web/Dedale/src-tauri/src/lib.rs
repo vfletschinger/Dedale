@@ -119,6 +119,7 @@ pub fn run() {
             // Planning
             db::fetch_teams_for_event,
             db::fetch_actions_for_team,
+            db::fetch_actions_for_equipement,
             db::update_action_status,
             db::export_planning_excel,
             db::create_planning_pdf,
