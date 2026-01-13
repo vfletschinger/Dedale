@@ -14,8 +14,7 @@ export default function Planning({
 }) {
   const [teams, setTeams] = useState<TeamWithActions[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedTeams, setSelectedTeams] = useState<Set<string>>(new Set());
-  const [showTeamSelection, setShowTeamSelection] = useState(false);
+  // États pour la sélection supprimés - envoi direct par équipe
   
   // État unifié pour la synchronisation
   const [syncState, setSyncState] = useState<{
@@ -157,24 +156,37 @@ export default function Planning({
       const planning = await invoke<Plan>("send_planning", { teamId });
       
       console.log("📊 Planning reçu du backend:", {
+        team: planning.team?.name,
+        eventId: planning.team?.eventId,
         totalActions: planning.actions?.length || 0,
         totalEquipements: planning.equipements?.length || 0,
         totalCoordonnees: planning.coordonees?.length || 0,
       });
+      console.log("   - Équipe:", planning.team);
       console.log("   - Actions:", planning.actions);
       console.log("   - Équipements:", planning.equipements);
       console.log("   - Coordonnées:", planning.coordonees);
       
+      // Vérifier si le planning contient des données
+      if (!planning.actions || planning.actions.length === 0) {
+        setSyncState(prev => ({ 
+          ...prev, 
+          step: "error", 
+          errorMessage: `Aucune action trouvée pour l'équipe ${teamName}. Vérifiez que des actions sont assignées à cette équipe.` 
+        }));
+        return;
+      }
+      
       setSyncState(prev => ({ ...prev, step: "success" }));
       setMessage({
         type: "success",
-        text: `Planning envoyé à ${teamName} (${planning.actions?.length || 0} actions)`,
+        text: `Planning envoyé à ${teamName} (${planning.actions.length} actions, ${planning.equipements?.length || 0} équipements)`,
       });
 
-      // Fermer le modal après 2 secondes si succès
+      // Fermer le modal après 1 seconde si succès pour permettre de nouveaux envois
       setTimeout(() => {
         closeSyncModal();
-      }, 2000);
+      }, 1000);
 
     } catch (error) {
       console.error("Erreur envoi:", error);
@@ -189,6 +201,8 @@ export default function Planning({
   const closeSyncModal = () => {
     // Optionnel : Arrêter le serveur si nécessaire via invoke("stop_server")
     setSyncState({ step: "idle", teamId: null, teamName: null, qrCodeBase64: null, errorMessage: null });
+    // Remettre le mobile comme déconnecté pour forcer l'affichage du QR code au prochain envoi
+    setIsMobileConnected(false);
   };
 
   const generateTeamPDF = useCallback(async (teamId: string, teamName: string) => {
@@ -205,30 +219,7 @@ export default function Planning({
       loadTeamsWithActions();
   };
 
-  const toggleTeamSelection = (teamId: string) => {
-    const newSelected = new Set(selectedTeams);
-    if (newSelected.has(teamId)) {
-      newSelected.delete(teamId);
-    } else {
-      newSelected.add(teamId);
-    }
-    setSelectedTeams(newSelected);
-  };
-
-  const sendToSelectedTeams = async () => {
-    if (selectedTeams.size === 0) {
-      setMessage({ type: "error", text: "Veuillez sélectionner au moins une équipe" });
-      return;
-    }
-
-    // Envoyer à la première équipe sélectionnée pour commencer
-    const firstTeamId = Array.from(selectedTeams)[0];
-    const team = teams.find(t => t.id === firstTeamId);
-    
-    if (team) {
-      await startSyncProcess(team.id, team.name);
-    }
-  };
+  // Fonctions de sélection supprimées - envoi direct par équipe
 
   const formatDateTime = (s: string) => new Date(s).toLocaleString();
 
@@ -250,84 +241,21 @@ export default function Planning({
           </div>
         )}
 
-        {/* GROS BOUTON ENVOYER (au départ) */}
-        {!showTeamSelection && syncState.step === "idle" && (
-          <div className="flex justify-center mb-8">
-            <button
-              onClick={() => setShowTeamSelection(true)}
-              className="px-8 py-4 text-white font-bold text-lg rounded-lg bg-blue-600 hover:bg-blue-700 shadow-lg transition-colors"
-            >
-              📲 Envoyer les plannings
-            </button>
-          </div>
-        )}
-
-        {/* MODAL DE SÉLECTION DES ÉQUIPES */}
-        {showTeamSelection && syncState.step === "idle" && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-2xl p-8 max-w-lg w-full mx-4 shadow-2xl">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-gray-900">Sélectionner les équipes</h2>
-                <button
-                  onClick={() => {
-                    setShowTeamSelection(false);
-                    setSelectedTeams(new Set());
-                  }}
-                  className="text-gray-400 hover:text-gray-600 font-bold text-2xl"
-                >
-                  ✕
-                </button>
-              </div>
-              
-              <div className="space-y-3 bg-gray-50 p-4 rounded-lg border border-gray-200 max-h-80 overflow-y-auto">
-                {teams.length === 0 ? (
-                  <p className="text-gray-500 text-center py-4">Aucune équipe trouvée</p>
-                ) : (
-                  teams.map((team) => (
-                    <label key={team.id} className="flex items-center gap-3 cursor-pointer hover:bg-white p-3 rounded transition-colors">
-                      <input
-                        type="checkbox"
-                        checked={selectedTeams.has(team.id)}
-                        onChange={() => toggleTeamSelection(team.id)}
-                        className="w-5 h-5 rounded cursor-pointer text-blue-600"
-                      />
-                      <div className="flex-1">
-                        <p className="font-medium text-gray-900">{team.name}</p>
-                        <p className="text-sm text-gray-500">{team.actions.length} action(s)</p>
-                      </div>
-                    </label>
-                  ))
-                )}
-              </div>
-
-              {/* BOUTON D'ENVOI */}
-              <div className="flex justify-center mt-6">
-                <button
-                  onClick={sendToSelectedTeams}
-                  disabled={selectedTeams.size === 0}
-                  className={`px-8 py-4 text-white font-bold text-lg rounded-lg transition-colors ${
-                    selectedTeams.size === 0
-                      ? "bg-gray-400 cursor-not-allowed"
-                      : "bg-green-600 hover:bg-green-700 shadow-lg"
-                  }`}
-                >
-                  ✓ Envoyer ({selectedTeams.size} équipe{selectedTeams.size > 1 ? "s" : ""})
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Système de sélection supprimé - boutons directement sur chaque équipe */}
 
         {/* MODAL QR CODE */}
         {syncState.step !== "idle" && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-center flex-1">
-                  📱 Envoyer le planning
+                <h3 className="text-xl font-bold text-center flex-1 flex items-center justify-center gap-2">
+                  <i className="fas fa-mobile-alt text-blue-600"></i>
+                  Envoyer le planning
                 </h3>
                 {syncState.step !== "sending" && (
-                   <button onClick={closeSyncModal} className="text-gray-400 hover:text-gray-600 font-bold">✕</button>
+                   <button onClick={closeSyncModal} className="text-gray-400 hover:text-gray-600 font-bold">
+                     <i className="fas fa-times"></i>
+                   </button>
                 )}
               </div>
               
@@ -377,7 +305,9 @@ export default function Planning({
                 {/* Étape 3 : Succès */}
                 {syncState.step === "success" && (
                   <div className="py-8">
-                    <div className="h-16 w-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">✓</div>
+                    <div className="h-16 w-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                      <i className="fas fa-check"></i>
+                    </div>
                     <p className="font-bold text-green-600 text-lg">Envoyé avec succès !</p>
                   </div>
                 )}
@@ -385,7 +315,9 @@ export default function Planning({
                  {/* Étape 4 : Erreur */}
                  {syncState.step === "error" && (
                   <div className="py-4">
-                    <div className="h-16 w-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">!</div>
+                    <div className="h-16 w-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                      <i className="fas fa-exclamation"></i>
+                    </div>
                     <p className="text-red-600 font-bold mb-2">Une erreur est survenue</p>
                     <p className="text-sm text-gray-600 mb-6">{syncState.errorMessage}</p>
                     <button 
@@ -414,9 +346,35 @@ export default function Planning({
         <div className="space-y-6">
           {teams.map((team) => (
             <div key={team.id} className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
-              <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-                <h2 className="text-lg font-bold text-gray-900">{team.name}</h2>
-                <p className="text-sm text-gray-500">{team.actions.length} action(s)</p>
+              <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">{team.name}</h2>
+                  <p className="text-sm text-gray-500">{team.actions.length} action(s)</p>
+                </div>
+                <div className="flex gap-2">
+                  {/* Bouton PDF */}
+                  <button
+                    onClick={() => generateTeamPDF(team.id, team.name)}
+                    disabled={generatingPdfForTeam === team.id}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {generatingPdfForTeam === team.id ? (
+                      <div className="animate-spin h-4 w-4 border-b-2 border-white rounded-full"></div>
+                    ) : (
+                      <i className="fas fa-file-pdf"></i>
+                    )}
+                    PDF
+                  </button>
+                  
+                  {/* Bouton Envoyer planning */}
+                  <button
+                    onClick={() => startSyncProcess(team.id, team.name)}
+                    disabled={syncState.step !== "idle" && syncState.teamId === team.id}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                  >
+                    <i className="fas fa-paper-plane"></i> Envoyer planning
+                  </button>
+                </div>
               </div>
 
               {/* Contenu des actions */}

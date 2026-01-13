@@ -273,7 +273,16 @@ pub(crate) struct TransferEquipementCoordinate {
 
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
+pub struct TransferTeamInfo {
+    pub id: String,
+    pub name: String,
+    pub event_id: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct Planning {
+    pub team: TransferTeamInfo,
     pub actions: Vec<Action>,
     pub equipements: Vec<TransferEquipement>,
     pub coordonees: Vec<TransferEquipementCoordinate>,

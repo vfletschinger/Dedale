@@ -454,6 +454,28 @@ pub async fn send_planning(
 
     println!("[DB] 📤 send_planning appelé avec team_id: {}", team_id);
 
+    // Récupérer les informations de l'équipe
+    let team_info = sqlx::query_as::<_, (String, String, String)>(
+        "SELECT id, name, event_id FROM team WHERE id = ?"
+    )
+    .bind(&team_id)
+    .fetch_optional(&pool)
+    .await
+    .map_err(|e| format!("Erreur team: {}", e))?;
+
+    let (team_id_db, team_name, event_id) = match team_info {
+        Some(info) => info,
+        None => return Err(format!("Équipe avec id {} non trouvée", team_id))
+    };
+
+    let team = TransferTeamInfo {
+        id: team_id_db.clone(),
+        name: team_name.clone(),
+        event_id: event_id.clone(),
+    };
+
+    println!("[DB] 👥 Équipe trouvée: {} (event: {})", team_name, event_id);
+
     let actions = sqlx::query_as::<_, Action>(
         r#"
         SELECT id, team_id, equipement_id, type as type, scheduled_time, is_done 
@@ -473,17 +495,16 @@ pub async fn send_planning(
 
     if actions.is_empty() {
         println!("[DB] ⚠️ Aucune action trouvée pour team_id: {}", team_id);
-        return Ok(Planning { actions: vec![], equipements: vec![], coordonees: vec![] });
+        return Ok(Planning { 
+            team, 
+            actions: vec![], 
+            equipements: vec![], 
+            coordonees: vec![] 
+        });
     }
 
-    // Récupérer les IDs des équipements concernés pour ne pas tout charger
-    // On utilise un HashSet pour dédoublonner les IDs
-    let equipement_ids: Vec<String> = actions.iter().map(|a| a.equipement_id.clone()).collect();
     
-    // Création d'une string pour le "IN (?,?,?)" (Rust SQLx ne gère pas nativement les vecteurs dans IN pour SQLite facilement sans macro)
-    // Pour simplifier ici, je suppose qu'on charge les équipements liés à ces actions.
-    // L'idéal est de faire une jointure ou une requête "WHERE id IN ..." 
-    // Voici une méthode générique un peu brute mais simple :
+    let equipement_ids: Vec<String> = actions.iter().map(|a| a.equipement_id.clone()).collect();
     
     let equip_params = vec!["?"; equipement_ids.len()].join(",");
     let sql_equip = format!("SELECT id, event_id, type_id, quantity, length_per_unit, date_pose, date_depose FROM equipement WHERE id IN ({})", equip_params);
@@ -528,12 +549,14 @@ pub async fn send_planning(
     println!("[DB] 📍 Coordonnées totales: {}", coords.len());
     
     let result = Planning {
+        team,
         actions,
         equipements: final_equipements,
         coordonees: coords, 
     };
     
-    println!("[DB] ✅ Planning final: {} actions, {} équipements, {} coordonnées", 
+    println!("[DB] ✅ Planning final: équipe '{}', {} actions, {} équipements, {} coordonnées", 
+             result.team.name,
              result.actions.len(), 
              result.equipements.len(), 
              result.coordonees.len());

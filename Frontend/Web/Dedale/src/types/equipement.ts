@@ -36,7 +36,15 @@ export type TransferEquipementCoordinate = {
     order_index: number | null;
 }
 
+export type TransferTeamInfo = {
+  id: string;
+  name: string;
+  eventId: string;
+}
+
 export type Planning = {
+  team: TransferTeamInfo;
   actions: Action[];
   equipements: Equipement[];
+  coordonees: TransferEquipementCoordinate[];
 }
