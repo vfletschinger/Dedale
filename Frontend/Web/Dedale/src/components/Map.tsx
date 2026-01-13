@@ -324,7 +324,13 @@ function OfflineMapLibre({
               <FontAwesomeIcon icon={faLayerGroup} />
               <span>Éléments</span>
               <span className="text-xs bg-slate-600 px-2 py-0.5 rounded-full">
-                {zones.length + parcours.length + equipements.length + interests.length}
+                {zones.length + parcours.length + interests.length + (
+                  selectedEquipementTypes === null
+                    ? equipements.length
+                    : selectedEquipementTypes.length === 0
+                      ? 0
+                      : equipements.filter(eq => !eq.type_id || selectedEquipementTypes.includes(eq.type_id)).length
+                )}
               </span>
             </span>
           </button>
@@ -591,12 +597,20 @@ function OfflineMapLibre({
                     )}
 
                     {/* --- SECTION ÉQUIPEMENTS --- */}
-                    {equipements.length > 0 && (
+                    {(() => {
+                      // Filtrer les équipements selon le filtre de type
+                      const filteredEquipements = selectedEquipementTypes === null
+                        ? equipements  // Pas encore initialisé = tous
+                        : selectedEquipementTypes.length === 0
+                          ? []  // Filtre vide = aucun
+                          : equipements.filter(eq => !eq.type_id || selectedEquipementTypes.includes(eq.type_id));
+                      
+                      return filteredEquipements.length > 0 && (
                       <div>
                         <div className="px-4 py-2 bg-orange-50 text-sm font-bold text-orange-700 uppercase tracking-wider flex items-center gap-2">
-                          <FontAwesomeIcon icon={faTools} /> Équipements ({equipements.length})
+                          <FontAwesomeIcon icon={faTools} /> Équipements ({filteredEquipements.length})
                         </div>
-                        {equipements.map((eq) => (
+                        {filteredEquipements.map((eq) => (
                           <div
                             key={`equipement-${eq.id}`}
                             className="p-3 border-b border-gray-200 last:border-0 hover:bg-orange-50 cursor-pointer"
@@ -628,7 +642,8 @@ function OfflineMapLibre({
                           </div>
                         ))}
                       </div>
-                    )}
+                    );
+                    })()}
 
                     {/* --- SECTION POINTS D'INTÉRÊT --- */}
                     {interests.length > 0 && (

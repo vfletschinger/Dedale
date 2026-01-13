@@ -205,6 +205,32 @@ export function useMapPoints(
           // Interactions pour les points d'intérêt
           map.on("mouseenter", "db-interests-layer", () => (map.getCanvas().style.cursor = "pointer"));
           map.on("mouseleave", "db-interests-layer", () => (map.getCanvas().style.cursor = ""));
+
+          // Clic sur un point d'intérêt existant
+          map.on("click", "db-interests-layer", (e) => {
+            const f = e.features?.[0];
+            if (!f) return;
+
+            const description = f.properties?.description || 'Aucune description';
+            const coords = (f.geometry as GeoJSON.Point).coordinates as [number, number];
+
+            // Fermer toute popup existante
+            const existingPopups = document.querySelectorAll('.maplibregl-popup');
+            existingPopups.forEach(popup => popup.remove());
+
+            // Créer et afficher la popup
+            new maplibregl.Popup({ closeOnClick: true, maxWidth: '300px' })
+              .setLngLat(coords)
+              .setHTML(`
+                <div class="p-2">
+                  <div class="font-bold text-purple-700 mb-2 flex items-center gap-1">
+                    <span>Point d'intérêt</span>
+                  </div>
+                  <p class="text-sm text-gray-700">${description}</p>
+                </div>
+              `)
+              .addTo(map);
+          });
         }
 
         // --- Gestionnaires d'événements liés aux layers ---
