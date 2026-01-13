@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
-use crate::db::{get_db_pool, insert_point, PointWithDetails};
 use crate::db::equipements::{send_equipements_to_mobile, TransferEquipement};
+use crate::db::{get_db_pool, insert_point, PointWithDetails};
 use base64::{engine::general_purpose, Engine as _};
 use image::codecs::png::PngEncoder;
 use image::{ImageEncoder, Luma};
@@ -228,7 +228,6 @@ pub(crate) struct TransferAction {
     is_done: Option<bool>,
 }
 
-
 /// Structure pour un event envoyé au mobile (avec noms camelCase pour compatibilité)
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -379,19 +378,19 @@ async fn insert_mobile_points(
         // Insérer ou mettre à jour le point avec tous les champs (sans created_at/modified_at)
         sqlx::query(
             r#"INSERT OR REPLACE INTO point (id, event_id, x, y, name, type, status, comment) 
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)"#
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)"#,
         )
-            .bind(&point.id)
-            .bind(&event_id)
-            .bind(point.x)
-            .bind(point.y)
-            .bind(point.name.as_deref().unwrap_or("Point"))
-            .bind(point.point_type.as_deref())
-            .bind(point.status.unwrap_or(0))
-            .bind(point.comment.as_deref())
-            .execute(&mut *tx)
-            .await
-            .map_err(|e| format!("Erreur INSERT point {}: {}", point.id, e))?;
+        .bind(&point.id)
+        .bind(&event_id)
+        .bind(point.x)
+        .bind(point.y)
+        .bind(point.name.as_deref().unwrap_or("Point"))
+        .bind(point.point_type.as_deref())
+        .bind(point.status.unwrap_or(0))
+        .bind(point.comment.as_deref())
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| format!("Erreur INSERT point {}: {}", point.id, e))?;
 
         // Note: Les tables comment et obstacle n'existent pas dans la base web
         // Seule la table picture existe
@@ -425,13 +424,12 @@ async fn fetch_events_for_transfer(
 
     for event_id in event_ids {
         // Récupérer l'événement
-        let event_row = sqlx::query(
-            "SELECT id, name, start_date, end_date FROM event WHERE id = ?"
-        )
-        .bind(event_id)
-        .fetch_optional(&pool)
-        .await
-        .map_err(|e| format!("Erreur récupération event {}: {}", event_id, e))?;
+        let event_row =
+            sqlx::query("SELECT id, name, start_date, end_date FROM event WHERE id = ?")
+                .bind(event_id)
+                .fetch_optional(&pool)
+                .await
+                .map_err(|e| format!("Erreur récupération event {}: {}", event_id, e))?;
 
         if let Some(event_row) = event_row {
             let event_id_str: String = event_row.get("id");
@@ -463,7 +461,7 @@ async fn fetch_events_for_transfer(
             // Récupérer les zones de cet événement
             let zones_rows = sqlx::query(
                 "SELECT id, event_id, name, color, geometry_json 
-                 FROM zone WHERE event_id = ?"
+                 FROM zone WHERE event_id = ?",
             )
             .bind(&event_id_str)
             .fetch_all(&pool)
@@ -484,7 +482,7 @@ async fn fetch_events_for_transfer(
             // Récupérer les points de cet événement
             let points_rows = sqlx::query(
                 "SELECT id, event_id, x, y, name, comment, type, status 
-                 FROM point WHERE event_id = ?"
+                 FROM point WHERE event_id = ?",
             )
             .bind(&event_id_str)
             .fetch_all(&pool)
@@ -506,24 +504,22 @@ async fn fetch_events_for_transfer(
                 .collect();
 
             // Récupérer les équipes de cet événement
-            let teams_rows = sqlx::query(
-                "SELECT id, event_id, name FROM team WHERE event_id = ?"
-            )
-            .bind(&event_id_str)
-            .fetch_all(&pool)
-            .await
-            .map_err(|e| format!("Erreur récupération teams: {}", e))?;
+            let teams_rows = sqlx::query("SELECT id, event_id, name FROM team WHERE event_id = ?")
+                .bind(&event_id_str)
+                .fetch_all(&pool)
+                .await
+                .map_err(|e| format!("Erreur récupération teams: {}", e))?;
 
             let mut teams: Vec<TransferTeam> = Vec::new();
             for team_row in teams_rows {
                 let team_id: String = team_row.get("id");
-                
+
                 // Récupérer les membres de cette équipe avec les infos de la personne
                 let members_rows = sqlx::query(
                     "SELECT m.id, m.team_id, m.person_id, p.firstname, p.lastname 
                      FROM member m 
                      LEFT JOIN person p ON m.person_id = p.id 
-                     WHERE m.team_id = ?"
+                     WHERE m.team_id = ?",
                 )
                 .bind(&team_id)
                 .fetch_all(&pool)
@@ -564,7 +560,7 @@ async fn fetch_events_for_transfer(
                  FROM action a 
                  WHERE a.team_id IN (
                      SELECT id FROM team WHERE event_id = ?
-                 )"
+                 )",
             )
             .bind(&event_id_str)
             .fetch_all(&pool)
@@ -585,7 +581,6 @@ async fn fetch_events_for_transfer(
 
             let equipements = send_equipements_to_mobile(event_id_str.clone(), app.clone()).await?;
 
-
             transfer_events.push(TransferEvent {
                 id: event_id_str.clone(),
                 name: event_row.get("name"),
@@ -596,7 +591,7 @@ async fn fetch_events_for_transfer(
                 points,
                 teams,
                 actions,
-                equipements
+                equipements,
             });
 
             println!(
@@ -789,7 +784,9 @@ async fn handle_websocket(
                                 "🚀 Insertion de {} point(s) en base de données...",
                                 points_count
                             );
-                            match insert_mobile_points(app, event_id.clone(), mobile_export.points).await {
+                            match insert_mobile_points(app, event_id.clone(), mobile_export.points)
+                                .await
+                            {
                                 Ok(_) => {
                                     println!("✅ Points insérés avec succès !");
                                     // Émettre un événement pour notifier le frontend
@@ -828,12 +825,12 @@ async fn handle_websocket(
                             eprintln!("⚠️ Erreur envoi confirmation: {}", e);
                         }
                         let _ = websocket.flush();
-                        
+
                         // Émettre événement de déconnexion pour le frontend
                         app.emit("mobile-disconnected", ()).unwrap_or_else(|e| {
                             eprintln!("⚠️ Erreur émission événement mobile-disconnected: {}", e);
                         });
-                        
+
                         // Envoyer goodbye et fermer la connexion après succès
                         let goodbye = serde_json::json!({
                             "type": "goodbye",
@@ -930,12 +927,12 @@ async fn handle_websocket(
             }
             Err(e) => {
                 eprintln!("Client déconnecté : {}", e);
-                
+
                 // Émettre événement de déconnexion pour le frontend
                 app.emit("mobile-disconnected", ()).unwrap_or_else(|e| {
                     eprintln!("⚠️ Erreur émission événement mobile-disconnected: {}", e);
                 });
-                
+
                 // Essayer d'envoyer un message goodbye avant de fermer
                 let goodbye = serde_json::json!({
                     "type": "goodbye",
@@ -944,7 +941,7 @@ async fn handle_websocket(
                 let _ = websocket.write(Message::Text(goodbye.to_string().into()));
                 let _ = websocket.flush();
                 let _ = websocket.close(None);
-                
+
                 // Nettoyer le sender global
                 if let Ok(mut sender) = EVENT_SENDER.lock() {
                     *sender = None;
@@ -1015,9 +1012,14 @@ pub fn start_server(app: AppHandle, event_ids: Vec<String>) -> Result<String, St
                                 // Create a Tokio runtime to run the async function
                                 let rt = tokio::runtime::Runtime::new().unwrap();
                                 rt.block_on(async {
-                                    if let Err(e) =
-                                        handle_websocket(&app_clone, ws, event_ids_clone, event_receiver, control_receiver)
-                                            .await
+                                    if let Err(e) = handle_websocket(
+                                        &app_clone,
+                                        ws,
+                                        event_ids_clone,
+                                        event_receiver,
+                                        control_receiver,
+                                    )
+                                    .await
                                     {
                                         eprintln!("Erreur WebSocket: {}", e);
                                     }
@@ -1049,8 +1051,8 @@ pub async fn send_event_to_mobile(app: AppHandle, event_id: String) -> Result<()
     println!("📤 Demande d'envoi de l'événement {} au mobile", event_id);
 
     // Utiliser fetch_events_for_transfer pour récupérer toutes les données
-    let events = fetch_events_for_transfer(&app, &[event_id.clone()]).await?;
-    
+    let events = fetch_events_for_transfer(&app, std::slice::from_ref(&event_id)).await?;
+
     let event = events
         .into_iter()
         .next()
@@ -1200,7 +1202,9 @@ async fn handle_receive_websocket(
 
                         if points_count > 0 {
                             println!("🚀 Insertion de {} point(s)...", points_count);
-                            match insert_mobile_points(app, event_id.clone(), mobile_export.points).await {
+                            match insert_mobile_points(app, event_id.clone(), mobile_export.points)
+                                .await
+                            {
                                 Ok(_) => {
                                     println!("✅ Points insérés avec succès !");
 
@@ -1246,12 +1250,12 @@ async fn handle_receive_websocket(
             }
             Err(e) => {
                 eprintln!("📥 Client déconnecté: {}", e);
-                
+
                 // Émettre événement de déconnexion pour le frontend
                 app.emit("mobile-disconnected", ()).unwrap_or_else(|e| {
                     eprintln!("⚠️ Erreur émission événement mobile-disconnected: {}", e);
                 });
-                
+
                 return Ok(());
             }
         }

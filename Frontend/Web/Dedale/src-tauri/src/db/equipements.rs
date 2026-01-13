@@ -1,10 +1,9 @@
 use crate::db::get_db_pool;
 use crate::types::*;
+use serde::Serialize;
 use sqlx::Row;
 use tauri::AppHandle;
 use uuid::Uuid;
-use serde::Serialize;
-
 
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -18,7 +17,6 @@ pub(crate) struct TransferEquipement {
     pub date_depose: Option<String>,
     pub coordinates: Vec<TransferEquipementCoordinate>,
 }
-
 
 /// Structure pour un event envoyé au mobile (avec noms camelCase pour compatibilité)
 #[derive(Debug, Serialize, Clone)]
@@ -128,6 +126,7 @@ pub async fn seed_default_equipment_types(app: AppHandle) -> Result<(), String> 
 // ============================================
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn create_equipement(
     app: AppHandle,
     event_id: String,
@@ -301,6 +300,7 @@ pub async fn delete_equipement(app: AppHandle, equipement_id: String) -> Result<
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn update_equipement(
     app: AppHandle,
     equipement_id: String,
@@ -376,14 +376,12 @@ pub async fn add_action(
 ) -> Result<String, String> {
     let pool = get_db_pool(&app).await?;
     let action_id = Uuid::new_v4().to_string();
-    
+
     // Utiliser SQLite pour générer la timestamp au format ISO 8601
-    let scheduled_time: String = sqlx::query_scalar(
-        "SELECT strftime('%Y-%m-%dT%H:%M:%SZ', 'now')"
-    )
-    .fetch_one(&pool)
-    .await
-    .map_err(|e| e.to_string())?;
+    let scheduled_time: String = sqlx::query_scalar("SELECT strftime('%Y-%m-%dT%H:%M:%SZ', 'now')")
+        .fetch_one(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
 
     sqlx::query(
         "INSERT INTO action (id, team_id, equipement_id, type, scheduled_time, is_done) VALUES (?, ?, ?, ?, ?, ?)",
@@ -418,15 +416,26 @@ pub async fn delete_action(app: AppHandle, action_id: String) -> Result<(), Stri
 #[tauri::command]
 pub async fn send_equipements_to_mobile(
     event_id: String,
-    app: AppHandle
+    app: AppHandle,
 ) -> Result<Vec<TransferEquipement>, String> {
     let pool = get_db_pool(&app).await?;
 
     // Récupérer tous les équipements de l'événement
-    let equipements = sqlx::query_as::<_, (String, String, String, Option<i32>, Option<i32>, Option<String>, Option<String>)>(
+    let equipements = sqlx::query_as::<
+        _,
+        (
+            String,
+            String,
+            String,
+            Option<i32>,
+            Option<i32>,
+            Option<String>,
+            Option<String>,
+        ),
+    >(
         "SELECT id, event_id, type_id, quantity, length_per_unit, date_pose, date_depose 
          FROM equipement 
-         WHERE event_id = ?"
+         WHERE event_id = ?",
     )
     .bind(&event_id)
     .fetch_all(&pool)
@@ -441,22 +450,22 @@ pub async fn send_equipements_to_mobile(
             "SELECT id, x, y, order_index 
              FROM equipement_coordinate 
              WHERE equipement_id = ? 
-             ORDER BY order_index ASC"
+             ORDER BY order_index ASC",
         )
         .bind(&id)
         .fetch_all(&pool)
         .await
         .map_err(|e| format!("Erreur récupération coordonnées: {}", e))?
         .into_iter()
-        .map(|(coord_id, x, y, order_index)| {
-            TransferEquipementCoordinate {
+        .map(
+            |(coord_id, x, y, order_index)| TransferEquipementCoordinate {
                 id: coord_id,
                 equipement_id: id.clone(),
                 x,
                 y,
                 order_index,
-            }
-        })
+            },
+        )
         .collect::<Vec<_>>();
 
         equipements_with_coords.push(TransferEquipement {

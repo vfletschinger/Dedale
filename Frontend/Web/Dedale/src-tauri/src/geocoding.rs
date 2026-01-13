@@ -28,7 +28,12 @@ fn get_addresses_db_path() -> Result<PathBuf, String> {
     // Liste des chemins possibles à tester
     let possible_paths = vec![
         // Mode dev - chemin relatif depuis target/debug
-        exe_dir.join("..").join("..").join("..").join("resources").join("addresses.db"),
+        exe_dir
+            .join("..")
+            .join("..")
+            .join("..")
+            .join("resources")
+            .join("addresses.db"),
         // Mode dev - autre structure
         exe_dir.join("resources").join("addresses.db"),
         // Mode prod - ressources à côté de l'exécutable
@@ -74,15 +79,13 @@ pub async fn search_address(query: String) -> Result<Vec<SearchResult>, String> 
     println!("[geocoding] Utilisation de la base: {:?}", db_path);
 
     // Ouvrir la connexion SQLite en mode lecture seule
-    let conn = rusqlite::Connection::open_with_flags(
-        &db_path,
-        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
-    )
-    .map_err(|e| {
-        let err = format!("Erreur d'ouverture de la base: {}", e);
-        println!("[geocoding] {}", err);
-        err
-    })?;
+    let conn =
+        rusqlite::Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+            .map_err(|e| {
+                let err = format!("Erreur d'ouverture de la base: {}", e);
+                println!("[geocoding] {}", err);
+                err
+            })?;
 
     println!("[geocoding] Connexion SQLite ouverte");
 
@@ -130,7 +133,11 @@ pub async fn search_address(query: String) -> Result<Vec<SearchResult>, String> 
         .filter_map(|r| r.ok())
         .collect();
 
-    println!("[geocoding] Recherche '{}' -> {} résultats", query, results.len());
+    println!(
+        "[geocoding] Recherche '{}' -> {} résultats",
+        query,
+        results.len()
+    );
 
     for (i, r) in results.iter().enumerate() {
         println!("[geocoding]   {}. {}", i + 1, r.display_name);

@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use sqlx::FromRow;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Event {
@@ -45,6 +44,7 @@ pub struct Team {
     pub event_id: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Member {
     pub id: String,
@@ -157,6 +157,7 @@ pub struct Picture {
     pub image: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Comment {
     pub id: String,
@@ -173,6 +174,7 @@ pub struct ObstacleType {
     pub length: Option<f64>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Obstacle {
     pub id: String,
@@ -194,6 +196,7 @@ pub struct Geometry {
     pub name: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PointDetail {
     pub point: Point,
@@ -205,6 +208,7 @@ pub struct PointDetail {
     pub obstacle: Vec<Obstacle>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PictureInput {
     pub id: String,

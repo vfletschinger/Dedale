@@ -97,7 +97,7 @@ pub async fn create_team(app: AppHandle, name: String, event_id: String) -> Resu
         id: new_id,
         name: Some(name),
         number: 0,
-        event_id: event_id,
+        event_id,
     })
 }
 

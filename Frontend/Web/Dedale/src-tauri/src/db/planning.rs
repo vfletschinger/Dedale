@@ -269,6 +269,7 @@ pub async fn create_planning_pdf(app: AppHandle, event_id: Option<String>) -> Re
     content.push_str("(Planning) Tj\n");
     content.push_str("0 -30 Td\n");
 
+    #[allow(unused_variables)]
     let mut y_offset = 30;
     for (_team_id, team_name) in team_rows {
         content.push_str(&format!("({}) Tj\n", team_name));
