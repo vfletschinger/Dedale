@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useState, useEffect } from "react";
+import toast from "react-hot-toast";
 import { emit } from "@tauri-apps/api/event";
 import SelectableList from "./SelectableList";
 import { Equipement } from "../types/map";
@@ -111,7 +112,11 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
             await invoke("remove_member", { teamId, personId });
             setCurrentMembers(currentMembers.filter(m => m.id !== personId));
             await emit("team-update");
-        } catch (e) { console.error(e); }
+            toast.success("Membre retiré");
+        } catch (e) {
+            console.error(e);
+            toast.error("Erreur lors du retrait du membre");
+        }
     };
 
     const startAddingMember = async () => {
@@ -132,7 +137,11 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
             setIsAddingMember(false);
             setSelectedPersonId("");
             await emit("team-update");
-        } catch (e) { console.error(e); }
+            toast.success("Membre ajouté");
+        } catch (e) {
+            console.error(e);
+            toast.error("Erreur lors de l'ajout du membre");
+        }
     };
 
     const handleRemoveSelectedMembers = async () => {
@@ -146,8 +155,10 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
             setSelectedItemIds([]);
             setShowMultiDeleteConfirm(false);
             await emit("team-update");
+            toast.success(`${selectedItemIds.length} membres retirés`);
         } catch (e) {
             console.error(e);
+            toast.error("Erreur lors de la suppression des membres");
         } finally {
             setLoading(false);
         }
@@ -166,7 +177,11 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
             await invoke("delete_action", { actionId });
             setCurrentActions(currentActions.filter(e => e.action_id !== actionId));
             await emit("team-update");
-        } catch (e) { console.error(e); }
+            toast.success("Action supprimée");
+        } catch (e) {
+            console.error(e);
+            toast.error("Erreur lors de la suppression de l'action");
+        }
     };
 
     const startAddingEquipementAction = async () => {
@@ -240,8 +255,10 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
             setIsAddingEquipementAction(false);
             setSelectedEquipementId("");
             await emit("team-update");
+            toast.success("Action ajoutée");
         } catch (e) {
             console.error(e);
+            toast.error("Erreur lors de l'ajout de l'action");
         }
     };
 
@@ -256,8 +273,10 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
             setSelectedItemIds([]);
             setShowMultiDeleteConfirm(false);
             await emit("team-update");
+            toast.success(`${selectedItemIds.length} actions supprimées`);
         } catch (e) {
             console.error(e);
+            toast.error("Erreur lors de la suppression des actions");
         } finally {
             setLoading(false);
         }
@@ -272,8 +291,10 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
             await invoke("delete_team", { teamId });
             onDelete(teamId);
             onClose();
+            toast.success("Équipe supprimée");
         } catch (error) {
             console.error("Erreur suppression:", error);
+            toast.error("Erreur lors de la suppression de l'équipe");
             setIsDeleting(false);
         }
     };
@@ -285,9 +306,10 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
             await invoke("update_team", { id: teamId, name: editedName });
             setIsEditing(false);
             await emit("team-update");
+            toast.success("Nom de l'équipe modifié");
         } catch (e) {
             console.error(e);
-            alert("Erreur lors de la modification");
+            toast.error("Erreur lors de la modification");
         } finally {
             setIsSaving(false);
         }
@@ -318,7 +340,7 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
                             type="text"
                             value={editedName}
                             onChange={(e) => setEditedName(e.target.value)}
-                            className="w-full text-lg font-bold text-gray-800 bg-white border border-blue-300 rounded px-2 py-1 outline-none focus:ring-2 focus:ring-blue-200 text-transform: capitalize"
+                            className="w-full text-lg font-bold text-gray-800 bg-white border border-primary/50 rounded px-2 py-1 outline-none focus:ring-2 focus:ring-primary/30 text-transform: capitalize"
                             autoFocus
                         />
                     ) : (
@@ -363,7 +385,7 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
 
             {/* CONTENU */}
             < div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-                <div className="flex items-center justify-center gap-2 bg-blue-50 p-2 rounded-lg border border-blue-100 animate-in slide-in-from-top-2 duration-200"><button
+                <div className="flex items-center justify-center gap-2 bg-primary/10 p-2 rounded-lg border border-primary/20 animate-in slide-in-from-top-2 duration-200"><button
                     onClick={() => activeTab == "equipements" ? setSelectedItemIds(currentActions.map((action) => action.action_id)) : activeTab == "members" ? setSelectedItemIds(currentMembers.map((member) => member.id)) : ""}
                     className="text-[10px] sm:text-xs bg-gray-500 text-white px-3 py-1.5 rounded-md hover:bg-gray-700 transition-colors font-bold whitespace-nowrap"
                 >
@@ -387,7 +409,7 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
                         </>
                     )}
                 </div>
-                <span className="text-xs font-medium text-blue-700">
+                <span className="text-xs font-medium text-primary">
                     {selectedItemIds.length} élément(s) sélectionné(s)
                 </span>
                 {loading ?
@@ -397,10 +419,10 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
                     &&
                     (<div>
                         {!isEditing && (isAddingMember ? (
-                            <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
-                                <p className="text-xs font-bold text-blue-800 mb-2">Ajouter un membre</p>
+                            <div className="mt-4 p-3 bg-primary/10 rounded-lg border border-primary/20">
+                                <p className="text-xs font-bold text-primary mb-2">Ajouter un membre</p>
                                 <div className="flex gap-2">
-                                    <select value={selectedPersonId} onChange={(e) => setSelectedPersonId(e.target.value)} className="flex-1 text-sm border border-blue-200 rounded px-2 py-1 outline-none cursor-pointer">
+                                    <select value={selectedPersonId} onChange={(e) => setSelectedPersonId(e.target.value)} className="flex-1 text-sm border border-primary/30 rounded px-2 py-1 outline-none cursor-pointer">
                                         <option value="">Choisir...</option>
                                         {availablePeople.map(p => <option key={p.id} value={p.id}>{p.firstname} {p.lastname}</option>)}
                                     </select>
@@ -420,7 +442,7 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
                             renderItem={(member, isSelected) => (
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3 overflow-hidden flex-1">
-                                        <div className="w-8 h-8 rounded-full bg-blue-100 shrink-0 flex items-center justify-center text-blue-700 font-bold text-xs">
+                                        <div className="w-8 h-8 rounded-full bg-primary/10 shrink-0 flex items-center justify-center text-primary font-bold text-xs">
                                             {member.firstname[0].toUpperCase()}{member.lastname[0].toUpperCase()}
                                         </div>
                                         <input type="checkbox" checked={isSelected} readOnly />
@@ -460,10 +482,10 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
                     &&
                     (<div>
                         {!isEditing && (isAddingEquipementAction ? (
-                            <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
-                                <p className="text-xs font-bold text-blue-800 mb-2">Ajouter un membre</p>
+                            <div className="mt-4 p-3 bg-primary/10 rounded-lg border border-primary/20">
+                                <p className="text-xs font-bold text-primary mb-2">Ajouter un membre</p>
                                 <div className="flex gap-2">
-                                    <select value={selectedEquipementId} onChange={(e) => setSelectedEquipementId(e.target.value)} className="flex-1 text-sm border border-blue-200 rounded px-2 py-1 outline-none cursor-pointer">
+                                    <select value={selectedEquipementId} onChange={(e) => setSelectedEquipementId(e.target.value)} className="flex-1 text-sm border border-primary/30 rounded px-2 py-1 outline-none cursor-pointer">
                                         <option value="">Choisir...</option>
                                         {availableEquipements.map((action) => {
                                             const item = action as unknown as AvailableActionOption;
@@ -494,7 +516,7 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
                                         <div className="overflow-hidden">
                                             <p className="hover:text-primary transition-colors cursor-pointer text-sm font-medium text-gray-800 truncate text-transform: capitalize">
                                                 {equipement.type_name}
-                                                <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 uppercase">
+                                                <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary uppercase">
                                                     {equipement.action_type}
                                                 </span>
                                             </p>

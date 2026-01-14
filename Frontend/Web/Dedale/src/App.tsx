@@ -13,6 +13,9 @@ import Persons from "./components/Persons";
 import Planning from "./components/Planning";
 import { Event as AppEvent } from "./components/Events";
 
+import LoadingScreen from "./components/LoadingScreen";
+import { Toaster } from 'react-hot-toast';
+
 // Wrapper pour cacher une page tout en la gardant montée
 function PageWrapper({
   isVisible,
@@ -50,6 +53,7 @@ function App() {
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [events, setEvents] = useState<AppEvent[]>([]);
   const [firstLaunch, setFirstLaunch] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   const handleEventClick = (eventId: string) => {
     setSelectedEventId(eventId);
@@ -60,6 +64,7 @@ function App() {
   useEffect(() => {
     const unlisten = listen('first-launch', () => {
       setFirstLaunch(true);
+      setIsInitializing(false);
     });
 
     (async () => {
@@ -70,11 +75,15 @@ function App() {
         }
       } catch {
         // ignore
+      } finally {
+        setTimeout(() => {
+          setIsInitializing(false);
+        }, 500);
       }
     })();
 
     return () => {
-      unlisten.then(f => f()).catch(() => { });
+      unlisten.then(f => typeof f === 'function' && f()).catch(() => { });
     };
   }, []);
 
@@ -97,9 +106,9 @@ function App() {
     });
 
     return () => {
-      unlistenTeam.then(f => f());
-      unlistenPerson.then(f => f());
-      unlistenMap.then(f => f());
+      unlistenTeam.then(f => typeof f === 'function' && f());
+      unlistenPerson.then(f => typeof f === 'function' && f());
+      unlistenMap.then(f => typeof f === 'function' && f());
     };
   }, [navigate]);
 
@@ -118,7 +127,9 @@ function App() {
     reset();
   }
 
-
+  if (isInitializing) {
+    return <LoadingScreen />;
+  }
 
   // Si c'est le premier lancement, afficher le formulaire admin
   if (firstLaunch) {
@@ -137,6 +148,7 @@ function App() {
 
   return (
     <div className="w-full min-h-screen bg-linear-to-br from-slate-50 via-indigo-50 to-purple-50 font-sans relative overflow-hidden">
+      <Toaster position="top-center" reverseOrder={false} />
       <header className="relative z-10">
         <Navigation
           currentPage={currentPage}
@@ -151,8 +163,8 @@ function App() {
           canGoBack={canGoBack}
           onGoBack={goBack}
           eventSelected={selectedEventId === null || undefined ? false : true}
-          deselectEvent={handleDeselection}
           eventName={events.find(e => String(e.id) === selectedEventId)?.name}
+          deselectEvent={handleDeselection}
         />
       </header>
 
@@ -210,15 +222,15 @@ function App() {
       </main>
 
       {currentPage === "event" && (
-        <div className="fixed bottom-6 right-6 z-50 bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-white/30 p-4">
+        <div className="fixed bottom-6 right-6 z-50 bg-gray-900 rounded-2xl shadow-xl border border-gray-800 p-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-linear-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold">
+            <div className="w-10 h-10 bg-secondary rounded-full flex items-center justify-center text-gray-900 font-bold">
               {events.length}
             </div>
             <div>
-              <div className="text-sm font-semibold text-gray-800">Total Events</div>
-              <div className="text-xs text-gray-500">
-                {events.filter((e) => e.statut === 'active' || e.statut === 'Actif').length} actifs
+              <div className="text-sm font-semibold text-white">Événements au total</div>
+              <div className="text-xs text-gray-400">
+                {events.filter((e) => e.statut === 'active' || e.statut === 'Actif').length} actif(s)
               </div>
             </div>
           </div>

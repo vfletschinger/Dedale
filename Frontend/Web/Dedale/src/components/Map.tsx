@@ -290,7 +290,7 @@ function OfflineMapLibre({
   return (
     <div className="h-full flex flex-col bg-gray-50 overflow-hidden">
       {/* --- HEADER --- */}
-      <div className="bg-slate-700 shadow-lg shrink-0">
+      <div className="bg-gray-900 shadow-lg shrink-0 relative z-30">
         <div className="p-4 pb-0">
           <div className="flex items-center gap-3">
             {/* Barre de recherche */}
@@ -299,21 +299,21 @@ function OfflineMapLibre({
         </div>
 
         {/* Onglets Navigation */}
-        <div className="flex items-center gap-2 px-4 mt-3 border-t border-slate-600">
+        <div className="flex items-center gap-2 px-4 mt-4 border-t border-gray-800">
           <button
             onClick={() => {
               setTimelineFilterDate(null); // Réinitialiser le filtre temporel
               setViewMode("points");
             }}
-            className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${viewMode === "points"
-              ? "text-white border-primary"
-              : "text-slate-400 border-transparent hover:text-slate-200"
+            className={`px-4 py-3 text-sm font-bold border-b-2 transition-all ${viewMode === "points"
+              ? "text-secondary border-secondary bg-white/5"
+              : "text-gray-400 border-transparent hover:text-white hover:bg-white/5"
               }`}
           >
             <span className="flex items-center gap-2">
               <FontAwesomeIcon icon={faList} />
               <span>Liste des points</span>
-              <span className="text-xs bg-slate-600 px-2 py-0.5 rounded-full">
+              <span className={`text-xs px-2 py-0.5 rounded-full ${viewMode === 'points' ? 'bg-secondary text-gray-900' : 'bg-gray-700 text-gray-300'}`}>
                 {points.length}
               </span>
             </span>
@@ -344,9 +344,9 @@ function OfflineMapLibre({
           </button>
           <button
             onClick={() => setViewMode("timeline")}
-            className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${viewMode === "timeline"
-              ? "text-white border-primary"
-              : "text-slate-400 border-transparent hover:text-slate-200"
+            className={`px-4 py-3 text-sm font-bold border-b-2 transition-all ${viewMode === "timeline"
+              ? "text-secondary border-secondary bg-white/5"
+              : "text-gray-400 border-transparent hover:text-white hover:bg-white/5"
               }`}
           >
             <span className="flex items-center gap-2">
@@ -420,7 +420,7 @@ function OfflineMapLibre({
                             <FontAwesomeIcon icon={faMapMarkerAlt} className="text-red-500" /> {p.name || `Point #${p.id.slice(0, 8)}`}
                           </span>
                           <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1 border border-primary/20">
-                            <FontAwesomeIcon icon={faEye} /> Voir
+                            Voir
                           </span>
                         </div>
                         <div className="flex gap-2 text-xs">

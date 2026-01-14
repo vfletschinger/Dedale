@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import toast from "react-hot-toast";
 import { emit } from "@tauri-apps/api/event";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import TeamDetails, { TeamDetailData, Person, Event, EquipementAction } from "./TeamDetails";
@@ -53,6 +54,7 @@ function Teams({ activeEventId }: { activeEventId: string }) {
         setTeams(teamsData);
       } catch (e) {
         console.error(e);
+        toast.error("Erreur lors du chargement des équipes");
       } finally {
         if (showSpinner) {
           setLoading(false);
@@ -144,6 +146,7 @@ function Teams({ activeEventId }: { activeEventId: string }) {
       return data;
     } catch (error) {
       console.error("Failed to fetch team details:", error);
+      toast.error("Erreur lors du chargement des détails de l'équipe");
       throw error;
     }
   };
