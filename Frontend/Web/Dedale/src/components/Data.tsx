@@ -30,6 +30,8 @@ type TransferPhase = "idle" | "qr_displayed" | "connected";
 function Data() {
   const [qrCodeBase64, setQrCodeBase64] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isPdfLoading, setIsPdfLoading] = useState<boolean>(false);
+  const [isExcelLoading, setIsExcelLoading] = useState<boolean>(false);
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedEventIds, setSelectedEventIds] = useState<Set<string>>(new Set());
   const [selectedEventId, setSelectedEventId] = useState<string>("");
@@ -74,6 +76,7 @@ function Data() {
   // Fonction pour l'export Excel
   const generate_excel = useCallback(async () => {
     try {
+      setIsExcelLoading(true);
       const appDataPath = await path.appDataDir();
       if (!appDataPath) throw new Error("Impossible de récupérer AppData");
 
@@ -95,18 +98,23 @@ function Data() {
     } catch (error) {
       console.error("Erreur export Excel:", error);
       toast.error(`Erreur Export: ${String(error)}`);
+    } finally {
+      setIsExcelLoading(false);
     }
   }, [selectedEventId]);
 
   // Fonction pour la création de PDF
   const createPdf = useCallback(async () => {
     try {
+      setIsPdfLoading(true);
       const eventIdParam = selectedEventId ? selectedEventId : null;
       await invoke("create_pdf", { eventId: eventIdParam });
       toast.success("Le rapport PDF a été généré avec succès.");
     } catch (error) {
       console.error("Erreur PDF:", error);
       toast.error(`Erreur PDF: ${String(error)}`);
+    } finally {
+      setIsPdfLoading(false);
     }
   }, [selectedEventId]);
 
@@ -298,14 +306,15 @@ function Data() {
             <div className="grid grid-cols-1 gap-4 pt-4">
               <button
                 onClick={generate_excel}
-                className="w-full py-4 px-6 bg-white border border-gray-200 rounded-xl hover:border-green-500 hover:bg-green-50 transition-all group/btn flex items-center justify-between shadow-sm hover:shadow-md"
+                disabled={isExcelLoading}
+                className="w-full py-4 px-6 bg-white border border-gray-200 rounded-xl hover:border-green-500 hover:bg-green-50 transition-all group/btn flex items-center justify-between shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-lg bg-green-100 text-green-600 flex items-center justify-center text-xl group-hover/btn:scale-110 transition-transform">
-                    <FontAwesomeIcon icon={faFileExcel} />
+                    <FontAwesomeIcon icon={isExcelLoading ? faSpinner : faFileExcel} className={isExcelLoading ? "animate-spin" : ""} />
                   </div>
                   <div className="text-left">
-                    <p className="font-bold text-gray-900">Exporter en Excel</p>
+                    <p className="font-bold text-gray-900">{isExcelLoading ? "Export en cours..." : "Exporter en Excel"}</p>
                     <p className="text-xs text-gray-500">Format .xlsx compatible</p>
                   </div>
                 </div>
@@ -314,14 +323,15 @@ function Data() {
 
               <button
                 onClick={createPdf}
-                className="w-full py-4 px-6 bg-white border border-gray-200 rounded-xl hover:border-red-500 hover:bg-red-50 transition-all group/btn flex items-center justify-between shadow-sm hover:shadow-md"
+                disabled={isPdfLoading}
+                className="w-full py-4 px-6 bg-white border border-gray-200 rounded-xl hover:border-red-500 hover:bg-red-50 transition-all group/btn flex items-center justify-between shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-lg bg-red-100 text-red-600 flex items-center justify-center text-xl group-hover/btn:scale-110 transition-transform">
-                    <FontAwesomeIcon icon={faFilePdf} />
+                    <FontAwesomeIcon icon={isPdfLoading ? faSpinner : faFilePdf} className={isPdfLoading ? "animate-spin" : ""} />
                   </div>
                   <div className="text-left">
-                    <p className="font-bold text-gray-900">Générer un rapport PDF</p>
+                    <p className="font-bold text-gray-900">{isPdfLoading ? "Génération en cours..." : "Générer un rapport PDF"}</p>
                     <p className="text-xs text-gray-500">Document complet imprimable</p>
                   </div>
                 </div>

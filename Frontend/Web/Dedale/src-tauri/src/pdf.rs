@@ -13,6 +13,31 @@ use typst_as_lib::TypstEngine;
 use typst_pdf::PdfOptions;
 
 // =============================================================================
+// Fonction de formatage des dates
+// =============================================================================
+fn format_date(date_str: &str) -> String {
+    // Format attendu: "YYYY-MM-DD" ou "YYYY-MM-DDTHH:MM:SS"
+    let parts: Vec<&str> = date_str.split('T').collect();
+    let date_part = parts[0];
+    let time_part = parts.get(1).map(|t| t.split(':').take(2).collect::<Vec<_>>().join(":"));
+    
+    let date_components: Vec<&str> = date_part.split('-').collect();
+    if date_components.len() == 3 {
+        let day = date_components[2];
+        let month = date_components[1];
+        let year = date_components[0];
+        
+        if let Some(time) = time_part {
+            format!("{}/{}/{} à {}", day, month, year, time)
+        } else {
+            format!("{}/{}/{}", day, month, year)
+        }
+    } else {
+        date_str.to_string()
+    }
+}
+
+// =============================================================================
 // 1. PDF GLOBAL (Vue d'ensemble de l'événement)
 // =============================================================================
 #[tauri::command]
@@ -62,7 +87,7 @@ pub async fn create_pdf(app: AppHandle, event_id: Option<String>) -> Result<(), 
                 ]
                 #v(0.5cm)
                 "#,
-                name, start, end
+                name, format_date(&start), format_date(&end)
             ));
         }
     }
@@ -151,7 +176,7 @@ pub async fn create_pdf(app: AppHandle, event_id: Option<String>) -> Result<(), 
     let pdf_bytes =
         typst_pdf::pdf(&doc, &options).map_err(|e| format!("Failed to export PDF: {:#?}", e))?;
 
-    let (dir_path, file_name) = utils::create_file_name("Global_Recap".to_string());
+    let (dir_path, file_name) = utils::create_file_name("Global_Recap".to_string(), "pdf".to_string());
     if let Some(save_path) = utils::show_save_dialog(&file_name, &dir_path, "pdf".to_string()) {
         fs::write(save_path, pdf_bytes)
             .map_err(|e| format!("Failed to write final PDF file: {}", e))?;
@@ -392,7 +417,7 @@ pub async fn create_team_mission_pdf(
         };
 
         let display_date = match date_opt {
-            Some(d) => d.replace("T", " à "),
+            Some(d) => format_date(d),
             None => "Non planifié".to_string(),
         };
 
@@ -443,8 +468,23 @@ pub async fn create_team_mission_pdf(
     let pdf_bytes = typst_pdf::pdf(&doc, &PdfOptions::default())
         .map_err(|e| format!("PDF export failed: {:?}", e))?;
 
+    let mut event_name: String = "".to_string();
+    if !event_id.is_empty() {
+        let pool = db::get_db_pool(&app).await?;
+
+        let row = sqlx::query("SELECT name FROM event WHERE id = ?")
+            .bind(event_id)
+            .fetch_optional(&pool)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        if let Some(r) = row {
+            event_name = r.get("name");
+        }
+    }
+
     let (dir_path, file_name) =
-        utils::create_file_name(format!("Planning_{}_{}.pdf", team_name, event_id));
+        utils::create_file_name(format!("Planning_{}_{}", team_name, event_name), "pdf".to_string());
     if let Some(save_path) = utils::show_save_dialog(&file_name, &dir_path, "pdf".to_string()) {
         fs::write(save_path, pdf_bytes).map_err(|e| e.to_string())?;
     }
@@ -487,16 +527,4 @@ fn load_fonts_from_directory(fonts_dir: &Path) -> Result<Vec<Vec<u8>>, String> {
     }
 
     Ok(fonts)
-}
-
-fn get_color_for_type(type_name: Option<&str>) -> String {
-    match type_name.unwrap_or("Autre").to_lowercase().as_str() {
-        s if s.contains("barrière") || s.contains("heras") => "blue".to_string(),
-        s if s.contains("extincteur") || s.contains("secours") => "red".to_string(),
-        s if s.contains("tente") || s.contains("pagode") => "gray".to_string(),
-        s if s.contains("signal") || s.contains("panneau") => "orange".to_string(),
-        s if s.contains("elec") || s.contains("cable") => "yellow".to_string(),
-        s if s.contains("wc") || s.contains("sanitaire") => "purple".to_string(),
-        _ => "black".to_string(),
-    }
 }
