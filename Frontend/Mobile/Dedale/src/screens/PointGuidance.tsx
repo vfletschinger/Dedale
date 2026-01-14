@@ -9,11 +9,14 @@ import {
 } from "react-native";
 import MapView, { Marker, Polyline, PROVIDER_DEFAULT } from "react-native-maps";
 import * as Location from "expo-location";
-import { useRoute, useNavigation, useIsFocused } from "@react-navigation/native";
+import {
+  useRoute,
+  useNavigation,
+  useIsFocused,
+} from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import { usePoints } from "../context/PointsContext";
 import { InterestPointsType } from "../types/database";
-import "../style/global.css";
 import Colors from "../constants/colors";
 
 type RouteParams = {
@@ -210,10 +213,7 @@ export default function PointGuidanceScreen() {
       {/* Header */}
       <View className="bg-gradient-to-r from-blue-500 to-blue-600 px-4 py-4 shadow-md">
         <View className="flex-row items-center justify-between mb-2">
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            className="p-2"
-          >
+          <TouchableOpacity onPress={() => navigation.goBack()} className="p-2">
             <Feather name="arrow-left" size={24} color="white" />
           </TouchableOpacity>
           <Text className="text-white text-lg font-bold flex-1 ml-3">
@@ -312,9 +312,7 @@ export default function PointGuidanceScreen() {
         </View>
 
         <TouchableOpacity
-          onPress={() =>
-            setLocationTracking(!locationTracking)
-          }
+          onPress={() => setLocationTracking(!locationTracking)}
           className={`mt-3 py-3 px-4 rounded-lg flex-row items-center justify-center ${
             locationTracking ? "bg-secondary" : "bg-slate-400"
           }`}

@@ -20,7 +20,9 @@ export async function seedDatabase(db: SQLiteDatabase) {
 
     // Si des points existent, faire un seeding partiel (équipes/actions seulement)
     if (existingPoints && existingPoints.count > 0) {
-      console.log("Des points existent déjà, seeding partiel (équipes/actions)...");
+      console.log(
+        "Des points existent déjà, seeding partiel (équipes/actions)..."
+      );
 
       // Vérifier si des équipes existent
       const existingTeams = db.getFirstSync<{ count: number }>(
@@ -36,10 +38,22 @@ export async function seedDatabase(db: SQLiteDatabase) {
         if (existingEvents.length > 0) {
           console.log("Insertion des équipes...");
           const teams = [
-            { id: generateUUID(), event_id: existingEvents[0].id, name: "Équipe Alpha" },
-            { id: generateUUID(), event_id: existingEvents[0].id, name: "Équipe Bravo" },
+            {
+              id: generateUUID(),
+              event_id: existingEvents[0].id,
+              name: "Équipe Alpha",
+            },
+            {
+              id: generateUUID(),
+              event_id: existingEvents[0].id,
+              name: "Équipe Bravo",
+            },
             existingEvents[1]
-              ? { id: generateUUID(), event_id: existingEvents[1].id, name: "Équipe Illkirch" }
+              ? {
+                  id: generateUUID(),
+                  event_id: existingEvents[1].id,
+                  name: "Équipe Illkirch",
+                }
               : null,
           ].filter(Boolean) as { id: string; event_id: string; name: string }[];
 
@@ -58,8 +72,12 @@ export async function seedDatabase(db: SQLiteDatabase) {
       );
 
       if (!existingActions || existingActions.count === 0) {
-        const teamIds = db.getAllSync<{ id: string }>("SELECT id FROM team LIMIT 5");
-        const equipementIds = db.getAllSync<{ id: string }>("SELECT id FROM equipement LIMIT 5");
+        const teamIds = db.getAllSync<{ id: string }>(
+          "SELECT id FROM team LIMIT 5"
+        );
+        const equipementIds = db.getAllSync<{ id: string }>(
+          "SELECT id FROM equipement LIMIT 5"
+        );
 
         if (teamIds.length > 0 && equipementIds.length > 0) {
           console.log("Insertion des actions...");
@@ -78,7 +96,9 @@ export async function seedDatabase(db: SQLiteDatabase) {
                   team_id: teamIds[1].id,
                   equipement_id: equipementIds[1].id,
                   type: "retrait",
-                  scheduled_time: new Date(Date.now() + 3600 * 1000).toISOString(),
+                  scheduled_time: new Date(
+                    Date.now() + 3600 * 1000
+                  ).toISOString(),
                   is_done: 0,
                 }
               : null,
@@ -88,7 +108,9 @@ export async function seedDatabase(db: SQLiteDatabase) {
                   team_id: teamIds[2].id,
                   equipement_id: equipementIds[2].id,
                   type: "inspection",
-                  scheduled_time: new Date(Date.now() + 2 * 3600 * 1000).toISOString(),
+                  scheduled_time: new Date(
+                    Date.now() + 2 * 3600 * 1000
+                  ).toISOString(),
                   is_done: 1,
                 }
               : null,
@@ -119,7 +141,7 @@ export async function seedDatabase(db: SQLiteDatabase) {
 
       console.log("Seeding partiel terminé.");
       return;
-    };
+    }
 
     // 1. Seed events (avec UUIDs)
     console.log("Insertion des événements...");
@@ -296,10 +318,11 @@ export async function seedDatabase(db: SQLiteDatabase) {
     const typeIds: string[] = [];
     equipementTypes.forEach((type) => {
       const typeId = generateUUID();
-      db.runSync(
-        "INSERT INTO type (id, name, description) VALUES (?, ?, ?)",
-        [typeId, type.name, type.description]
-      );
+      db.runSync("INSERT INTO type (id, name, description) VALUES (?, ?, ?)", [
+        typeId,
+        type.name,
+        type.description,
+      ]);
       typeIds.push(typeId);
     });
 
@@ -438,7 +461,7 @@ export async function seedDatabase(db: SQLiteDatabase) {
       const pointIndex = index % pointIds.length;
       db.runSync(
         "INSERT INTO equipement_coordinate (id, equipement_id, x, y, order_index) VALUES (?, ?, ?, ?, ?)",
-        [coordId, equipementId, 7.75 + (index * 0.01), 48.57 + (index * 0.01), 0]
+        [coordId, equipementId, 7.75 + index * 0.01, 48.57 + index * 0.01, 0]
       );
       equipementIds.push(equipementId);
     });
@@ -452,10 +475,11 @@ export async function seedDatabase(db: SQLiteDatabase) {
     ];
 
     teams.forEach((team) => {
-      db.runSync(
-        "INSERT INTO team (id, event_id, name) VALUES (?, ?, ?)",
-        [team.id, team.event_id, team.name]
-      );
+      db.runSync("INSERT INTO team (id, event_id, name) VALUES (?, ?, ?)", [
+        team.id,
+        team.event_id,
+        team.name,
+      ]);
     });
 
     // 7. Seed actions (liées à des équipes et des équipements)

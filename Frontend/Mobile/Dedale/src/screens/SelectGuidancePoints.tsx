@@ -13,7 +13,6 @@ import { Feather } from "@expo/vector-icons";
 import { usePoints } from "../context/PointsContext";
 import { InterestPointsType } from "../types/database";
 import { getAddressFromCoords, shortId } from "../services/Helper";
-import "../style/global.css";
 import Colors from "../constants/colors";
 
 interface SelectionState {
@@ -56,12 +55,18 @@ export default function SelectGuidancePointsScreen() {
 
   const handleStartNavigation = () => {
     if (!selection.start || !selection.end) {
-      Alert.alert("Erreur", "Veuillez sélectionner un point de départ et d'arrivée");
+      Alert.alert(
+        "Erreur",
+        "Veuillez sélectionner un point de départ et d'arrivée"
+      );
       return;
     }
 
     if (selection.start === selection.end) {
-      Alert.alert("Erreur", "Les points de départ et d'arrivée doivent être différents");
+      Alert.alert(
+        "Erreur",
+        "Les points de départ et d'arrivée doivent être différents"
+      );
       return;
     }
 
@@ -89,7 +94,12 @@ export default function SelectGuidancePointsScreen() {
           <View className="flex-row items-center mb-1">
             <Text className="text-sm font-bold text-slate-700">Départ</Text>
             {isStartSelected && (
-              <Feather name="check-circle" size={16} color="#16a34a" className="ml-1" />
+              <Feather
+                name="check-circle"
+                size={16}
+                color="#16a34a"
+                className="ml-1"
+              />
             )}
           </View>
           <Text className="font-semibold text-slate-900">
@@ -112,7 +122,12 @@ export default function SelectGuidancePointsScreen() {
           <View className="flex-row items-center mb-1">
             <Text className="text-sm font-bold text-slate-700">Arrivée</Text>
             {isEndSelected && (
-              <Feather name="check-circle" size={16} color="#dc2626" className="ml-1" />
+              <Feather
+                name="check-circle"
+                size={16}
+                color="#dc2626"
+                className="ml-1"
+              />
             )}
           </View>
           <Text className="font-semibold text-slate-900">
@@ -161,12 +176,18 @@ export default function SelectGuidancePointsScreen() {
                 </Text>
                 {selection.start && (
                   <Text className="text-sm text-slate-700 mt-1">
-                    ✓ Départ: {points.find((p: InterestPointsType) => p.id === selection.start)?.name || "Point"}
+                    ✓ Départ:{" "}
+                    {points.find(
+                      (p: InterestPointsType) => p.id === selection.start
+                    )?.name || "Point"}
                   </Text>
                 )}
                 {selection.end && (
                   <Text className="text-sm text-slate-700 mt-1">
-                    ✓ Arrivée: {points.find((p: InterestPointsType) => p.id === selection.end)?.name || "Point"}
+                    ✓ Arrivée:{" "}
+                    {points.find(
+                      (p: InterestPointsType) => p.id === selection.end
+                    )?.name || "Point"}
                   </Text>
                 )}
               </View>
@@ -195,11 +216,7 @@ export default function SelectGuidancePointsScreen() {
                   : "bg-slate-300"
               }`}
             >
-              <Feather
-                name="navigation"
-                size={20}
-                color="white"
-              />
+              <Feather name="navigation" size={20} color="white" />
               <Text className="text-white font-bold ml-2">
                 Commencer le guidage
               </Text>

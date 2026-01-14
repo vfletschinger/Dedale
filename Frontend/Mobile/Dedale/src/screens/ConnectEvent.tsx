@@ -1,5 +1,8 @@
 import { View, Text, Pressable, FlatList } from "react-native";
-import { useSafeAreaInsets, SafeAreaView } from "react-native-safe-area-context";
+import {
+  useSafeAreaInsets,
+  SafeAreaView,
+} from "react-native-safe-area-context";
 import QRCodeScanner from "../components/QrCodeScanner";
 import { useState, useEffect } from "react";
 import { useNavigation } from "@react-navigation/native";
@@ -105,9 +108,12 @@ export default function ConnectEvent() {
 
   if (scanQR) {
     return (
-      <SafeAreaView className="container" edges={["top"]}>
-        <View className="header header-row">
-          <Pressable onPress={() => setScanQR(false)} className="row gap-2">
+      <SafeAreaView className="flex-1 bg-gray-50" edges={["top"]}>
+        <View className="bg-primary pt-4 pb-4 px-4 shadow-sm flex-row items-center justify-between">
+          <Pressable
+            onPress={() => setScanQR(false)}
+            className="flex-row items-center gap-2"
+          >
             <Feather name="arrow-left" size={24} color="#fff" />
             <Text className="text-white text-lg font-semibold">Retour</Text>
           </Pressable>
@@ -118,10 +124,12 @@ export default function ConnectEvent() {
   }
 
   return (
-    <View className="container">
+    <View className="flex-1 bg-gray-50">
       <SafeAreaView edges={["top"]} className="bg-primary">
         <View className="bg-primary pb-4 px-4">
-          <Text className="header-title">Sélectionner un événement</Text>
+          <Text className="text-accent text-2xl font-bold">
+            Sélectionner un événement
+          </Text>
         </View>
       </SafeAreaView>
 
@@ -134,7 +142,7 @@ export default function ConnectEvent() {
         contentContainerClassName="py-4 flex-grow"
         contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
         ListEmptyComponent={
-          <View className="center py-16">
+          <View className="flex-1 justify-center items-center py-16">
             <Text className="text-base text-gray-400 mt-4">
               Aucun événement disponible
             </Text>

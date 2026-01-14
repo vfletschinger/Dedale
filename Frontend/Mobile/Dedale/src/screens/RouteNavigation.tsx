@@ -36,9 +36,11 @@ export async function fetchRouteCoordinates(
   }
 
   try {
-    const coordinates = points.map((point) => `${point.x},${point.y}`).join(";");
+    const coordinates = points
+      .map((point) => `${point.x},${point.y}`)
+      .join(";");
     const url = `https://router.project-osrm.org/route/v1/foot/${coordinates}?overview=full&geometries=geojson`;
-    
+
     const response = await fetch(url);
     const data = await response.json();
 
@@ -79,8 +81,8 @@ export default function RouteNavigation() {
 
   useEffect(() => {
     const loadRoute = async () => {
-        const coords = await fetchRouteCoordinates(points);
-        setRouteCoordinates(coords);
+      const coords = await fetchRouteCoordinates(points);
+      setRouteCoordinates(coords);
     };
     loadRoute();
   }, [points]);
@@ -204,14 +206,14 @@ export default function RouteNavigation() {
 
   if (!currentRegion || points.length === 0) {
     return (
-      <View className="center">
+      <View className="flex-1 justify-center items-center">
         <Text>Chargement de la carte...</Text>
       </View>
     );
   }
 
   return (
-    <View className="container-white">
+    <View className="flex-1 bg-white">
       <MapView
         ref={mapRef}
         testID="map-view"
@@ -234,7 +236,9 @@ export default function RouteNavigation() {
           <Marker
             key={point.id}
             coordinate={{ latitude: point.y, longitude: point.x }}
-            pinColor={index === currentPointIndex ? Colors.secondary : "#9ca3af"}
+            pinColor={
+              index === currentPointIndex ? Colors.secondary : "#9ca3af"
+            }
             title={`Point #${shortId(point.id.toString())}`}
             description={
               index === currentPointIndex
@@ -254,40 +258,49 @@ export default function RouteNavigation() {
         </Pressable>
       )}
 
-      <Pressable onPress={() => navigation.goBack()} className="back-btn">
-        <View className="back-btn-gray">
-          <Text className="back-btn-gray-text">←</Text>
+      <Pressable
+        onPress={() => navigation.goBack()}
+        className="absolute top-12 left-4 z-50"
+      >
+        <View className="bg-gray-300 px-3 py-2 rounded-full">
+          <Text className="text-gray-500 text-lg">←</Text>
         </View>
       </Pressable>
 
-      <View className="nav-controls">
-        <View className="nav-info">
-          <Text className="nav-info-text">
+      <View className="absolute bottom-10 left-5 right-5 bg-white rounded-2xl p-4 shadow-lg">
+        <View className="items-center mb-3">
+          <Text className="text-sm text-gray-500 mb-1">
             Point {currentPointIndex + 1} / {points.length}
           </Text>
-          <Text className="nav-point-name">
+          <Text className="text-lg font-bold text-gray-800">
             Point #{shortId(points[currentPointIndex].id.toString())}
           </Text>
         </View>
 
-        <View className="nav-buttons">
+        <View className="flex-row justify-between gap-3">
           <Pressable
             onPress={goToPreviousPoint}
-            className={currentPointIndex === 0 ? "nav-btn-disabled" : "nav-btn"}
+            className={
+              currentPointIndex === 0
+                ? "flex-1 bg-gray-300 p-3 rounded-lg items-center"
+                : "flex-1 bg-blue-500 p-3 rounded-lg items-center"
+            }
             disabled={currentPointIndex === 0}
           >
-            <Text className="nav-btn-text">← Précédent</Text>
+            <Text className="text-white font-semibold text-sm">
+              ← Précédent
+            </Text>
           </Pressable>
 
           <Pressable
             onPress={goToNextPoint}
             className={
               currentPointIndex === points.length - 1
-                ? "nav-btn-disabled"
-                : "nav-btn"
+                ? "flex-1 bg-gray-300 p-3 rounded-lg items-center"
+                : "flex-1 bg-blue-500 p-3 rounded-lg items-center"
             }
           >
-            <Text className="nav-btn-text">Suivant →</Text>
+            <Text className="text-white font-semibold text-sm">Suivant →</Text>
           </Pressable>
         </View>
       </View>

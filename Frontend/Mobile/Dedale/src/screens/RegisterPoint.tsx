@@ -166,7 +166,13 @@ export default function RegisterPointScreen() {
             const equipementId = generateUUID();
             db.runSync(
               "INSERT INTO equipement (id, event_id, type_id, quantity, length_per_unit) VALUES (?, ?, ?, ?, ?)",
-              [equipementId, selectedEventId, obstacle.type_id, obstacle.number, 0]
+              [
+                equipementId,
+                selectedEventId,
+                obstacle.type_id,
+                obstacle.number,
+                0,
+              ]
             );
             // Ajouter la coordonnée du point comme coordonnée de l'équipement
             const coordId = generateUUID();
@@ -206,7 +212,7 @@ export default function RegisterPointScreen() {
   };
 
   return (
-    <View className="container-white">
+    <View className="flex-1 bg-white">
       <Map
         mapRef={mapRef}
         initialRegion={
@@ -275,13 +281,16 @@ export default function RegisterPointScreen() {
       />
 
       <View className="absolute bottom-5 left-5 right-5 flex-row justify-between gap-2">
-        <Pressable onPress={requestLocation} className="flex-1 btn-violet">
+        <Pressable
+          onPress={requestLocation}
+          className="flex-1 bg-violet-500 p-4 rounded-xl items-center active:bg-violet-600"
+        >
           <Text className="text-white font-bold">Centrer</Text>
         </Pressable>
 
         <Pressable
           onPress={() => setIsModalVisible(true)}
-          className="flex-1 btn-violet"
+          className="flex-1 bg-violet-500 p-4 rounded-xl items-center active:bg-violet-600"
         >
           <Text className="text-white font-bold">Ajouter un point</Text>
         </Pressable>
@@ -297,7 +306,7 @@ export default function RegisterPointScreen() {
           behavior={Platform.OS === "ios" ? "padding" : undefined}
           className="flex-1 justify-end"
         >
-          <View className="modal-bottom-content">
+          <View className="bg-white p-5 rounded-t-2xl">
             <ScrollView
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
@@ -309,7 +318,7 @@ export default function RegisterPointScreen() {
 
               {/* Commentaire */}
               <TextInput
-                className="input-multiline mb-3"
+                className="border border-gray-300 rounded-lg p-3 min-h-[60px] mb-3"
                 placeholder="Entrez le commentaire du point"
                 value={pointComment}
                 onChangeText={setPointComment}
@@ -330,8 +339,11 @@ export default function RegisterPointScreen() {
                   </Text>
                   <View className="flex-row flex-wrap gap-2">
                     {selectedObstacles.map((obs, idx) => (
-                      <View key={idx} className="obstacle-tag">
-                        <Text className="obstacle-tag-text">
+                      <View
+                        key={idx}
+                        className="bg-blue-100 px-3 py-1.5 rounded-full"
+                      >
+                        <Text className="text-blue-800 font-medium">
                           {obs.name} ({obs.number})
                         </Text>
                       </View>

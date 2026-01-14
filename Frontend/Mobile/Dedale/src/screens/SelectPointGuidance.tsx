@@ -14,7 +14,6 @@ import { usePoints } from "../context/PointsContext";
 import { useEvent } from "../context/EventContext";
 import PointCard from "../components/PointCard";
 import { InterestPointsType } from "../types/database";
-import "../style/global.css";
 
 export default function SelectPointGuidanceScreen() {
   const navigation = useNavigation<any>();
@@ -98,7 +97,9 @@ export default function SelectPointGuidanceScreen() {
         <View className="bg-white border-b border-slate-200 px-4 py-3 shadow-sm">
           <View className="flex-row items-center gap-2 mb-2">
             <Feather name="map-pin" size={18} color="#22c55e" />
-            <Text className="font-semibold text-slate-700">Point de départ</Text>
+            <Text className="font-semibold text-slate-700">
+              Point de départ
+            </Text>
           </View>
           <View className="bg-green-50 rounded-lg p-3 border border-green-200">
             <Text className="font-bold text-slate-800">
@@ -122,7 +123,10 @@ export default function SelectPointGuidanceScreen() {
       )}
 
       {/* Liste des points */}
-      <ScrollView className="flex-1 px-4 py-4" showsVerticalScrollIndicator={false}>
+      <ScrollView
+        className="flex-1 px-4 py-4"
+        showsVerticalScrollIndicator={false}
+      >
         {filteredPoints.length === 0 ? (
           <View className="items-center justify-center py-12">
             <Feather name="inbox" size={48} color="#cbd5e1" />
