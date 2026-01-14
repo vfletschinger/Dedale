@@ -5,7 +5,7 @@ mod tests {
     /// Test que create_file_name retourne un nom de fichier avec l'extension correcte
     #[test]
     fn test_create_file_name_returns_correct_extension_pdf() {
-        let (_, file_name) = create_file_name("pdf".to_string());
+        let (_, file_name) = create_file_name("recap".to_string(), "pdf".to_string());
         assert!(
             file_name.ends_with(".pdf"),
             "Le nom de fichier devrait se terminer par .pdf"
@@ -14,7 +14,7 @@ mod tests {
 
     #[test]
     fn test_create_file_name_returns_correct_extension_xlsx() {
-        let (_, file_name) = create_file_name("xlsx".to_string());
+        let (_, file_name) = create_file_name("recap".to_string(), "xlsx".to_string());
         assert!(
             file_name.ends_with(".xlsx"),
             "Le nom de fichier devrait se terminer par .xlsx"
@@ -24,7 +24,7 @@ mod tests {
     /// Test que create_file_name retourne un chemin de fichier non vide
     #[test]
     fn test_create_file_name_returns_non_empty_path() {
-        let (file_path, _) = create_file_name("pdf".to_string());
+        let (file_path, _) = create_file_name("recap".to_string(), "pdf".to_string());
         assert!(
             !file_path.is_empty(),
             "Le chemin de fichier ne devrait pas être vide"
@@ -34,7 +34,7 @@ mod tests {
     /// Test que le nom de fichier contient "recap"
     #[test]
     fn test_create_file_name_contains_recap() {
-        let (_, file_name) = create_file_name("pdf".to_string());
+        let (_, file_name) = create_file_name("recap".to_string(), "pdf".to_string());
         assert!(
             file_name.contains("recap"),
             "Le nom de fichier devrait contenir 'recap'"
@@ -44,7 +44,7 @@ mod tests {
     /// Test que le chemin contient "dedale"
     #[test]
     fn test_create_file_name_path_contains_dedale() {
-        let (file_path, _) = create_file_name("pdf".to_string());
+        let (file_path, _) = create_file_name("recap".to_string(), "pdf".to_string());
         assert!(
             file_path.contains("dedale"),
             "Le chemin devrait contenir 'dedale'"
@@ -57,7 +57,7 @@ mod tests {
         let extensions = vec!["txt", "json", "csv", "doc"];
 
         for ext in extensions {
-            let (_, file_name) = create_file_name(ext.to_string());
+            let (_, file_name) = create_file_name("recap".to_string(), ext.to_string());
             assert!(
                 file_name.ends_with(&format!(".{}", ext)),
                 "Le nom de fichier devrait se terminer par .{}",
@@ -69,7 +69,7 @@ mod tests {
     /// Test que le format du nom de fichier est correct (recap.extension ou recap(n).extension)
     #[test]
     fn test_create_file_name_format() {
-        let (_, file_name) = create_file_name("pdf".to_string());
+        let (_, file_name) = create_file_name("recap".to_string(), "pdf".to_string());
 
         // Le nom devrait commencer par "recap"
         assert!(
@@ -82,7 +82,7 @@ mod tests {
     /// Test que le chemin de fichier est un chemin absolu valide
     #[test]
     fn test_create_file_name_returns_valid_path() {
-        let (file_path, _) = create_file_name("pdf".to_string());
+        let (file_path, _) = create_file_name("recap".to_string(), "pdf".to_string());
 
         // Vérifie que le chemin ressemble à un chemin absolu
         #[cfg(windows)]

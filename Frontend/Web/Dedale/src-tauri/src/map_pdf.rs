@@ -94,17 +94,14 @@ pub async fn generate_cropped_map(
             // CORRECTION FINALE :
             // x et y sont déjà des u32. On les passe directement sans 'as u64'.
             if let Ok(coord) = TileCoord::new(zoom, x, y) {
-                match reader.get_tile(coord).await {
-                    Ok(Some(tile_bytes)) => {
-                        if let Ok(tile_img) = image::load_from_memory(&tile_bytes) {
-                            let px = (x - t_x1) * 256;
-                            let py = (y - t_y1) * 256;
-                            if px < final_img.width() && py < final_img.height() {
-                                let _ = final_img.copy_from(&tile_img, px, py);
-                            }
+                if let Ok(Some(tile_bytes)) = reader.get_tile(coord).await {
+                    if let Ok(tile_img) = image::load_from_memory(&tile_bytes) {
+                        let px = (x - t_x1) * 256;
+                        let py = (y - t_y1) * 256;
+                        if px < final_img.width() && py < final_img.height() {
+                            let _ = final_img.copy_from(&tile_img, px, py);
                         }
                     }
-                    _ => {}
                 }
             }
         }
@@ -119,8 +116,8 @@ pub async fn generate_cropped_map(
         .map_err(|e| e.to_string())?;
 
     // 6. Retour
-    let (w_lon, n_lat) = tile_to_lon_lat(t_x1, t_y1, zoom);
-    let (e_lon, s_lat) = tile_to_lon_lat(t_x2 + 1, t_y2 + 1, zoom);
+    let (_w_lon, _n_lat) = tile_to_lon_lat(t_x1, t_y1, zoom);
+    let (_e_lon, _s_lat) = tile_to_lon_lat(t_x2 + 1, t_y2 + 1, zoom);
 
     Ok(CroppedMap {
         image_path: filename.to_string(),

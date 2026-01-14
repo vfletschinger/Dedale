@@ -191,7 +191,7 @@ pub async fn create_pdf(app: AppHandle, event_id: Option<String>) -> Result<(), 
                                 let img_path = temp_dir.join(&img_filename);
 
                                 // Sauvegarder l'image
-                                if let Ok(_) = fs::write(&img_path, decoded) {
+                                if fs::write(&img_path, decoded).is_ok() {
                                     typst_src.push_str(&format!(
                                         "  image(\"{}\", width: 100%),\n",
                                         img_filename
@@ -632,7 +632,7 @@ fn decode_base64(base64_str: &str) -> Result<Vec<u8>, String> {
     // Nettoyer la chaîne base64
     let clean_str = if base64_str.contains(",") {
         // Format data URI: "data:image/png;base64,..." ou "data:image/jpeg;base64,..."
-        base64_str.split(',').last().unwrap_or(base64_str)
+        base64_str.split(',').next_back().unwrap_or(base64_str)
     } else {
         base64_str
     };
