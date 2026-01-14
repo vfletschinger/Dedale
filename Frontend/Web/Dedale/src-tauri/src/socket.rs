@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
-use crate::db::equipements::{send_equipements_to_mobile, send_planning};
+use crate::db::equipements::{ send_planning};
 use crate::db::{get_db_pool, insert_point, PointWithDetails};
-use crate::types::TransferEquipement;
+use crate::types::*;
 use base64::{engine::general_purpose, Engine as _};
 use image::codecs::png::PngEncoder;
 use image::{ImageEncoder, Luma};
@@ -10,7 +10,6 @@ use local_ip_address::local_ip;
 use once_cell::sync::Lazy;
 use qrcode::QrCode;
 use rand::Rng;
-use serde::{Deserialize, Serialize};
 use sqlx::{Row, Sqlite, Transaction};
 use std::io::Cursor;
 use std::net::SocketAddr;
@@ -149,219 +148,12 @@ pub fn get_default_local_ip() -> IpAddr {
     local_ip().unwrap_or(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)))
 }
 
-// ==================== Structures internes ====================
-
 /// Canal global pour envoyer des événements au thread WebSocket
 static EVENT_SENDER: Lazy<Mutex<Option<Sender<TransferEvent>>>> = Lazy::new(|| Mutex::new(None));
 
 /// Canal global pour envoyer des messages de contrôle (comme "terminate")
 static CONTROL_SENDER: Lazy<Mutex<Option<Sender<String>>>> = Lazy::new(|| Mutex::new(None));
 
-/// Structure pour un parcours envoyé au mobile
-#[derive(Debug, Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct TransferParcours {
-    id: String,
-    event_id: String,
-    name: String,
-    color: Option<String>,
-    start_time: Option<String>,
-    speed_low: Option<f64>,
-    speed_high: Option<f64>,
-    geometry_json: Option<String>,
-}
-
-/// Structure pour une zone envoyée au mobile
-#[derive(Debug, Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct TransferZone {
-    id: String,
-    event_id: String,
-    name: String,
-    color: Option<String>,
-    geometry_json: Option<String>,
-}
-
-/// Structure pour un point envoyé au mobile
-#[derive(Debug, Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct TransferPoint {
-    id: String,
-    event_id: String,
-    x: f64,
-    y: f64,
-    name: Option<String>,
-    comment: Option<String>,
-    #[serde(rename = "type")]
-    point_type: Option<String>,
-    status: Option<bool>,
-}
-
-/// Structure pour une équipe envoyée au mobile
-#[derive(Debug, Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct TransferTeam {
-    id: String,
-    event_id: String,
-    name: Option<String>,
-    members: Vec<TransferMember>,
-}
-
-/// Structure pour un membre d'équipe envoyé au mobile
-#[derive(Debug, Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct TransferMember {
-    id: String,
-    team_id: String,
-    person_id: String,
-    person_name: Option<String>,
-}
-
-/// Structure pour une action envoyée au mobile
-#[derive(Debug, Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct TransferAction {
-    id: String,
-    team_id: String,
-    equipement_id: String,
-    action_type: Option<String>,
-    scheduled_time: Option<String>,
-    is_done: Option<bool>,
-}
-
-/// Structure pour un event envoyé au mobile (avec noms camelCase pour compatibilité)
-#[derive(Debug, Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct TransferEvent {
-    id: String,
-    name: String,
-    start_date: String,
-    end_date: String,
-    parcours: Vec<TransferParcours>,
-    zones: Vec<TransferZone>,
-    points: Vec<TransferPoint>,
-    teams: Vec<TransferTeam>,
-    actions: Vec<TransferAction>,
-    equipements: Vec<TransferEquipement>,
-}
-
-/// Structure pour un accusé de réception d'event du mobile
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[allow(dead_code)]
-pub struct EventAck {
-    id: String,
-    name: String,
-    #[serde(default)]
-    description: Option<String>,
-    #[serde(default)]
-    date_debut: Option<String>,
-    #[serde(default)]
-    date_fin: Option<String>,
-    #[serde(default)]
-    statut: Option<String>,
-    #[serde(default)]
-    geometry: Option<String>,
-}
-
-/// Réponse envoyée au mobile
-#[derive(Debug, Serialize)]
-struct AckResponse {
-    code: i32,
-    message: String,
-}
-
-/// Action demandée par le mobile
-#[derive(Debug, Deserialize)]
-struct ClientAction {
-    action: String,
-}
-
-/// Structure pour l'export du mobile vers le desktop (event + points)
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct MobileExport {
-    event: MobileExportEvent,
-    points: Vec<MobilePointDetail>,
-}
-
-/// Structure pour un point dans l'export mobile (format différent du desktop)
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
-struct MobilePointDetail {
-    id: String, // UUID
-    x: f64,
-    y: f64,
-    event_id: String, // UUID
-    #[serde(default)]
-    name: Option<String>,
-    #[serde(rename = "type")]
-    #[serde(default)]
-    point_type: Option<String>,
-    #[serde(default)]
-    status: Option<i64>,
-    #[serde(default)]
-    comment: Option<String>,
-    #[serde(default)]
-    created_at: Option<String>,
-    #[serde(default)]
-    modified_at: Option<String>,
-    #[serde(default)]
-    comments: Vec<MobileComment>,
-    #[serde(default)]
-    pictures: Vec<MobilePicture>,
-    #[serde(default)]
-    obstacles: Vec<MobileObstacle>,
-    #[serde(default)]
-    equipements: Vec<serde_json::Value>, // Flexible pour les équipements
-}
-
-#[derive(Debug, Deserialize)]
-struct MobileComment {
-    id: String,       // UUID
-    point_id: String, // UUID reference
-    value: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct MobilePicture {
-    id: String,       // UUID
-    point_id: String, // UUID reference
-    image: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct MobileObstacle {
-    id: String,       // UUID
-    point_id: String, // UUID reference
-    type_id: i64,
-    number: i32,
-}
-
-/// Structure pour l'event dans l'export mobile
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
-struct MobileExportEvent {
-    id: String,
-    name: String,
-    #[serde(default)]
-    description: Option<String>,
-    #[serde(alias = "date_debut")]
-    #[serde(alias = "dateDebut")]
-    #[serde(default)]
-    start_date: Option<String>,
-    #[serde(alias = "date_fin")]
-    #[serde(alias = "dateFin")]
-    #[serde(default)]
-    end_date: Option<String>,
-    #[serde(default)]
-    statut: Option<String>,
-    #[serde(default)]
-    geometry: Option<String>,
-    #[serde(default)]
-    #[serde(alias = "calculatedStatus")]
-    calculated_status: Option<String>,
-}
 
 /// Insère les points au format mobile dans la base de données
 async fn insert_mobile_points(
@@ -415,6 +207,7 @@ async fn insert_mobile_points(
 }
 
 /// Récupère les events sélectionnés pour le transfert avec leurs parcours, zones et points
+/// UNIQUEMENT pour l'export Data - N'inclut JAMAIS teams/actions/équipements
 async fn fetch_events_for_transfer(
     app: &AppHandle,
     event_ids: &[String],
@@ -424,7 +217,7 @@ async fn fetch_events_for_transfer(
     let mut transfer_events = Vec::new();
 
     for event_id in event_ids {
-        // Récupérer l'événement
+        // Récupérer SEULEMENT l'événement de base
         let event_row =
             sqlx::query("SELECT id, name, start_date, end_date FROM event WHERE id = ?")
                 .bind(event_id)
@@ -435,7 +228,7 @@ async fn fetch_events_for_transfer(
         if let Some(event_row) = event_row {
             let event_id_str: String = event_row.get("id");
 
-            // Récupérer les parcours de cet événement
+            // Récupérer les parcours de cet événement (DATA EXPORT ONLY)
             let parcours_rows = sqlx::query(
                 "SELECT id, event_id, name, color, start_time, speed_low, speed_high, geometry_json 
                  FROM parcours WHERE event_id = ?"
@@ -459,7 +252,7 @@ async fn fetch_events_for_transfer(
                 })
                 .collect();
 
-            // Récupérer les zones de cet événement
+            // Récupérer les zones de cet événement (DATA EXPORT ONLY)
             let zones_rows = sqlx::query(
                 "SELECT id, event_id, name, color, geometry_json 
                  FROM zone WHERE event_id = ?",
@@ -480,7 +273,7 @@ async fn fetch_events_for_transfer(
                 })
                 .collect();
 
-            // Récupérer les points de cet événement
+            // Récupérer les points de cet événement (DATA EXPORT ONLY)
             let points_rows = sqlx::query(
                 "SELECT id, event_id, x, y, name, comment, type, status 
                  FROM point WHERE event_id = ?",
@@ -504,84 +297,6 @@ async fn fetch_events_for_transfer(
                 })
                 .collect();
 
-            // Récupérer les équipes de cet événement
-            let teams_rows = sqlx::query("SELECT id, event_id, name FROM team WHERE event_id = ?")
-                .bind(&event_id_str)
-                .fetch_all(&pool)
-                .await
-                .map_err(|e| format!("Erreur récupération teams: {}", e))?;
-
-            let mut teams: Vec<TransferTeam> = Vec::new();
-            for team_row in teams_rows {
-                let team_id: String = team_row.get("id");
-
-                // Récupérer les membres de cette équipe avec les infos de la personne
-                let members_rows = sqlx::query(
-                    "SELECT m.id, m.team_id, m.person_id, p.firstname, p.lastname 
-                     FROM member m 
-                     LEFT JOIN person p ON m.person_id = p.id 
-                     WHERE m.team_id = ?",
-                )
-                .bind(&team_id)
-                .fetch_all(&pool)
-                .await
-                .map_err(|e| format!("Erreur récupération members: {}", e))?;
-
-                let members: Vec<TransferMember> = members_rows
-                    .iter()
-                    .map(|row| {
-                        let firstname: Option<String> = row.get("firstname");
-                        let lastname: Option<String> = row.get("lastname");
-                        let person_name = match (firstname, lastname) {
-                            (Some(fn_), Some(ln)) => Some(format!("{} {}", fn_, ln)),
-                            (Some(fn_), None) => Some(fn_),
-                            (None, Some(ln)) => Some(ln),
-                            (None, None) => None,
-                        };
-                        TransferMember {
-                            id: row.get("id"),
-                            team_id: row.get("team_id"),
-                            person_id: row.get("person_id"),
-                            person_name,
-                        }
-                    })
-                    .collect();
-
-                teams.push(TransferTeam {
-                    id: team_id,
-                    event_id: event_id_str.clone(),
-                    name: team_row.get("name"),
-                    members,
-                });
-            }
-
-            // Récupérer les actions liées aux équipes de cet événement
-            let actions_rows = sqlx::query(
-                "SELECT a.id, a.team_id, a.equipement_id, a.type, a.scheduled_time, a.is_done 
-                 FROM action a 
-                 WHERE a.team_id IN (
-                     SELECT id FROM team WHERE event_id = ?
-                 )",
-            )
-            .bind(&event_id_str)
-            .fetch_all(&pool)
-            .await
-            .map_err(|e| format!("Erreur récupération actions: {}", e))?;
-
-            let actions: Vec<TransferAction> = actions_rows
-                .iter()
-                .map(|row| TransferAction {
-                    id: row.get("id"),
-                    team_id: row.get("team_id"),
-                    equipement_id: row.get("equipement_id"),
-                    action_type: row.get("type"),
-                    scheduled_time: row.get("scheduled_time"),
-                    is_done: row.get("is_done"),
-                })
-                .collect();
-
-            let equipements = send_equipements_to_mobile(event_id_str.clone(), app.clone()).await?;
-
             transfer_events.push(TransferEvent {
                 id: event_id_str.clone(),
                 name: event_row.get("name"),
@@ -590,25 +305,20 @@ async fn fetch_events_for_transfer(
                 parcours,
                 zones,
                 points,
-                teams,
-                actions,
-                equipements,
             });
 
             println!(
-                "📋 Event '{}' récupéré avec {} parcours, {} zones, {} points, {} équipes, {} actions",
+                "📋 [DATA EXPORT] Event '{}' récupéré avec {} parcours, {} zones, {} points (SANS teams/actions/équipements)",
                 event_row.get::<String, _>("name"),
                 transfer_events.last().unwrap().parcours.len(),
                 transfer_events.last().unwrap().zones.len(),
                 transfer_events.last().unwrap().points.len(),
-                transfer_events.last().unwrap().teams.len(),
-                transfer_events.last().unwrap().actions.len(),
             );
         }
     }
 
     println!(
-        "✅ {} événement(s) récupéré(s) pour le transfert",
+        "✅ [DATA EXPORT] {} événement(s) récupéré(s) pour le transfert (SANS données de planning)",
         transfer_events.len()
     );
 
@@ -1046,18 +756,26 @@ pub fn start_server(app: AppHandle, event_ids: Vec<String>) -> Result<String, St
     Ok(base64_data)
 }
 
-/// Envoyer un événement individuel au mobile connecté
+/// Envoyer un événement individuel au mobile connecté (DATA EXPORT UNIQUEMENT)
+/// N'envoie QUE l'événement + parcours + zones + points
+/// PAS de teams, actions ou équipements !
 #[tauri::command]
 pub async fn send_event_to_mobile(app: AppHandle, event_id: String) -> Result<(), String> {
-    println!("📤 Demande d'envoi de l'événement {} au mobile", event_id);
+    println!("📤 [DATA EXPORT] Demande d'envoi de l'événement {} au mobile", event_id);
 
-    // Utiliser fetch_events_for_transfer pour récupérer toutes les données
+    // Utiliser fetch_events_for_transfer qui récupère SEULEMENT event + parcours + zones + points
     let events = fetch_events_for_transfer(&app, std::slice::from_ref(&event_id)).await?;
 
     let event = events
         .into_iter()
         .next()
         .ok_or_else(|| format!("Event {} non trouvé", event_id))?;
+
+    println!("📋 [DATA EXPORT] Événement récupéré: {} parcours, {} zones, {} points (PAS de teams/actions/équipements)", 
+             event.parcours.len(), event.zones.len(), event.points.len());
+
+    // Vérification de sécurité : s'assurer qu'aucune donnée de planning n'est présente
+    println!("🔒 [SÉCURITÉ] Envoi DATA uniquement - aucune donnée de planning incluse");
 
     // Envoyer via le canal global
     let sender = EVENT_SENDER
@@ -1070,6 +788,7 @@ pub async fn send_event_to_mobile(app: AppHandle, event_id: String) -> Result<()
         .send(event)
         .map_err(|e| format!("Erreur envoi via canal: {}", e))?;
 
+    println!("✅ [DATA EXPORT] Événement {} envoyé avec données géographiques SEULEMENT", event_id);
     Ok(())
 }
 
@@ -1328,25 +1047,31 @@ async fn handle_receive_planning(
     mut websocket: tungstenite::WebSocket<std::net::TcpStream>,
     team_id: String,
 ) -> Result<(), String> {
-    println!("📥 Client connecté pour réception, team_id: {}", team_id);
+    println!("📥 [PLANNING EXPORT] Client connecté pour réception, team_id: {}", team_id);
 
     // Émettre un événement Tauri pour notifier le frontend
     app.emit("mobile-connected", ()).unwrap_or_else(|e| {
         eprintln!("⚠️ Erreur émission événement mobile-connected: {}", e);
     });
 
+    // Récupérer SEULEMENT les données de planning (teams + actions + équipements)
     let planning = send_planning(team_id.clone(), app.clone()).await?;
     let actions = vec![planning];
 
-    // Envoyer un message de bienvenue
+    println!("🔒 [SÉCURITÉ] Envoi PLANNING uniquement - teams/actions/équipements SEULEMENT (pas d'events/parcours/zones/points)");
+
+    // Envoyer un message de planning (PAS d'événements géographiques)
     let message = serde_json::json!({
-        "actions" : actions
+        "type": "planning_data",
+        "actions": actions
     });
     websocket
         .write(Message::Text(message.to_string().into()))
-        .map_err(|e| format!("Erreur envoi message: {}", e))?;
+        .map_err(|e| format!("Erreur envoi message planning: {}", e))?;
     websocket
         .flush()
         .map_err(|e| format!("Erreur flush: {}", e))?;
+        
+    println!("✅ [PLANNING EXPORT] Planning envoyé (teams/actions/équipements uniquement)");
     Ok(())
 }
