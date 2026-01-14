@@ -235,7 +235,7 @@ export default function RouteNavigation() {
             key={point.id}
             coordinate={{ latitude: point.y, longitude: point.x }}
             pinColor={index === currentPointIndex ? Colors.secondary : "#9ca3af"}
-            title={`Point #${shortId(point.id)}`}
+            title={`Point #${shortId(point.id.toString())}`}
             description={
               index === currentPointIndex
                 ? "Point actuel"
@@ -266,7 +266,7 @@ export default function RouteNavigation() {
             Point {currentPointIndex + 1} / {points.length}
           </Text>
           <Text className="nav-point-name">
-            Point #{shortId(points[currentPointIndex].id)}
+            Point #{shortId(points[currentPointIndex].id.toString())}
           </Text>
         </View>
 

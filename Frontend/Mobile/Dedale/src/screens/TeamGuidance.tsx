@@ -11,6 +11,7 @@ import {
   Dimensions,
   Linking,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import MapView, { Marker, Polyline, Region } from "react-native-maps";
@@ -481,7 +482,7 @@ export default function TeamGuidanceScreen() {
 
   if (actions.length === 0) {
     return (
-      <View style={styles.container} edges={["top"]}>
+      <SafeAreaView style={styles.container} edges={["top"]}>
         <View style={styles.header}>
           <Pressable
             onPress={() => navigation.goBack()}
@@ -498,7 +499,7 @@ export default function TeamGuidanceScreen() {
             Il n'y a plus d'actions en attente pour cette équipe.
           </Text>
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
@@ -556,7 +557,7 @@ export default function TeamGuidanceScreen() {
       </MapView>
 
       {/* Header superposé */}
-      <View style={styles.headerOverlay} edges={["top"]}>
+      <View style={styles.headerOverlay}>
         <View style={styles.headerContent}>
           <Pressable
             onPress={() => navigation.goBack()}
@@ -574,7 +575,7 @@ export default function TeamGuidanceScreen() {
       </View>
 
       {/* Panneau d'action en bas */}
-      <View style={styles.bottomPanel} edges={["bottom"]}>
+      <View style={styles.bottomPanel}>
         <View style={styles.progressBar}>
           {actions.map((_, index) => (
             <View

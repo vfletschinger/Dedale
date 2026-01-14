@@ -266,7 +266,7 @@ export default function PlanningScreen() {
               key={action.id}
               style={[
                 styles.actionCard,
-                action.is_done && styles.actionCardDone,
+                action.is_done ? styles.actionCardDone : undefined,
               ]}
             >
               <View style={styles.actionHeader}>

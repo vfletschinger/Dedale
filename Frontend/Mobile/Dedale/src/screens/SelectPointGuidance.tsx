@@ -19,7 +19,6 @@ import "../style/global.css";
 export default function SelectPointGuidanceScreen() {
   const navigation = useNavigation<any>();
   const { points } = usePoints();
-  const { event } = useEvent();
   const [step, setStep] = useState<"start" | "end">("start");
   const [startPoint, setStartPoint] = useState<InterestPointsType | null>(null);
   const [endPoint, setEndPoint] = useState<InterestPointsType | null>(null);
@@ -55,7 +54,7 @@ export default function SelectPointGuidanceScreen() {
 
   const filteredPoints =
     step === "end" && startPoint
-      ? points.filter((p) => p.id !== startPoint.id)
+      ? points.filter((p: InterestPointsType) => p.id !== startPoint.id)
       : points;
 
   return (
@@ -134,7 +133,7 @@ export default function SelectPointGuidanceScreen() {
             </Text>
           </View>
         ) : (
-          filteredPoints.map((point) => (
+          filteredPoints.map((point: InterestPointsType) => (
             <TouchableOpacity
               key={point.id}
               onPress={() => handleSelectPoint(point)}

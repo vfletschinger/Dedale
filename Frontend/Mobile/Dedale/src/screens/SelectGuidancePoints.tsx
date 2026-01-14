@@ -161,12 +161,12 @@ export default function SelectGuidancePointsScreen() {
                 </Text>
                 {selection.start && (
                   <Text className="text-sm text-slate-700 mt-1">
-                    ✓ Départ: {points.find((p) => p.id === selection.start)?.name || "Point"}
+                    ✓ Départ: {points.find((p: InterestPointsType) => p.id === selection.start)?.name || "Point"}
                   </Text>
                 )}
                 {selection.end && (
                   <Text className="text-sm text-slate-700 mt-1">
-                    ✓ Arrivée: {points.find((p) => p.id === selection.end)?.name || "Point"}
+                    ✓ Arrivée: {points.find((p: InterestPointsType) => p.id === selection.end)?.name || "Point"}
                   </Text>
                 )}
               </View>

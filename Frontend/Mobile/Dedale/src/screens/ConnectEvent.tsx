@@ -119,11 +119,11 @@ export default function ConnectEvent() {
 
   return (
     <View className="container">
-      <View edges={["top"]} className="bg-primary">
+      <SafeAreaView edges={["top"]} className="bg-primary">
         <View className="bg-primary pb-4 px-4">
           <Text className="header-title">Sélectionner un événement</Text>
         </View>
-      </View>
+      </SafeAreaView>
 
       <FlatList
         data={events}

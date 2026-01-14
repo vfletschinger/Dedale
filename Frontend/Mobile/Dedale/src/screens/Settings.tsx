@@ -30,6 +30,7 @@ type PointWithDetails = InterestPointsType & {
 type EventExportData = {
   event: any;
   points: PointWithDetails[];
+  equipements: EquipementType[];
 };
 
 export default function SettingsScreen() {

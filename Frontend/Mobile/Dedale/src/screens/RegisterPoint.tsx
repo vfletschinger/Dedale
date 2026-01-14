@@ -27,7 +27,7 @@ import { generateUUID } from "../services/Helper";
 import Colors from "../constants/colors";
 
 type SelectedObstacle = {
-  type_id: number;
+  type_id: string;
   name: string;
   number: number;
 };
@@ -160,19 +160,19 @@ export default function RegisterPointScreen() {
       }
 
       // Sauvegarder les équipements (anciennement obstacles)
-      if (selectedObstacles.length > 0 && selectedEvent?.id) {
+      if (selectedObstacles.length > 0 && selectedEventId && location) {
         for (const obstacle of selectedObstacles) {
           try {
             const equipementId = generateUUID();
             db.runSync(
               "INSERT INTO equipement (id, event_id, type_id, quantity, length_per_unit) VALUES (?, ?, ?, ?, ?)",
-              [equipementId, selectedEvent.id, obstacle.type_id, obstacle.number, 0]
+              [equipementId, selectedEventId, obstacle.type_id, obstacle.number, 0]
             );
             // Ajouter la coordonnée du point comme coordonnée de l'équipement
             const coordId = generateUUID();
             db.runSync(
               "INSERT INTO equipement_coordinate (id, equipement_id, x, y, order_index) VALUES (?, ?, ?, ?, ?)",
-              [coordId, equipementId, location.coords.longitude, location.coords.latitude, 0]
+              [coordId, equipementId, location.longitude, location.latitude, 0]
             );
           } catch (equipErr) {
             console.error(
