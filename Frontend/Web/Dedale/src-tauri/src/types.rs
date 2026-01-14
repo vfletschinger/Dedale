@@ -44,6 +44,7 @@ pub struct Team {
     pub event_id: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Member {
     pub id: String,
@@ -156,6 +157,7 @@ pub struct Picture {
     pub image: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Comment {
     pub id: String,
@@ -172,6 +174,7 @@ pub struct ObstacleType {
     pub length: Option<f64>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Obstacle {
     pub id: String,
@@ -193,6 +196,7 @@ pub struct Geometry {
     pub name: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PointDetail {
     pub point: Point,
@@ -204,6 +208,7 @@ pub struct PointDetail {
     pub obstacle: Vec<Obstacle>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PictureInput {
     pub id: String,
@@ -258,7 +263,6 @@ pub struct TransferEquipement {
     pub coordinates: Vec<TransferEquipementCoordinate>,
 }
 
-
 /// Structure pour un event envoyé au mobile (avec noms camelCase pour compatibilité)
 #[derive(Debug, Serialize, Clone, sqlx::FromRow)]
 #[serde(rename_all = "camelCase")]
@@ -269,7 +273,6 @@ pub(crate) struct TransferEquipementCoordinate {
     pub y: f64,
     pub order_index: Option<i32>,
 }
-
 
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -287,7 +290,6 @@ pub struct Planning {
     pub equipements: Vec<TransferEquipement>,
     pub coordonees: Vec<TransferEquipementCoordinate>,
 }
-
 
 #[derive(sqlx::FromRow)]
 pub struct TransferEquipementWithoutCoords {
