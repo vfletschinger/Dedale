@@ -1,5 +1,7 @@
 import logoStrasbourg from "../assets/logo_strasbourg.png";
 import type { PageKey } from "../hooks/useNavigation";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faChevronLeft } from "@fortawesome/free-solid-svg-icons";
 
 interface NavigationProps {
   currentPage: PageKey;
@@ -8,6 +10,7 @@ interface NavigationProps {
   onGoBack?: () => void;
   eventSelected: boolean;
   deselectEvent: () => void;
+  eventName?: string;
 }
 
 const NAV_ITEMS: { key: PageKey; label: string }[] = [
@@ -26,11 +29,12 @@ export default function Navigation({
   onGoBack,
   eventSelected,
   deselectEvent,
+  eventName,
 }: NavigationProps) {
   return (
     <nav className="sticky top-0 z-[100] w-full border-b border-gray-200 bg-slate-700 shadow-lg">
       {/* Barre d'accentuation supérieure */}
-      <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-blue-500/60 to-transparent"></div>
+      <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-primary/60 to-transparent"></div>
 
       <div className="w-full px-2 sm:px-4">
         <div className="flex h-14 items-center gap-6">
@@ -39,23 +43,10 @@ export default function Navigation({
             {canGoBack && onGoBack && (
               <button
                 onClick={onGoBack}
-                className="group flex h-8 w-8 items-center justify-center rounded-lg bg-slate-600 text-slate-300 hover:text-white transition-all border border-slate-500 hover:border-blue-400 hover:bg-slate-500 cursor-pointer"
+                className="group flex h-8 w-8 items-center justify-center rounded-lg bg-slate-600 text-slate-300 hover:text-white transition-all border border-slate-500 hover:border-primary hover:bg-slate-500 cursor-pointer"
                 aria-label="Retour"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={3}
-                    d="M15 19l-7-7 7-7"
-                  />
-                </svg>
+                <FontAwesomeIcon icon={faChevronLeft} className="h-4 w-4" />
               </button>
             )}
 
@@ -64,7 +55,7 @@ export default function Navigation({
               onClick={() => onNavigate("event")}
             >
               <div className="relative flex items-center justify-center">
-                <div className="absolute inset-0 bg-blue-500/20 blur-md rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div className="absolute inset-0 bg-primary/20 blur-md rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 <img
                   src={logoStrasbourg}
                   alt="Logo"
@@ -97,7 +88,7 @@ export default function Navigation({
                     disabled={isDisabled}
                     className={`relative px-4 py-2 text-[11px] font-semibold tracking-wide uppercase transition-all duration-200 rounded-md
                     ${isActive
-                        ? "text-white bg-blue-600 shadow-md"
+                        ? "text-white bg-primary shadow-md"
                         : isDisabled
                           ? "text-slate-500 bg-slate-800 cursor-not-allowed opacity-50"
                           : "text-slate-300 hover:text-white hover:bg-slate-700"
@@ -115,7 +106,7 @@ export default function Navigation({
           </div>
           <div hidden={!eventSelected} className="flex items-center gap-2 px-2 py-1.5 bg-slate-800 rounded-lg border border-slate-600 shadow-md">
             <button onClick={deselectEvent} className={`relative px-4 py-2 text-[11px] font-semibold tracking-wide uppercase transition-all duration-200 rounded-md cursor-pointer text-slate-300 hover:text-white hover:bg-slate-700`}>
-              Déselectionner l'événement
+              {eventName || "Événement"}
             </button>
           </div>
         </div>
