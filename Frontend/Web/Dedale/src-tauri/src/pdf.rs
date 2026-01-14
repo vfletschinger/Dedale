@@ -4,6 +4,7 @@ use crate::db::EquipementActionComplet;
 use crate::db::EquipementComplet;
 use crate::map_pdf; // Assurez-vous que c'est le bon nom de module (map_pdf ou map_static)
 use crate::utils;
+use base64::Engine;
 use sqlx::Row;
 use std::fmt::Write;
 use std::fs;
@@ -154,8 +155,51 @@ pub async fn create_pdf(app: AppHandle, event_id: Option<String>) -> Result<(), 
         writeln!(typst_src, "{}", heading).unwrap();
         typst_src.push_str("#v(0.5em)\n");
 
+        // Afficher le nom du point s'il existe
+        if let Some(name) = &p.name {
+            writeln!(typst_src, "*Nom:* {}", name).unwrap();
+        }
+
+        // Afficher les commentaires s'il y en a
         if let Some(comment) = &p.comment {
-            writeln!(typst_src, "*Commentaires:* {}.", comment).unwrap();
+            writeln!(typst_src, "*Commentaires:* {}", comment).unwrap();
+        }
+
+        // Afficher les photos s'il y en a
+        if !p.pictures.is_empty() {
+            writeln!(typst_src, "*Photos:*").unwrap();
+            typst_src.push_str("#grid(\n");
+            typst_src.push_str("  columns: (1fr, 1fr),\n");
+            typst_src.push_str("  gutter: 0.5em,\n");
+
+            for (idx, pic) in p.pictures.iter().enumerate() {
+                if let Some(image_data) = &pic.image {
+                    // Décoder l'image
+                    match decode_base64(image_data) {
+                        Ok(decoded) => {
+                            // Déterminer le format de l'image
+                            if let Some(format) = get_image_format(&decoded) {
+                                let img_filename = format!("point_{}_img_{}.{}", point_number, idx, format);
+                                let img_path = temp_dir.join(&img_filename);
+
+                                // Sauvegarder l'image
+                                if let Ok(_) = fs::write(&img_path, decoded) {
+                                    typst_src.push_str(&format!(
+                                        "  image(\"{}\", width: 100%),\n",
+                                        img_filename
+                                    ));
+                                }
+                            } else {
+                                eprintln!("⚠️ Unknown image format for point_{}_img_{}", point_number, idx);
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("⚠️ Failed to decode image for point_{}_img_{}: {}", point_number, idx, e);
+                        }
+                    }
+                }
+            }
+            typst_src.push_str(")\n");
         }
 
         typst_src.push_str("#v(1cm)\n#line(length: 100%, stroke: gray)\n#v(1cm)\n");
@@ -527,4 +571,54 @@ fn load_fonts_from_directory(fonts_dir: &Path) -> Result<Vec<Vec<u8>>, String> {
     }
 
     Ok(fonts)
+}
+
+fn get_image_format(data: &[u8]) -> Option<&'static str> {
+    // Vérifier les signatures d'image communes
+    if data.len() < 3 {
+        return None;
+    }
+
+    // PNG: 89 50 4E 47
+    if data.len() >= 8 && &data[0..8] == b"\x89PNG\r\n\x1a\n" {
+        return Some("png");
+    }
+
+    // JPEG: FF D8 FF
+    if data[0] == 0xFF && data[1] == 0xD8 && data[2] == 0xFF {
+        return Some("jpg");
+    }
+
+    // GIF: 47 49 46 38 (GIF8)
+    if data.len() >= 6 && &data[0..3] == b"GIF" && data[3] == b'8' {
+        return Some("gif");
+    }
+
+    // WEBP: 52 49 46 46 ... 57 45 42 50 (RIFF ... WEBP)
+    if data.len() >= 12 && &data[0..4] == b"RIFF" && &data[8..12] == b"WEBP" {
+        return Some("webp");
+    }
+
+    None
+}
+
+fn decode_base64(base64_str: &str) -> Result<Vec<u8>, String> {
+    // Nettoyer la chaîne base64
+    let clean_str = if base64_str.contains(",") {
+        // Format data URI: "data:image/png;base64,..." ou "data:image/jpeg;base64,..."
+        base64_str.split(',').last().unwrap_or(base64_str)
+    } else {
+        base64_str
+    };
+
+    // Nettoyer les espaces, sauts de ligne et autres caractères invisibles
+    let clean_str = clean_str
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect::<String>();
+
+    // Utiliser la crate base64 pour décoder
+    base64::engine::general_purpose::STANDARD
+        .decode(&clean_str)
+        .map_err(|e| format!("Failed to decode base64: {}", e))
 }
