@@ -356,6 +356,7 @@ pub(crate) struct TransferEvent {
 }
 
 /// Structure simplifiée pour envoyer seulement les données de base de l'événement
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct BasicTransferEvent {
