@@ -5,11 +5,10 @@ import { invoke } from "@tauri-apps/api/core";
 import { useNavigation } from "./hooks/useNavigation";
 import Navigation from "./components/Navigation";
 import Data from "./components/Data";
-import Teams from "./components/Teams";
+import TeamsAndPersons from "./components/TeamsAndPersons";
 import Map from "./components/Map";
 import Event from "./components/Events";
 import AdminForm from "./components/AdminForm";
-import Persons from "./components/Persons";
 import Planning from "./components/Planning";
 import { Event as AppEvent } from "./components/Events";
 
@@ -88,14 +87,13 @@ function App() {
   }, []);
 
   useEffect(() => {
-    // Si on demande d'aller voir une équipe
+    // Si on demande d'aller voir une équipe ou une personne
     const unlistenTeam = listen('navigate-to-team', () => {
-      navigate("team");
+      navigate("team-person");
     });
 
-    // Si on demande d'aller voir une personne
     const unlistenPerson = listen('navigate-to-person', () => {
-      navigate("person");
+      navigate("team-person");
     });
 
     // Si on demande d'aller voir un event
@@ -153,8 +151,8 @@ function App() {
         <Navigation
           currentPage={currentPage}
           onNavigate={(page) => {
-            // Empêcher la navigation vers map, team, person, data ou planning si aucun événement sélectionné
-            if (!selectedEventId && (page === "map" || page === "team" || page === "person" || page === "data" || page === "planning")) {
+            // Empêcher la navigation vers map, team-person, data ou planning si aucun événement sélectionné
+            if (!selectedEventId && (page === "map" || page === "team-person" || page === "data" || page === "planning")) {
               alert("Veuillez sélectionner un événement avant d'accéder à cette page.");
               return;
             }
@@ -191,17 +189,10 @@ function App() {
             </PageWrapper>
           )}
 
-          {/* Teams - kept mounted once visited */}
-          {selectedEventId && hasVisited("team") && (
-            <PageWrapper isVisible={currentPage === "team"}>
-              <Teams activeEventId={selectedEventId} />
-            </PageWrapper>
-          )}
-
-          {/* Persons - kept mounted once visited */}
-          {hasVisited("person") && (
-            <PageWrapper isVisible={currentPage === "person"}>
-              <Persons activeEventId={selectedEventId} />
+          {/* Teams and Persons - kept mounted once visited */}
+          {selectedEventId && hasVisited("team-person") && (
+            <PageWrapper isVisible={currentPage === "team-person"}>
+              <TeamsAndPersons activeEventId={selectedEventId} />
             </PageWrapper>
           )}
 
