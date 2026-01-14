@@ -7,6 +7,7 @@ mod geocoding;
 mod map;
 mod map_static;
 mod pdf;
+mod pmtiles;
 mod seed;
 mod socket;
 mod types;
@@ -124,6 +125,7 @@ pub fn run() {
             db::create_planning_pdf,
             db::send_equipements_to_mobile,
             db::send_planning,
+            pmtiles::get_pmtiles_file_path,
         ])
         .run(tauri::generate_context!())
         .expect("Erreur lors de l'exécution de l'application Tauri");

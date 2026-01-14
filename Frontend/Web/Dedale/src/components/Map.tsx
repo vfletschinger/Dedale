@@ -1,4 +1,5 @@
 import { useRef, useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
@@ -52,6 +53,7 @@ function OfflineMapLibre({
   // --- ÉTATS GLOBAUX DU COMPOSANT ---
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
+  const [pmtilesUrl, setPmtilesUrl] = useState<string | null>(null);
 
   // Gestion de l'affichage (Vue Carte vs Timeline vs Éléments)
   const [viewMode, setViewMode] = useState<"points" | "elements" | "timeline">("points");
@@ -133,23 +135,48 @@ function OfflineMapLibre({
 
   // --- EFFETS (Chargement initial) ---
 
-  // Initialisation de la carte MapLibre
+  // Récupération du chemin PMTiles au démarrage
   useEffect(() => {
-    if (map || !mapContainer.current) return;
+    const loadPmtilesPath = async () => {
+      try {
+        // Appeler la commande Tauri pour obtenir le chemin du fichier
+        const result = await invoke<{ path: string; url: string }>('get_pmtiles_file_path');
+
+        // Utiliser convertFileSrc pour obtenir une URL accessible par le webview
+        const { convertFileSrc } = await import('@tauri-apps/api/core');
+        const assetUrl = convertFileSrc(result.path);
+        setPmtilesUrl(assetUrl);
+      } catch {
+        // En mode dev (Vite sans Tauri), utiliser le chemin relatif vers public/
+        setPmtilesUrl('/eurometropole_strasbourg.pmtiles');
+      }
+    };
+    loadPmtilesPath();
+  }, []);
+
+  // Initialisation de la carte MapLibre (après obtention de l'URL PMTiles)
+  useEffect(() => {
+    if (map || !mapContainer.current || pmtilesUrl === null) return;
+
     // Enregistrer le protocole PMTiles
     const protocol = new Protocol();
     maplibregl.addProtocol("pmtiles", protocol.tile);
 
-    // Utilisation du style externe avec les nouvelles couleurs
-    const mapStyle = getMapStyle();
+    // Utilisation du style externe avec l'URL dynamique du fichier PMTiles
+    const mapStyle = getMapStyle(pmtilesUrl);
 
     const mapInstance = new maplibregl.Map({
       container: mapContainer.current,
       style: mapStyle,
       center: [7.7635, 48.5465],
-      zoom: 17, // Zoom initial plus proche pour voir le détail
-      minZoom: 13, // Zoom minimum
-      maxZoom: 19, // Permettre le zoom très proche
+      zoom: 17,
+      minZoom: 13,
+      maxZoom: 19,
+      // Limites de la carte (Eurométropole de Strasbourg)
+      maxBounds: [
+        [7.55, 48.45], // Sud-Ouest [lng, lat]
+        [7.90, 48.65], // Nord-Est [lng, lat]
+      ],
     });
 
     setMap(mapInstance);
@@ -159,7 +186,7 @@ function OfflineMapLibre({
       mapInstance.remove();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [pmtilesUrl]);
 
   // Mise à jour des limites visibles de la carte quand elle est déplacée/zoomée
   useEffect(() => {
@@ -329,16 +356,16 @@ function OfflineMapLibre({
               <FontAwesomeIcon icon={faLayerGroup} />
               <span>Éléments</span>
               <span className="text-xs bg-slate-600 px-2 py-0.5 rounded-full">
-                {(visibilityFilters.showZones ? zones.length : 0) + 
-                 (visibilityFilters.showParcours ? parcours.length : 0) + 
-                 (visibilityFilters.showInterests ? interests.length : 0) + 
-                 (visibilityFilters.showEquipements ? (
-                  selectedEquipementTypes === null
-                    ? equipements.length
-                    : selectedEquipementTypes.length === 0
-                      ? 0
-                      : equipements.filter(eq => !eq.type_id || selectedEquipementTypes.includes(eq.type_id)).length
-                 ) : 0)}
+                {(visibilityFilters.showZones ? zones.length : 0) +
+                  (visibilityFilters.showParcours ? parcours.length : 0) +
+                  (visibilityFilters.showInterests ? interests.length : 0) +
+                  (visibilityFilters.showEquipements ? (
+                    selectedEquipementTypes === null
+                      ? equipements.length
+                      : selectedEquipementTypes.length === 0
+                        ? 0
+                        : equipements.filter(eq => !eq.type_id || selectedEquipementTypes.includes(eq.type_id)).length
+                  ) : 0)}
               </span>
             </span>
           </button>
@@ -459,14 +486,14 @@ function OfflineMapLibre({
                   const visibleInterests = visibilityFilters.showInterests ? interests : [];
                   const visibleEquipements = visibilityFilters.showEquipements
                     ? (selectedEquipementTypes === null
-                        ? equipements
-                        : selectedEquipementTypes.length === 0
-                          ? []
-                          : equipements.filter(eq => !eq.type_id || selectedEquipementTypes.includes(eq.type_id)))
+                      ? equipements
+                      : selectedEquipementTypes.length === 0
+                        ? []
+                        : equipements.filter(eq => !eq.type_id || selectedEquipementTypes.includes(eq.type_id)))
                     : [];
-                  
+
                   const hasNoElements = visibleZones.length === 0 && visibleParcours.length === 0 && visibleEquipements.length === 0 && visibleInterests.length === 0;
-                  
+
                   if (hasNoElements) {
                     return (
                       <div className="text-center text-gray-500 py-8">
@@ -480,7 +507,7 @@ function OfflineMapLibre({
                       </div>
                     );
                   }
-                  
+
                   return (
                     <div className="divide-y divide-gray-200">
                       {/* --- SECTION ZONES --- */}
