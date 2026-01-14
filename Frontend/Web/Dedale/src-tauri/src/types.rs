@@ -316,7 +316,6 @@ pub(crate) struct TransferParcours {
     pub geometry_json: Option<String>,
 }
 
-
 /// Structure pour une zone envoyée au mobile
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -342,8 +341,6 @@ pub(crate) struct TransferPoint {
     pub point_type: Option<String>,
     pub status: Option<bool>,
 }
-
-
 
 /// Structure pour un event envoyé au mobile (avec noms camelCase pour compatibilité)
 #[derive(Debug, Serialize, Clone)]

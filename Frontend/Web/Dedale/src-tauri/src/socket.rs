@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use crate::db::equipements::{ send_planning};
+use crate::db::equipements::send_planning;
 use crate::db::{get_db_pool, insert_point, PointWithDetails};
 use crate::types::*;
 use base64::{engine::general_purpose, Engine as _};
@@ -153,7 +153,6 @@ static EVENT_SENDER: Lazy<Mutex<Option<Sender<TransferEvent>>>> = Lazy::new(|| M
 
 /// Canal global pour envoyer des messages de contrôle (comme "terminate")
 static CONTROL_SENDER: Lazy<Mutex<Option<Sender<String>>>> = Lazy::new(|| Mutex::new(None));
-
 
 /// Insère les points au format mobile dans la base de données
 async fn insert_mobile_points(
@@ -761,7 +760,10 @@ pub fn start_server(app: AppHandle, event_ids: Vec<String>) -> Result<String, St
 /// PAS de teams, actions ou équipements !
 #[tauri::command]
 pub async fn send_event_to_mobile(app: AppHandle, event_id: String) -> Result<(), String> {
-    println!("📤 [DATA EXPORT] Demande d'envoi de l'événement {} au mobile", event_id);
+    println!(
+        "📤 [DATA EXPORT] Demande d'envoi de l'événement {} au mobile",
+        event_id
+    );
 
     // Utiliser fetch_events_for_transfer qui récupère SEULEMENT event + parcours + zones + points
     let events = fetch_events_for_transfer(&app, std::slice::from_ref(&event_id)).await?;
@@ -788,7 +790,10 @@ pub async fn send_event_to_mobile(app: AppHandle, event_id: String) -> Result<()
         .send(event)
         .map_err(|e| format!("Erreur envoi via canal: {}", e))?;
 
-    println!("✅ [DATA EXPORT] Événement {} envoyé avec données géographiques SEULEMENT", event_id);
+    println!(
+        "✅ [DATA EXPORT] Événement {} envoyé avec données géographiques SEULEMENT",
+        event_id
+    );
     Ok(())
 }
 
@@ -1047,7 +1052,10 @@ async fn handle_receive_planning(
     mut websocket: tungstenite::WebSocket<std::net::TcpStream>,
     team_id: String,
 ) -> Result<(), String> {
-    println!("📥 [PLANNING EXPORT] Client connecté pour réception, team_id: {}", team_id);
+    println!(
+        "📥 [PLANNING EXPORT] Client connecté pour réception, team_id: {}",
+        team_id
+    );
 
     // Émettre un événement Tauri pour notifier le frontend
     app.emit("mobile-connected", ()).unwrap_or_else(|e| {
@@ -1071,7 +1079,7 @@ async fn handle_receive_planning(
     websocket
         .flush()
         .map_err(|e| format!("Erreur flush: {}", e))?;
-        
+
     println!("✅ [PLANNING EXPORT] Planning envoyé (teams/actions/équipements uniquement)");
     Ok(())
 }
