@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import * as path from "@tauri-apps/api/path";
-import QrCode from "./QrCode";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faWifi,
@@ -12,7 +11,6 @@ import {
   faMobileAlt,
   faCloudUploadAlt,
   faCheck,
-  faTimes,
   faSpinner,
   faServer
 } from "@fortawesome/free-solid-svg-icons";

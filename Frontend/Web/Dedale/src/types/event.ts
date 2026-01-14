@@ -1,3 +1,10 @@
+// Type pour les types de géométrie
+export interface GeometryType {
+  id: string;
+  name: string;
+  color?: string;
+}
+
 export interface Event {
   id: string;
   name?: string;

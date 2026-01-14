@@ -1,7 +1,7 @@
 import logoStrasbourg from "../../public/dedale.png";
 import type { PageKey } from "../hooks/useNavigation";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faChevronLeft, faCalendarAlt, faTimes } from "@fortawesome/free-solid-svg-icons";
+import { faCalendarAlt, faTimes } from "@fortawesome/free-solid-svg-icons";
 
 interface NavigationProps {
   currentPage: PageKey;
@@ -25,8 +25,6 @@ const NAV_ITEMS: { key: PageKey; label: string }[] = [
 export default function Navigation({
   currentPage,
   onNavigate,
-  canGoBack,
-  onGoBack,
   eventSelected,
   eventName,
   deselectEvent,
