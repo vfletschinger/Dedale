@@ -2,7 +2,7 @@ use crate::db;
 use crate::db::fetch_equipement_coordinates;
 use crate::db::EquipementActionComplet;
 use crate::db::EquipementComplet;
-use crate::map_pdf; // Assurez-vous que c'est le bon nom de module (map_pdf ou map_static)
+use crate::map_pdf;
 use crate::utils;
 use base64::Engine;
 use sqlx::Row;
