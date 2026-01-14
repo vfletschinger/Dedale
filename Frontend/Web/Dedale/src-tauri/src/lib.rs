@@ -5,7 +5,7 @@ mod db;
 mod excel;
 mod geocoding;
 mod map;
-mod map_static;
+mod map_pdf;
 mod pdf;
 mod seed;
 mod socket;
