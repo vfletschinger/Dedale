@@ -4,7 +4,6 @@ use std::path::Path;
 
 pub struct CroppedMap {
     pub image_path: String,
-    pub bounds: Bounds,
     pub zoom: u8,
     pub tile_origin_x: u32,
     pub tile_origin_y: u32,
@@ -12,13 +11,6 @@ pub struct CroppedMap {
     pub height_tiles: u32,
 }
 
-#[derive(Clone, Copy, Debug)]
-pub struct Bounds {
-    pub min_x: f64,
-    pub max_x: f64,
-    pub min_y: f64,
-    pub max_y: f64,
-}
 
 // 2. AJOUT DE LA MÉTHODE DE CALCUL
 impl CroppedMap {
@@ -133,13 +125,6 @@ pub async fn generate_cropped_map(
 
     Ok(CroppedMap {
         image_path: filename.to_string(),
-        bounds: Bounds {
-            min_x: w_lon,
-            max_x: e_lon,
-            min_y: s_lat,
-            max_y: n_lat,
-        },
-        // N'OUBLIEZ PAS DE REMPLIR CES CHAMPS :
         zoom,
         tile_origin_x: t_x1,
         tile_origin_y: t_y1,
