@@ -4,7 +4,7 @@ use tauri::{Emitter, Manager};
 mod db;
 mod excel;
 mod map;
-mod map_static;
+mod map_pdf;
 mod pdf;
 mod seed;
 mod socket;
