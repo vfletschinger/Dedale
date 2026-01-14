@@ -1,404 +1,486 @@
-import { useState, useEffect, useRef } from 'react';
-import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { useState, useEffect } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faCalendarPlus,
-  faTrash,
-  faExternalLinkAlt,
-  faSearch,
   faCalendarAlt,
+  faPlus,
+  faTrash,
+  faMapMarkedAlt,
   faFileImport,
-  faCheck,
-  faTimes,
   faMobileAlt,
+  faTimes,
+  faCheck,
   faSpinner,
-  faCalendarCheck,
-  faExclamationCircle,
-  faInfoCircle
-} from '@fortawesome/free-solid-svg-icons';
-import QrCode from './QrCode';
+  faExclamationTriangle,
+  faGhost,
+  faClock,
+} from "@fortawesome/free-solid-svg-icons";
 import toast from 'react-hot-toast';
 
-export type Event = {
+// Types
+export interface Event {
   id: string;
   name: string;
-  description: string;
-  dateDebut: string;
-  dateFin: string;
+  start_date: string;
+  end_date: string;
   statut: string;
-};
+}
 
-type EventProps = {
-  onEventClick: (eventId: string) => void;
+interface EventsProps {
+  onEventClick?: (eventId: string) => void;
   onEventsLoaded?: (events: Event[]) => void;
+}
+
+const formatDate = (dateStr: string): string => {
+  if (!dateStr) return "Non définie";
+  try {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString("fr-FR", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
+  } catch {
+    return dateStr;
+  }
 };
 
-function Events({ onEventClick, onEventsLoaded }: EventProps) {
+function Events({ onEventClick, onEventsLoaded }: EventsProps) {
   const [events, setEvents] = useState<Event[]>([]);
-  const [showForm, setShowForm] = useState(false);
-  const [newEvent, setNewEvent] = useState({
-    name: '',
-    description: '',
-    dateDebut: '',
-    dateFin: ''
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [formData, setFormData] = useState({
+    name: "",
+    dateDebut: "",
+    dateFin: "",
   });
-  const [importModalOpen, setImportModalOpen] = useState(false);
-  const [qrCodeBase64, setQrCodeBase64] = useState<string | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    fetchEvents();
-  }, []);
+  // État pour le QR code de réception
+  const [receiveQrCode, setReceiveQrCode] = useState<string | null>(null);
+  const [receiveStatus, setReceiveStatus] = useState<string>("En attente...");
 
-  // Écouter les événements de connexion mobile pour l'import
-  useEffect(() => {
-    let unlistenConnect: () => void;
-    let unlistenDisconnect: () => void;
-
-    async function setupListeners() {
-      const uConnect = await listen('mobile-connected', () => {
-        setIsConnected(true);
-        toast.success("Mobile connecté !");
-      });
-      const uDisconnect = await listen('mobile-disconnected', () => {
-        setIsConnected(false);
-        toast('Mobile déconnecté', { icon: '👋' });
-      });
-      unlistenConnect = uConnect;
-      unlistenDisconnect = uDisconnect;
-    }
-
-    if (importModalOpen) {
-      setupListeners();
-    }
-
-    return () => {
-      if (unlistenConnect) unlistenConnect();
-      if (unlistenDisconnect) unlistenDisconnect();
-    };
-  }, [importModalOpen]);
-
-
-  async function fetchEvents() {
-    setIsLoading(true);
+  const loadEvents = async () => {
+    setLoading(true);
+    setError(null);
     try {
-      const data = await invoke<Event[]>('fetch_events');
-      setEvents(data);
-      if (onEventsLoaded) {
-        onEventsLoaded(data);
-      }
-    } catch (error) {
-      console.error('Erreur chargement événements', error);
+      console.log("Flux: Chargement des événements...");
+      const eventsData = await invoke<Event[]>("fetch_events");
+      console.log("Flux: Événements reçus:", eventsData);
+      setEvents(eventsData);
+      if (onEventsLoaded) onEventsLoaded(eventsData);
+    } catch (err: unknown) {
+      console.error("Erreur lors du chargement des événements:", err);
+      const errorMessage = err instanceof Error ? err.message : "Erreur inconnue";
+      setError(errorMessage);
       toast.error("Impossible de charger les événements.");
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
-  }
+  };
 
-  async function handleCreateEvent(e: React.FormEvent) {
-    e.preventDefault();
-    if (!newEvent.name || !newEvent.dateDebut || !newEvent.dateFin) {
-      toast.error("Veuillez remplir les champs obligatoires.");
-      return;
-    }
+  useEffect(() => {
+    loadEvents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
+  // Écouter les événements de réception de points
+  useEffect(() => {
+    let unlistenConnectedFn: (() => void) | null = null;
+    let unlistenPointsUpdatedFn: (() => void) | null = null;
+    let isMounted = true;
+
+    const setupListeners = async () => {
+      unlistenConnectedFn = await listen("mobile-connected", () => {
+        if (!isMounted) return;
+        console.log("Mobile connecté pour réception !");
+        setReceiveStatus("Mobile connecté ! En attente des données...");
+        toast.success("Mobile connecté !");
+      });
+
+      unlistenPointsUpdatedFn = await listen<number>(
+        "points-updated",
+        (event) => {
+          if (!isMounted) return;
+          const eventId = event.payload;
+          console.log("Points mis à jour pour event_id:", eventId);
+          // Si c'est l'événement qu'on est en train de recevoir
+        },
+      );
+    };
+
+    setupListeners();
+
+    return () => {
+      isMounted = false;
+      if (unlistenConnectedFn) unlistenConnectedFn();
+      if (unlistenPointsUpdatedFn) unlistenPointsUpdatedFn();
+    };
+  }, []);
+
+  // Fonction pour démarrer la réception depuis le mobile
+  const handleReceiveFromMobile = async (eventId: string) => {
     try {
-      await invoke('create_event', { ...newEvent, statut: 'active' });
-      toast.success("Événement créé avec succès !");
-      setNewEvent({ name: '', description: '', dateDebut: '', dateFin: '' });
-      setShowForm(false);
-      fetchEvents();
-    } catch (error) {
-      console.error('Erreur création', error);
-      toast.error(`Erreur lors de la création : ${error}`);
-    }
-  }
+      setReceiveStatus("Génération du QR code...");
 
-  async function handleDeleteEvent(id: string) {
-    if (!confirm('Voulez-vous vraiment supprimer cet événement ?')) return;
-    try {
-      await invoke('delete_event', { id });
-      toast.success("Événement supprimé.");
-      fetchEvents();
-    } catch (error) {
-      console.error('Erreur suppression', error);
-      toast.error(`Erreur lors de la suppression : ${error}`);
-    }
-  }
+      console.log("Démarrage serveur de réception pour event:", eventId);
+      const qrCodeBase64 = await invoke<string>("start_receive_server", {
+        eventId,
+      });
 
-  // --- Gestion de l'import depuis le mobile ---
-  async function startImportServer() {
-    try {
-      setQrCodeBase64(null);
-      const qr = await invoke<string>('start_import_server');
-      setQrCodeBase64(qr);
+      setReceiveQrCode(qrCodeBase64);
+      setReceiveStatus("Scannez le QR code avec le mobile");
     } catch (err) {
-      console.error("Erreur start import server", err);
+      console.error("Erreur démarrage serveur réception:", err);
+      setReceiveStatus(`Erreur: ${err}`);
       toast.error("Impossible de démarrer le serveur de réception.");
     }
-  }
+  };
 
-  async function stopImportServer() {
+  const closeReceiveModal = () => {
+    setReceiveQrCode(null);
+    setReceiveStatus("En attente...");
+  };
+
+  const handleCreateEvent = async () => {
     try {
-      await invoke('stop_import_server');
-      setIsConnected(false);
+      if (formData.name.trim() === "") {
+        toast.error("Le nom de l'événement est requis !");
+        return;
+      }
+
+      if (formData.dateDebut === "" || formData.dateFin === "") {
+        toast.error("Les dates de début et de fin sont requises !");
+        return;
+      }
+
+      // Vérifier que les dates ne sont pas dans le passé
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD d'aujourd'hui
+      if (formData.dateDebut < today) {
+        toast.error("La date de début ne peut pas être dans le passé !");
+        return;
+      }
+
+      if (formData.dateFin < today) {
+        toast.error("La date de fin ne peut pas être dans le passé !");
+        return;
+      }
+
+      if (new Date(formData.dateDebut) > new Date(formData.dateFin)) {
+        toast.error("La date de fin ne peut pas être antérieure à la date de début !");
+        return;
+      }
+
+      const newEvent = {
+        name: formData.name.trim(),
+        start_date: formData.dateDebut, // <--- Renommé pour matcher Rust
+        end_date: formData.dateFin,
+      };
+
+      console.log("Création d'un nouvel événement...", newEvent);
+      await invoke("insert_event", { event: newEvent });
+      console.log("Événement créé avec succès");
+      toast.success("Événement créé avec succès !");
+
+      setFormData({
+        name: "",
+        dateDebut: "",
+        dateFin: ""
+      });
+      setShowCreateForm(false);
+      loadEvents();
     } catch (err) {
-      console.error("Erreur stop import server", err);
+      console.error("Erreur lors de la création:", err);
+      toast.error(`Erreur lors de la création : ${err}`);
     }
+  };
+
+  const handleInputChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >,
+  ) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleDeleteEvent = async (eventId: string) => {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer cet événement ?")) {
+      return;
+    }
+    try {
+      console.log("Suppression de l'événement:", eventId);
+      await invoke("delete_event", { eventId });
+      console.log("Événement supprimé");
+      toast.success("Événement supprimé.");
+      loadEvents();
+    } catch (err) {
+      console.error("Erreur lors de la suppression:", err);
+      toast.error("Erreur lors de la suppression de l'événement");
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-full p-8">
+        <div className="flex flex-col items-center gap-3">
+          <FontAwesomeIcon icon={faSpinner} spin className="text-primary h-8 w-8" />
+          <span className="text-gray-500 font-medium">Chargement des événements...</span>
+        </div>
+      </div>
+    );
   }
 
-  function handleOpenImportModal() {
-    setImportModalOpen(true);
-    startImportServer();
-  }
-
-  function handleCloseImportModal() {
-    setImportModalOpen(false);
-    stopImportServer();
-    fetchEvents(); // Rafraîchir la liste après import potentiel
+  if (error) {
+    return (
+      <div className="mx-auto max-w-lg mt-10 bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-xl shadow-xs">
+        <h3 className="font-bold flex items-center gap-2 text-lg mb-2">
+          <FontAwesomeIcon icon={faExclamationTriangle} /> Erreur
+        </h3>
+        <p className="mb-4">{error}</p>
+        <button
+          onClick={loadEvents}
+          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium text-sm"
+        >
+          Réessayer
+        </button>
+      </div>
+    );
   }
 
   return (
-    <div className="h-full flex flex-col space-y-6 pb-20">
-
-      {/* Header */}
+    <div className="h-full flex flex-col space-y-6">
       <div className="flex justify-between items-end">
         <div>
           <h2 className="text-3xl font-extrabold text-gray-900 flex items-center gap-3">
-            <span className="w-10 h-10 rounded-xl bg-linear-to-br from-primary to-blue-600 flex items-center justify-center text-white text-lg shadow-lg shadow-blue-500/30">
+            <span className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white text-lg shadow-lg shadow-primary/30">
               <FontAwesomeIcon icon={faCalendarAlt} />
             </span>
             Événements
           </h2>
-          <p className="text-gray-500 mt-1 ml-1">Gérez vos missions et interventions.</p>
+          <p className="text-gray-500 mt-1 ml-1">Gérez vos événements et planifications.</p>
         </div>
-        <div className="flex gap-3">
-          <button
-            onClick={handleOpenImportModal}
-            className="px-4 py-2 bg-white text-gray-700 font-semibold rounded-xl border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm flex items-center gap-2"
-          >
-            <FontAwesomeIcon icon={faFileImport} />
-            <span className="hidden sm:inline">Importer</span>
-          </button>
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="px-4 py-2 bg-primary text-white font-semibold rounded-xl shadow-lg shadow-blue-500/20 hover:bg-primary/90 hover:-translate-y-0.5 transition-all flex items-center gap-2"
-          >
-            <FontAwesomeIcon icon={showForm ? faTimes : faCalendarPlus} />
-            <span>{showForm ? 'Fermer' : 'Nouvel événement'}</span>
-          </button>
-        </div>
+
+        <button
+          onClick={() => setShowCreateForm(!showCreateForm)}
+          className={`px-5 py-2.5 rounded-xl font-medium shadow-md transition-all duration-200 flex items-center gap-2 transform active:scale-95 ${showCreateForm
+            ? "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50"
+            : "bg-primary text-white hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/20"
+            }`}
+        >
+          {showCreateForm ? <><FontAwesomeIcon icon={faTimes} /> Annuler</> : <><FontAwesomeIcon icon={faPlus} /> Nouvel événement</>}
+        </button>
       </div>
 
-      {/* Formulaire de création (Animé) */}
-      {showForm && (
-        <div className="bg-white rounded-2xl p-6 shadow-xl border border-gray-100 animate-in slide-in-from-top-4 fade-in duration-300">
-          <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-              <FontAwesomeIcon icon={faCalendarPlus} />
-            </div>
-            Créer un nouvel événement
+      {/* Formulaire de création */}
+      {showCreateForm && (
+        <div className="p-6 bg-white rounded-2xl border border-gray-100 shadow-xl shadow-gray-200/50 animate-in slide-in-from-top-4 duration-300">
+          <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
+            <span className="w-8 h-8 rounded-lg bg-green-100 text-green-600 flex items-center justify-center text-sm">
+              <FontAwesomeIcon icon={faPlus} />
+            </span>
+            Créer un événement
           </h3>
-          <form onSubmit={handleCreateEvent} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nom de l'événement</label>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="md:col-span-1">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Nom de l'événement
+              </label>
               <input
                 type="text"
-                placeholder="Ex: Festival des Vieilles Charrues 2024"
-                value={newEvent.name}
-                onChange={(e) => setNewEvent({ ...newEvent, name: e.target.value })}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all placeholder:text-gray-400"
-                required
-              />
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-              <textarea
-                placeholder="Détails importants, lieu, équipe..."
-                value={newEvent.description}
-                onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all placeholder:text-gray-400 resize-none h-24"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Date de début</label>
-              <input
-                type="datetime-local"
-                value={newEvent.dateDebut}
-                onChange={(e) => setNewEvent({ ...newEvent, dateDebut: e.target.value })}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-gray-600"
-                required
+                name="name"
+                value={formData.name}
+                onChange={handleInputChange}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all bg-gray-50 focus:bg-white"
+                placeholder="Ex: Festival de musique..."
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Date de fin</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Date de début
+              </label>
               <input
-                type="datetime-local"
-                value={newEvent.dateFin}
-                onChange={(e) => setNewEvent({ ...newEvent, dateFin: e.target.value })}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-gray-600"
-                required
+                type="date"
+                name="dateDebut"
+                value={formData.dateDebut}
+                min={new Date().toISOString().split('T')[0]} // Empêche la sélection de dates passées
+                onChange={handleInputChange}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all bg-gray-50 focus:bg-white"
               />
             </div>
-
-            <div className="md:col-span-2 flex justify-end gap-3 mt-2">
-              <button
-                type="button"
-                onClick={() => setShowForm(false)}
-                className="px-5 py-2.5 rounded-xl text-gray-600 font-medium hover:bg-gray-50 border border-transparent hover:border-gray-200 transition-all"
-              >
-                Annuler
-              </button>
-              <button
-                type="submit"
-                className="px-6 py-2.5 bg-primary text-white font-bold rounded-xl shadow-lg shadow-blue-500/20 hover:bg-primary/90 hover:-translate-y-0.5 transition-all"
-              >
-                Créer l'événement
-              </button>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Date de fin
+              </label>
+              <input
+                type="date"
+                name="dateFin"
+                value={formData.dateFin}
+                min={new Date().toISOString().split('T')[0]} // Empêche la sélection de dates passées
+                onChange={handleInputChange}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all bg-gray-50 focus:bg-white"
+              />
             </div>
-          </form>
+          </div>
+          <div className="mt-8 flex justify-end gap-3">
+            <button
+              onClick={() => setShowCreateForm(false)}
+              className="px-5 py-2.5 text-gray-600 font-medium hover:bg-gray-100 rounded-xl transition-colors"
+            >
+              Annuler
+            </button>
+            <button
+              onClick={handleCreateEvent}
+              className="px-6 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-all font-medium shadow-md shadow-green-600/20 flex items-center gap-2"
+            >
+              <FontAwesomeIcon icon={faCheck} /> Confirmer la création
+            </button>
+          </div>
         </div>
       )}
 
       {/* Liste des événements (Grid Layout) */}
-      {isLoading && events.length === 0 ? (
-        <div className="flex justify-center items-center py-12">
-          <div className="flex flex-col items-center gap-3">
-            <FontAwesomeIcon icon={faSpinner} spin className="text-primary h-8 w-8" />
-            <span className="text-gray-500 font-medium">Chargement des événements...</span>
-          </div>
-        </div>
-      ) : events.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-gray-400 bg-gray-50/50 rounded-3xl border border-dashed border-gray-300">
-          <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-6">
-            <FontAwesomeIcon icon={faCalendarAlt} className="text-4xl text-gray-300" />
-          </div>
-          <h3 className="text-xl font-bold text-gray-600 mb-2">Aucun événement</h3>
-          <p className="text-gray-500 mb-6">Commencez par créer votre première mission.</p>
-          <button
-            onClick={() => setShowForm(true)}
-            className="px-6 py-3 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 shadow-sm transition-all"
-          >
-            Créer maintenant
-          </button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto custom-scrollbar pr-2 pb-4">
-          {events.map((event) => (
-            <div
-              key={event.id}
-              className="group relative bg-white rounded-2xl border border-gray-100 shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col"
+      <div className="flex-1 overflow-y-auto pb-20 custom-scrollbar">
+        {events.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-gray-400 bg-gray-50/50 rounded-3xl border border-dashed border-gray-300">
+            <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-6">
+              <FontAwesomeIcon icon={faGhost} className="text-4xl text-gray-300" />
+            </div>
+            <h3 className="text-xl font-bold text-gray-600 mb-2">Aucun événement</h3>
+            <p className="text-gray-500 mb-6">
+              Commencez par créer votre premier événement.
+            </p>
+            <button
+              onClick={() => setShowCreateForm(true)}
+              className="px-6 py-2.5 bg-primary text-white rounded-xl hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all font-medium"
             >
-              {/* Bandeau de couleur latérale */}
-              <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary/20 group-hover:bg-primary transition-colors"></div>
+              Créer maintenant
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {events.map((event) => (
+              <div
+                key={event.id}
+                onClick={() => onEventClick?.(event.id)}
+                className="group bg-white rounded-2xl p-0 border border-gray-100 shadow-xs hover:shadow-xl hover:shadow-primary/5 hover:-translate-y-1 transition-all duration-300 cursor-pointer overflow-hidden flex flex-col"
+              >
+                {/* Card Header with Color Strip */}
+                <div className="relative p-5 pb-0 flex items-start gap-4">
+                  <div className="absolute top-0 left-0 bottom-0 w-1.5 bg-primary/20 group-hover:bg-primary transition-colors"></div>
 
-              <div className="p-6 flex-1">
-                <div className="flex justify-between items-start mb-3">
-                  <div className="bg-blue-50 text-primary text-xs font-bold px-2 py-1 rounded-full uppercase tracking-wide">
-                    {event.statut}
+                  <div className="flex-1">
+                    <h3 className="text-xl font-bold text-gray-800 group-hover:text-primary transition-colors mb-1">
+                      {event.name}
+                    </h3>
+                    <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                      <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-500 border border-gray-200">
+                        {event.statut || "Actif"}
+                      </span>
+                    </div>
                   </div>
+                </div>
+
+                {/* Card Body */}
+                <div className="p-5 pt-4 flex-1">
+                  <div className="bg-gray-50 rounded-xl p-3 border border-gray-100 flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center text-primary shadow-sm border border-gray-100 shrink-0">
+                      <FontAwesomeIcon icon={faClock} />
+                    </div>
+                    <div className="flex flex-col text-sm">
+                      <span className="text-gray-500 text-xs">Période</span>
+                      <span className="font-medium text-gray-800">
+                        {formatDate(event.start_date)} - {formatDate(event.end_date)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card Footer Actions */}
+                <div className="p-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2 opacity-80 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleReceiveFromMobile(event.id);
+                    }}
+                    className="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                    title="Importer depuis mobile"
+                  >
+                    <FontAwesomeIcon icon={faFileImport} />
+                  </button>
+                  <div className="w-px h-4 bg-gray-300 mx-1"></div>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       handleDeleteEvent(event.id);
                     }}
-                    className="text-gray-300 hover:text-red-500 transition-colors p-1"
+                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                     title="Supprimer"
                   >
                     <FontAwesomeIcon icon={faTrash} />
                   </button>
-                </div>
-
-                <h3 className="text-xl font-bold text-gray-900 mb-2 line-clamp-1 group-hover:text-primary transition-colors">
-                  {event.name}
-                </h3>
-
-                <p className="text-gray-500 text-sm mb-4 line-clamp-2 min-h-[2.5em]">
-                  {event.description || "Aucune description fournie pour cet événement."}
-                </p>
-
-                <div className="flex flex-col gap-1.5 text-sm text-gray-600">
-                  <div className="flex items-center gap-2">
-                    <FontAwesomeIcon icon={faCalendarCheck} className="text-gray-400 w-4" />
-                    <span>Du {new Date(event.dateDebut).toLocaleDateString()}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <FontAwesomeIcon icon={faCalendarCheck} className="text-gray-400 w-4" />
-                    <span>Au {new Date(event.dateFin).toLocaleDateString()}</span>
-                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEventClick?.(event.id);
+                    }}
+                    className="ml-2 px-4 py-2 bg-white border border-gray-200 text-sm font-semibold text-gray-700 rounded-lg shadow-sm hover:border-primary hover:text-primary transition-all flex items-center gap-2"
+                  >
+                    Ouvrir
+                    <FontAwesomeIcon icon={faMapMarkedAlt} className="text-xs" />
+                  </button>
                 </div>
               </div>
+            ))}
+          </div>
+        )}
+      </div>
 
-              <div className="bg-gray-50 px-6 py-4 border-t border-gray-100 mt-auto">
-                <button
-                  onClick={() => onEventClick(event.id)}
-                  className="w-full py-2.5 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-primary hover:text-white hover:border-primary transition-all shadow-sm flex items-center justify-center gap-2"
-                >
-                  <span>Ouvrir</span>
-                  <FontAwesomeIcon icon={faExternalLinkAlt} className="text-xs" />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Modal Import Mobile (Premium) */}
-      {importModalOpen && (
+      {/* Modal QR Code pour réception */}
+      {receiveQrCode && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl p-8 max-w-sm w-full mx-4 shadow-2xl animate-in zoom-in-95 duration-200 relative overflow-hidden">
-            {/* Background Decoration */}
-            <div className="absolute top-0 left-0 w-full h-1/3 bg-linear-to-b from-blue-50 to-transparent -z-10"></div>
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full mx-4 shadow-2xl animate-in zoom-in-95 duration-200">
+            <h3 className="text-xl font-extrabold text-center mb-6 flex items-center justify-center gap-3 text-gray-800">
+              <span className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+                <FontAwesomeIcon icon={faMobileAlt} />
+              </span>
+              Réception Mobile
+            </h3>
+
+            <div className="bg-gray-50 p-6 rounded-2xl border border-dashed border-gray-300 mb-6 flex justify-center relative group">
+              <img
+                src={`data:image/png;base64,${receiveQrCode}`}
+                alt="QR Code"
+                className="w-48 h-48 mix-blend-multiply"
+              />
+            </div>
+
+            <p className="text-gray-600 text-center text-sm mb-6 leading-relaxed">
+              Scannez ce QR code avec l'application mobile pour transférer les points vers cet événement.
+            </p>
 
             <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-white rounded-2xl shadow-lg border border-blue-50 flex items-center justify-center mx-auto mb-4 text-primary text-2xl">
-                {isConnected ? <FontAwesomeIcon icon={faCheck} className="text-green-500" /> : <FontAwesomeIcon icon={faMobileAlt} />}
-              </div>
-              <h3 className="text-xl font-extrabold text-gray-800">Importer un événement</h3>
-              <p className="text-sm text-gray-500 mt-1 font-medium">Réception depuis l'application mobile</p>
+              <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${receiveStatus.includes("connecté") ? "bg-green-100 text-green-700" : "bg-blue-50 text-blue-600"
+                }`}>
+                <div className={`w-2 h-2 rounded-full ${receiveStatus.includes("connecté") ? "bg-green-500" : "bg-blue-500 animate-pulse"}`}></div>
+                {receiveStatus}
+              </span>
             </div>
 
-            <div className="flex flex-col items-center justify-center">
-              {!qrCodeBase64 ? (
-                <div className="py-8 flex flex-col items-center">
-                  <FontAwesomeIcon icon={faSpinner} spin className="text-4xl text-primary mb-3" />
-                  <span className="text-gray-500 font-medium text-sm">Génération du QR Code...</span>
-                </div>
-              ) : isConnected ? (
-                <div className="py-8 text-center animate-in slide-in-from-bottom-2">
-                  <div className="text-green-500 font-bold text-lg mb-2">Appareil connecté !</div>
-                  <p className="text-gray-600 text-sm">En attente des données...</p>
-                </div>
-              ) : (
-                <div className="bg-white p-2 rounded-xl border-2 border-primary/20 shadow-xl mb-6">
-                  <QrCode qrCodeUri={`data:image/png;base64,${qrCodeBase64}`} />
-                </div>
-              )}
-
-              {!isConnected && qrCodeBase64 && (
-                <p className="text-xs text-gray-500 mb-6 flex items-center gap-2 bg-gray-50 px-3 py-1 rounded-full border border-gray-100">
-                  <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></span>
-                  Scannez ce code pour vous connecter
-                </p>
-              )}
-
+            <div className="flex justify-center">
               <button
-                onClick={handleCloseImportModal}
-                className="w-full py-3 bg-gray-100 text-gray-600 font-bold rounded-xl hover:bg-gray-200 hover:text-gray-800 transition-colors"
+                onClick={closeReceiveModal}
+                className="w-full px-6 py-3 bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition-transform active:scale-95 font-bold shadow-lg shadow-gray-900/20"
               >
                 Fermer
               </button>
             </div>
           </div>
         </div>
-      )}
-
-    </div>
+      )
+      }
+    </div >
   );
 }
-
 export default Events;

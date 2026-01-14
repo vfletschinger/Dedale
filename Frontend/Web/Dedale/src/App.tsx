@@ -148,7 +148,7 @@ function App() {
 
   return (
     <div className="w-full min-h-screen bg-linear-to-br from-slate-50 via-indigo-50 to-purple-50 font-sans relative overflow-hidden">
-      <Toaster position="top-right" reverseOrder={false} />
+      <Toaster position="top-center" reverseOrder={false} />
       <header className="relative z-10">
         <Navigation
           currentPage={currentPage}
