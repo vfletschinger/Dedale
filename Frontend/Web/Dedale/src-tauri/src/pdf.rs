@@ -20,14 +20,16 @@ fn format_date(date_str: &str) -> String {
     // Format attendu: "YYYY-MM-DD" ou "YYYY-MM-DDTHH:MM:SS"
     let parts: Vec<&str> = date_str.split('T').collect();
     let date_part = parts[0];
-    let time_part = parts.get(1).map(|t| t.split(':').take(2).collect::<Vec<_>>().join(":"));
-    
+    let time_part = parts
+        .get(1)
+        .map(|t| t.split(':').take(2).collect::<Vec<_>>().join(":"));
+
     let date_components: Vec<&str> = date_part.split('-').collect();
     if date_components.len() == 3 {
         let day = date_components[2];
         let month = date_components[1];
         let year = date_components[0];
-        
+
         if let Some(time) = time_part {
             format!("{}/{}/{} à {}", day, month, year, time)
         } else {
@@ -88,7 +90,9 @@ pub async fn create_pdf(app: AppHandle, event_id: Option<String>) -> Result<(), 
                 ]
                 #v(0.5cm)
                 "#,
-                name, format_date(&start), format_date(&end)
+                name,
+                format_date(&start),
+                format_date(&end)
             ));
         }
     }
@@ -117,8 +121,11 @@ pub async fn create_pdf(app: AppHandle, event_id: Option<String>) -> Result<(), 
                 if (0.0..=1.0).contains(&pct_x) && (0.0..=1.0).contains(&pct_y) {
                     // Petit cercle rouge avec numéro à côté avec fond blanc (plus petit)
                     let marker = r#"#circle(radius: 1.5pt, fill: red, stroke: 0.5pt + white)"#;
-                    let number_label = format!(r#"#box(fill: white, stroke: 0.3pt + gray, radius: 1pt, inset: 1pt)[#text(size: 5pt, weight: "bold")[{}]]"#, point_number);
-                    
+                    let number_label = format!(
+                        r#"#box(fill: white, stroke: 0.3pt + gray, radius: 1pt, inset: 1pt)[#text(size: 5pt, weight: "bold")[{}]]"#,
+                        point_number
+                    );
+
                     // Alterner la position des numéros pour éviter les chevauchements
                     // Valeurs réduites pour rapprocher les numéros des points
                     let (dx_offset, dy_offset) = match index % 4 {
@@ -127,7 +134,7 @@ pub async fn create_pdf(app: AppHandle, event_id: Option<String>) -> Result<(), 
                         2 => (-10, -4), // haut à gauche
                         _ => (-10, 2),  // bas à gauche
                     };
-                    
+
                     typst_src.push_str(&format!(
                         r#"#place(top + left, dx: {}% - 0.75pt, dy: {}% - 0.75pt)[ {} ]#place(top + left, dx: {}% + {}pt, dy: {}% {}pt)[ {} ]"#,
                         pct_x * 100.0,
@@ -142,7 +149,7 @@ pub async fn create_pdf(app: AppHandle, event_id: Option<String>) -> Result<(), 
                 }
             }
             typst_src.push_str("]\n#v(1cm)\n");
-        },
+        }
         Err(e) => {
             eprintln!("❌ ERREUR CARTE GLOBALE : {}", e);
             typst_src.push_str(&format!("_Impossible de générer la carte : {}_\n", e));
@@ -179,7 +186,8 @@ pub async fn create_pdf(app: AppHandle, event_id: Option<String>) -> Result<(), 
                         Ok(decoded) => {
                             // Déterminer le format de l'image
                             if let Some(format) = get_image_format(&decoded) {
-                                let img_filename = format!("point_{}_img_{}.{}", point_number, idx, format);
+                                let img_filename =
+                                    format!("point_{}_img_{}.{}", point_number, idx, format);
                                 let img_path = temp_dir.join(&img_filename);
 
                                 // Sauvegarder l'image
@@ -190,11 +198,17 @@ pub async fn create_pdf(app: AppHandle, event_id: Option<String>) -> Result<(), 
                                     ));
                                 }
                             } else {
-                                eprintln!("⚠️ Unknown image format for point_{}_img_{}", point_number, idx);
+                                eprintln!(
+                                    "⚠️ Unknown image format for point_{}_img_{}",
+                                    point_number, idx
+                                );
                             }
                         }
                         Err(e) => {
-                            eprintln!("⚠️ Failed to decode image for point_{}_img_{}: {}", point_number, idx, e);
+                            eprintln!(
+                                "⚠️ Failed to decode image for point_{}_img_{}: {}",
+                                point_number, idx, e
+                            );
                         }
                     }
                 }
@@ -220,7 +234,8 @@ pub async fn create_pdf(app: AppHandle, event_id: Option<String>) -> Result<(), 
     let pdf_bytes =
         typst_pdf::pdf(&doc, &options).map_err(|e| format!("Failed to export PDF: {:#?}", e))?;
 
-    let (dir_path, file_name) = utils::create_file_name("Global_Recap".to_string(), "pdf".to_string());
+    let (dir_path, file_name) =
+        utils::create_file_name("Global_Recap".to_string(), "pdf".to_string());
     if let Some(save_path) = utils::show_save_dialog(&file_name, &dir_path, "pdf".to_string()) {
         fs::write(save_path, pdf_bytes)
             .map_err(|e| format!("Failed to write final PDF file: {}", e))?;
@@ -352,8 +367,11 @@ pub async fn create_team_mission_pdf(
 
     // --- GÉNÉRATION CARTE ÉQUIPE ---
     if !map_points.is_empty() {
-        println!("🗺️ Génération de la carte d'équipe avec {} points...", map_points.len());
-        
+        println!(
+            "🗺️ Génération de la carte d'équipe avec {} points...",
+            map_points.len()
+        );
+
         let map_res = map_pdf::generate_cropped_map(&temp_dir, &map_points).await;
 
         match map_res {
@@ -369,7 +387,8 @@ pub async fn create_team_mission_pdf(
                 ));
 
                 // Pour gérer les superpositions, on compte combien de fois une coordonnée (discrétisée) a été utilisée
-                let mut coord_counts: std::collections::HashMap<(i64, i64), usize> = std::collections::HashMap::new();
+                let mut coord_counts: std::collections::HashMap<(i64, i64), usize> =
+                    std::collections::HashMap::new();
 
                 // Placement des marqueurs NUMÉROTÉS
                 for (index, m) in mission_data.iter().enumerate() {
@@ -379,11 +398,16 @@ pub async fn create_team_mission_pdf(
                         let (pct_x, pct_y) = map.get_percent_pos(coord.x, coord.y);
 
                         if (0.0..=1.0).contains(&pct_x) && (0.0..=1.0).contains(&pct_y) {
-                            
                             // Plus de distinction de couleur entre pose et retrait
                             let marker_color = "red";
-                            let marker = format!(r#"#circle(radius: 3pt, fill: {}, stroke: 1pt + white)"#, marker_color);
-                            let number_label = format!(r#"#box(fill: white, stroke: 0.5pt + gray, radius: 2pt, inset: 2pt)[#text(size: 8pt, weight: "bold")[{}]]"#, point_number);
+                            let marker = format!(
+                                r#"#circle(radius: 3pt, fill: {}, stroke: 1pt + white)"#,
+                                marker_color
+                            );
+                            let number_label = format!(
+                                r#"#box(fill: white, stroke: 0.5pt + gray, radius: 2pt, inset: 2pt)[#text(size: 8pt, weight: "bold")[{}]]"#,
+                                point_number
+                            );
 
                             // Discrétisation pour détecter les superpositions (précision ~0.1%)
                             let x_key = (pct_x * 1000.0) as i64;
@@ -403,7 +427,7 @@ pub async fn create_team_mission_pdf(
                                 (-20, -20), // 6: plus haut-gauche
                                 (-20, 20),  // 7: plus bas-gauche
                             ];
-                            
+
                             // On utilise le compteur pour choisir l'offset, modulo la taille de la liste
                             let (dx_offset, dy_offset) = offsets[count % offsets.len()];
 
@@ -422,7 +446,7 @@ pub async fn create_team_mission_pdf(
                     }
                 }
                 typst_src.push_str("]\n#v(1cm)\n");
-            },
+            }
             Err(e) => {
                 eprintln!("⚠️ Erreur carte équipe : {}", e);
             }
@@ -465,15 +489,15 @@ pub async fn create_team_mission_pdf(
             None => "Non planifié".to_string(),
         };
 
-        let action_label = if is_pose { 
-            r#"#text(fill: green, weight: "bold")[POSE]"# 
-        } else { 
-            r#"#text(fill: red, weight: "bold")[RETRAIT]"# 
+        let action_label = if is_pose {
+            r#"#text(fill: green, weight: "bold")[POSE]"#
+        } else {
+            r#"#text(fill: red, weight: "bold")[RETRAIT]"#
         };
 
         let type_name = m.equipement.type_name.as_deref().unwrap_or("Inconnu");
         let length = m.equipement.length.unwrap_or(0);
-        
+
         // Affichage Nom/Type d'équipement (avec longueur si pertinente)
         let equip_str = if length > 0 {
             format!("{} ({}m)", type_name, length)
@@ -527,8 +551,10 @@ pub async fn create_team_mission_pdf(
         }
     }
 
-    let (dir_path, file_name) =
-        utils::create_file_name(format!("Planning_{}_{}", team_name, event_name), "pdf".to_string());
+    let (dir_path, file_name) = utils::create_file_name(
+        format!("Planning_{}_{}", team_name, event_name),
+        "pdf".to_string(),
+    );
     if let Some(save_path) = utils::show_save_dialog(&file_name, &dir_path, "pdf".to_string()) {
         fs::write(save_path, pdf_bytes).map_err(|e| e.to_string())?;
     }
