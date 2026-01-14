@@ -460,17 +460,14 @@ pub async fn send_equipements_to_mobile(
 }
 
 #[tauri::command]
-pub async fn send_planning(
-    team_id: String,
-    app: AppHandle
-) -> Result<Planning, String> { 
+pub async fn send_planning(team_id: String, app: AppHandle) -> Result<Planning, String> {
     let pool = get_db_pool(&app).await?;
 
     println!("[DB] 📤 send_planning appelé avec team_id: {}", team_id);
 
     // Récupérer les informations de l'équipe
     let team_info = sqlx::query_as::<_, (String, String, String)>(
-        "SELECT id, name, event_id FROM team WHERE id = ?"
+        "SELECT id, name, event_id FROM team WHERE id = ?",
     )
     .bind(&team_id)
     .fetch_optional(&pool)
@@ -479,7 +476,7 @@ pub async fn send_planning(
 
     let (team_id_db, team_name, event_id) = match team_info {
         Some(info) => info,
-        None => return Err(format!("Équipe avec id {} non trouvée", team_id))
+        None => return Err(format!("Équipe avec id {} non trouvée", team_id)),
     };
 
     let team = TransferTeamInfo {
@@ -488,14 +485,17 @@ pub async fn send_planning(
         event_id: event_id.clone(),
     };
 
-    println!("[DB] 👥 Équipe trouvée: {} (event: {})", team_name, event_id);
+    println!(
+        "[DB] 👥 Équipe trouvée: {} (event: {})",
+        team_name, event_id
+    );
 
     let actions = sqlx::query_as::<_, Action>(
         r#"
         SELECT id, team_id, equipement_id, type as type, scheduled_time, is_done 
         FROM action 
         WHERE team_id = ?
-        "#
+        "#,
     )
     .bind(&team_id)
     .fetch_all(&pool)
@@ -504,28 +504,32 @@ pub async fn send_planning(
 
     println!("[DB] 🔍 Actions trouvées: {}", actions.len());
     for action in &actions {
-        println!("   - Action: {} (equipement: {}, type: {:?})", action.id, action.equipement_id, action.r#type);
+        println!(
+            "   - Action: {} (equipement: {}, type: {:?})",
+            action.id, action.equipement_id, action.r#type
+        );
     }
 
     if actions.is_empty() {
         println!("[DB] ⚠️ Aucune action trouvée pour team_id: {}", team_id);
-        return Ok(Planning { 
-            team, 
-            actions: vec![], 
-            equipements: vec![], 
-            coordonees: vec![] 
+        return Ok(Planning {
+            team,
+            actions: vec![],
+            equipements: vec![],
+            coordonees: vec![],
         });
     }
 
-    
     let equipement_ids: Vec<String> = actions.iter().map(|a| a.equipement_id.clone()).collect();
-    
+
     let equip_params = vec!["?"; equipement_ids.len()].join(",");
     let sql_equip = format!("SELECT id, event_id, type_id, quantity, length_per_unit, date_pose, date_depose FROM equipement WHERE id IN ({})", equip_params);
-    
+
     let mut query_equip = sqlx::query_as::<_, TransferEquipementWithoutCoords>(&sql_equip);
-    for id in &equipement_ids { query_equip = query_equip.bind(id); }
-    
+    for id in &equipement_ids {
+        query_equip = query_equip.bind(id);
+    }
+
     let raw_equipements = query_equip
         .fetch_all(&pool)
         .await
@@ -534,46 +538,54 @@ pub async fn send_planning(
     // 3. Récupérer les COORDONNÉES pour ces équipements
     let sql_coords = format!("SELECT id, equipement_id, x, y, order_index FROM equipement_coordinate WHERE equipement_id IN ({})", equip_params);
     let mut query_coords = sqlx::query_as::<_, TransferEquipementCoordinate>(&sql_coords);
-    for id in &equipement_ids { query_coords = query_coords.bind(id); }
+    for id in &equipement_ids {
+        query_coords = query_coords.bind(id);
+    }
 
     let coords = query_coords
         .fetch_all(&pool)
         .await
         .map_err(|e| format!("Erreur coords: {}", e))?;
-    
-    let final_equipements: Vec<TransferEquipement> = raw_equipements.into_iter().map(|eq| {
-        let my_coords: Vec<TransferEquipementCoordinate> = coords.iter()
-            .filter(|c| c.equipement_id == eq.id)
-            .cloned()
-            .collect();
-            
-        TransferEquipement {
-            id: eq.id,
-            event_id: eq.event_id,
-            type_id: eq.type_id,
-            quantity: eq.quantity.unwrap_or(0),
-            length_per_unit: eq.length_per_unit.unwrap_or(0) as f64,
-            date_pose: eq.date_pose,
-            date_depose: eq.date_depose,
-            coordinates: my_coords, 
-        }
-    }).collect();
+
+    let final_equipements: Vec<TransferEquipement> = raw_equipements
+        .into_iter()
+        .map(|eq| {
+            let my_coords: Vec<TransferEquipementCoordinate> = coords
+                .iter()
+                .filter(|c| c.equipement_id == eq.id)
+                .cloned()
+                .collect();
+
+            TransferEquipement {
+                id: eq.id,
+                event_id: eq.event_id,
+                type_id: eq.type_id,
+                quantity: eq.quantity.unwrap_or(0),
+                length_per_unit: eq.length_per_unit.unwrap_or(0) as f64,
+                date_pose: eq.date_pose,
+                date_depose: eq.date_depose,
+                coordinates: my_coords,
+            }
+        })
+        .collect();
 
     println!("[DB] 🚚 Équipements trouvés: {}", final_equipements.len());
     println!("[DB] 📍 Coordonnées totales: {}", coords.len());
-    
+
     let result = Planning {
         team,
         actions,
         equipements: final_equipements,
-        coordonees: coords, 
+        coordonees: coords,
     };
-    
-    println!("[DB] ✅ Planning final: équipe '{}', {} actions, {} équipements, {} coordonnées", 
-             result.team.name,
-             result.actions.len(), 
-             result.equipements.len(), 
-             result.coordonees.len());
+
+    println!(
+        "[DB] ✅ Planning final: équipe '{}', {} actions, {} équipements, {} coordonnées",
+        result.team.name,
+        result.actions.len(),
+        result.equipements.len(),
+        result.coordonees.len()
+    );
 
     Ok(result)
 }

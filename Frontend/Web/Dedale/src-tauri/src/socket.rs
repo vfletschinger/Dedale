@@ -1155,7 +1155,7 @@ pub fn start_receive_server(app: AppHandle, event_id: String) -> Result<String, 
 }
 
 #[tauri::command]
-pub fn start_server_planning(app: AppHandle, team_id : String) -> Result<String, String> {
+pub fn start_server_planning(app: AppHandle, team_id: String) -> Result<String, String> {
     println!(
         "📥 Démarrage du serveur de réception pour l'envoie des actions {}",
         team_id
@@ -1349,5 +1349,4 @@ async fn handle_receive_planning(
         .flush()
         .map_err(|e| format!("Erreur flush: {}", e))?;
     Ok(())
-
 }

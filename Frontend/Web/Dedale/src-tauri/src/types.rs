@@ -263,7 +263,6 @@ pub struct TransferEquipement {
     pub coordinates: Vec<TransferEquipementCoordinate>,
 }
 
-
 /// Structure pour un event envoyé au mobile (avec noms camelCase pour compatibilité)
 #[derive(Debug, Serialize, Clone, sqlx::FromRow)]
 #[serde(rename_all = "camelCase")]
@@ -274,7 +273,6 @@ pub(crate) struct TransferEquipementCoordinate {
     pub y: f64,
     pub order_index: Option<i32>,
 }
-
 
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -292,7 +290,6 @@ pub struct Planning {
     pub equipements: Vec<TransferEquipement>,
     pub coordonees: Vec<TransferEquipementCoordinate>,
 }
-
 
 #[derive(sqlx::FromRow)]
 pub struct TransferEquipementWithoutCoords {
