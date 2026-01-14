@@ -29,7 +29,9 @@ fn get_pmtiles_path() -> Result<PathBuf, String> {
             .join("resources")
             .join("eurometropole_strasbourg.pmtiles"),
         // Mode prod - ressources à côté de l'exécutable
-        exe_dir.join("resources").join("eurometropole_strasbourg.pmtiles"),
+        exe_dir
+            .join("resources")
+            .join("eurometropole_strasbourg.pmtiles"),
         // Mode prod - directement à côté de l'exécutable
         exe_dir.join("eurometropole_strasbourg.pmtiles"),
         // Chemin absolu de fallback pour le dev
@@ -59,19 +61,19 @@ fn get_pmtiles_path() -> Result<PathBuf, String> {
 pub fn get_pmtiles_file_path() -> Result<PmtilesPath, String> {
     let path = get_pmtiles_path()?;
     let mut path_str = path.to_string_lossy().to_string();
-    
+
     // Sur Windows, supprimer le préfixe \\?\ qui est ajouté par canonicalize()
     if path_str.starts_with(r"\\?\") {
         path_str = path_str[4..].to_string();
     }
-    
+
     // Créer une URL de type file:// pour le protocole PMTiles
     #[cfg(target_os = "windows")]
     let file_url = format!("file:///{}", path_str.replace("\\", "/"));
-    
+
     #[cfg(not(target_os = "windows"))]
     let file_url = format!("file://{}", path_str);
-    
+
     Ok(PmtilesPath {
         path: path_str,
         url: file_url,
