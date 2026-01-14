@@ -73,19 +73,8 @@ export default function EquipementForm({
       return;
     }
 
-    const now = new Date();
     const poseDate = new Date(datePose);
     const deposeDate = new Date(dateDepose);
-
-    if (poseDate < now) {
-      toast.error("La date de pose ne peut pas être dans le passé !");
-      return;
-    }
-
-    if (deposeDate < now) {
-      toast.error("La date de dépose ne peut pas être dans le passé !");
-      return;
-    }
 
     if (poseDate >= deposeDate) {
       toast.error("La date de dépose doit être postérieure à la date de pose !");

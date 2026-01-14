@@ -155,18 +155,6 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
         return;
       }
 
-      // Vérifier que les dates ne sont pas dans le passé
-      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD d'aujourd'hui
-      if (formData.dateDebut < today) {
-        toast.error("La date de début ne peut pas être dans le passé !");
-        return;
-      }
-
-      if (formData.dateFin < today) {
-        toast.error("La date de fin ne peut pas être dans le passé !");
-        return;
-      }
-
       if (new Date(formData.dateDebut) > new Date(formData.dateFin)) {
         toast.error("La date de fin ne peut pas être antérieure à la date de début !");
         return;
@@ -174,7 +162,7 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
 
       const newEvent = {
         name: formData.name.trim(),
-        start_date: formData.dateDebut, // <--- Renommé pour matcher Rust
+        start_date: formData.dateDebut, 
         end_date: formData.dateFin,
       };
 
