@@ -270,11 +270,9 @@ pub async fn create_planning_pdf(app: AppHandle, event_id: Option<String>) -> Re
     content.push_str("0 -30 Td\n");
 
     #[allow(unused_variables, unused_assignments)]
-    let mut y_offset = 30;
     for (_team_id, team_name) in team_rows {
         content.push_str(&format!("({}) Tj\n", team_name));
         content.push_str("0 -15 Td\n");
-        y_offset += 15;
         let actions_query = r#"
             SELECT 
                 type,
@@ -296,11 +294,9 @@ pub async fn create_planning_pdf(app: AppHandle, event_id: Option<String>) -> Re
             let status = if is_done { "[Done]" } else { "[Pending]" };
             content.push_str(&format!("  - {} {}) Tj\n", action_type, status));
             content.push_str("0 -10 Td\n");
-            y_offset += 10;
         }
 
         content.push_str("0 -10 Td\n");
-        y_offset += 10;
     }
 
     content.push_str("ET\n");
