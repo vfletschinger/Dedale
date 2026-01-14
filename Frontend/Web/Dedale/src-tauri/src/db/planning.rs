@@ -20,7 +20,7 @@ pub struct PlanningAction {
     pub id: String,
     pub team_id: String,
     pub equipement_id: String,
-    #[serde(rename = "type")]
+    #[serde(rename(serialize = "action_type", deserialize = "type"))]
     pub action_type: String,
     pub scheduled_time: String,
     pub is_done: bool,
@@ -84,6 +84,48 @@ pub async fn fetch_actions_for_team(
 
     let rows = sqlx::query(query)
         .bind(&team_id)
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let actions = rows
+        .into_iter()
+        .map(|row| PlanningAction {
+            id: row.get("id"),
+            team_id: row.get("team_id"),
+            equipement_id: row.get("equipement_id"),
+            action_type: row.get("type"),
+            scheduled_time: row.get("scheduled_time"),
+            is_done: row.get("is_done"),
+        })
+        .collect();
+
+    Ok(actions)
+}
+
+/// Récupère les actions pour un équipement
+#[tauri::command]
+pub async fn fetch_actions_for_equipement(
+    app: AppHandle,
+    equipement_id: String,
+) -> Result<Vec<PlanningAction>, String> {
+    let pool = get_db_pool(&app).await?;
+
+    let query = r#"
+        SELECT 
+            a.id,
+            a.team_id,
+            a.equipement_id,
+            a.type,
+            COALESCE(a.scheduled_time, '') as scheduled_time,
+            COALESCE(a.is_done, 0) as is_done
+        FROM action a
+        WHERE a.equipement_id = ?
+        ORDER BY a.type ASC
+    "#;
+
+    let rows = sqlx::query(query)
+        .bind(&equipement_id)
         .fetch_all(&pool)
         .await
         .map_err(|e| e.to_string())?;
