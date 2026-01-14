@@ -1,5 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useState } from "react";
+import toast from "react-hot-toast";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faTimes } from "@fortawesome/free-solid-svg-icons";
 
 // Fonction pour afficher un ID court (8 premiers caractères)
 const shortId = (id: string): string => {
@@ -59,9 +62,10 @@ export default function PointDetails({
       // Mettre à jour localement pour affichage immédiat
       point.status = newStatus;
       if (onRefresh) await onRefresh();
+      toast.success("Statut mis à jour");
     } catch (error) {
       console.error("Erreur lors de la mise à jour du statut:", error);
-      alert("Erreur lors de la mise à jour du statut.");
+      toast.error("Erreur lors de la mise à jour du statut.");
     } finally {
       setUpdatingStatus(false);
     }
@@ -80,9 +84,10 @@ export default function PointDetails({
       point.comment = newComment || undefined;
       setEditingComment(false);
       if (onRefresh) await onRefresh();
+      toast.success("Commentaire enregistré");
     } catch (error) {
       console.error("Erreur lors de la sauvegarde du commentaire:", error);
-      alert("Erreur lors de la sauvegarde du commentaire.");
+      toast.error("Erreur lors de la sauvegarde du commentaire.");
     }
   }
 
@@ -99,9 +104,10 @@ export default function PointDetails({
       point.name = newName || undefined;
       setEditingName(false);
       if (onRefresh) await onRefresh();
+      toast.success("Nom modifié");
     } catch (error) {
       console.error("Erreur lors de la sauvegarde du nom:", error);
-      alert("Erreur lors de la sauvegarde du nom.");
+      toast.error("Erreur lors de la sauvegarde du nom.");
     }
   }
 
@@ -113,9 +119,10 @@ export default function PointDetails({
       await invoke("delete_point", { pointId: point.id });
       if (onClose) onClose();
       if (onRefresh) await onRefresh();
+      toast.success("Point supprimé");
     } catch (error) {
       console.error("Erreur lors de la suppression:", error);
-      alert("Erreur lors de la suppression du point.");
+      toast.error("Erreur lors de la suppression du point.");
     }
   }
 
@@ -154,7 +161,7 @@ export default function PointDetails({
             }}
             className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
           >
-            ✕
+            <FontAwesomeIcon icon={faTimes} />
           </button>
         </div>
       </div>
@@ -173,7 +180,7 @@ export default function PointDetails({
                   setEditingName(true);
                   setNewName(point.name || "");
                 }}
-                className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                className="text-primary hover:text-white hover:bg-primary border border-primary px-3 py-1 rounded-lg text-sm font-medium transition-all"
               >
                 Modifier
               </button>
@@ -185,13 +192,13 @@ export default function PointDetails({
                 type="text"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                 placeholder="Entrer le nom du point..."
               />
               <div className="flex gap-2">
                 <button
                   onClick={saveName}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-medium transition-colors"
+                  className="flex-1 bg-primary hover:bg-primary/90 text-white py-2 rounded-lg font-medium transition-colors"
                 >
                   Sauvegarder
                 </button>
@@ -204,11 +211,13 @@ export default function PointDetails({
               </div>
             </div>
           ) : (
-            <p className="text-gray-700">
-              {point.name || (
-                <span className="text-gray-400 italic">Aucun nom</span>
-              )}
-            </p>
+            <div className=" border border-gray-200 rounded-lg px-4 py-3 shadow-sm">
+              <p className="text-gray-700">
+                {point.name || (
+                  <span className="text-gray-400 italic">Aucun nom</span>
+                )}
+              </p>
+            </div>
           )}
         </div>
 
@@ -220,11 +229,10 @@ export default function PointDetails({
           <button
             onClick={toggleStatus}
             disabled={updatingStatus}
-            className={`w-full px-4 py-2.5 rounded-lg font-medium transition-colors ${
-              point.status
-                ? "bg-green-100 text-green-700 hover:bg-green-200"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            } disabled:opacity-50 disabled:cursor-not-allowed`}
+            className={`w-full px-4 py-2.5 rounded-lg font-medium transition-colors ${point.status
+              ? "bg-green-100 text-green-700 hover:bg-green-200"
+              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             {updatingStatus ? "..." : point.status ? "Traité" : "Non traité"}
           </button>
@@ -242,7 +250,7 @@ export default function PointDetails({
                   setEditingComment(true);
                   setNewComment(point.comment || "");
                 }}
-                className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                className="text-primary hover:text-white hover:bg-primary border border-primary px-3 py-1 rounded-lg text-sm font-medium transition-all"
               >
                 Modifier
               </button>
@@ -253,14 +261,14 @@ export default function PointDetails({
               <textarea
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
                 rows={4}
                 placeholder="Ajouter un commentaire..."
               />
               <div className="flex gap-2">
                 <button
                   onClick={saveComment}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-medium transition-colors"
+                  className="flex-1 bg-primary hover:bg-primary/90 text-white py-2 rounded-lg font-medium transition-colors"
                 >
                   Sauvegarder
                 </button>
@@ -273,11 +281,13 @@ export default function PointDetails({
               </div>
             </div>
           ) : (
-            <p className="text-gray-700">
-              {point.comment || (
-                <span className="text-gray-400 italic">Aucun commentaire</span>
-              )}
-            </p>
+            <div className="border border-gray-200 rounded-lg px-4 py-3 shadow-sm">
+              <p className="text-gray-700">
+                {point.comment || (
+                  <span className="text-gray-400 italic">Aucun commentaire</span>
+                )}
+              </p>
+            </div>
           )}
         </div>
 
@@ -326,7 +336,7 @@ export default function PointDetails({
             onClick={() => setSelectedImage(null)}
             className="absolute top-4 right-4 w-10 h-10 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center text-white text-2xl font-bold"
           >
-            ✕
+            <FontAwesomeIcon icon={faTimes} />
           </button>
           <img
             src={selectedImage}

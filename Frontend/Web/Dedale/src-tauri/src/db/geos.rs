@@ -94,12 +94,13 @@ pub async fn fetch_geometries_for_event(
 #[tauri::command]
 pub async fn fetch_zones_for_event(app: AppHandle, event_id: String) -> Result<Vec<Zone>, String> {
     let pool = get_db_pool(&app).await?;
-    let rows =
-        sqlx::query("SELECT id, event_id, name, color, geometry_json FROM zone WHERE event_id = ?")
-            .bind(&event_id)
-            .fetch_all(&pool)
-            .await
-            .map_err(|e| e.to_string())?;
+    let rows = sqlx::query(
+        "SELECT id, event_id, name, color, description, geometry_json FROM zone WHERE event_id = ?",
+    )
+    .bind(&event_id)
+    .fetch_all(&pool)
+    .await
+    .map_err(|e| e.to_string())?;
 
     let geometries: Vec<Zone> = rows
         .into_iter()
@@ -108,6 +109,7 @@ pub async fn fetch_zones_for_event(app: AppHandle, event_id: String) -> Result<V
             event_id: row.get("event_id"),
             name: row.get("name"),
             color: row.get("color"),
+            description: row.get("description"),
             geometry_json: row.get("geometry_json"),
         })
         .collect();
@@ -162,17 +164,19 @@ pub async fn create_zone(
     geom: String,
     name: String,
     color: String,
+    description: Option<String>,
 ) -> Result<Zone, String> {
     let pool = get_db_pool(&app).await?;
     let uuid = Uuid::new_v4().to_string();
     let _result = sqlx::query(
-        "INSERT INTO zone (id, event_id, geometry_json,name,color) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO zone (id, event_id, geometry_json, name, color, description) VALUES (?, ?, ?, ?, ?, ?)",
     )
     .bind(&uuid)
     .bind(&event_id)
     .bind(&geom)
     .bind(&name)
     .bind(&color)
+    .bind(&description)
     .execute(&pool)
     .await
     .map_err(|e| e.to_string())?;
@@ -182,6 +186,7 @@ pub async fn create_zone(
         event_id,
         name: Some(name),
         color: Some(color),
+        description,
         geometry_json: Some(geom),
     })
 }
@@ -253,7 +258,6 @@ pub async fn delete_parcours(app: AppHandle, geometry_id: String) -> Result<(), 
     println!("[DB] 🗑️ Parcours {} supprimé", geometry_id);
     Ok(())
 }
-
 
 /// Supprime une géométrie en cherchant dans toutes les tables (point, parcours, zone)
 #[tauri::command]
@@ -405,6 +409,7 @@ pub async fn update_zone(
     geom: String,
     name: String,
     color: String,
+    description: Option<String>,
 ) -> Result<Zone, String> {
     let pool = get_db_pool(&app).await?;
 
@@ -416,14 +421,17 @@ pub async fn update_zone(
 
     let event_id: String = row.get("event_id");
 
-    sqlx::query("UPDATE zone SET geometry_json = ?, name = ?, color = ? WHERE id = ?")
-        .bind(&geom)
-        .bind(&name)
-        .bind(&color)
-        .bind(&geometry_id)
-        .execute(&pool)
-        .await
-        .map_err(|e| e.to_string())?;
+    sqlx::query(
+        "UPDATE zone SET geometry_json = ?, name = ?, color = ?, description = ? WHERE id = ?",
+    )
+    .bind(&geom)
+    .bind(&name)
+    .bind(&color)
+    .bind(&description)
+    .bind(&geometry_id)
+    .execute(&pool)
+    .await
+    .map_err(|e| e.to_string())?;
 
     println!("[DB] Géométrie {} mise à jour", geometry_id);
 
@@ -432,6 +440,7 @@ pub async fn update_zone(
         event_id,
         name: Some(name),
         color: Some(color),
+        description,
         geometry_json: Some(geom),
     })
 }
@@ -488,6 +497,7 @@ pub async fn update_parcours(
 
 /// Met à jour le nom d'une géométrie (zone ou parcours)
 #[tauri::command]
+#[allow(dead_code)]
 pub async fn update_geometry_name(
     app: AppHandle,
     geometry_id: String,

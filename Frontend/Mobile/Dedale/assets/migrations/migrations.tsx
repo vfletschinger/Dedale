@@ -352,6 +352,7 @@ export const migrations: Migration[] = [
           point_id TEXT NOT NULL,
           type_id INTEGER NOT NULL,
           quantity INTEGER DEFAULT 1,
+          description TEXT,
           FOREIGN KEY (point_id) REFERENCES point_new (id) ON DELETE CASCADE,
           FOREIGN KEY (type_id) REFERENCES equipement_type (id)
         );
@@ -384,6 +385,7 @@ export const migrations: Migration[] = [
           id TEXT PRIMARY KEY NOT NULL,
           event_id TEXT NOT NULL,
           wkt TEXT NOT NULL,
+          description TEXT,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY (event_id) REFERENCES event_new (id) ON DELETE CASCADE
         );

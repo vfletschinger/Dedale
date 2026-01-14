@@ -1,7 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useState, useEffect } from "react";
 import { Person } from "./CreatePerson";
+import toast from "react-hot-toast";
 import { emit } from "@tauri-apps/api/event";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faPen, faTimes, faTrash } from "@fortawesome/free-solid-svg-icons";
 
 // On a besoin de l'interface Team ici
 interface Team {
@@ -65,8 +68,10 @@ export default function PersonDetails({
       onDelete(person.id);
       await emit("team-update");
       onClose();
+      toast.success("Personne supprimée");
     } catch (e) {
       console.error(e);
+      toast.error("Erreur lors de la suppression");
     }
   };
 
@@ -75,8 +80,10 @@ export default function PersonDetails({
       await invoke("remove_member", { teamId, personId: person.id });
       setTeams(teams.filter((t) => t.id !== teamId));
       await emit("team-update");
+      toast.success("Retiré de l'équipe");
     } catch (e) {
       console.error(e);
+      toast.error("Erreur lors du retrait de l'équipe");
     }
   };
 
@@ -110,8 +117,10 @@ export default function PersonDetails({
       setIsAddingTeam(false);
       setSelectedTeamId("");
       await emit("team-update");
+      toast.success("Ajouté à l'équipe");
     } catch (e) {
       console.error(e);
+      toast.error("Erreur lors de l'ajout à l'équipe");
     }
   };
 
@@ -129,9 +138,10 @@ export default function PersonDetails({
       onUpdate(editData);
       setIsEditing(false);
       await emit("team-update");
+      toast.success("Profil mis à jour");
     } catch (e) {
       console.error(e);
-      alert("Erreur lors de la sauvegarde : " + e);
+      toast.error("Erreur lors de la sauvegarde : " + e);
     } finally {
       setIsSaving(false);
     }
@@ -140,8 +150,8 @@ export default function PersonDetails({
   return (
     <div className="bg-white w-full max-w-sm h-[500px] flex flex-col rounded-xl shadow-2xl overflow-hidden relative">
       {/* HEADER AVEC MODE ÉDITION */}
-      <div className="bg-linear-to-r from-blue-50 to-indigo-50 p-6 text-center border-b border-blue-100 relative shrink-0">
-        <div className="w-16 h-16 bg-white rounded-full mx-auto flex items-center justify-center text-2xl shadow-sm mb-3 text-blue-600 font-bold border border-blue-100">
+      <div className="bg-linear-to-r from-primary/10 to-indigo-50 p-6 text-center border-b border-primary/20 relative shrink-0">
+        <div className="w-16 h-16 bg-white rounded-full mx-auto flex items-center justify-center text-2xl shadow-sm mb-3 text-primary font-bold border border-primary/20">
           {person.firstname[0].toUpperCase()}
           {person.lastname[0].toUpperCase()}
         </div>
@@ -153,7 +163,7 @@ export default function PersonDetails({
               onChange={(e) =>
                 setEditData({ ...editData, firstname: e.target.value })
               }
-              className="w-24 text-center border border-blue-300 rounded px-1 py-0.5 text-sm font-bold text-transform: capitalize"
+              className="w-24 text-center border border-primary/50 rounded px-1 py-0.5 text-sm font-bold text-transform: capitalize"
               placeholder="Prénom"
             />
             <input
@@ -161,7 +171,7 @@ export default function PersonDetails({
               onChange={(e) =>
                 setEditData({ ...editData, lastname: e.target.value })
               }
-              className="w-24 text-center border border-blue-300 rounded px-1 py-0.5 text-sm font-bold text-transform: capitalize"
+              className="w-24 text-center border border-primary/50 rounded px-1 py-0.5 text-sm font-bold text-transform: capitalize"
               placeholder="Nom"
             />
           </div>
@@ -176,17 +186,10 @@ export default function PersonDetails({
         {!isEditing && (
           <button
             onClick={() => setIsEditing(true)}
-            className="absolute top-4 right-4 text-gray-400 hover:text-blue-600 transition-colors cursor-pointer"
+            className="absolute top-4 right-4 text-gray-400 hover:text-primary transition-colors cursor-pointer"
             title="Modifier"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-            </svg>
+            <FontAwesomeIcon icon={faPen} className="h-5 w-5" />
           </button>
         )}
       </div>
@@ -195,21 +198,19 @@ export default function PersonDetails({
       <div className="flex border-t border-gray-200 border-b shrink-0">
         <button
           onClick={() => (isEditing ? "" : setActiveTab("infos"))}
-          className={`flex-1 py-2 text-xs font-medium cursor-pointer ${
-            activeTab === "infos"
-              ? "bg-white text-blue-600 border-b-2 border-blue-600"
-              : "text-gray-500 hover:bg-gray-100"
-          }`}
+          className={`flex-1 py-2 text-xs font-medium cursor-pointer ${activeTab === "infos"
+            ? "bg-white text-primary border-b-2 border-primary"
+            : "text-gray-500 hover:bg-gray-100"
+            }`}
         >
           Informations
         </button>
         <button
           onClick={() => (isEditing ? "" : setActiveTab("teams"))}
-          className={`flex-1 py-2 text-xs font-medium cursor-pointer ${
-            activeTab === "teams"
-              ? "bg-white text-blue-600 border-b-2 border-blue-600"
-              : "text-gray-500 hover:bg-gray-100"
-          }`}
+          className={`flex-1 py-2 text-xs font-medium cursor-pointer ${activeTab === "teams"
+            ? "bg-white text-primary border-b-2 border-primary"
+            : "text-gray-500 hover:bg-gray-100"
+            }`}
         >
           Équipes ({teams.length})
         </button>
@@ -219,7 +220,7 @@ export default function PersonDetails({
       <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
         {loading ? (
           <div className="flex justify-center items-center py-8">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
           </div>
         ) : activeTab === "infos" ? (
           <div className="space-y-4">
@@ -265,7 +266,7 @@ export default function PersonDetails({
                   onClick={() => {
                     if (!isEditing) onTeamClick(team);
                   }}
-                  className="flex justify-between items-center p-2 bg-white border border-gray-100 rounded-lg shadow-sm hover:border-blue-300 cursor-pointer group transition-all"
+                  className="flex justify-between items-center p-2 bg-white border border-gray-100 rounded-lg shadow-sm hover:border-primary/50 cursor-pointer group transition-all"
                 >
                   <span className="text-sm font-medium text-gray-700 text-transform: capitalize">
                     {team.name}
@@ -279,30 +280,18 @@ export default function PersonDetails({
                     }}
                     className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all p-1"
                   >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
+                    <FontAwesomeIcon icon={faTimes} className="w-4 h-4" />
                   </button>
                 </div>
               ))}
               {!isEditing &&
                 (isAddingTeam ? (
-                  <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100 animate-in fade-in slide-in-from-top-2">
+                  <div className="mt-4 p-3 bg-primary/10 rounded-lg border border-primary/20 animate-in fade-in slide-in-from-top-2">
                     <div className="flex gap-2">
                       <select
                         value={selectedTeamId}
                         onChange={(e) => setSelectedTeamId(e.target.value)}
-                        className="flex-1 text-transform: capitalize text-sm border border-blue-200 rounded px-2 py-1 outline-none cursor-pointer"
+                        className="flex-1 text-transform: capitalize text-sm border border-primary/30 rounded px-2 py-1 outline-none cursor-pointer"
                       >
                         <option value="">Choisir...</option>
                         {availableTeams.map((t) => (
@@ -314,7 +303,7 @@ export default function PersonDetails({
                       <button
                         onClick={() => confirmAddTeam()}
                         disabled={!selectedTeamId}
-                        className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 cursor-pointer"
+                        className="bg-secondary text-white px-3 py-1 rounded text-sm hover:bg-secondary/90 cursor-pointer"
                       >
                         OK
                       </button>
@@ -329,7 +318,7 @@ export default function PersonDetails({
                 ) : (
                   <button
                     onClick={startAddingTeam}
-                    className="w-full py-2 mt-4 border border-dashed border-gray-300 rounded-lg text-gray-500 text-xs hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all flex items-center justify-center gap-1 cursor-pointer"
+                    className="w-full py-2 mt-4 border border-dashed border-gray-300 rounded-lg text-gray-500 text-xs hover:border-primary/50 hover:text-primary hover:bg-primary/5 transition-all flex items-center justify-center gap-1 cursor-pointer"
                   >
                     <span>+</span> Rejoindre une équipe
                   </button>
@@ -381,19 +370,7 @@ export default function PersonDetails({
               onClick={() => setShowConfirm(true)}
               className="text-red-500 hover:bg-red-50 p-2 rounded transition-colors cursor-pointer"
             >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                />
-              </svg>
+              <FontAwesomeIcon icon={faTrash} className="w-5 h-5" />
             </button>
             <button
               onClick={onClose}
@@ -404,6 +381,6 @@ export default function PersonDetails({
           </>
         )}
       </div>
-    </div>
+    </div >
   );
 }

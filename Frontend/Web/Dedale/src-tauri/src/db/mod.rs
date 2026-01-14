@@ -9,16 +9,16 @@ pub mod equipements;
 pub mod events;
 pub mod geos;
 pub mod persons;
+pub mod planning;
 pub mod points;
 pub mod teams;
-pub mod planning;
 pub use equipements::*;
 pub use events::*;
 pub use geos::*;
 pub use persons::*;
+pub use planning::*;
 pub use points::*;
 pub use teams::*;
-pub use planning::*;
 // Réexporter les types depuis le module types
 pub use crate::types::*;
 
@@ -106,6 +106,7 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
             event_id CHAR(36) NOT NULL,
             name TEXT,
             color TEXT,
+            description TEXT,
             geometry_json TEXT,
             FOREIGN KEY (event_id) REFERENCES event (id) ON DELETE CASCADE
         )",
@@ -178,6 +179,7 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
             type_id CHAR(36) NOT NULL,
             quantity INTEGER,
             length_per_unit INTEGER,
+            description TEXT,
             date_pose DATETIME,
             date_depose DATETIME,
             FOREIGN KEY (event_id) REFERENCES event (id) ON DELETE CASCADE,
@@ -260,6 +262,15 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
     .await
     .map_err(|e| format!("Error creating action: {}", e))?;
 
+    // --- MIGRATIONS: Ajouter les colonnes description si elles n'existent pas ---
+    // Pour les bases de données existantes créées avant l'ajout de ces colonnes
+    let _ = sqlx::query("ALTER TABLE zone ADD COLUMN description TEXT")
+        .execute(&pool)
+        .await; // Ignore l'erreur si la colonne existe déjà
+
+    let _ = sqlx::query("ALTER TABLE equipement ADD COLUMN description TEXT")
+        .execute(&pool)
+        .await; // Ignore l'erreur si la colonne existe déjà
     sqlx::query(
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_action_per_equipement 
          ON action (equipement_id, type);",

@@ -3,33 +3,7 @@ use crate::types::*;
 use sqlx::Row;
 use tauri::AppHandle;
 use uuid::Uuid;
-use serde::Serialize;
 
-
-#[derive(Debug, Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct TransferEquipement {
-    pub id: String,
-    pub event_id: String,
-    pub type_id: String,
-    pub quantity: i32,
-    pub length_per_unit: f64,
-    pub date_pose: Option<String>,
-    pub date_depose: Option<String>,
-    pub coordinates: Vec<TransferEquipementCoordinate>,
-}
-
-
-/// Structure pour un event envoyé au mobile (avec noms camelCase pour compatibilité)
-#[derive(Debug, Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct TransferEquipementCoordinate {
-    pub id: String,
-    pub equipement_id: String,
-    pub x: f64,
-    pub y: f64,
-    pub order_index: Option<i32>,
-}
 // ============================================
 // TYPES D'ÉQUIPEMENTS
 // ============================================
@@ -103,6 +77,7 @@ pub async fn seed_default_equipment_types(app: AppHandle) -> Result<(), String> 
         let default_types = vec![
             ("Barrière", "Barrière de sécurité standard"),
             ("Bloc de béton", "Bloc de béton pour sécurisation"),
+            ("Véhicule", "Véhicule de blocage ou de sécurisation"),
         ];
 
         for (name, description) in default_types {
@@ -127,12 +102,14 @@ pub async fn seed_default_equipment_types(app: AppHandle) -> Result<(), String> 
 // ============================================
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn create_equipement(
     app: AppHandle,
     event_id: String,
     type_id: String,
     quantity: i32,
     length_per_unit: i32,
+    description: Option<String>,
     date_pose: String,
     date_depose: String,
     coordinates: Vec<(f64, f64)>, // Liste de (x, y) représentant la ligne
@@ -142,14 +119,15 @@ pub async fn create_equipement(
 
     // 1. Créer l'équipement
     sqlx::query(
-        "INSERT INTO equipement (id, event_id, type_id, quantity, length_per_unit, date_pose, date_depose) 
-         VALUES (?, ?, ?, ?, ?, ?, ?)"
+        "INSERT INTO equipement (id, event_id, type_id, quantity, length_per_unit, description, date_pose, date_depose) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
     )
     .bind(&equipement_id)
     .bind(&event_id)
     .bind(&type_id)
     .bind(quantity)
     .bind(length_per_unit)
+    .bind(&description)
     .bind(&date_pose)
     .bind(&date_depose)
     .execute(&pool)
@@ -201,6 +179,7 @@ pub async fn create_equipement(
         type_name,
         type_description,
         length: Some(length_per_unit),
+        description,
         date_pose: Some(date_pose.clone()),
         hour_pose: None,
         date_depose: Some(date_depose.clone()),
@@ -218,7 +197,7 @@ pub async fn fetch_equipements_for_event(
 
     // Récupérer tous les équipements de l'événement avec le nom du type
     let rows = sqlx::query(
-        "SELECT e.id, e.type_id, e.quantity, e.length_per_unit, e.date_pose, e.date_depose,
+        "SELECT e.id, e.type_id, e.quantity, e.length_per_unit, e.description, e.date_pose, e.date_depose,
                 t.name as type_name, t.description as type_description
          FROM equipement e
          LEFT JOIN type t ON e.type_id = t.id
@@ -263,6 +242,7 @@ pub async fn fetch_equipements_for_event(
             type_name: row.get("type_name"),
             type_description: row.get("type_description"),
             length: row.get("length_per_unit"),
+            description: row.get("description"),
             date_pose: row.get("date_pose"),
             hour_pose: None,
             date_depose: row.get("date_depose"),
@@ -296,23 +276,26 @@ pub async fn delete_equipement(app: AppHandle, equipement_id: String) -> Result<
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn update_equipement(
     app: AppHandle,
     equipement_id: String,
     type_id: String,
     quantity: i32,
     length_per_unit: i32,
+    description: Option<String>,
     date_pose: String,
     date_depose: String,
 ) -> Result<(), String> {
     let pool = get_db_pool(&app).await?;
 
     sqlx::query(
-        "UPDATE equipement SET type_id = ?, quantity = ?, length_per_unit = ?, date_pose = ?, date_depose = ? WHERE id = ?"
+        "UPDATE equipement SET type_id = ?, quantity = ?, length_per_unit = ?, description = ?, date_pose = ?, date_depose = ? WHERE id = ?"
     )
     .bind(&type_id)
     .bind(quantity)
     .bind(length_per_unit)
+    .bind(&description)
     .bind(&date_pose)
     .bind(&date_depose)
     .bind(&equipement_id)
@@ -346,7 +329,7 @@ pub async fn fetch_actions(app: AppHandle, event_id: String) -> Result<Vec<Actio
             id: row.get("id"),
             team_id: row.get("team_id"),
             equipement_id: row.get("equipement_id"),
-            action_type: row.get("type"),
+            r#type: row.get("type"),
             scheduled_time: row.get("scheduled_time"),
             is_done: row.get("is_done"),
         })
@@ -368,18 +351,29 @@ pub async fn add_action(
     action_type: String,
 ) -> Result<String, String> {
     let pool = get_db_pool(&app).await?;
-    let action_id = Uuid::new_v4().to_string();
-    
-    // Utiliser SQLite pour générer la timestamp au format ISO 8601
-    let scheduled_time: String = sqlx::query_scalar(
-        "SELECT strftime('%Y-%m-%dT%H:%M:%SZ', 'now')"
-    )
-    .fetch_one(&pool)
-    .await
-    .map_err(|e| e.to_string())?;
 
+    // Vérifier si une action existe déjà pour cet équipement et ce type
+    let existing_action: Option<(String,)> =
+        sqlx::query_as("SELECT id FROM action WHERE equipement_id = ? AND type = ?")
+            .bind(&equipement_id)
+            .bind(&action_type)
+            .fetch_optional(&pool)
+            .await
+            .map_err(|e| e.to_string())?;
+
+    let action_id = existing_action
+        .map(|(id,)| id)
+        .unwrap_or_else(|| Uuid::new_v4().to_string());
+
+    // Utiliser SQLite pour générer la timestamp au format ISO 8601
+    let scheduled_time: String = sqlx::query_scalar("SELECT strftime('%Y-%m-%dT%H:%M:%SZ', 'now')")
+        .fetch_one(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Utiliser INSERT OR REPLACE pour mettre à jour si l'action existe déjà
     sqlx::query(
-        "INSERT INTO action (id, team_id, equipement_id, type, scheduled_time, is_done) VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT OR REPLACE INTO action (id, team_id, equipement_id, type, scheduled_time, is_done) VALUES (?, ?, ?, ?, ?, ?)",
     )
     .bind(&action_id)
     .bind(&team_id)
@@ -411,15 +405,26 @@ pub async fn delete_action(app: AppHandle, action_id: String) -> Result<(), Stri
 #[tauri::command]
 pub async fn send_equipements_to_mobile(
     event_id: String,
-    app: AppHandle
+    app: AppHandle,
 ) -> Result<Vec<TransferEquipement>, String> {
     let pool = get_db_pool(&app).await?;
 
     // Récupérer tous les équipements de l'événement
-    let equipements = sqlx::query_as::<_, (String, String, String, Option<i32>, Option<i32>, Option<String>, Option<String>)>(
+    let equipements = sqlx::query_as::<
+        _,
+        (
+            String,
+            String,
+            String,
+            Option<i32>,
+            Option<i32>,
+            Option<String>,
+            Option<String>,
+        ),
+    >(
         "SELECT id, event_id, type_id, quantity, length_per_unit, date_pose, date_depose 
          FROM equipement 
-         WHERE event_id = ?"
+         WHERE event_id = ?",
     )
     .bind(&event_id)
     .fetch_all(&pool)
@@ -434,22 +439,22 @@ pub async fn send_equipements_to_mobile(
             "SELECT id, x, y, order_index 
              FROM equipement_coordinate 
              WHERE equipement_id = ? 
-             ORDER BY order_index ASC"
+             ORDER BY order_index ASC",
         )
         .bind(&id)
         .fetch_all(&pool)
         .await
         .map_err(|e| format!("Erreur récupération coordonnées: {}", e))?
         .into_iter()
-        .map(|(coord_id, x, y, order_index)| {
-            TransferEquipementCoordinate {
+        .map(
+            |(coord_id, x, y, order_index)| TransferEquipementCoordinate {
                 id: coord_id,
                 equipement_id: id.clone(),
                 x,
                 y,
                 order_index,
-            }
-        })
+            },
+        )
         .collect::<Vec<_>>();
 
         equipements_with_coords.push(TransferEquipement {
@@ -465,4 +470,135 @@ pub async fn send_equipements_to_mobile(
     }
 
     Ok(equipements_with_coords)
+}
+
+#[tauri::command]
+pub async fn send_planning(team_id: String, app: AppHandle) -> Result<Planning, String> {
+    let pool = get_db_pool(&app).await?;
+
+    println!("[DB] 📤 send_planning appelé avec team_id: {}", team_id);
+
+    // Récupérer les informations de l'équipe
+    let team_info = sqlx::query_as::<_, (String, String, String)>(
+        "SELECT id, name, event_id FROM team WHERE id = ?",
+    )
+    .bind(&team_id)
+    .fetch_optional(&pool)
+    .await
+    .map_err(|e| format!("Erreur team: {}", e))?;
+
+    let (team_id_db, team_name, event_id) = match team_info {
+        Some(info) => info,
+        None => return Err(format!("Équipe avec id {} non trouvée", team_id)),
+    };
+
+    let team = TransferTeamInfo {
+        id: team_id_db.clone(),
+        name: team_name.clone(),
+        event_id: event_id.clone(),
+    };
+
+    println!(
+        "[DB] 👥 Équipe trouvée: {} (event: {})",
+        team_name, event_id
+    );
+
+    let actions = sqlx::query_as::<_, Action>(
+        r#"
+        SELECT id, team_id, equipement_id, type as type, scheduled_time, is_done 
+        FROM action 
+        WHERE team_id = ?
+        "#,
+    )
+    .bind(&team_id)
+    .fetch_all(&pool)
+    .await
+    .map_err(|e| format!("Erreur actions: {}", e))?;
+
+    println!("[DB] 🔍 Actions trouvées: {}", actions.len());
+    for action in &actions {
+        println!(
+            "   - Action: {} (equipement: {}, type: {:?})",
+            action.id, action.equipement_id, action.r#type
+        );
+    }
+
+    if actions.is_empty() {
+        println!("[DB] ⚠️ Aucune action trouvée pour team_id: {}", team_id);
+        return Ok(Planning {
+            team,
+            actions: vec![],
+            equipements: vec![],
+            coordonees: vec![],
+        });
+    }
+
+    let equipement_ids: Vec<String> = actions.iter().map(|a| a.equipement_id.clone()).collect();
+
+    let equip_params = vec!["?"; equipement_ids.len()].join(",");
+    let sql_equip = format!("SELECT id, event_id, type_id, quantity, length_per_unit, date_pose, date_depose FROM equipement WHERE id IN ({})", equip_params);
+
+    let mut query_equip = sqlx::query_as::<_, TransferEquipementWithoutCoords>(&sql_equip);
+    for id in &equipement_ids {
+        query_equip = query_equip.bind(id);
+    }
+
+    let raw_equipements = query_equip
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| format!("Erreur equipements: {}", e))?;
+
+    // 3. Récupérer les COORDONNÉES pour ces équipements
+    let sql_coords = format!("SELECT id, equipement_id, x, y, order_index FROM equipement_coordinate WHERE equipement_id IN ({})", equip_params);
+    let mut query_coords = sqlx::query_as::<_, TransferEquipementCoordinate>(&sql_coords);
+    for id in &equipement_ids {
+        query_coords = query_coords.bind(id);
+    }
+
+    let coords = query_coords
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| format!("Erreur coords: {}", e))?;
+
+    let final_equipements: Vec<TransferEquipement> = raw_equipements
+        .into_iter()
+        .map(|eq| {
+            let my_coords: Vec<TransferEquipementCoordinate> = coords
+                .iter()
+                .filter(|c| c.equipement_id == eq.id)
+                .cloned()
+                .collect();
+
+            TransferEquipement {
+                id: eq.id,
+                event_id: eq.event_id,
+                type_id: eq.type_id,
+                quantity: eq.quantity.unwrap_or(0),
+                length_per_unit: eq.length_per_unit.unwrap_or(0) as f64,
+                date_pose: eq.date_pose,
+                date_depose: eq.date_depose,
+                coordinates: my_coords,
+            }
+        })
+        .collect();
+
+    println!("[DB] 🚚 Équipements trouvés: {}", final_equipements.len());
+    println!("[DB] 📍 Coordonnées totales: {}", coords.len());
+
+    let result = Planning {
+        team,
+        actions,
+        equipements: final_equipements,
+        coordonees: coords,
+    };
+
+    println!(
+        "[DB] ✅ Planning final: équipe '{}', {} actions, {} équipements, {} coordonnées",
+        result.team.name,
+        result.actions.len(),
+        result.equipements.len(),
+        result.coordonees.len()
+    );
+
+    Ok(result)
 }

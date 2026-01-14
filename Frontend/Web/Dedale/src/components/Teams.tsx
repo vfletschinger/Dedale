@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import toast from "react-hot-toast";
 import { emit } from "@tauri-apps/api/event";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import TeamDetails, { TeamDetailData, Person, Event, EquipementAction } from "./TeamDetails";
@@ -6,6 +7,8 @@ import CreateTeam from "./CreateTeam";
 import { listen } from "@tauri-apps/api/event";
 import MultiRangeSlider from "./MultiRangeSlider";
 import PersonDetails from "./PersonDetails";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faSearch, faUsers, faUser, faPlus } from "@fortawesome/free-solid-svg-icons";
 
 interface Team {
   id: string;
@@ -51,6 +54,7 @@ function Teams({ activeEventId }: { activeEventId: string }) {
         setTeams(teamsData);
       } catch (e) {
         console.error(e);
+        toast.error("Erreur lors du chargement des équipes");
       } finally {
         if (showSpinner) {
           setLoading(false);
@@ -142,6 +146,7 @@ function Teams({ activeEventId }: { activeEventId: string }) {
       return data;
     } catch (error) {
       console.error("Failed to fetch team details:", error);
+      toast.error("Erreur lors du chargement des détails de l'équipe");
       throw error;
     }
   };
@@ -170,7 +175,7 @@ function Teams({ activeEventId }: { activeEventId: string }) {
   const handleTeamCreated = (newTeam: Team) => {
     setTeams([...teams, { ...newTeam }]);
     // Émettre un événement pour les autres pages
-    emit("team-created").catch(() => {});
+    emit("team-created").catch(() => { });
   };
 
   const handleTeamDeleted = (deletedId: string) => {
@@ -183,7 +188,7 @@ function Teams({ activeEventId }: { activeEventId: string }) {
 
     setSelectedTeamData(null);
     // Émettre un événement pour les autres pages
-    emit("team-deleted").catch(() => {});
+    emit("team-deleted").catch(() => { });
   };
 
   return (
@@ -258,8 +263,8 @@ function Teams({ activeEventId }: { activeEventId: string }) {
 
       {/* --- SIDEBAR FILTRES --- */}
       <div className="w-64 p-6 bg-white rounded-lg shadow-lg shrink-0 flex flex-col gap-6">
-        <h2 className="text-xl font-bold text-gray-800 border-b pb-2">
-          🔍 Filtres
+        <h2 className="text-xl font-bold text-gray-800 border-b pb-2 flex items-center gap-2">
+          <FontAwesomeIcon icon={faSearch} /> Filtres
         </h2>
 
         {/* 1. Recherche Nom */}
@@ -272,7 +277,7 @@ function Teams({ activeEventId }: { activeEventId: string }) {
             placeholder="Rechercher..."
             value={filterName}
             onChange={(e) => setFilterName(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary outline-none"
           />
         </div>
 
@@ -281,7 +286,7 @@ function Teams({ activeEventId }: { activeEventId: string }) {
             <label className="text-xs font-semibold text-gray-500 uppercase">
               Membres
             </label>
-            <div className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+            <div className="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">
               {filterMinMembers} -{" "}
               {filterMaxMembers === 10 ? "10+" : filterMaxMembers}
             </div>
@@ -317,7 +322,7 @@ function Teams({ activeEventId }: { activeEventId: string }) {
                 setFilterMinMembers(0);
                 setFilterMaxMembers(10);
               }}
-              className="text-blue-500 hover:text-blue-700 hover:underline font-medium transition-colors"
+              className="text-primary hover:text-primary/80 hover:underline font-medium transition-colors"
             >
               Réinitialiser tout
             </button>
@@ -327,8 +332,8 @@ function Teams({ activeEventId }: { activeEventId: string }) {
 
       {/* --- CONTENU PRINCIPAL --- */}
       <div className="flex-1 p-6 bg-white rounded-lg shadow-lg flex flex-col max-h-screen relative overflow-hidden">
-        <h2 className="text-xl font-bold text-gray-800 mb-6">
-          👥 Équipes
+        <h2 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+          <FontAwesomeIcon icon={faUsers} /> Équipes
           {filteredTeams.length !== teams.length && (
             <span className="text-sm font-normal text-gray-500 ml-2">
               (Filtrées)
@@ -338,7 +343,7 @@ function Teams({ activeEventId }: { activeEventId: string }) {
 
         {loading ? (
           <div className="flex justify-center items-center py-8">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
           </div>
         ) : (
           <div className="overflow-y-auto flex-1 pb-20">
@@ -353,11 +358,11 @@ function Teams({ activeEventId }: { activeEventId: string }) {
                     key={team.id}
                     onMouseEnter={() => handleMouseEnter(team.id)}
                     onClick={() => handleOpenTeam(team)}
-                    className="relative p-3 bg-linear-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200 hover:shadow-md hover:scale-[1.02] transition-all cursor-pointer flex flex-col justify-between"
+                    className="relative p-3 bg-linear-to-br from-primary/5 to-primary/20 rounded-lg border border-primary/20 hover:shadow-md hover:scale-[1.02] transition-all cursor-pointer flex flex-col justify-between"
                   >
                     {loadingTeamId === team.id && (
                       <div className="absolute top-2 right-2">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
                       </div>
                     )}
                     <div>
@@ -366,7 +371,7 @@ function Teams({ activeEventId }: { activeEventId: string }) {
                       </h3>
                     </div>
                     <p className="text-xs text-gray-500 mt-4">
-                      👤 {team.number} membre{team.number > 1 ? "s" : ""}
+                      <FontAwesomeIcon icon={faUser} /> {team.number} membre{team.number > 1 ? "s" : ""}
                     </p>
                   </div>
                 ))
@@ -377,23 +382,10 @@ function Teams({ activeEventId }: { activeEventId: string }) {
 
         <button
           onClick={() => setIsCreateModalOpen(true)}
-          className="absolute bottom-8 right-8 w-10 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg hover:shadow-xl hover:scale-110 cursor-pointer active:scale-95 transition-all duration-200 flex items-center justify-center z-10 group"
+          className="absolute bottom-8 right-8 w-10 h-10 bg-primary hover:opacity-90 text-white rounded-full shadow-lg hover:shadow-xl hover:scale-110 cursor-pointer active:scale-95 transition-all duration-200 flex items-center justify-center z-10 group"
           title="Créer une nouvelle équipe"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-8 w-8 transition-transform group-hover:rotate-90"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 4v16m8-8H4"
-            />
-          </svg>
+          <FontAwesomeIcon icon={faPlus} className="h-6 w-6 transition-transform group-hover:rotate-90" />
         </button>
       </div>
     </div>

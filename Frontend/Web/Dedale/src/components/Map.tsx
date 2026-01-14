@@ -11,7 +11,8 @@ import AddressSearch from "./AdressSearch";
 import ParcoursForm from "./ParcoursForm";
 import InterestForm from "./InterestForm";
 import EquipementForm from "./EquipementForm";
-import EquipementTypeFilter from "./EquipementTypeFilter";
+import EquipementTypeFilter, { VisibilityFilters } from "./EquipementTypeFilter";
+import ZoneForm from "./ZoneForm";
 
 // Hooks personnalisés
 import { useMapPoints } from "../hooks/useMapPoints";
@@ -19,9 +20,29 @@ import { useMapGeometries } from "../hooks/useMapGeometries";
 import { useEvents } from "../hooks/useEvents";
 
 // Types et Utils
-import { SearchResult, MapEvent, Equipement } from "../types/map";
+import { SearchResult, MapEvent, Equipement, MapInterest } from "../types/map";
 import { getMapStyle } from "../utils/mapStyles";
 import { Protocol } from "pmtiles";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faMapMarkerAlt,
+  faDrawPolygon,
+  faRoute,
+  faExclamationCircle,
+  faTools,
+  faTimes,
+  faList,
+  faCalendarAlt,
+  faLayerGroup,
+  faSquare,
+  faWaveSquare,
+  faEye,
+  faTrash,
+  faCamera,
+  faCheck,
+  faComment,
+  faInbox
+} from "@fortawesome/free-solid-svg-icons";
 
 function OfflineMapLibre({
   selectedEventId,
@@ -32,8 +53,8 @@ function OfflineMapLibre({
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
 
-  // Gestion de l'affichage (Vue Carte vs Timeline)
-  const [viewMode, setViewMode] = useState<"points" | "timeline">("points");
+  // Gestion de l'affichage (Vue Carte vs Timeline vs Éléments)
+  const [viewMode, setViewMode] = useState<"points" | "elements" | "timeline">("points");
 
   // État pour le filtre spatial (limites visibles de la carte)
   const [mapBounds, setMapBounds] = useState<{ north: number; south: number; east: number; west: number } | null>(null);
@@ -45,6 +66,14 @@ function OfflineMapLibre({
   // null = pas encore initialisé (afficher tous), [] = aucun sélectionné (afficher aucun)
   const [selectedEquipementTypes, setSelectedEquipementTypes] = useState<string[] | null>(null);
 
+  // État pour les filtres de visibilité des éléments
+  const [visibilityFilters, setVisibilityFilters] = useState<VisibilityFilters>({
+    showZones: true,
+    showParcours: true,
+    showInterests: true,
+    showEquipements: true,
+  });
+
   // Gestion du marqueur d'adresse (Recherche)
   const [currentMarker, setCurrentMarker] = useState<maplibregl.Marker | null>(
     null
@@ -53,6 +82,7 @@ function OfflineMapLibre({
   // 1. Logique des POINTS
   const {
     points,
+    interests,
     selectedPoint,
     setSelectedPoint,
     addingPointCoords,
@@ -62,7 +92,7 @@ function OfflineMapLibre({
     refreshPoints,
     refreshInterest,
     openPopupForPoint,
-  } = useMapPoints(map, selectedEventId);
+  } = useMapPoints(map, selectedEventId, visibilityFilters.showInterests);
 
   // 2. Logique des GÉOMÉTRIES (Zones & Parcours)
   const {
@@ -72,8 +102,6 @@ function OfflineMapLibre({
     drawingMode,
     selectedGeometry,
     editingGeometry,
-    isGeometryListOpen,
-    setIsGeometryListOpen,
     startDrawPolygon,
     startDrawLine,
     startDrawInterest,
@@ -92,7 +120,10 @@ function OfflineMapLibre({
     saveEquipmentWithDetails,
     cancelEquipmentForm,
     handleDeleteEquipement,
-  } = useMapGeometries(map, selectedEventId, timelineFilterDate, selectedEquipementTypes);
+    pendingZoneGeometry,
+    saveZoneWithDetails,
+    cancelZoneForm,
+  } = useMapGeometries(map, selectedEventId, timelineFilterDate, selectedEquipementTypes, visibilityFilters);
 
   // 3. Logique des ÉVÉNEMENTS
   const { events } = useEvents();
@@ -121,12 +152,6 @@ function OfflineMapLibre({
       maxZoom: 19, // Permettre le zoom très proche
     });
 
-    const initialMarker = new maplibregl.Marker()
-      .setLngLat([7.7635, 48.5465])
-      .setPopup(new maplibregl.Popup().setText("Bienvenue à Strasbourg !"))
-      .addTo(mapInstance);
-
-    setCurrentMarker(initialMarker);
     setMap(mapInstance);
 
     return () => {
@@ -215,6 +240,37 @@ function OfflineMapLibre({
     );
   };
 
+  // Fonction pour centrer et afficher la popup d'un point d'intérêt
+  const focusOnInterest = (interest: MapInterest) => {
+    if (!map) return;
+
+    // Fermer toute popup existante
+    const existingPopups = document.querySelectorAll('.maplibregl-popup');
+    existingPopups.forEach(popup => popup.remove());
+
+    // Centrer la carte sur le point
+    map.flyTo({
+      center: [Number(interest.x), Number(interest.y)],
+      zoom: 17,
+      duration: 1000
+    });
+
+    // Créer et afficher la popup après le déplacement
+    setTimeout(() => {
+      new maplibregl.Popup({ closeOnClick: true, maxWidth: '300px' })
+        .setLngLat([Number(interest.x), Number(interest.y)])
+        .setHTML(`
+          <div class="p-2">
+            <div class="font-bold text-purple-700 mb-2 flex items-center gap-1">
+              <span>Point d'intérêt</span>
+            </div>
+            <p class="text-sm text-gray-700">${interest.description || 'Aucune description'}</p>
+          </div>
+        `)
+        .addTo(map);
+    }, 1000);
+  };
+
   const handleAddressSelect = (place: SearchResult) => {
     if (!map) return;
     const { lon, lat, display_name } = place;
@@ -234,7 +290,7 @@ function OfflineMapLibre({
   return (
     <div className="h-full flex flex-col bg-gray-50 overflow-hidden">
       {/* --- HEADER --- */}
-      <div className="bg-slate-700 shadow-lg shrink-0">
+      <div className="bg-gray-900 shadow-lg shrink-0 relative z-30">
         <div className="p-4 pb-0">
           <div className="flex items-center gap-3">
             {/* Barre de recherche */}
@@ -243,34 +299,58 @@ function OfflineMapLibre({
         </div>
 
         {/* Onglets Navigation */}
-        <div className="flex items-center gap-2 px-4 mt-3 border-t border-slate-600">
+        <div className="flex items-center gap-2 px-4 mt-4 border-t border-gray-800">
           <button
             onClick={() => {
               setTimelineFilterDate(null); // Réinitialiser le filtre temporel
               setViewMode("points");
             }}
-            className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${viewMode === "points"
-              ? "text-white border-blue-400"
-              : "text-slate-400 border-transparent hover:text-slate-200"
+            className={`px-4 py-3 text-sm font-bold border-b-2 transition-all ${viewMode === "points"
+              ? "text-secondary border-secondary bg-white/5"
+              : "text-gray-400 border-transparent hover:text-white hover:bg-white/5"
               }`}
           >
             <span className="flex items-center gap-2">
-              <span>📋</span>
+              <FontAwesomeIcon icon={faList} />
               <span>Liste des points</span>
-              <span className="text-xs bg-slate-600 px-2 py-0.5 rounded-full">
+              <span className={`text-xs px-2 py-0.5 rounded-full ${viewMode === 'points' ? 'bg-secondary text-gray-900' : 'bg-gray-700 text-gray-300'}`}>
                 {points.length}
               </span>
             </span>
           </button>
           <button
-            onClick={() => setViewMode("timeline")}
-            className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${viewMode === "timeline"
-              ? "text-white border-blue-400"
+            onClick={() => setViewMode("elements")}
+            className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${viewMode === "elements"
+              ? "text-white border-primary"
               : "text-slate-400 border-transparent hover:text-slate-200"
               }`}
           >
             <span className="flex items-center gap-2">
-              <span>📅</span>
+              <FontAwesomeIcon icon={faLayerGroup} />
+              <span>Éléments</span>
+              <span className="text-xs bg-slate-600 px-2 py-0.5 rounded-full">
+                {(visibilityFilters.showZones ? zones.length : 0) + 
+                 (visibilityFilters.showParcours ? parcours.length : 0) + 
+                 (visibilityFilters.showInterests ? interests.length : 0) + 
+                 (visibilityFilters.showEquipements ? (
+                  selectedEquipementTypes === null
+                    ? equipements.length
+                    : selectedEquipementTypes.length === 0
+                      ? 0
+                      : equipements.filter(eq => !eq.type_id || selectedEquipementTypes.includes(eq.type_id)).length
+                 ) : 0)}
+              </span>
+            </span>
+          </button>
+          <button
+            onClick={() => setViewMode("timeline")}
+            className={`px-4 py-3 text-sm font-bold border-b-2 transition-all ${viewMode === "timeline"
+              ? "text-secondary border-secondary bg-white/5"
+              : "text-gray-400 border-transparent hover:text-white hover:bg-white/5"
+              }`}
+          >
+            <span className="flex items-center gap-2">
+              <FontAwesomeIcon icon={faCalendarAlt} />
               <span>Frise chronologique</span>
             </span>
           </button>
@@ -281,6 +361,8 @@ function OfflineMapLibre({
               selectedTypes={selectedEquipementTypes}
               onFilterChange={setSelectedEquipementTypes}
               variant="header"
+              visibilityFilters={visibilityFilters}
+              onVisibilityChange={setVisibilityFilters}
             />
           </div>
         </div>
@@ -288,7 +370,7 @@ function OfflineMapLibre({
 
       {/* --- CONTENU PRINCIPAL --- */}
       <div className="flex-1 flex overflow-hidden">
-        {/* PANNEAU LATÉRAL (Gauche) */}
+        {/* PANNEAU LATÉRAL - Liste des points */}
         {
           viewMode === "points" && (
             <div className="w-96 bg-white border-r border-gray-200 shadow-lg flex flex-col z-20">
@@ -319,7 +401,7 @@ function OfflineMapLibre({
                 <div className="flex-1 overflow-y-auto p-2 space-y-2">
                   {points.length === 0 ? (
                     <div className="text-center text-gray-500 py-8">
-                      <p className="text-5xl mb-3">📭</p>
+                      <p className="text-5xl mb-3"><FontAwesomeIcon icon={faInbox} className="text-gray-300" /></p>
                       <p className="font-semibold text-gray-700">Aucun point</p>
                       <p className="text-sm mt-2">
                         Sélectionnez un événement et ajoutez des points sur la
@@ -331,29 +413,29 @@ function OfflineMapLibre({
                       <div
                         key={p.id}
                         onClick={() => openPopupForPoint(p)}
-                        className="p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-400 hover:shadow-md cursor-pointer group"
+                        className="p-3 bg-white rounded-lg border border-gray-200 hover:border-primary hover:shadow-md cursor-pointer group"
                       >
                         <div className="flex justify-between items-center mb-1">
-                          <span className="font-bold text-gray-800 text-sm flex gap-2">
-                            <span>📍</span> {p.name || `Point #${p.id.slice(0, 8)}`}
+                          <span className="font-bold text-gray-800 text-sm flex gap-2 items-center">
+                            <FontAwesomeIcon icon={faMapMarkerAlt} className="text-red-500" /> {p.name || `Point #${p.id.slice(0, 8)}`}
                           </span>
-                          <button className="text-blue-600 text-xs font-semibold px-2 py-1 rounded hover:bg-blue-50">
-                            Voir →
-                          </button>
+                          <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1 border border-primary/20">
+                            Voir
+                          </span>
                         </div>
                         <div className="flex gap-2 text-xs">
-                          <span className="bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-200">
-                            📷 {p.pictures?.length || 0}
+                          <span className="bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-200 flex items-center gap-1">
+                            <FontAwesomeIcon icon={faCamera} /> {p.pictures?.length || 0}
                           </span>
                           {p.status && (
-                            <span className="bg-green-50 text-green-700 px-1.5 py-0.5 rounded border border-green-200">
-                              ✓ Traité
+                            <span className="bg-green-50 text-green-700 px-1.5 py-0.5 rounded border border-green-200 flex items-center gap-1">
+                              <FontAwesomeIcon icon={faCheck} /> Traité
                             </span>
                           )}
                         </div>
                         {p.comment && (
-                          <div className="text-xs text-gray-500 mt-2 line-clamp-1">
-                            💬 {p.comment}
+                          <div className="text-xs text-gray-500 mt-2 line-clamp-1 flex items-center gap-1">
+                            <FontAwesomeIcon icon={faComment} /> {p.comment}
                           </div>
                         )}
                       </div>
@@ -361,6 +443,260 @@ function OfflineMapLibre({
                   )}
                 </div>
               )}
+            </div>
+          )
+        }
+
+        {/* PANNEAU LATÉRAL - Éléments (Zones, Parcours, Équipements, Points d'intérêt) */}
+        {
+          viewMode === "elements" && (
+            <div className="w-96 bg-white border-r border-gray-200 shadow-lg flex flex-col z-20">
+              <div className="flex-1 overflow-y-auto">
+                {(() => {
+                  // Calculer les éléments visibles selon les filtres
+                  const visibleZones = visibilityFilters.showZones ? zones : [];
+                  const visibleParcours = visibilityFilters.showParcours ? parcours : [];
+                  const visibleInterests = visibilityFilters.showInterests ? interests : [];
+                  const visibleEquipements = visibilityFilters.showEquipements
+                    ? (selectedEquipementTypes === null
+                        ? equipements
+                        : selectedEquipementTypes.length === 0
+                          ? []
+                          : equipements.filter(eq => !eq.type_id || selectedEquipementTypes.includes(eq.type_id)))
+                    : [];
+                  
+                  const hasNoElements = visibleZones.length === 0 && visibleParcours.length === 0 && visibleEquipements.length === 0 && visibleInterests.length === 0;
+                  
+                  if (hasNoElements) {
+                    return (
+                      <div className="text-center text-gray-500 py-8">
+                        <p className="text-5xl mb-3"><FontAwesomeIcon icon={faLayerGroup} className="text-gray-300" /></p>
+                        <p className="font-semibold text-gray-700">Aucun élément</p>
+                        <p className="text-sm mt-2">
+                          {zones.length + parcours.length + interests.length + equipements.length > 0
+                            ? "Modifiez les filtres pour afficher des éléments."
+                            : "Utilisez les outils sur la carte pour ajouter des zones, parcours, équipements ou points d'intérêt."}
+                        </p>
+                      </div>
+                    );
+                  }
+                  
+                  return (
+                    <div className="divide-y divide-gray-200">
+                      {/* --- SECTION ZONES --- */}
+                      {visibleZones.length > 0 && (
+                        <div>
+                          <div className="px-4 py-2 bg-blue-50 text-sm font-bold text-blue-700 uppercase tracking-wider flex items-center gap-2">
+                            <FontAwesomeIcon icon={faSquare} /> Zones ({visibleZones.length})
+                          </div>
+                          {visibleZones.map((zone) => {
+                            const itemData = { ...zone, type: "zone" as const };
+                            const isSelected =
+                              selectedGeometry?.id === zone.id &&
+                              selectedGeometry?.type === "zone";
+                            const isEditing =
+                              editingGeometry?.id === zone.id &&
+                              editingGeometry?.type === "zone";
+
+                            return (
+                              <div
+                                key={`zone-${zone.id}`}
+                                className={`p-3 border-b border-gray-200 last:border-0 hover:bg-primary/10 cursor-pointer transition-colors ${isSelected
+                                  ? "bg-primary/20 border-l-4 border-l-primary"
+                                  : isEditing
+                                    ? "bg-amber-50"
+                                    : ""
+                                  }`}
+                                onClick={() =>
+                                  highlightGeometry(
+                                    isSelected ? null : itemData
+                                  )
+                                }
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="text-lg text-primary"><FontAwesomeIcon icon={faSquare} /></span>
+                                  <span className="text-sm font-medium truncate flex-1">
+                                    {zone.name ||
+                                      `Zone #${zone.id.slice(0, 8)}`}
+                                  </span>
+                                  {isSelected && (
+                                    <span className="text-primary text-sm">
+                                      <FontAwesomeIcon icon={faEye} />
+                                    </span>
+                                  )}
+                                </div>
+
+                                {isEditing && (
+                                  <div className="flex gap-2 mt-2">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        saveEditGeometry();
+                                      }}
+                                      className="flex-1 bg-green-600 text-white text-xs py-1 rounded"
+                                    >
+                                      Sauver
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        cancelEditGeometry();
+                                      }}
+                                      className="flex-1 bg-gray-500 text-white text-xs py-1 rounded"
+                                    >
+                                      Annuler
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* --- SECTION PARCOURS --- */}
+                      {visibleParcours.length > 0 && (
+                        <div>
+                          <div className="px-4 py-2 bg-green-50 text-sm font-bold text-green-700 uppercase tracking-wider flex items-center gap-2">
+                            <FontAwesomeIcon icon={faWaveSquare} /> Parcours ({visibleParcours.length})
+                          </div>
+                          {visibleParcours.map((p) => {
+                            const itemData = {
+                              ...p,
+                              type: "parcours" as const,
+                            };
+                            const isSelected =
+                              selectedGeometry?.id === p.id &&
+                              selectedGeometry?.type === "parcours";
+                            const isEditing =
+                              editingGeometry?.id === p.id &&
+                              editingGeometry?.type === "parcours";
+
+                            return (
+                              <div
+                                key={`parcours-${p.id}`}
+                                className={`p-3 border-b border-gray-200 last:border-0 hover:bg-primary/10 cursor-pointer transition-colors ${isSelected
+                                  ? "bg-primary/20 border-l-4 border-l-green-500"
+                                  : isEditing
+                                    ? "bg-amber-50"
+                                    : ""
+                                  }`}
+                                onClick={() =>
+                                  highlightGeometry(
+                                    isSelected ? null : itemData
+                                  )
+                                }
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="text-lg text-green-600"><FontAwesomeIcon icon={faWaveSquare} /></span>
+                                  <span className="text-sm font-medium truncate flex-1">
+                                    {p.name || `Parcours #${p.id.slice(0, 8)}`}
+                                  </span>
+                                  {isSelected && (
+                                    <span className="text-green-500 text-sm">
+                                      <FontAwesomeIcon icon={faEye} />
+                                    </span>
+                                  )}
+                                </div>
+
+                                {isEditing && (
+                                  <div className="flex gap-2 mt-2">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        saveEditGeometry();
+                                      }}
+                                      className="flex-1 bg-green-600 text-white text-xs py-1 rounded"
+                                    >
+                                      Sauver
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        cancelEditGeometry();
+                                      }}
+                                      className="flex-1 bg-gray-500 text-white text-xs py-1 rounded"
+                                    >
+                                      Annuler
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* --- SECTION ÉQUIPEMENTS --- */}
+                      {visibleEquipements.length > 0 && (
+                        <div>
+                          <div className="px-4 py-2 bg-orange-50 text-sm font-bold text-orange-700 uppercase tracking-wider flex items-center gap-2">
+                            <FontAwesomeIcon icon={faTools} /> Équipements ({visibleEquipements.length})
+                          </div>
+                          {visibleEquipements.map((eq) => (
+                            <div
+                              key={`equipement-${eq.id}`}
+                              className="p-3 border-b border-gray-200 last:border-0 hover:bg-orange-50 cursor-pointer"
+                              onClick={() => focusOnEquipement(eq)}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 flex-1">
+                                  <span className="text-lg text-orange-600"><FontAwesomeIcon icon={faTools} /></span>
+                                  <div className="flex-1">
+                                    <span className="text-sm font-medium text-gray-700">
+                                      {eq.type_name || "Équipement"}
+                                    </span>
+                                    <div className="text-xs text-gray-500">
+                                      {eq.length}m/unité • {eq.coordinates?.length || 0} points
+                                    </div>
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteEquipement(eq.id);
+                                  }}
+                                  className="p-1.5 text-red-600 hover:bg-red-100 rounded"
+                                  title="Supprimer"
+                                >
+                                  <FontAwesomeIcon icon={faTrash} />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* --- SECTION POINTS D'INTÉRÊT --- */}
+                      {visibleInterests.length > 0 && (
+                        <div>
+                          <div className="px-4 py-2 bg-purple-50 text-sm font-bold text-purple-700 uppercase tracking-wider flex items-center gap-2">
+                            <FontAwesomeIcon icon={faExclamationCircle} /> Points d'intérêt ({visibleInterests.length})
+                          </div>
+                          {visibleInterests.map((interest) => (
+                            <div
+                              key={`interest-${interest.id}`}
+                              className="p-3 border-b border-gray-200 last:border-0 hover:bg-purple-50 cursor-pointer"
+                              onClick={() => focusOnInterest(interest)}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg text-purple-600"><FontAwesomeIcon icon={faExclamationCircle} /></span>
+                                <span className="text-sm font-medium truncate flex-1 text-gray-700">
+                                  {interest.description
+                                    ? (interest.description.length > 40
+                                      ? `${interest.description.slice(0, 40)}...`
+                                      : interest.description)
+                                    : `Point #${interest.id.slice(0, 8)}`}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
             </div>
           )
         }
@@ -391,7 +727,7 @@ function OfflineMapLibre({
               ) : (
                 <div className="p-4 bg-gray-100 text-center flex items-center justify-center h-full">
                   <div>
-                    <p className="text-5xl mb-3">📅</p>
+                    <p className="text-5xl mb-3"><FontAwesomeIcon icon={faCalendarAlt} className="text-gray-300" /></p>
                     <p className="font-semibold text-gray-700">Aucun événement sélectionné</p>
                     <p className="text-sm mt-2 text-gray-500">
                       Sélectionnez un événement pour voir la frise chronologique
@@ -412,9 +748,9 @@ function OfflineMapLibre({
             <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
               {/* Message d'aide */}
               {(drawingMode !== "none" || awaitingMapClick) && (
-                <div className="bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-medium animate-fade-in">
+                <div className="bg-primary text-white px-4 py-2 rounded-lg shadow-lg text-sm font-medium animate-fade-in">
                   {awaitingMapClick
-                    ? "📍 Cliquez sur la carte pour placer le point"
+                    ? <span><FontAwesomeIcon icon={faMapMarkerAlt} /> Cliquez sur la carte pour placer le point</span>
                     : "Double-cliquez pour terminer le dessin"}
                 </div>
               )}
@@ -429,18 +765,18 @@ function OfflineMapLibre({
                     }`}
                   title="Ajouter un point"
                 >
-                  <span className="text-base">📍</span>
+                  <span className="text-base"><FontAwesomeIcon icon={faMapMarkerAlt} /></span>
                 </button>
 
                 <button
                   onClick={startDrawPolygon}
                   className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${drawingMode === "zone"
-                    ? "bg-blue-600 text-white"
+                    ? "bg-primary text-white"
                     : "bg-white hover:bg-gray-50 text-gray-700"
                     }`}
                   title="Zone (Polygone)"
                 >
-                  <span className="text-base">⬡</span>
+                  <span className="text-base"><FontAwesomeIcon icon={faDrawPolygon} /></span>
                 </button>
 
                 <button
@@ -451,17 +787,17 @@ function OfflineMapLibre({
                     }`}
                   title="Parcours (Ligne)"
                 >
-                  <span className="text-base">╱</span>
+                  <span className="text-base"><FontAwesomeIcon icon={faRoute} /></span>
                 </button>
                 <button
                   onClick={startDrawInterest}
                   className={`px-2 py-2 rounded-lg shadow-lg flex items-center justify-center transition-all ${drawingMode === "interest"
                     ? "bg-purple-600 text-white"
-                    : "bg-black/30 hover:bg-black/40 backdrop-blur-sm text-white"
+                    : "bg-white hover:bg-gray-50 text-gray-700"
                     }`}
                   title="Point d'intérêt"
                 >
-                  <span className="text-base font-bold">?</span>
+                  <span className="text-base"><FontAwesomeIcon icon={faExclamationCircle} /></span>
                 </button>
 
                 <button
@@ -472,7 +808,7 @@ function OfflineMapLibre({
                     }`}
                   title="Équipement"
                 >
-                  <span className="text-base">🚧</span>
+                  <span className="text-base"><FontAwesomeIcon icon={faTools} /></span>
                 </button>
 
                 {(drawingMode !== "none" || awaitingMapClick) && (
@@ -481,226 +817,15 @@ function OfflineMapLibre({
                       if (drawingMode !== "none") cancelDrawing();
                       if (awaitingMapClick) {
                         setAddingPointCoords(null);
-                        // Hack pour forcer l'annulation si le state awaitingMapClick n'est pas exposé directement
                         window.dispatchEvent(new Event("cancel-map-action"));
                       }
                     }}
                     className="px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg shadow-lg text-sm font-semibold flex items-center gap-1"
                   >
-                    <span>✕ Annuler</span>
+                    <span><FontAwesomeIcon icon={faTimes} /> Annuler</span>
                   </button>
                 )}
               </div>
-
-              {/* Liste des Zones et Parcours (Dropdown) */}
-              {(zones.length > 0 ||
-                parcours.length > 0 ||
-                equipements.length > 0) && (
-                  <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden max-w-sm mt-2">
-                    <button
-                      onClick={() => setIsGeometryListOpen(!isGeometryListOpen)}
-                      className="w-full px-4 py-2 flex justify-between items-center text-sm font-semibold hover:bg-gray-50"
-                    >
-                      <span>
-                        📐 {zones.length + parcours.length + equipements.length}{" "}
-                        élément(s)
-                      </span>
-                      <span
-                        className={`transform transition-transform ${isGeometryListOpen ? "rotate-180" : ""
-                          }`}
-                      >
-                        ▼
-                      </span>
-                    </button>
-
-                    {isGeometryListOpen && (
-                      <div className="max-h-60 overflow-y-auto bg-gray-50 border-t border-gray-200">
-                        {/* --- SECTION ZONES --- */}
-                        {zones.length > 0 && (
-                          <div>
-                            <div className="px-3 py-1 bg-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                              Zones
-                            </div>
-                            {zones.map((zone) => {
-                              const itemData = { ...zone, type: "zone" as const };
-                              const isSelected =
-                                selectedGeometry?.id === zone.id &&
-                                selectedGeometry?.type === "zone";
-                              const isEditing =
-                                editingGeometry?.id === zone.id &&
-                                editingGeometry?.type === "zone";
-
-                              return (
-                                <div
-                                  key={`zone-${zone.id}`}
-                                  className={`p-2 border-b border-gray-200 last:border-0 hover:bg-blue-50 cursor-pointer transition-colors ${isSelected
-                                    ? "bg-blue-100 border-l-4 border-l-blue-500"
-                                    : isEditing
-                                      ? "bg-amber-50"
-                                      : ""
-                                    }`}
-                                  onClick={() =>
-                                    highlightGeometry(
-                                      isSelected ? null : itemData
-                                    )
-                                  }
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-base">🟦</span>
-                                    <span className="text-xs font-medium truncate flex-1">
-                                      {zone.name ||
-                                        `Zone #${zone.id.slice(0, 8)}`}
-                                    </span>
-                                    {isSelected && (
-                                      <span className="text-blue-500 text-xs">
-                                        👁️
-                                      </span>
-                                    )}
-                                  </div>
-
-                                  {isEditing && (
-                                    <div className="flex gap-2 mt-2">
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          saveEditGeometry();
-                                        }}
-                                        className="flex-1 bg-green-600 text-white text-xs py-1 rounded"
-                                      >
-                                        Sauver
-                                      </button>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          cancelEditGeometry();
-                                        }}
-                                        className="flex-1 bg-gray-500 text-white text-xs py-1 rounded"
-                                      >
-                                        Annuler
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-
-                        {/* --- SECTION PARCOURS --- */}
-                        {parcours.length > 0 && (
-                          <div>
-                            <div className="px-3 py-1 bg-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider border-t border-gray-200">
-                              Parcours
-                            </div>
-                            {parcours.map((p) => {
-                              const itemData = {
-                                ...p,
-                                type: "parcours" as const,
-                              };
-                              const isSelected =
-                                selectedGeometry?.id === p.id &&
-                                selectedGeometry?.type === "parcours";
-                              const isEditing =
-                                editingGeometry?.id === p.id &&
-                                editingGeometry?.type === "parcours";
-
-                              return (
-                                <div
-                                  key={`parcours-${p.id}`}
-                                  className={`p-2 border-b border-gray-200 last:border-0 hover:bg-blue-50 cursor-pointer transition-colors ${isSelected
-                                    ? "bg-blue-100 border-l-4 border-l-green-500"
-                                    : isEditing
-                                      ? "bg-amber-50"
-                                      : ""
-                                    }`}
-                                  onClick={() =>
-                                    highlightGeometry(
-                                      isSelected ? null : itemData
-                                    )
-                                  }
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-base">〰️</span>
-                                    <span className="text-xs font-medium truncate flex-1">
-                                      {p.name || `Parcours #${p.id.slice(0, 8)}`}
-                                    </span>
-                                    {isSelected && (
-                                      <span className="text-green-500 text-xs">
-                                        👁️
-                                      </span>
-                                    )}
-                                  </div>
-
-                                  {isEditing && (
-                                    <div className="flex gap-2 mt-2">
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          saveEditGeometry();
-                                        }}
-                                        className="flex-1 bg-green-600 text-white text-xs py-1 rounded"
-                                      >
-                                        Sauver
-                                      </button>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          cancelEditGeometry();
-                                        }}
-                                        className="flex-1 bg-gray-500 text-white text-xs py-1 rounded"
-                                      >
-                                        Annuler
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-
-                        {/* --- SECTION ÉQUIPEMENTS --- */}
-                        {equipements.length > 0 && (
-                          <div>
-                            <div className="px-3 py-1 bg-orange-100 text-xs font-bold text-orange-700 uppercase tracking-wider">
-                              🚧 Équipements
-                            </div>
-                            {equipements.map((eq) => (
-                              <div
-                                key={`equipement-${eq.id}`}
-                                className="p-2 border-b border-gray-200 last:border-0 hover:bg-orange-50 cursor-pointer"
-                                onClick={() => focusOnEquipement(eq)}
-                              >
-                                <div className="flex items-center justify-between">
-                                  <div className="flex-1">
-                                    <span className="text-sm font-medium text-gray-700">
-                                      {eq.type_name || "Équipement"}
-                                    </span>
-                                    <div className="text-xs text-gray-500 mt-0.5">
-                                      {eq.length}m/unité • {eq.coordinates?.length || 0} points
-                                    </div>
-                                  </div>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation(); // Empêcher le focus sur l'équipement
-                                      handleDeleteEquipement(eq.id);
-                                    }}
-                                    className="p-1 text-red-600 hover:bg-red-100 rounded"
-                                    title="Supprimer"
-                                  >
-                                    🗑️
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )
-              }
-
             </div >
           )
           }
@@ -712,6 +837,14 @@ function OfflineMapLibre({
         <ParcoursForm
           onSubmit={saveParcoursWithDetails}
           onCancel={cancelParcoursForm}
+        />
+      )}
+
+      {/* Formulaire de création de zone */}
+      {pendingZoneGeometry && (
+        <ZoneForm
+          onSubmit={saveZoneWithDetails}
+          onCancel={cancelZoneForm}
         />
       )}
 
