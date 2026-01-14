@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useState } from "react";
+import toast from "react-hot-toast";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTimes } from "@fortawesome/free-solid-svg-icons";
 
@@ -61,9 +62,10 @@ export default function PointDetails({
       // Mettre à jour localement pour affichage immédiat
       point.status = newStatus;
       if (onRefresh) await onRefresh();
+      toast.success("Statut mis à jour");
     } catch (error) {
       console.error("Erreur lors de la mise à jour du statut:", error);
-      alert("Erreur lors de la mise à jour du statut.");
+      toast.error("Erreur lors de la mise à jour du statut.");
     } finally {
       setUpdatingStatus(false);
     }
@@ -82,9 +84,10 @@ export default function PointDetails({
       point.comment = newComment || undefined;
       setEditingComment(false);
       if (onRefresh) await onRefresh();
+      toast.success("Commentaire enregistré");
     } catch (error) {
       console.error("Erreur lors de la sauvegarde du commentaire:", error);
-      alert("Erreur lors de la sauvegarde du commentaire.");
+      toast.error("Erreur lors de la sauvegarde du commentaire.");
     }
   }
 
@@ -101,9 +104,10 @@ export default function PointDetails({
       point.name = newName || undefined;
       setEditingName(false);
       if (onRefresh) await onRefresh();
+      toast.success("Nom modifié");
     } catch (error) {
       console.error("Erreur lors de la sauvegarde du nom:", error);
-      alert("Erreur lors de la sauvegarde du nom.");
+      toast.error("Erreur lors de la sauvegarde du nom.");
     }
   }
 
@@ -115,9 +119,10 @@ export default function PointDetails({
       await invoke("delete_point", { pointId: point.id });
       if (onClose) onClose();
       if (onRefresh) await onRefresh();
+      toast.success("Point supprimé");
     } catch (error) {
       console.error("Erreur lors de la suppression:", error);
-      alert("Erreur lors de la suppression du point.");
+      toast.error("Erreur lors de la suppression du point.");
     }
   }
 
@@ -175,7 +180,7 @@ export default function PointDetails({
                   setEditingName(true);
                   setNewName(point.name || "");
                 }}
-                className="text-primary hover:text-primary/80 text-sm font-medium"
+                className="text-primary hover:text-white hover:bg-primary border border-primary px-3 py-1 rounded-lg text-sm font-medium transition-all"
               >
                 Modifier
               </button>
@@ -206,11 +211,13 @@ export default function PointDetails({
               </div>
             </div>
           ) : (
-            <p className="text-gray-700">
-              {point.name || (
-                <span className="text-gray-400 italic">Aucun nom</span>
-              )}
-            </p>
+            <div className=" border border-gray-200 rounded-lg px-4 py-3 shadow-sm">
+              <p className="text-gray-700">
+                {point.name || (
+                  <span className="text-gray-400 italic">Aucun nom</span>
+                )}
+              </p>
+            </div>
           )}
         </div>
 
@@ -243,7 +250,7 @@ export default function PointDetails({
                   setEditingComment(true);
                   setNewComment(point.comment || "");
                 }}
-                className="text-primary hover:text-primary/80 text-sm font-medium"
+                className="text-primary hover:text-white hover:bg-primary border border-primary px-3 py-1 rounded-lg text-sm font-medium transition-all"
               >
                 Modifier
               </button>
@@ -274,11 +281,13 @@ export default function PointDetails({
               </div>
             </div>
           ) : (
-            <p className="text-gray-700">
-              {point.comment || (
-                <span className="text-gray-400 italic">Aucun commentaire</span>
-              )}
-            </p>
+            <div className="border border-gray-200 rounded-lg px-4 py-3 shadow-sm">
+              <p className="text-gray-700">
+                {point.comment || (
+                  <span className="text-gray-400 italic">Aucun commentaire</span>
+                )}
+              </p>
+            </div>
           )}
         </div>
 

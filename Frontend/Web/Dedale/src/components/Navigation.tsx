@@ -1,7 +1,7 @@
-import logoStrasbourg from "../assets/logo_strasbourg.png";
+import logoStrasbourg from "../../public/dedale.png";
 import type { PageKey } from "../hooks/useNavigation";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faChevronLeft } from "@fortawesome/free-solid-svg-icons";
+import { faCalendarAlt, faTimes } from "@fortawesome/free-solid-svg-icons";
 
 interface NavigationProps {
   currentPage: PageKey;
@@ -9,6 +9,7 @@ interface NavigationProps {
   canGoBack?: boolean;
   onGoBack?: () => void;
   eventSelected: boolean;
+  eventName?: string;
   deselectEvent: () => void;
 }
 
@@ -24,88 +25,85 @@ const NAV_ITEMS: { key: PageKey; label: string }[] = [
 export default function Navigation({
   currentPage,
   onNavigate,
-  canGoBack,
-  onGoBack,
   eventSelected,
+  eventName,
   deselectEvent,
 }: NavigationProps) {
   return (
-    <nav className="sticky top-0 z-[100] w-full border-b border-gray-200 bg-slate-700 shadow-lg">
-      {/* Barre d'accentuation supérieure */}
-      <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-primary/60 to-transparent"></div>
-
-      <div className="w-full px-2 sm:px-4">
-        <div className="flex h-14 items-center gap-6">
-          {/* Section Gauche : Terminal Branding */}
-          <div className="flex items-center gap-6 flex-shrink-0">
-            {canGoBack && onGoBack && (
-              <button
-                onClick={onGoBack}
-                className="group flex h-8 w-8 items-center justify-center rounded-lg bg-slate-600 text-slate-300 hover:text-white transition-all border border-slate-500 hover:border-primary hover:bg-slate-500 cursor-pointer"
-                aria-label="Retour"
-              >
-                <FontAwesomeIcon icon={faChevronLeft} className="h-4 w-4" />
-              </button>
-            )}
-
+    <nav className="sticky top-0 z-[100] w-full bg-gray-900 border-b border-gray-800 shadow-xl">
+      <div className="w-full px-6">
+        <div className="flex h-16 items-center justify-between">
+          {/* Section Gauche : Logo & Branding */}
+          <div className="flex items-center ">
             <div
-              className="flex items-center gap-3 cursor-pointer group"
+              className="flex items-center cursor-pointer group"
               onClick={() => onNavigate("event")}
             >
-              <div className="relative flex items-center justify-center">
-                <div className="absolute inset-0 bg-primary/20 blur-md rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                <img
-                  src={logoStrasbourg}
-                  alt="Logo"
-                  className="relative h-7 w-auto object-contain brightness-110 group-hover:brightness-125 transition-all duration-300"
-                />
-              </div>
-              <div className="flex flex-col leading-none">
-                <span className="text-sm font-bold tracking-wider text-white uppercase">
-                  Dedale
-                </span>
-                <span className="text-[9px] font-medium text-slate-400 tracking-wide uppercase mt-0.5">
-                  Gestion Événements
-                </span>
-              </div>
+              <img
+                src={logoStrasbourg}
+                alt="Logo"
+                className="h-16 w-auto "
+              />
+              <span className="text-3xl font-bold text-white tracking-tight ">
+                Dedale
+              </span>
             </div>
           </div>
 
           {/* Section Centre : Navigation */}
-          <div className="flex-1 flex justify-center">
-            <div className="flex items-center gap-2 px-2 py-1.5 bg-slate-800 rounded-lg border border-slate-600 shadow-md">
-              {NAV_ITEMS.map(({ key, label }) => {
-                const isActive = currentPage === key;
-                const requiresEvent = key !== "event";
-                const isDisabled = requiresEvent && !eventSelected;
+          <div className="flex items-center gap-1 h-full">
+            {NAV_ITEMS.map(({ key, label }) => {
+              const isActive = currentPage === key;
+              const requiresEvent = key !== "event";
+              const isDisabled = requiresEvent && !eventSelected;
 
-                return (
-                  <button
-                    key={key}
-                    onClick={() => onNavigate(key)}
-                    disabled={isDisabled}
-                    className={`relative px-4 py-2 text-[11px] font-semibold tracking-wide uppercase transition-all duration-200 rounded-md
-                    ${isActive
-                        ? "text-white bg-primary shadow-md"
-                        : isDisabled
-                          ? "text-slate-500 bg-slate-800 cursor-not-allowed opacity-50"
-                          : "text-slate-300 hover:text-white hover:bg-slate-700"
-                      }`}
-                    title={isDisabled ? "Sélectionnez d'abord un événement" : ""}
-                  >
-                    <span className="relative z-10">{label}</span>
-                    {isActive && (
-                      <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent rounded-md"></div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+              return (
+                <button
+                  key={key}
+                  onClick={() => onNavigate(key)}
+                  disabled={isDisabled}
+                  className={`relative h-full px-5 text-sm font-medium transition-all duration-200 flex items-center justify-center
+                  ${isActive
+                      ? "text-secondary bg-white/5 border-b-2 border-secondary"
+                      : isDisabled
+                        ? "text-gray-600 cursor-not-allowed"
+                        : "text-gray-300 hover:text-white hover:bg-white/5 border-b-2 border-transparent"
+                    }`}
+                  title={isDisabled ? "Sélectionnez d'abord un événement" : ""}
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
-          <div hidden={!eventSelected} className="flex items-center gap-2 px-2 py-1.5 bg-slate-800 rounded-lg border border-slate-600 shadow-md">
-            <button onClick={deselectEvent} className={`relative px-4 py-2 text-[11px] font-semibold tracking-wide uppercase transition-all duration-200 rounded-md cursor-pointer text-slate-300 hover:text-white hover:bg-slate-700`}>
-              Déselectionner l'événement
-            </button>
+          <div className="flex items-center flex-shrink-0">
+            {eventSelected ? (
+              <div className="flex items-center group relative">
+                <div className="flex items-center gap-3 px-5 py-2 bg-gray-800 border border-gray-700 rounded-full pr-12 transition-all hover:border-yellow-500/50">
+                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                  <FontAwesomeIcon icon={faCalendarAlt} className="text-yellow-500 text-sm" />
+                  <span className="text-sm font-medium text-gray-200 max-w-[180px] truncate">
+                    {eventName || "Événement"}
+                  </span>
+                </div>
+                <button
+                  onClick={deselectEvent}
+                  className="absolute right-1 w-8 h-8 flex items-center justify-center rounded-full bg-gray-700 hover:bg-red-500/20 text-gray-400 hover:text-red-500 transition-all cursor-pointer"
+                  title="Désélectionner l'événement"
+                >
+                  <FontAwesomeIcon icon={faTimes} className="text-xs" />
+                </button>
+              </div>
+            ) : (
+              <button
+                className="flex items-center gap-2 px-5 py-2.5 bg-yellow-500  text-gray-900 font-bold rounded-lg transition-all cursor-pointer transform "
+              >
+                <FontAwesomeIcon icon={faCalendarAlt} className="text-sm" />
+                <span className="text-sm">
+                  Sélectionner un événement
+                </span>
+              </button>
+            )}
           </div>
         </div>
       </div>

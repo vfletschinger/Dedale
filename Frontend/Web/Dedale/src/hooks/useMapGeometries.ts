@@ -6,6 +6,14 @@ import { invoke } from "@tauri-apps/api/core";
 import { geoJSONtoWKT, parseWKTtoGeoJSON } from "../utils/maputils";
 import { Zone, Parcours, Equipement } from "../types/map";
 
+// Types pour les filtres de visibilité
+export interface VisibilityFilters {
+  showZones: boolean;
+  showParcours: boolean;
+  showInterests: boolean;
+  showEquipements: boolean;
+}
+
 // Extend types to include description property
 type ZoneWithDescription = Zone & { description?: string };
 type ParcoursWithDescription = Parcours & { description?: string };
@@ -45,6 +53,7 @@ export function useMapGeometries(
   selectedEventId: string | null,
   timelineFilterDate: Date | null = null,
   equipementTypeFilter: string[] | null = null, // Filtre par type d'équipement (IDs des types)
+  visibilityFilters: VisibilityFilters = { showZones: true, showParcours: true, showInterests: true, showEquipements: true }, // Filtres de visibilité des éléments
 ) {
   // --- ÉTATS ---
   const [zones, setZones] = useState<Zone[]>([]);
@@ -105,6 +114,11 @@ export function useMapGeometries(
     equipementTypeFilterRef.current = equipementTypeFilter;
   }, [equipementTypeFilter]);
 
+  const visibilityFiltersRef = useRef<VisibilityFilters>(visibilityFilters);
+  useEffect(() => {
+    visibilityFiltersRef.current = visibilityFilters;
+  }, [visibilityFilters]);
+
   useEffect(() => {
     drawingModeRef.current = drawingMode;
   }, [drawingMode]);
@@ -117,7 +131,8 @@ export function useMapGeometries(
       currentParcours: Parcours[],
       currentEquipements: Equipement[] = [],
       filterDate: Date | null = null,
-      typeFilter: string[] | null = null // Filtre par type d'équipement
+      typeFilter: string[] | null = null, // Filtre par type d'équipement
+      visFilters: VisibilityFilters = { showZones: true, showParcours: true, showInterests: true, showEquipements: true } // Filtres de visibilité
     ) => {
       // Vérifier que le style est chargé avant de manipuler les sources/layers
       if (!mapObj.isStyleLoaded()) {
@@ -139,15 +154,20 @@ export function useMapGeometries(
       if (mapObj.getSource("event-equipements"))
         mapObj.removeSource("event-equipements");
 
+      // Filtrer les zones et parcours selon les filtres de visibilité
+      const filteredZones = visFilters.showZones ? currentZones : [];
+      const filteredParcours = visFilters.showParcours ? currentParcours : [];
+      const filteredEquipementsInput = visFilters.showEquipements ? currentEquipements : [];
+
       if (
-        currentZones.length === 0 &&
-        currentParcours.length === 0 &&
-        currentEquipements.length === 0
+        filteredZones.length === 0 &&
+        filteredParcours.length === 0 &&
+        filteredEquipementsInput.length === 0
       )
         return;
 
       // Conversion Zones -> GeoJSON
-      const zoneFeatures = currentZones
+      const zoneFeatures = filteredZones
         .map((z) => {
           const geometry = parseWKTtoGeoJSON(z.geometry_json);
           if (!geometry) return null;
@@ -160,7 +180,7 @@ export function useMapGeometries(
         .filter((f): f is GeoJSON.Feature => f !== null);
 
       // Conversion Parcours -> GeoJSON
-      const parcoursFeatures = currentParcours
+      const parcoursFeatures = filteredParcours
         .map((p) => {
           const geometry = parseWKTtoGeoJSON(p.geometry_json);
           if (!geometry) return null;
@@ -207,7 +227,7 @@ export function useMapGeometries(
       }
 
       // Affichage des équipements (avec filtre temporel et filtre par type optionnels)
-      if (currentEquipements.length > 0) {
+      if (filteredEquipementsInput.length > 0) {
         // D'abord filtrer par type si un filtre est actif et non-null
         // null = pas encore initialisé = afficher tous
         // [] = aucun sélectionné = afficher aucun
@@ -215,13 +235,13 @@ export function useMapGeometries(
         let filteredEquipements: Equipement[];
         if (typeFilter === null) {
           // Pas de filtre défini = tous les équipements
-          filteredEquipements = currentEquipements;
+          filteredEquipements = filteredEquipementsInput;
         } else if (typeFilter.length === 0) {
           // Filtre vide = aucun équipement
           filteredEquipements = [];
         } else {
           // Filtrer par les types sélectionnés
-          filteredEquipements = currentEquipements.filter((eq) => {
+          filteredEquipements = filteredEquipementsInput.filter((eq) => {
             // Si l'équipement n'a pas de type_id, on l'affiche (équipement sans type)
             if (!eq.type_id) return true;
             return typeFilter.includes(eq.type_id);
@@ -265,6 +285,26 @@ export function useMapGeometries(
           });
         }
 
+        // Fonction pour déterminer l'épaisseur du trait selon le type d'équipement
+        const getLineWidth = (typeName?: string): number => {
+          if (!typeName) return 3;
+          const name = typeName.toLowerCase();
+          // Véhicules et engins de blocage : trait très épais
+          if (name.includes("véhicule") || name.includes("vehicule") || name.includes("engin")) {
+            return 8;
+          }
+          // Blocs de béton et glissières : trait épais
+          if (name.includes("bloc") || name.includes("glissière") || name.includes("glissiere")) {
+            return 5;
+          }
+          // Barrières : trait fin
+          if (name.includes("barrière") || name.includes("barriere")) {
+            return 2;
+          }
+          // Par défaut : trait moyen
+          return 3;
+        };
+
         const equipementFeatures = filteredEquipements
           .map((eq) => {
             if (!eq.coordinates || eq.coordinates.length < 2) return null;
@@ -278,6 +318,7 @@ export function useMapGeometries(
                 id: eq.id,
                 type: "equipement",
                 type_name: eq.type_name,
+                line_width: getLineWidth(eq.type_name),
               },
             } as GeoJSON.Feature;
           })
@@ -294,9 +335,8 @@ export function useMapGeometries(
             type: "line",
             source: "event-equipements",
             paint: {
-              "line-color": "#f97316", // Orange pour les équipements
-              "line-width": 4,
-              "line-dasharray": [3, 2],
+              "line-color": "#000000", // Noir pour tous les équipements
+              "line-width": ["get", "line_width"], // Épaisseur variable selon le type
             },
           });
         }
@@ -334,7 +374,8 @@ export function useMapGeometries(
           fetchedParcours,
           fetchedEquipements,
           timelineFilterDateRef.current,
-          equipementTypeFilterRef.current
+          equipementTypeFilterRef.current,
+          visibilityFiltersRef.current
         );
       }
     } catch (err) {
@@ -368,8 +409,8 @@ export function useMapGeometries(
     if (!map) return;
 
     // Redessiner les géométries avec les nouveaux filtres
-    refreshGeometriesOnMap(map, zones, parcours, equipements, timelineFilterDate, equipementTypeFilter);
-  }, [map, timelineFilterDate, equipementTypeFilter, zones, parcours, equipements, refreshGeometriesOnMap]);
+    refreshGeometriesOnMap(map, zones, parcours, equipements, timelineFilterDate, equipementTypeFilter, visibilityFilters);
+  }, [map, timelineFilterDate, equipementTypeFilter, visibilityFilters, zones, parcours, equipements, refreshGeometriesOnMap]);
 
   // --- Initialisation Draw & Listeners ---
   useEffect(() => {
@@ -576,38 +617,47 @@ export function useMapGeometries(
     // Créer le contenu du popup avec boutons d'action
     const name = item.name || `${item.type === "zone" ? "Zone" : "Parcours"} #${item.id.slice(0, 8)}`;
     const description = item.description || "Aucune description";
-    const emoji = item.type === "zone" ? "◼" : "●";
     const itemId = item.id;
     const itemType = item.type;
 
     const popupContent = `
-      <div style="min-width: 220px; font-family: system-ui, -apple-system, sans-serif;">
-        <div style="font-weight: 700; font-size: 14px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-          <span>${emoji}</span>
-          <span>${name}</span>
+      <div style="min-width: 240px; font-family: system-ui, -apple-system, sans-serif; padding: 4px;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+          <div style="width: 40px; height: 40px; background: ${item.type === "zone" ? "#dbeafe" : "#dcfce7"}; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+            <span style="font-size: 18px; color: ${item.type === "zone" ? "#2563eb" : "#16a34a"};">${item.type === "zone" ? "◼" : "━"}</span>
+          </div>
+          <div style="flex: 1;">
+            <div style="font-weight: 700; font-size: 15px; color: #1e293b; line-height: 1.2;">${name}</div>
+            <div style="font-size: 11px; color: #64748b; margin-top: 2px;">${item.type === "zone" ? "Zone" : "Parcours"}</div>
+          </div>
         </div>
-        <div style="font-size: 12px; color: #64748b; margin-bottom: 10px; line-height: 1.4;">
-          ${description}
-        </div>
-        <div style="display: flex; gap: 8px; font-size: 11px; color: #94a3b8; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid #e2e8f0;">
-          <span>Type: <strong style="color: #475569;">${item.type === "zone" ? "Zone" : "Parcours"}</strong></span>
+        <div style="background: #f8fafc; border-radius: 8px; padding: 10px; margin-bottom: 14px;">
+          <div style="font-size: 12px; color: #475569; line-height: 1.5;">
+            ${description}
+          </div>
         </div>
         <div style="display: flex; gap: 8px;">
           <button 
             id="geo-edit-btn" 
             data-id="${itemId}" 
             data-type="${itemType}"
-            style="flex: 1; padding: 8px 12px; background: #3b82f6; color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;"
+            style="flex: 1; padding: 10px 14px; background: #2563eb; color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: background 0.2s;"
+            onmouseover="this.style.background='#1d4ed8'"
+            onmouseout="this.style.background='#2563eb'"
           >
-            ✎ Modifier
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            Modifier
           </button>
           <button 
             id="geo-delete-btn" 
             data-id="${itemId}" 
             data-type="${itemType}"
-            style="flex: 1; padding: 8px 12px; background: #ef4444; color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;"
+            style="flex: 1; padding: 10px 14px; background: #ef4444; color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: background 0.2s;"
+            onmouseover="this.style.background='#dc2626'"
+            onmouseout="this.style.background='#ef4444'"
           >
-            ✕ Supprimer
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            Supprimer
           </button>
         </div>
       </div>

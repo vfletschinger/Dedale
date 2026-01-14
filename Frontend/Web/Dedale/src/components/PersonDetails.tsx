@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useState, useEffect } from "react";
 import { Person } from "./CreatePerson";
+import toast from "react-hot-toast";
 import { emit } from "@tauri-apps/api/event";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPen, faTimes, faTrash } from "@fortawesome/free-solid-svg-icons";
@@ -67,8 +68,10 @@ export default function PersonDetails({
       onDelete(person.id);
       await emit("team-update");
       onClose();
+      toast.success("Personne supprimée");
     } catch (e) {
       console.error(e);
+      toast.error("Erreur lors de la suppression");
     }
   };
 
@@ -77,8 +80,10 @@ export default function PersonDetails({
       await invoke("remove_member", { teamId, personId: person.id });
       setTeams(teams.filter((t) => t.id !== teamId));
       await emit("team-update");
+      toast.success("Retiré de l'équipe");
     } catch (e) {
       console.error(e);
+      toast.error("Erreur lors du retrait de l'équipe");
     }
   };
 
@@ -112,8 +117,10 @@ export default function PersonDetails({
       setIsAddingTeam(false);
       setSelectedTeamId("");
       await emit("team-update");
+      toast.success("Ajouté à l'équipe");
     } catch (e) {
       console.error(e);
+      toast.error("Erreur lors de l'ajout à l'équipe");
     }
   };
 
@@ -131,9 +138,10 @@ export default function PersonDetails({
       onUpdate(editData);
       setIsEditing(false);
       await emit("team-update");
+      toast.success("Profil mis à jour");
     } catch (e) {
       console.error(e);
-      alert("Erreur lors de la sauvegarde : " + e);
+      toast.error("Erreur lors de la sauvegarde : " + e);
     } finally {
       setIsSaving(false);
     }
@@ -142,7 +150,7 @@ export default function PersonDetails({
   return (
     <div className="bg-white w-full max-w-sm h-[500px] flex flex-col rounded-xl shadow-2xl overflow-hidden relative">
       {/* HEADER AVEC MODE ÉDITION */}
-      <div className="bg-linear-to-r from-blue-50 to-indigo-50 p-6 text-center border-b border-blue-100 relative shrink-0">
+      <div className="bg-linear-to-r from-primary/10 to-indigo-50 p-6 text-center border-b border-primary/20 relative shrink-0">
         <div className="w-16 h-16 bg-white rounded-full mx-auto flex items-center justify-center text-2xl shadow-sm mb-3 text-primary font-bold border border-primary/20">
           {person.firstname[0].toUpperCase()}
           {person.lastname[0].toUpperCase()}
@@ -155,7 +163,7 @@ export default function PersonDetails({
               onChange={(e) =>
                 setEditData({ ...editData, firstname: e.target.value })
               }
-              className="w-24 text-center border border-blue-300 rounded px-1 py-0.5 text-sm font-bold text-transform: capitalize"
+              className="w-24 text-center border border-primary/50 rounded px-1 py-0.5 text-sm font-bold text-transform: capitalize"
               placeholder="Prénom"
             />
             <input
@@ -163,7 +171,7 @@ export default function PersonDetails({
               onChange={(e) =>
                 setEditData({ ...editData, lastname: e.target.value })
               }
-              className="w-24 text-center border border-blue-300 rounded px-1 py-0.5 text-sm font-bold text-transform: capitalize"
+              className="w-24 text-center border border-primary/50 rounded px-1 py-0.5 text-sm font-bold text-transform: capitalize"
               placeholder="Nom"
             />
           </div>
@@ -258,7 +266,7 @@ export default function PersonDetails({
                   onClick={() => {
                     if (!isEditing) onTeamClick(team);
                   }}
-                  className="flex justify-between items-center p-2 bg-white border border-gray-100 rounded-lg shadow-sm hover:border-blue-300 cursor-pointer group transition-all"
+                  className="flex justify-between items-center p-2 bg-white border border-gray-100 rounded-lg shadow-sm hover:border-primary/50 cursor-pointer group transition-all"
                 >
                   <span className="text-sm font-medium text-gray-700 text-transform: capitalize">
                     {team.name}
@@ -278,12 +286,12 @@ export default function PersonDetails({
               ))}
               {!isEditing &&
                 (isAddingTeam ? (
-                  <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100 animate-in fade-in slide-in-from-top-2">
+                  <div className="mt-4 p-3 bg-primary/10 rounded-lg border border-primary/20 animate-in fade-in slide-in-from-top-2">
                     <div className="flex gap-2">
                       <select
                         value={selectedTeamId}
                         onChange={(e) => setSelectedTeamId(e.target.value)}
-                        className="flex-1 text-transform: capitalize text-sm border border-blue-200 rounded px-2 py-1 outline-none cursor-pointer"
+                        className="flex-1 text-transform: capitalize text-sm border border-primary/30 rounded px-2 py-1 outline-none cursor-pointer"
                       >
                         <option value="">Choisir...</option>
                         {availableTeams.map((t) => (
