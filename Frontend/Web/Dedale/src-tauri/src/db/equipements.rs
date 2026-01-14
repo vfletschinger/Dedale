@@ -351,7 +351,7 @@ pub async fn add_action(
     action_type: String,
 ) -> Result<String, String> {
     let pool = get_db_pool(&app).await?;
-    
+
     // Vérifier si une action existe déjà pour cet équipement et ce type
     let existing_action: Option<(String,)> =
         sqlx::query_as("SELECT id FROM action WHERE equipement_id = ? AND type = ?")
