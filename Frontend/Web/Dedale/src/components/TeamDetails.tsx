@@ -188,14 +188,11 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
         setIsAddingEquipementAction(true);
         try {
             const allEquipements = await invoke<Equipement[]>("fetch_equipements_for_event", { eventId: activeEventId });
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const allEventActions = await invoke<any[]>("fetch_actions", { eventId: activeEventId });
-
-            const takenSet = new Set(allEventActions.map(a => `${a.equipement_id}-${a.action_type}`));
 
             const actionsList: AvailableActionOption[] = [];
 
-            allEquipements.forEach(eq => {
+            // Pour chaque équipement, vérifier quelles actions sont déjà assignées (toutes équipes confondues)
+            for (const eq of allEquipements) {
                 const format = (d: string | undefined) => {
                     if (!d) return "Non planifié";
                     const date = new Date(d);
@@ -207,21 +204,27 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
                     });
                 };
 
-                if (!takenSet.has(`${eq.id}-pose`)) {
+                // Récupérer toutes les actions de cet équipement (toutes équipes)
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const allEquipementActions = await invoke<any[]>("fetch_actions_for_equipement", { equipementId: eq.id });
+                
+                const takenTypes = new Set(allEquipementActions.map(a => a.action_type));
+
+                if (!takenTypes.has('pose')) {
                     actionsList.push({
                         ...eq,
                         temp_type: 'pose',
                         label: `${eq.type_name} • Pose • ${format(eq.date_pose)}`
                     });
                 }
-                if (!takenSet.has(`${eq.id}-retrait`)) {
+                if (!takenTypes.has('retrait')) {
                     actionsList.push({
                         ...eq,
                         temp_type: 'retrait',
                         label: `${eq.type_name} • Retrait • ${format(eq.date_depose)}`
                     });
                 }
-            });
+            }
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             setavailableEquipements(actionsList as any);
