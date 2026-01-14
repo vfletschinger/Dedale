@@ -41,9 +41,119 @@ import {
   faTrash,
   faCamera,
   faCheck,
-  faComment,
-  faInbox
+  faInbox,
+  faSpinner
 } from "@fortawesome/free-solid-svg-icons";
+
+// Composant pour l'affichage d'un point dans la liste avec chargement d'adresse asynchrone
+function PointListItem({ point, onClick, cachedAddress, onCacheAddress }: {
+  point: import("../types/map").MapPoint;
+  onClick: () => void;
+  cachedAddress?: string;
+  onCacheAddress: (id: string, address: string) => void;
+}) {
+  const [address, setAddress] = useState<string | null>(cachedAddress || null);
+  const [loadingAddress, setLoadingAddress] = useState(!cachedAddress);
+
+  useEffect(() => {
+    // Si on a déjà l'adresse en cache, on ne fait rien (ou on met à jour si nécessaire)
+    if (cachedAddress) {
+      setAddress(cachedAddress);
+      setLoadingAddress(false);
+      return;
+    }
+
+    let mounted = true;
+
+    const fetchAddress = async () => {
+      try {
+        setLoadingAddress(true);
+        const result = await invoke<string | null>("reverse_geocode", {
+          lat: Number(point.y),
+          lon: Number(point.x),
+        });
+
+        if (mounted) {
+          if (result) {
+            setAddress(result);
+            onCacheAddress(point.id, result);
+          } else {
+            setAddress(null);
+          }
+        }
+      } catch (err) {
+        console.error("Erreur reverse geocoding pour le point", point.id, err);
+      } finally {
+        if (mounted) setLoadingAddress(false);
+      }
+    };
+
+    fetchAddress();
+
+    return () => {
+      mounted = false;
+    };
+  }, [point.x, point.y, point.id, cachedAddress, onCacheAddress]);
+
+  return (
+    <div
+      onClick={onClick}
+      className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm hover:shadow-md hover:border-primary transition-all cursor-pointer group"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start gap-3">
+          <div className="mt-1 bg-red-50 text-red-500 p-2 rounded-full h-8 w-8 flex items-center justify-center shrink-0">
+            <FontAwesomeIcon icon={faMapMarkerAlt} />
+          </div>
+          <div>
+            <h4 className="font-bold text-gray-900 text-sm leading-tight">
+              {point.name || "Point sans nom"}
+            </h4>
+
+            {/* Adresse récupérée dynamiquement */}
+            <p className="text-xs text-gray-600 mt-1 flex items-center gap-1.5 font-medium">
+              {loadingAddress ? (
+                <span className="text-gray-400 italic flex items-center gap-1">
+                  <FontAwesomeIcon icon={faSpinner} spin className="text-[10px]" /> Recherche adresse...
+                </span>
+              ) : address ? (
+                <span>{address}</span>
+              ) : (
+                <span className="text-gray-400 italic">Adresse inconnue</span>
+              )}
+            </p>
+
+            {/* Badges (Photos / Statut) - Plus discret */}
+            <div className="flex flex-wrap gap-2 mt-2">
+              {(point.pictures && point.pictures.length > 0) && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-100">
+                  <FontAwesomeIcon icon={faCamera} /> {point.pictures.length}
+                </span>
+              )}
+              {point.status && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-50 text-green-700 border border-green-100">
+                  <FontAwesomeIcon icon={faCheck} /> Traité
+                </span>
+              )}
+            </div>
+
+            {/* Commentaire tronqué */}
+            {point.comment && (
+              <p className="text-xs text-slate-500 mt-1.5 line-clamp-1 pl-2 border-l-2 border-slate-200 italic">
+                {point.comment}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Bouton Voir (visible au survol du groupe) */}
+        <button className="opacity-0 group-hover:opacity-100 transition-opacity bg-primary text-white p-1.5 rounded-md shadow-sm hover:bg-primary-dark">
+          <FontAwesomeIcon icon={faEye} className="text-xs" />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function OfflineMapLibre({
   selectedEventId,
@@ -57,6 +167,9 @@ function OfflineMapLibre({
 
   // Gestion de l'affichage (Vue Carte vs Timeline vs Éléments)
   const [viewMode, setViewMode] = useState<"points" | "elements" | "timeline">("points");
+
+  // Cache pour les adresses (ID Point -> Adresse) pour éviter le flickering
+  const [addressCache, setAddressCache] = useState<Record<string, string>>({});
 
   // État pour le filtre spatial (limites visibles de la carte)
   const [mapBounds, setMapBounds] = useState<{ north: number; south: number; east: number; west: number } | null>(null);
@@ -400,7 +513,7 @@ function OfflineMapLibre({
         {/* PANNEAU LATÉRAL - Liste des points */}
         {
           viewMode === "points" && (
-            <div className="w-96 bg-white border-r border-gray-200 shadow-lg flex flex-col z-20">
+            <div className="w-80 bg-white border-r border-gray-200 shadow-lg flex flex-col z-20">
               {addingPointCoords ? (
                 // Mode: Ajout d'un point
                 <div className="flex-1 overflow-y-auto">
@@ -421,6 +534,8 @@ function OfflineMapLibre({
                     point={selectedPoint}
                     onClose={() => setSelectedPoint(null)}
                     onRefresh={refreshPoints}
+                    cachedAddress={addressCache[selectedPoint.id]}
+                    onCacheAddress={(id, addr) => setAddressCache(prev => ({ ...prev, [id]: addr }))}
                   />
                 </div>
               ) : (
@@ -437,35 +552,13 @@ function OfflineMapLibre({
                     </div>
                   ) : (
                     points.map((p) => (
-                      <div
+                      <PointListItem
                         key={p.id}
+                        point={p}
                         onClick={() => openPopupForPoint(p)}
-                        className="p-3 bg-white rounded-lg border border-gray-200 hover:border-primary hover:shadow-md cursor-pointer group"
-                      >
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="font-bold text-gray-800 text-sm flex gap-2 items-center">
-                            <FontAwesomeIcon icon={faMapMarkerAlt} className="text-red-500" /> {p.name || `Point #${p.id.slice(0, 8)}`}
-                          </span>
-                          <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1 border border-primary/20">
-                            Voir
-                          </span>
-                        </div>
-                        <div className="flex gap-2 text-xs">
-                          <span className="bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-200 flex items-center gap-1">
-                            <FontAwesomeIcon icon={faCamera} /> {p.pictures?.length || 0}
-                          </span>
-                          {p.status && (
-                            <span className="bg-green-50 text-green-700 px-1.5 py-0.5 rounded border border-green-200 flex items-center gap-1">
-                              <FontAwesomeIcon icon={faCheck} /> Traité
-                            </span>
-                          )}
-                        </div>
-                        {p.comment && (
-                          <div className="text-xs text-gray-500 mt-2 line-clamp-1 flex items-center gap-1">
-                            <FontAwesomeIcon icon={faComment} /> {p.comment}
-                          </div>
-                        )}
-                      </div>
+                        cachedAddress={addressCache[p.id]}
+                        onCacheAddress={(id, addr) => setAddressCache(prev => ({ ...prev, [id]: addr }))}
+                      />
                     ))
                   )}
                 </div>
@@ -477,7 +570,7 @@ function OfflineMapLibre({
         {/* PANNEAU LATÉRAL - Éléments (Zones, Parcours, Équipements, Points d'intérêt) */}
         {
           viewMode === "elements" && (
-            <div className="w-96 bg-white border-r border-gray-200 shadow-lg flex flex-col z-20">
+            <div className="w-80 bg-white border-r border-gray-200 shadow-lg flex flex-col z-20">
               <div className="flex-1 overflow-y-auto">
                 {(() => {
                   // Calculer les éléments visibles selon les filtres
