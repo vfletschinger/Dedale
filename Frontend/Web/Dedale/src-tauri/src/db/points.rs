@@ -88,6 +88,7 @@ pub async fn update_point(app: AppHandle, point: Point) -> Result<Point, String>
     Ok(point)
 }
 #[tauri::command]
+#[allow(dead_code)]
 pub async fn fetch_pictures(app: AppHandle, point_id: String) -> Result<Vec<Picture>, String> {
     let rows = sqlx::query("SELECT id, image_data, point_id FROM picture WHERE point_id = ?")
         .bind(point_id)
@@ -338,7 +339,7 @@ pub async fn insert_point(app: AppHandle, point: PointWithDetails) -> Result<Vec
     .bind(point.name.clone())
     .bind(point.comment.clone())
     .bind(point.r#type.clone())
-    .bind(point.status.clone())
+    .bind(point.status)
     .execute(&pool)
     .await
     .map_err(|e| format!("Failed to insert point: {}", e))?;

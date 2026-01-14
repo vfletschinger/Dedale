@@ -3,6 +3,7 @@ use tauri::{Emitter, Manager};
 
 mod db;
 mod excel;
+mod geocoding;
 mod map;
 mod map_static;
 mod pdf;
@@ -10,7 +11,6 @@ mod seed;
 mod socket;
 mod types;
 mod utils;
-mod geocoding;
 
 #[cfg(test)]
 mod tests;
@@ -110,7 +110,7 @@ pub fn run() {
             db::create_equipement,
             db::fetch_equipements_for_event,
             db::delete_equipement,
-            db::update_equipement,     
+            db::update_equipement,
             db::add_action,
             db::fetch_actions,
             db::delete_action,

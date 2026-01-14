@@ -225,7 +225,7 @@ pub async fn create_planning_pdf(app: AppHandle, event_id: Option<String>) -> Re
         .to_string()
     };
 
-    let _team_rows = sqlx::query_as::<_, (String, String)>(&teams_query)
+    let team_rows = sqlx::query_as::<_, (String, String)>(&teams_query)
         .fetch_all(&pool)
         .await
         .map_err(|e| e.to_string())?;
@@ -268,6 +268,36 @@ pub async fn create_planning_pdf(app: AppHandle, event_id: Option<String>) -> Re
     content.push_str("50 750 Td\n");
     content.push_str("(Planning) Tj\n");
     content.push_str("0 -30 Td\n");
+
+    #[allow(unused_variables, unused_assignments)]
+    for (_team_id, team_name) in team_rows {
+        content.push_str(&format!("({}) Tj\n", team_name));
+        content.push_str("0 -15 Td\n");
+        let actions_query = r#"
+            SELECT 
+                type,
+                equipement_id,
+                scheduled_time,
+                is_done
+            FROM action
+            WHERE team_id = ?
+            ORDER BY scheduled_time ASC
+        "#;
+
+        let action_rows = sqlx::query_as::<_, (String, String, String, bool)>(actions_query)
+            .bind(&_team_id)
+            .fetch_all(&pool)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        for (action_type, _equipement_id, _scheduled_time, is_done) in action_rows {
+            let status = if is_done { "[Done]" } else { "[Pending]" };
+            content.push_str(&format!("  - {} {}) Tj\n", action_type, status));
+            content.push_str("0 -10 Td\n");
+        }
+
+        content.push_str("0 -10 Td\n");
+    }
 
     content.push_str("ET\n");
     content.push_str("endstream\n");
