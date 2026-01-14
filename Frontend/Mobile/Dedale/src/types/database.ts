@@ -77,13 +77,28 @@ export type EquipementTypeType = {
 
 export type EquipementType = {
   id: string; // UUID
-  point_id: string; // UUID reference
-  type_id: number;
+  event_id: string; // UUID reference to event
+  type_id: string; // UUID reference to type
   quantity: number;
-  name?: string; // From joined equipement_type
+  length_per_unit?: number;
+  date_pose?: string;
+  date_depose?: string;
+  name?: string; // From joined type table
   description?: string;
-  width?: number;
-  length?: number;
+};
+
+export type EquipementCoordinateType = {
+  id: string; // UUID
+  equipement_id: string; // UUID reference
+  x: number;
+  y: number;
+  order_index: number;
+};
+
+export type TypeType = {
+  id: string; // UUID
+  name?: string;
+  description?: string;
 };
 
 export type TeamType = {

@@ -293,13 +293,14 @@ export async function seedDatabase(db: SQLiteDatabase) {
       },
     ];
 
-    const typeIds: number[] = [];
+    const typeIds: string[] = [];
     equipementTypes.forEach((type) => {
-      const result = db.runSync(
-        "INSERT INTO equipement_type (id, name, description, width, length) VALUES (?, ?, ?, ?, ?)",
-        [type.id, type.name, type.description, type.width, type.length]
+      const typeId = generateUUID();
+      db.runSync(
+        "INSERT INTO type (id, name, description) VALUES (?, ?, ?)",
+        [typeId, type.name, type.description]
       );
-      typeIds.push(result.lastInsertRowId);
+      typeIds.push(typeId);
     });
 
     // 3. Seed points avec event_id direct et UUIDs
@@ -411,25 +412,33 @@ export async function seedDatabase(db: SQLiteDatabase) {
     // 5. Seed equipements (quelques exemples)
     console.log("Insertion des équipements...");
     const equipements = [
-      { point_id: pointIds[0], type_id: typeIds[0], quantity: 2 },
-      { point_id: pointIds[0], type_id: typeIds[4], quantity: 1 },
-      { point_id: pointIds[1], type_id: typeIds[2], quantity: 1 },
-      { point_id: pointIds[2], type_id: typeIds[1], quantity: 3 },
-      { point_id: pointIds[4], type_id: typeIds[5], quantity: 10 },
-      { point_id: pointIds[5], type_id: typeIds[6], quantity: 8 },
+      { event_id: eventIds[0], type_id: typeIds[0], quantity: 2 },
+      { event_id: eventIds[0], type_id: typeIds[4], quantity: 1 },
+      { event_id: eventIds[0], type_id: typeIds[2], quantity: 1 },
+      { event_id: eventIds[1], type_id: typeIds[1], quantity: 3 },
+      { event_id: eventIds[1], type_id: typeIds[5], quantity: 10 },
+      { event_id: eventIds[1], type_id: typeIds[6], quantity: 8 },
     ];
 
     const equipementIds: string[] = [];
-    equipements.forEach((equipement) => {
+    equipements.forEach((equipement, index) => {
       const equipementId = generateUUID();
       db.runSync(
-        "INSERT INTO equipement (id, point_id, type_id, quantity) VALUES (?, ?, ?, ?)",
+        "INSERT INTO equipement (id, event_id, type_id, quantity, length_per_unit) VALUES (?, ?, ?, ?, ?)",
         [
           equipementId,
-          equipement.point_id,
+          equipement.event_id,
           equipement.type_id,
           equipement.quantity,
+          0,
         ]
+      );
+      // Ajouter une coordonnée pour chaque équipement
+      const coordId = generateUUID();
+      const pointIndex = index % pointIds.length;
+      db.runSync(
+        "INSERT INTO equipement_coordinate (id, equipement_id, x, y, order_index) VALUES (?, ?, ?, ?, ?)",
+        [coordId, equipementId, 7.75 + (index * 0.01), 48.57 + (index * 0.01), 0]
       );
       equipementIds.push(equipementId);
     });
@@ -547,8 +556,14 @@ export function clearDatabase(db: SQLiteDatabase): void {
     if (tableExists("equipement_type")) {
       db.execSync("DELETE FROM equipement_type");
     }
+    if (tableExists("type")) {
+      db.execSync("DELETE FROM type");
+    }
     if (tableExists("obstacle_type")) {
       db.execSync("DELETE FROM obstacle_type");
+    }
+    if (tableExists("equipement_coordinate")) {
+      db.execSync("DELETE FROM equipement_coordinate");
     }
 
     // New schema: parcours and zone

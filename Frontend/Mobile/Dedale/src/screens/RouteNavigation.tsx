@@ -9,6 +9,7 @@ import MapView, {
   PROVIDER_DEFAULT,
 } from "react-native-maps";
 import * as Location from "expo-location";
+import Colors from "../constants/colors";
 
 export function checkPointVisibility(
   point: { x: number; y: number },
@@ -224,7 +225,7 @@ export default function RouteNavigation() {
         {routeCoordinates.length > 0 && (
           <Polyline
             coordinates={routeCoordinates}
-            strokeColor="#3b82f6"
+            strokeColor={Colors.secondary}
             strokeWidth={4}
           />
         )}
@@ -233,7 +234,7 @@ export default function RouteNavigation() {
           <Marker
             key={point.id}
             coordinate={{ latitude: point.y, longitude: point.x }}
-            pinColor={index === currentPointIndex ? "#3b82f6" : "#9ca3af"}
+            pinColor={index === currentPointIndex ? Colors.secondary : "#9ca3af"}
             title={`Point #${shortId(point.id)}`}
             description={
               index === currentPointIndex
@@ -247,7 +248,7 @@ export default function RouteNavigation() {
       {!isPointVisible && (
         <Pressable
           onPress={centerOnCurrentPoint}
-          className="absolute top-16 right-5 bg-blue-500 py-3 px-4 rounded-3xl shadow-lg"
+          className="absolute top-16 right-5 bg-secondary py-3 px-4 rounded-3xl shadow-lg"
         >
           <Text className="text-white font-semibold text-sm">📍 Recentrer</Text>
         </Pressable>

@@ -24,6 +24,7 @@ import * as ImageHelper from "../services/ImageHelper";
 import { useEvent } from "../context/EventContext";
 import { usePoints } from "../context/PointsContext";
 import { generateUUID } from "../services/Helper";
+import Colors from "../constants/colors";
 
 type SelectedObstacle = {
   type_id: number;
@@ -159,13 +160,19 @@ export default function RegisterPointScreen() {
       }
 
       // Sauvegarder les équipements (anciennement obstacles)
-      if (selectedObstacles.length > 0) {
+      if (selectedObstacles.length > 0 && selectedEvent?.id) {
         for (const obstacle of selectedObstacles) {
           try {
             const equipementId = generateUUID();
             db.runSync(
-              "INSERT INTO equipement (id, point_id, type_id, quantity) VALUES (?, ?, ?, ?)",
-              [equipementId, pointId, obstacle.type_id, obstacle.number]
+              "INSERT INTO equipement (id, event_id, type_id, quantity, length_per_unit) VALUES (?, ?, ?, ?, ?)",
+              [equipementId, selectedEvent.id, obstacle.type_id, obstacle.number, 0]
+            );
+            // Ajouter la coordonnée du point comme coordonnée de l'équipement
+            const coordId = generateUUID();
+            db.runSync(
+              "INSERT INTO equipement_coordinate (id, equipement_id, x, y, order_index) VALUES (?, ?, ?, ?, ?)",
+              [coordId, equipementId, location.coords.longitude, location.coords.latitude, 0]
             );
           } catch (equipErr) {
             console.error(
@@ -232,7 +239,7 @@ export default function RegisterPointScreen() {
                   style={{
                     width: 30,
                     height: 30,
-                    backgroundColor: "#3b82f6",
+                    backgroundColor: Colors.secondary,
                     borderRadius: 15,
                     borderTopLeftRadius: 15,
                     borderTopRightRadius: 15,
@@ -269,7 +276,7 @@ export default function RegisterPointScreen() {
 
       <View className="absolute bottom-5 left-5 right-5 flex-row justify-between gap-2">
         <Pressable onPress={requestLocation} className="flex-1 btn-violet">
-          <Text className="text-white font-bold">Obtenir ma position</Text>
+          <Text className="text-white font-bold">Centrer</Text>
         </Pressable>
 
         <Pressable
@@ -280,7 +287,6 @@ export default function RegisterPointScreen() {
         </Pressable>
       </View>
 
-      {/* Modal principale */}
       <Modal
         visible={isModalVisible}
         transparent={true}

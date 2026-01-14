@@ -1,27 +1,14 @@
-import {
-  View,
-  Text,
-  FlatList,
-  ActivityIndicator,
-  Pressable,
-  Modal,
-  Alert,
-} from "react-native";
+import { View, Text, FlatList, ActivityIndicator, Pressable, Modal, Alert,} from "react-native";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import React, { useEffect, useState } from "react";
 import { InterestPointsType } from "../types/database";
 import { getDatabase } from "../../assets/migrations";
-
-import {
-  calculateDistance,
-  getAddressFromCoords,
-  getUserLocation,
-  shortId,
-} from "../services/Helper";
+import { calculateDistance, getAddressFromCoords, getUserLocation, shortId, } from "../services/Helper";
 import { deletePoint } from "../services/databaseAcces";
 import InterestPointCard from "../components/PointCard";
 import { useEvent } from "../context/EventContext";
 import { usePoints } from "../context/PointsContext";
+import Colors from "../constants/colors";
 
 function ModalPointItem({
   item,
@@ -73,7 +60,6 @@ export default function InterestPointsScreen() {
     latitude: number;
     longitude: number;
   } | null>(null);
-  const [modalVisible, setModalVisible] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
   useEffect(() => {
@@ -114,7 +100,7 @@ export default function InterestPointsScreen() {
           onPress: () => {
             const success = deletePoint(pointId, db);
             if (success) {
-              refreshPoints(); // Rafraîchir la liste des points
+              refreshPoints();
               Alert.alert("Succès", "Point supprimé avec succès.");
             } else {
               Alert.alert("Erreur", "Impossible de supprimer le point");
@@ -156,29 +142,11 @@ export default function InterestPointsScreen() {
     });
   };
 
-  const openSelectionModal = () => {
-    setSelectedIds([]);
-    setModalVisible(true);
-  };
-
-  const validateSelection = () => {
-    if (selectedIds.length === 0) {
-      Alert.alert(
-        "Aucun point sélectionné",
-        "Veuillez sélectionner au moins un point pour créer un itinéraire."
-      );
-      return;
-    }
-    const selectedPoints = sortedList.filter((p) => selectedIds.includes(p.id));
-    setModalVisible(false);
-    navigation.navigate("CreateRoute", { points: selectedPoints });
-  };
-
 
   if (pointsLoading) {
     return (
       <View className="flex-1 items-center justify-center bg-gray-50">
-        <ActivityIndicator size="large" color="#3b82f6" />
+        <ActivityIndicator size="large" color={Colors.secondary} />
         <Text className="mt-4 text-gray-600 text-base">
           Chargement des points...
         </Text>
@@ -260,84 +228,14 @@ export default function InterestPointsScreen() {
                 navigation.navigate("PointDetails", { pointId: item.id })
               }
               onDelete={() => handleDelete(item.id)}
-              displayKnob={false}
+              displayKnob={false} 
+              displayCoordinates={false}
+              displayDeleteButton={false}
             />
           )}
           ListFooterComponent={<View className="h-4" />}
         />
       )}
-
-      {/* Persistent centered button at bottom */}
-      <Pressable
-        onPress={openSelectionModal}
-        className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-blue-500 rounded-full p-4 shadow-lg active:bg-blue-600"
-        style={{
-          transform: [{ scale: 1 }],
-          zIndex: 1000,
-        }}
-      >
-        <Text className="text-white font-bold text-lg">
-          + Créer un itinéraire
-        </Text>
-      </Pressable>
-
-      {/* Selection Modal */}
-      <Modal
-        visible={modalVisible}
-        animationType="fade"
-        transparent={true}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <Pressable
-          onPress={() => setModalVisible(false)}
-          className="flex-1 bg-black/40 justify-center items-center"
-          style={{ padding: 12 }}
-        >
-          <Pressable
-            onPress={() => {}}
-            className="bg-white rounded-2xl w-11/12 h-5/6"
-            style={{ padding: 16 }}
-          >
-            <View className="flex-row items-center justify-between mb-3">
-              <Text className="text-lg font-semibold">
-                Sélectionner des points
-              </Text>
-              <Pressable onPress={() => setModalVisible(false)} className="p-2">
-                <Text className="text-blue-600 font-semibold">Fermer</Text>
-              </Pressable>
-            </View>
-
-            <FlatList
-              data={sortedList}
-              keyExtractor={(item) => item.id.toString()}
-              renderItem={({ item }) => (
-                <ModalPointItem
-                  item={item}
-                  selected={selectedIds.includes(item.id)}
-                  onToggle={() => toggleSelect(item.id)}
-                />
-              )}
-            />
-
-            <View className="flex-row justify-between mt-3">
-              <Pressable
-                onPress={() => setModalVisible(false)}
-                className="modal-btn-cancel"
-              >
-                <Text>Annuler</Text>
-              </Pressable>
-              <Pressable
-                onPress={validateSelection}
-                className="modal-btn-confirm"
-              >
-                <Text className="text-white font-semibold">
-                  Valider ({selectedIds.length})
-                </Text>
-              </Pressable>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
     </View>
   );
 }

@@ -125,7 +125,7 @@ const QRCodeScanner = ({
   onExportSuccess,
 }: QRCodeScannerProps) => {
   const { setWsClient, setIsConnected } = useWebSocket();
-  const { refreshEvents, selectedEventId } = useEvent();
+  const { refreshEvents } = useEvent();
   const { refreshPoints } = usePoints();
   const { refreshGeometries } = useGeometries();
   const [permission, requestPermission] = useCameraPermissions();
@@ -535,181 +535,6 @@ const QRCodeScanner = ({
     }
   };
 
-  // Insérer les données de planning (actions, équipes, équipements) pour l'événement actuel
-  const insertPlanningData = (planningData: any): { success: boolean; message: string } => {
-    try {
-      if (!selectedEventId) {
-        return { success: false, message: "Aucun événement sélectionné" };
-      }
-
-      let teamsCount = 0;
-      let actionsCount = 0;
-      let equipementsCount = 0;
-      let coordsCount = 0;
-      let skippedTeams = 0;
-
-      const actionsArray = planningData.actions || [];
-      
-      for (const actionGroup of actionsArray) {
-        // Vérifier que l'équipe appartient à l'événement actuel
-        const team = actionGroup.team;
-        if (!team || team.eventId !== selectedEventId) {
-          console.log(`⚠️ Équipe ignorée (eventId: ${team?.eventId} !== ${selectedEventId})`);
-          skippedTeams++;
-          continue;
-        }
-
-        // Insérer/mettre à jour l'équipe
-        const existingTeam = db.getFirstSync(
-          "SELECT id FROM team WHERE id = ?",
-          [team.id]
-        );
-
-        if (!existingTeam) {
-          db.runSync(
-            "INSERT INTO team (id, event_id, name) VALUES (?, ?, ?)",
-            [team.id, team.eventId, team.name]
-          );
-          teamsCount++;
-        } else {
-          db.runSync(
-            "UPDATE team SET name = ? WHERE id = ?",
-            [team.name, team.id]
-          );
-        }
-
-        // Insérer les équipements
-        const equipements = actionGroup.equipements || [];
-        for (const equip of equipements) {
-          // Vérifier que l'équipement appartient à l'événement actuel
-          if (equip.eventId !== selectedEventId) {
-            console.log(`⚠️ Équipement ignoré (eventId: ${equip.eventId} !== ${selectedEventId})`);
-            continue;
-          }
-
-          const existingEquip = db.getFirstSync(
-            "SELECT id FROM equipement WHERE id = ?",
-            [equip.id]
-          );
-
-          if (!existingEquip) {
-            db.runSync(
-              "INSERT INTO equipement (id, event_id, type_id, quantity, length_per_unit, date_pose, date_depose) VALUES (?, ?, ?, ?, ?, ?, ?)",
-              [
-                equip.id,
-                equip.eventId,
-                equip.typeId || null,
-                equip.quantity || 1,
-                equip.lengthPerUnit || 0,
-                equip.datePose || null,
-                equip.dateDepose || null,
-              ]
-            );
-            equipementsCount++;
-          } else {
-            db.runSync(
-              "UPDATE equipement SET type_id = ?, quantity = ?, length_per_unit = ?, date_pose = ?, date_depose = ? WHERE id = ?",
-              [
-                equip.typeId || null,
-                equip.quantity || 1,
-                equip.lengthPerUnit || 0,
-                equip.datePose || null,
-                equip.dateDepose || null,
-                equip.id,
-              ]
-            );
-          }
-
-          // Insérer les coordonnées de l'équipement
-          const coordinates = equip.coordinates || [];
-          for (const coord of coordinates) {
-            const existingCoord = db.getFirstSync(
-              "SELECT id FROM equipement_coordinate WHERE id = ?",
-              [coord.id]
-            );
-
-            if (!existingCoord) {
-              db.runSync(
-                "INSERT INTO equipement_coordinate (id, equipement_id, x, y, order_index) VALUES (?, ?, ?, ?, ?)",
-                [coord.id, coord.equipementId, coord.x, coord.y, coord.orderIndex || 0]
-              );
-              coordsCount++;
-            }
-          }
-        }
-
-        // Insérer les coordonnées globales (si présentes au niveau du groupe)
-        const globalCoords = actionGroup.coordonees || actionGroup.coordinates || [];
-        for (const coord of globalCoords) {
-          const existingCoord = db.getFirstSync(
-            "SELECT id FROM equipement_coordinate WHERE id = ?",
-            [coord.id]
-          );
-
-          if (!existingCoord) {
-            db.runSync(
-              "INSERT INTO equipement_coordinate (id, equipement_id, x, y, order_index) VALUES (?, ?, ?, ?, ?)",
-              [coord.id, coord.equipementId, coord.x, coord.y, coord.orderIndex || 0]
-            );
-            coordsCount++;
-          }
-        }
-
-        // Insérer les actions
-        const actions = actionGroup.actions || [];
-        for (const action of actions) {
-          const existingAction = db.getFirstSync(
-            "SELECT id FROM action WHERE id = ?",
-            [action.id]
-          );
-
-          const isDone = action.is_done !== undefined 
-            ? (action.is_done ? 1 : 0) 
-            : (action.isDone ? 1 : 0);
-
-          if (!existingAction) {
-            db.runSync(
-              "INSERT INTO action (id, team_id, equipement_id, type, scheduled_time, is_done) VALUES (?, ?, ?, ?, ?, ?)",
-              [
-                action.id,
-                action.team_id || action.teamId,
-                action.equipement_id || action.equipementId,
-                action.type || action.actionType || null,
-                action.scheduled_time || action.scheduledTime || null,
-                isDone,
-              ]
-            );
-            actionsCount++;
-          } else {
-            db.runSync(
-              "UPDATE action SET type = ?, scheduled_time = ?, is_done = ? WHERE id = ?",
-              [
-                action.type || action.actionType || null,
-                action.scheduled_time || action.scheduledTime || null,
-                isDone,
-                action.id,
-              ]
-            );
-          }
-        }
-      }
-
-      console.log(`✅ Planning importé: ${teamsCount} équipes, ${actionsCount} actions, ${equipementsCount} équipements, ${coordsCount} coordonnées`);
-      
-      if (skippedTeams > 0) {
-        console.log(`⚠️ ${skippedTeams} équipe(s) ignorée(s) (événement différent)`);
-      }
-
-      return { 
-        success: true, 
-        message: `${teamsCount} équipe(s), ${actionsCount} action(s), ${equipementsCount} équipement(s) importé(s)` 
-      };
-    } catch (error) {
-      console.error("❌ Erreur insertion planning:", error);
-      return { success: false, message: `Erreur: ${error}` };
-    }
-  };
-
   // Récupérer les données complètes d'un événement pour l'export
   const getEventExportData = (eventId: number): EventExportData | null => {
     try {
@@ -851,30 +676,7 @@ const QRCodeScanner = ({
         const onEventsReceived = (data: any) => {
           console.log("📦 Données reçues:", JSON.stringify(data).substring(0, 200));
           try {
-            // Vérifier si c'est des données de planning
-            if (data.type === "planning_data") {
-              console.log("📋 Données de planning détectées");
-              
-              if (!selectedEventId) {
-                setTransferStatus("Erreur: Aucun événement sélectionné");
-                Alert.alert(
-                  "Erreur",
-                  "Veuillez d'abord sélectionner un événement avant d'importer des données de planning."
-                );
-                return;
-              }
-
-              const result = insertPlanningData(data);
-              if (result.success) {
-                setTransferStatus(`✅ ${result.message}`);
-                setReceivedCount((prev) => prev + 1);
-              } else {
-                setTransferStatus(`❌ ${result.message}`);
-              }
-              return;
-            }
-
-            // Normaliser les données reçues en tableau (événements)
+            // Normaliser les données reçues en tableau
             let eventsArray: any[];
             if (Array.isArray(data)) {
               eventsArray = data;

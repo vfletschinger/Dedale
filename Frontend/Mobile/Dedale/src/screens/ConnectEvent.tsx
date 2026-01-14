@@ -1,8 +1,5 @@
 import { View, Text, Pressable, FlatList } from "react-native";
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import { useSafeAreaInsets, SafeAreaView } from "react-native-safe-area-context";
 import QRCodeScanner from "../components/QrCodeScanner";
 import { useState, useEffect } from "react";
 import { useNavigation } from "@react-navigation/native";
@@ -12,7 +9,6 @@ import { useEvent, EventWithStatus } from "../context/EventContext";
 import { EventType } from "../types/database";
 import { getDatabase } from "../../assets/migrations";
 
-// Fonction utilitaire exportée pour les tests
 export function sortEventsByStatus(
   events: (EventType | EventWithStatus)[]
 ): (EventType | EventWithStatus)[] {
@@ -23,7 +19,6 @@ export function sortEventsByStatus(
   };
 
   return [...events].sort((a, b) => {
-    // Support both 'status' and 'statut' properties
     const statusA = (
       (a as any).status ||
       (a as any).statut ||
@@ -53,7 +48,6 @@ export default function ConnectEvent() {
   const handleEventSelect = (event: EventType | EventWithStatus) => {
     const db = getDatabase();
 
-    // Compter les différentes entités liées à l'événement
     const pointCount = db.getFirstSync<{ count: number }>(
       "SELECT COUNT(*) as count FROM point WHERE event_id = ?",
       [event.id]
@@ -78,8 +72,7 @@ export default function ConnectEvent() {
     );
     const equipementCount = db.getFirstSync<{ count: number }>(
       `SELECT COUNT(*) as count FROM equipement e 
-       INNER JOIN point pt ON e.point_id = pt.id 
-       WHERE pt.event_id = ?`,
+       WHERE e.event_id = ?`,
       [event.id]
     );
 
@@ -126,11 +119,11 @@ export default function ConnectEvent() {
 
   return (
     <View className="container">
-      <SafeAreaView edges={["top"]} className="bg-blue-500">
-        <View className="bg-blue-500 pb-4 px-4">
+      <View edges={["top"]} className="bg-primary">
+        <View className="bg-primary pb-4 px-4">
           <Text className="header-title">Sélectionner un événement</Text>
         </View>
-      </SafeAreaView>
+      </View>
 
       <FlatList
         data={events}
@@ -154,7 +147,7 @@ export default function ConnectEvent() {
         style={{ paddingBottom: Math.max(insets.bottom, 16) }}
       >
         <Pressable
-          className="bg-blue-500 flex-row items-center justify-center gap-3 py-4 rounded-xl shadow-lg active:bg-blue-600"
+          className="bg-secondary flex-row items-center justify-center gap-3 py-4 rounded-xl shadow-lg active:bg-secondary-dark"
           onPress={() => setScanQR(true)}
         >
           <Feather name="camera" size={24} color="#fff" />

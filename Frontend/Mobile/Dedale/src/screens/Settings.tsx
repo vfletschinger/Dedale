@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import {
-  SafeAreaView,
   View,
   Text,
   TouchableOpacity,
@@ -21,6 +20,7 @@ import {
   PictureType,
   EquipementType,
 } from "../types/database";
+import Colors from "../constants/colors";
 
 type PointWithDetails = InterestPointsType & {
   pictures: PictureType[];
@@ -94,27 +94,33 @@ export default function SettingsScreen() {
         [eventId]
       );
 
-      // Pour chaque point, récupérer ses photos et équipements
+      // Pour chaque point, récupérer ses photos
       const pointsWithDetails: PointWithDetails[] = points.map((point) => {
         const pictures = db.getAllSync<PictureType>(
           "SELECT * FROM picture WHERE point_id = ?",
-          [point.id]
-        );
-        const equipements = db.getAllSync<EquipementType>(
-          "SELECT * FROM equipement WHERE point_id = ?",
           [point.id]
         );
 
         return {
           ...point,
           pictures,
-          equipements,
+          equipements: [], // Les équipements sont maintenant au niveau event
         };
       });
+
+      // Récupérer les équipements de l'événement avec leurs coordonnées
+      const equipements = db.getAllSync<EquipementType>(
+        `SELECT e.*, t.name, t.description 
+         FROM equipement e 
+         LEFT JOIN type t ON e.type_id = t.id 
+         WHERE e.event_id = ?`,
+        [eventId]
+      );
 
       return {
         event,
         points: pointsWithDetails,
+        equipements: equipements || [],
       };
     } catch (error) {
       console.error(
@@ -230,7 +236,7 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView className="container">
+    <View className="container">
       <View className="header header-row">
         {scanQR && (
           <TouchableOpacity onPress={() => setScanQR(false)} className="mr-4">
@@ -331,7 +337,7 @@ export default function SettingsScreen() {
             className="items-center justify-center"
             style={isEventListExpanded ? { flex: 0.25 } : { flex: 0.33 }}
           >
-            <Feather name="settings" size={48} color="#3b82f6" />
+            <Feather name="settings" size={48} color={Colors.secondary} />
             <Text className="text-lg font-bold text-gray-800 mt-3 mb-2 text-center">
               Data Synchronization
             </Text>
@@ -376,6 +382,6 @@ export default function SettingsScreen() {
           </View>
         </View>
       )}
-    </SafeAreaView>
+    </View>
   );
 }

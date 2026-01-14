@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
-  SafeAreaView,
   StatusBar,
   FlatList,
   TouchableOpacity,
@@ -15,6 +14,7 @@ import { usePoints } from "../context/PointsContext";
 import { InterestPointsType } from "../types/database";
 import { getAddressFromCoords, shortId } from "../services/Helper";
 import "../style/global.css";
+import Colors from "../constants/colors";
 
 interface SelectionState {
   start: string | null;
@@ -127,7 +127,7 @@ export default function SelectGuidancePointsScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <View className="flex-1 bg-white">
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
 
       {/* Header */}
@@ -155,8 +155,8 @@ export default function SelectGuidancePointsScreen() {
           <View className="flex-1 px-4 py-4">
             {/* Résumé de la sélection */}
             {(selection.start || selection.end) && (
-              <View className="bg-blue-50 rounded-lg p-3 mb-4 border border-blue-200">
-                <Text className="text-sm font-semibold text-blue-900">
+              <View className="bg-secondary/10 rounded-lg p-3 mb-4 border border-secondary/30">
+                <Text className="text-sm font-semibold text-secondary">
                   Sélection actuelle:
                 </Text>
                 {selection.start && (
@@ -191,7 +191,7 @@ export default function SelectGuidancePointsScreen() {
               disabled={!selection.start || !selection.end}
               className={`py-3 px-4 rounded-lg items-center justify-center flex-row ${
                 selection.start && selection.end
-                  ? "bg-blue-500"
+                  ? "bg-secondary"
                   : "bg-slate-300"
               }`}
             >
@@ -207,6 +207,6 @@ export default function SelectGuidancePointsScreen() {
           </View>
         </>
       )}
-    </SafeAreaView>
+    </View>
   );
 }

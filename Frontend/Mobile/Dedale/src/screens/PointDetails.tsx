@@ -38,21 +38,21 @@ import { shortId } from "../services/Helper";
 import MapView, { Marker, MapPressEvent } from "react-native-maps";
 import CoordinatesDisplay from "../components/CoordinatesDisplay";
 import EditModal from "../components/EditModal";
-import ObstacleSelector from "../components/ObstacleSelector";
+import ObstacleSelector, { SelectedObstacle } from "../components/ObstacleSelector";
+import { useEvent } from "../context/EventContext";
+import { usePoints } from "../context/PointsContext";
+import Colors from "../constants/colors";
 
 type RouteParams = { pointId: string };
-
-type SelectedEquipement = {
-  type_id: number;
-  name: string;
-  quantity: number;
-};
 
 export default function PointDetails() {
   const db = getDatabase();
   const route = useRoute();
   const { pointId } = route.params as RouteParams;
   const navigation = useNavigation();
+  const { getSelectedEvent } = useEvent();
+  const { refreshPoints } = usePoints();
+  const selectedEvent = getSelectedEvent();
   const [pointData, setPointData] = useState<PointDetailType | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -93,11 +93,12 @@ export default function PointDetails() {
       );
 
       const equipements = db.getAllSync<EquipementType>(
-        `SELECT e.*, et.name, et.description, et.width, et.length
+        `SELECT e.*, t.name, t.description
          FROM equipement e
-         LEFT JOIN equipement_type et ON e.type_id = et.id
-         WHERE e.point_id = ?`,
-        [pointId]
+         LEFT JOIN type t ON e.type_id = t.id
+         INNER JOIN equipement_coordinate ec ON ec.equipement_id = e.id
+         WHERE ec.x = ? AND ec.y = ?`,
+        [point.x, point.y]
       );
 
       setPointData({
@@ -134,10 +135,10 @@ export default function PointDetails() {
         {
           text: "Supprimer",
           style: "destructive",
-          onPress: () => {
+          onPress: async () => {
             const success = deletePoint(pointId, db);
             if (success) {
-              Alert.alert("Succès", "Point supprimé avec succès");
+              await refreshPoints();
               navigation.goBack();
             } else {
               Alert.alert("Erreur", "Impossible de supprimer le point");
@@ -190,7 +191,7 @@ export default function PointDetails() {
     }
   };
 
-  const handleDeletePicture = (pictureId: number) => {
+  const handleDeletePicture = (pictureId: string) => {
     Alert.alert("Confirmer", "Supprimer cette image ?", [
       { text: "Annuler", style: "cancel" },
       {
@@ -247,7 +248,7 @@ export default function PointDetails() {
     }
   };
 
-  const handleSaveEquipements = (equipements: SelectedEquipement[]) => {
+  const handleSaveEquipements = (equipements: SelectedObstacle[]) => {
     if (equipements.length === 0) {
       if (editingObstacles) {
         // Mode édition : supprimer tous les équipements existants
@@ -286,9 +287,11 @@ export default function PointDetails() {
         });
       }
 
-      // Ajouter les nouveaux équipements
-      for (const equipement of equipements) {
-        addEquipement(pointId, equipement.type_id, equipement.quantity, db);
+      // Ajouter les nouveaux équipements (maintenant au niveau event)
+      if (selectedEvent?.id) {
+        for (const equipement of equipements) {
+          addEquipement(selectedEvent.id, equipement.type_id, equipement.number, db);
+        }
       }
 
       updateTimeStamp(pointId, db);
@@ -312,7 +315,7 @@ export default function PointDetails() {
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center">
-        <ActivityIndicator size="large" color="#3b82f6" />
+        <ActivityIndicator size="large" color={Colors.secondary} />
       </View>
     );
   }
@@ -327,29 +330,22 @@ export default function PointDetails() {
 
   return (
     <>
-      <ScrollView className="container-white">
-        <View className="header-lg header-row">
+      <View className="container-white">
+        <View className="header-lg header-row pt-12 pb-3 bg-primary">
           <View className="row flex-1">
             <Pressable onPress={() => navigation.goBack()} className="mr-3">
               <View className="back-btn-circle">
                 <Text className="back-btn-text">←</Text>
               </View>
             </Pressable>
-            <Text className="header-title-lg">Détail du point</Text>
-          </View>
-
-          <View className="row-gap">
-            <Pressable onPress={handleDelete} className="btn-icon-danger">
-              <Text className="text-white text-xl">🗑️</Text>
-            </Pressable>
+            <Text className="header-title-lg" numberOfLines={1}>
+              {pointData.point.name || `Point #${shortId(pointData.point.id)}`}
+            </Text>
           </View>
         </View>
 
-        <View className="p-4">
-          <Text className="text-3xl font-bold mb-4">
-            {pointData.point.name || `Point #${shortId(pointData.point.id)}`}
-          </Text>
-
+        <ScrollView className="flex-1">
+          <View className="p-4">
           {/* Coordonnées */}
           <View>
             <View className="mb-3">
@@ -357,6 +353,7 @@ export default function PointDetails() {
                 latitude={pointData.point.y}
                 longitude={pointData.point.x}
                 showAddress={true}
+                showCoordinates={false}
               />
             </View>
             <View className="overflow-hidden rounded-lg mb-2">
@@ -393,7 +390,7 @@ export default function PointDetails() {
                 });
                 setIsCoordinatesModalVisible(true);
               }}
-              className="bg-blue-500 py-3 rounded-lg"
+              className="bg-secondary py-3 rounded-lg"
             >
               <Text className="text-white text-center font-semibold">
                 📍 Modifier la position
@@ -472,9 +469,9 @@ export default function PointDetails() {
                   <Text className="text-sm mt-1">
                     Quantité: {equipement.quantity}
                   </Text>
-                  {(equipement.length || equipement.width) && (
+                  {equipement.length_per_unit && equipement.length_per_unit > 0 && (
                     <Text className="text-sm">
-                      Dimensions: {equipement.length}m x {equipement.width}m
+                      Longueur par unité: {equipement.length_per_unit}m
                     </Text>
                   )}
                 </View>
@@ -519,7 +516,17 @@ export default function PointDetails() {
             )}
           </View>
         </View>
-      </ScrollView>
+
+        <Pressable
+          onPress={handleDelete}
+          className="mx-4 mb-6 py-4 bg-white border border-red-500 rounded-lg"
+        >
+          <Text className="text-red-500 text-center font-semibold text-base">
+            Supprimer le point
+          </Text>
+        </Pressable>
+        </ScrollView>
+      </View>
 
       {/* Modal de modification de position */}
       <Modal

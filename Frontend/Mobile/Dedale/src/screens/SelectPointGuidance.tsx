@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import {
   View,
   Text,
-  SafeAreaView,
   StatusBar,
   TouchableOpacity,
   ScrollView,
@@ -60,7 +59,7 @@ export default function SelectPointGuidanceScreen() {
       : points;
 
   return (
-    <SafeAreaView className="flex-1 bg-gradient-to-b from-slate-50 to-slate-100">
+    <View className="flex-1 bg-gradient-to-b from-slate-50 to-slate-100">
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
 
       {/* Header */}
@@ -78,12 +77,12 @@ export default function SelectPointGuidanceScreen() {
         <View className="flex-row items-center gap-2 mt-2">
           <View
             className={`flex-1 h-1 rounded ${
-              step === "start" ? "bg-blue-500" : "bg-green-500"
+              step === "start" ? "bg-secondary" : "bg-accent"
             }`}
           />
           <View
             className={`flex-1 h-1 rounded ${
-              step === "end" ? "bg-blue-500" : "bg-slate-300"
+              step === "end" ? "bg-secondary" : "bg-slate-300"
             }`}
           />
         </View>
@@ -115,7 +114,7 @@ export default function SelectPointGuidanceScreen() {
               onPress={() => setStep("start")}
               className="mt-2 p-2"
             >
-              <Text className="text-blue-500 text-sm font-semibold">
+              <Text className="text-secondary text-sm font-semibold">
                 ✏️ Modifier
               </Text>
             </TouchableOpacity>
@@ -141,7 +140,7 @@ export default function SelectPointGuidanceScreen() {
               onPress={() => handleSelectPoint(point)}
               activeOpacity={0.7}
             >
-              <View className="bg-white rounded-lg p-4 mb-3 border-2 border-slate-200 active:border-blue-500">
+              <View className="bg-white rounded-lg p-4 mb-3 border-2 border-slate-200 active:border-secondary">
                 <View className="flex-row items-center">
                   <View className="flex-1">
                     <Text className="font-bold text-slate-800 text-base">
@@ -156,7 +155,7 @@ export default function SelectPointGuidanceScreen() {
                       </Text>
                     )}
                   </View>
-                  <View className="ml-4 bg-blue-500 rounded-full p-3">
+                  <View className="ml-4 bg-secondary rounded-full p-3">
                     <Feather name="chevron-right" size={20} color="white" />
                   </View>
                 </View>
@@ -177,6 +176,6 @@ export default function SelectPointGuidanceScreen() {
           </Text>
         </TouchableOpacity>
       )}
-    </SafeAreaView>
+    </View>
   );
 }
