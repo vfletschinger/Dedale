@@ -11,7 +11,6 @@ pub struct CroppedMap {
     pub height_tiles: u32,
 }
 
-
 // 2. AJOUT DE LA MÉTHODE DE CALCUL
 impl CroppedMap {
     pub fn get_percent_pos(&self, lon: f64, lat: f64) -> (f64, f64) {
