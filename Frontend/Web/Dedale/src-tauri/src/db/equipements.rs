@@ -353,20 +353,17 @@ pub async fn add_action(
     let pool = get_db_pool(&app).await?;
     
     // Vérifier si une action existe déjà pour cet équipement et ce type
-    let existing_action: Option<(String,)> = sqlx::query_as(
-        "SELECT id FROM action WHERE equipement_id = ? AND type = ?"
-    )
-    .bind(&equipement_id)
-    .bind(&action_type)
-    .fetch_optional(&pool)
-    .await
-    .map_err(|e| e.to_string())?;
+    let existing_action: Option<(String,)> =
+        sqlx::query_as("SELECT id FROM action WHERE equipement_id = ? AND type = ?")
+            .bind(&equipement_id)
+            .bind(&action_type)
+            .fetch_optional(&pool)
+            .await
+            .map_err(|e| e.to_string())?;
 
     let action_id = existing_action
         .map(|(id,)| id)
         .unwrap_or_else(|| Uuid::new_v4().to_string());
-    
-    let action_id = Uuid::new_v4().to_string();
 
     // Utiliser SQLite pour générer la timestamp au format ISO 8601
     let scheduled_time: String = sqlx::query_scalar("SELECT strftime('%Y-%m-%dT%H:%M:%SZ', 'now')")
