@@ -193,7 +193,7 @@ export default function Planning({
     try {
       await invoke("create_team_mission_pdf", { teamId, eventId: activeEventId });
       toast.success(`PDF généré avec succès pour ${teamName}`);
-    } catch (e) {
+    } catch (_e) {
       toast.error("Erreur lors de la génération du PDF");
     } finally {
       setGeneratingPdfForTeam(null);
@@ -204,7 +204,7 @@ export default function Planning({
     try {
       await invoke("update_action_status", { actionId });
       loadTeamsWithActions();
-    } catch (e) {
+    } catch (_e) {
       toast.error("Erreur lors de la mise à jour du statut");
     }
   };

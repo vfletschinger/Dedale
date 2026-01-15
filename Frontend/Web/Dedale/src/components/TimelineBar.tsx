@@ -64,8 +64,8 @@ function TimelineBar({
   const [poseTeamId, setPoseTeamId] = useState<string>("");
   const [deposeTeamId, setDeposeTeamId] = useState<string>("");
   const [isAssigning, setIsAssigning] = useState(false);
-  const [existingPoseTeamId, setExistingPoseTeamId] = useState<string>("");
-  const [existingDeposeTeamId, setExistingDeposeTeamId] = useState<string>("");
+  const [_existingPoseTeamId, setExistingPoseTeamId] = useState<string>("");
+  const [_existingDeposeTeamId, setExistingDeposeTeamId] = useState<string>("");
   const [equipmentsActionsMap, setEquipmentsActionsMap] = useState<
     Map<string, { pose: string | null; depose: string | null }>
   >(new Map());
@@ -89,16 +89,13 @@ function TimelineBar({
     }
   }, [event?.id]);
 
-  // �couter les �v�nements de cr�ation d'�quipe
   useEffect(() => {
     if (!event?.id) return;
 
-    const unlisten = listen("team-created", (evt) => {
-      const newTeam = evt.payload as Team;
-      // Recharger toutes les �quipes pour �tre s�r d'avoir la liste � jour
+    const unlisten = listen("team-created", () => {
       invoke<Team[]>("fetch_teams_for_event", { eventId: event.id })
         .then(setTeams)
-        .catch((err) => console.error("Erreur rechargement �quipes:", err));
+        .catch((err) => console.error("Erreur rechargement équipes:", err));
     });
 
     return () => {
@@ -136,7 +133,6 @@ function TimelineBar({
       }
     });
 
-    // Si TOUS les �quipements ont une �quipe de pose ET c'est la m�me, l'afficher
     if (allHavePose && poseTeams.size === 1) {
       const commonPoseTeam = Array.from(poseTeams)[0];
       setExistingPoseTeamId(commonPoseTeam);
@@ -146,7 +142,6 @@ function TimelineBar({
       setPoseTeamId("");
     }
 
-    // Si TOUS les �quipements ont une �quipe de d�pose ET c'est la m�me, l'afficher
     if (allHaveDepose && deposeTeams.size === 1) {
       const commonDeposeTeam = Array.from(deposeTeams)[0];
       setExistingDeposeTeamId(commonDeposeTeam);
@@ -157,7 +152,6 @@ function TimelineBar({
     }
   }, [selectedEquipements, equipmentsActionsMap]);
 
-  // Charger les actions pour tous les �quipements (se d�clenche au montage et si les IDs changent)
   useEffect(() => {
     if (!event?.id || equipements.length === 0) return;
 
@@ -167,7 +161,6 @@ function TimelineBar({
       "�quipements"
     );
 
-    // Charger les actions pour chaque �quipement
     Promise.all(
       equipements.map((eq) => {
         return invoke<
@@ -256,12 +249,12 @@ function TimelineBar({
       const initialPercent =
         duration > 0
           ? Math.max(
-              0,
-              Math.min(
-                100,
-                ((minDate.getTime() - start.getTime()) / duration) * 100
-              )
+            0,
+            Math.min(
+              100,
+              ((minDate.getTime() - start.getTime()) / duration) * 100
             )
+          )
           : 0;
 
       return {
@@ -508,11 +501,10 @@ function TimelineBar({
         <div className="flex gap-2">
           <button
             onClick={() => setIsFilterActive(!isFilterActive)}
-            className={`px-2 py-0.5 rounded text-xs border ${
-              isFilterActive
-                ? "bg-amber-500 border-amber-500"
-                : "bg-slate-700 border-slate-600"
-            }`}
+            className={`px-2 py-0.5 rounded text-xs border ${isFilterActive
+              ? "bg-amber-500 border-amber-500"
+              : "bg-slate-700 border-slate-600"
+              }`}
           >
             {isFilterActive ? (
               formatDate(currentSliderDate)
@@ -525,11 +517,10 @@ function TimelineBar({
           <button
             onClick={() => setIsSpatialFilterActive(!isSpatialFilterActive)}
             disabled={!mapBounds}
-            className={`px-2 py-0.5 rounded text-xs border ${
-              isSpatialFilterActive
-                ? "bg-emerald-500 border-emerald-500"
-                : "bg-slate-700 border-slate-600"
-            } ${!mapBounds ? "opacity-50 cursor-not-allowed" : ""}`}
+            className={`px-2 py-0.5 rounded text-xs border ${isSpatialFilterActive
+              ? "bg-emerald-500 border-emerald-500"
+              : "bg-slate-700 border-slate-600"
+              } ${!mapBounds ? "opacity-50 cursor-not-allowed" : ""}`}
             title={
               !mapBounds
                 ? "Bougez la carte pour activer"
@@ -619,9 +610,8 @@ function TimelineBar({
             {hourTicks.map((tick, i) => (
               <div
                 key={i}
-                className={`absolute top-0 bottom-0 border-l ${
-                  tick.isMajor ? "border-slate-300" : "border-slate-100"
-                }`}
+                className={`absolute top-0 bottom-0 border-l ${tick.isMajor ? "border-slate-300" : "border-slate-100"
+                  }`}
                 style={{ left: `${tick.percent}%`, top: "64px" }}
               />
             ))}
@@ -655,11 +645,10 @@ function TimelineBar({
               return (
                 <div
                   key={eq.id}
-                  className={`group relative h-7 w-full rounded hover:shadow-sm transition-all flex items-center cursor-pointer ${
-                    isSelected
-                      ? "bg-blue-50 ring-2 ring-blue-400"
-                      : "hover:bg-white"
-                  }`}
+                  className={`group relative h-7 w-full rounded hover:shadow-sm transition-all flex items-center cursor-pointer ${isSelected
+                    ? "bg-blue-50 ring-2 ring-blue-400"
+                    : "hover:bg-white"
+                    }`}
                   onClick={() => handleEquipementClick(eq)}
                 >
                   {/* Label Equipement */}
@@ -674,11 +663,10 @@ function TimelineBar({
                       <>
                         {/* Moiti� gauche (pose) - verte si attribu�e, bleue sinon */}
                         <div
-                          className={`absolute h-1.5 top-1/2 -translate-y-1/2 rounded-l-full group-hover:brightness-110 ${
-                            existingActions.pose
-                              ? "bg-green-500"
-                              : "bg-blue-300/60"
-                          }`}
+                          className={`absolute h-1.5 top-1/2 -translate-y-1/2 rounded-l-full group-hover:brightness-110 ${existingActions.pose
+                            ? "bg-green-500"
+                            : "bg-blue-300/60"
+                            }`}
                           style={{
                             left: `${startP}%`,
                             width: `${Math.max(0.5, (endP - startP) / 2)}%`,
@@ -686,11 +674,10 @@ function TimelineBar({
                         />
                         {/* Moiti� droite (d�pose) - rouge si attribu�e, bleue sinon */}
                         <div
-                          className={`absolute h-1.5 top-1/2 -translate-y-1/2 rounded-r-full group-hover:brightness-110 ${
-                            existingActions.depose
-                              ? "bg-red-500"
-                              : "bg-blue-300/60"
-                          }`}
+                          className={`absolute h-1.5 top-1/2 -translate-y-1/2 rounded-r-full group-hover:brightness-110 ${existingActions.depose
+                            ? "bg-red-500"
+                            : "bg-blue-300/60"
+                            }`}
                           style={{
                             left: `${startP + (endP - startP) / 2}%`,
                             width: `${Math.max(0.5, (endP - startP) / 2)}%`,
@@ -724,9 +711,8 @@ function TimelineBar({
 
       {/* Panneau d'attribution - 50% de l'espace restant */}
       <div
-        className={`flex-1 flex flex-col border-t border-slate-300 overflow-y-auto ${
-          selectedEquipements.length > 0 ? "bg-white" : "bg-slate-50"
-        }`}
+        className={`flex-1 flex flex-col border-t border-slate-300 overflow-y-auto ${selectedEquipements.length > 0 ? "bg-white" : "bg-slate-50"
+          }`}
       >
         {selectedEquipements.length > 0 && (
           <div className="p-4 flex-1 flex flex-col">

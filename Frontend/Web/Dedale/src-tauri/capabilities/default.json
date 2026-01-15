@@ -13,14 +13,20 @@
     "sql:allow-execute",
     "sql:allow-close",
     "sql:allow-select",
+    "fs:default",
     {
-  "identifier": "http:default",
-  "allow": [
-    "http://localhost:8080/*",
-    "http://localhost:8082/*",
-    "http://localhost:8081/*",
-    "https://*.tauri.app"
-    ]
+      "identifier": "fs:allow-read-file",
+      "allow": [
+        {
+          "path": "$RESOURCE/**"
+        }
+      ]
+    },
+    {
+      "identifier": "http:default",
+      "allow": [
+        "https://*.tauri.app"
+      ]
     }
   ]
 }
