@@ -6,6 +6,7 @@ import {
   Pressable,
   FlatList,
   Alert,
+  Modal,
 } from "react-native";
 import CustomButton from "../components/CustomButton";
 import QRCodeScanner from "../components/QrCodeScanner";
@@ -36,7 +37,7 @@ type EventExportData = {
 export default function SettingsScreen() {
   const [scanQR, setScanQR] = useState(false);
   const [scanMode, setScanMode] = useState<"receive" | "send">("receive");
-  const [isEventListExpanded, setIsEventListExpanded] = useState(false);
+  const [isEventModalVisible, setIsEventModalVisible] = useState(false);
   const {
     selectedEventId,
     setSelectedEventId,
@@ -52,6 +53,7 @@ export default function SettingsScreen() {
 
   const handleEventChange = (event: EventWithStatus) => {
     setSelectedEventId(event.id);
+    setIsEventModalVisible(false);
   };
 
   const deleteEventLocally = (eventId: string) => {
@@ -265,7 +267,7 @@ export default function SettingsScreen() {
       ) : (
         <View className="flex-1 p-5">
           {/* Section Événement actuel */}
-          <View style={isEventListExpanded ? { flex: 0.25 } : { flex: 0.33 }}>
+          <View className="mb-4">
             <Text className="text-lg font-semibold mb-3">Événement actuel</Text>
             {selectedEvent ? (
               <EventItem
@@ -278,71 +280,86 @@ export default function SettingsScreen() {
                 Aucun événement sélectionné
               </Text>
             )}
+            
+            {/* Bouton pour changer d'événement */}
+            <Pressable
+              onPress={() => setIsEventModalVisible(true)}
+              className="mt-3 bg-gray-100 p-4 rounded-lg flex-row justify-between items-center"
+            >
+              <Text className="text-base font-medium text-gray-700">
+                Changer d&apos;événement
+              </Text>
+              <Feather name="chevron-right" size={20} color="#374151" />
+            </Pressable>
           </View>
 
-          {/* Section Changer d'événement - dynamique */}
-          <View
-            className="bg-gray-100 p-4 rounded-lg mb-4"
-            style={
-              isEventListExpanded
-                ? { flex: 1, maxHeight: "50%" }
-                : { flex: 0.05, justifyContent: "center" }
-            }
+          {/* Modal pour changer d'événement */}
+          <Modal
+            visible={isEventModalVisible}
+            animationType="fade"
+            transparent={true}
+            statusBarTranslucent={true}
+            onRequestClose={() => setIsEventModalVisible(false)}
           >
-            <Pressable
-              onPress={() => setIsEventListExpanded(!isEventListExpanded)}
-              className="flex-row justify-between items-center mb-2"
+            <Pressable 
+              className="flex-1 justify-center items-center"
+              style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+              onPress={() => setIsEventModalVisible(false)}
             >
-              <Text className="text-lg font-semibold">
-                Événements disponibles
-              </Text>
-              <Feather
-                name={isEventListExpanded ? "chevron-up" : "chevron-down"}
-                size={20}
-                color="#374151"
-              />
-            </Pressable>
-            {isEventListExpanded && events.length > 0 ? (
-              <FlatList
-                data={events}
-                keyExtractor={(item) => item.id.toString()}
-                renderItem={({ item }) => (
-                  <Pressable
-                    onPress={() => {
-                      handleEventChange(item);
-                      setIsEventListExpanded(false);
-                    }}
-                    className={
-                      item.id === selectedEventId
-                        ? "flex-row items-center justify-between p-3 rounded-lg mb-2 bg-blue-50"
-                        : "flex-row items-center justify-between p-3 rounded-lg mb-2 bg-white"
-                    }
-                  >
-                    <View className="flex-1">
-                      <Text className="font-semibold">{item.name}</Text>
-                      <Text className="text-xs text-gray-500" numberOfLines={1}>
-                        {item.description}
-                      </Text>
-                    </View>
-                    {item.id === selectedEventId && (
-                      <View className="w-8 h-8 rounded-full items-center justify-center border border-gray-300">
-                        <Text>✓</Text>
-                      </View>
+              <Pressable 
+                className="bg-white rounded-2xl w-[90%] max-h-[70%]"
+                onPress={(e) => e.stopPropagation()}
+              >
+                <View className="flex-row justify-between items-center p-4 border-b border-gray-200">
+                  <Text className="text-xl font-bold">Choisir un événement</Text>
+                  <TouchableOpacity onPress={() => setIsEventModalVisible(false)}>
+                    <Feather name="x" size={24} color="#374151" />
+                  </TouchableOpacity>
+                </View>
+                
+                {events.length > 0 ? (
+                  <FlatList
+                    data={events}
+                    keyExtractor={(item) => item.id.toString()}
+                    contentContainerStyle={{ padding: 16 }}
+                    renderItem={({ item }) => (
+                      <Pressable
+                        onPress={() => handleEventChange(item)}
+                        className={
+                          item.id === selectedEventId
+                            ? "flex-row items-center justify-between p-4 rounded-lg mb-3 bg-blue-50 border border-blue-200"
+                            : "flex-row items-center justify-between p-4 rounded-lg mb-3 bg-gray-50"
+                        }
+                      >
+                        <View className="flex-1">
+                          <Text className="font-semibold text-base">{item.name}</Text>
+                          <Text className="text-sm text-gray-500 mt-1" numberOfLines={2}>
+                            {item.description}
+                          </Text>
+                        </View>
+                        {item.id === selectedEventId && (
+                          <View className="w-8 h-8 rounded-full bg-blue-500 items-center justify-center ml-3">
+                            <Feather name="check" size={18} color="white" />
+                          </View>
+                        )}
+                      </Pressable>
                     )}
-                  </Pressable>
+                  />
+                ) : (
+                  <View className="p-8 items-center">
+                    <Feather name="inbox" size={48} color="#9CA3AF" />
+                    <Text className="text-gray-500 mt-4 text-center">
+                      Aucun événement disponible
+                    </Text>
+                  </View>
                 )}
-              />
-            ) : isEventListExpanded && events.length === 0 ? (
-              <Text className="text-sm text-gray-500">
-                Aucun événement disponible
-              </Text>
-            ) : null}
-          </View>
+              </Pressable>
+            </Pressable>
+          </Modal>
 
           {/* Section Synchronisation */}
           <View
-            className="items-center justify-center"
-            style={isEventListExpanded ? { flex: 0.25 } : { flex: 0.33 }}
+            className="items-center justify-center flex-1"
           >
             <Feather name="settings" size={48} color={Colors.secondary} />
             <Text className="text-lg font-bold text-gray-800 mt-3 mb-2 text-center">
@@ -383,7 +400,7 @@ export default function SettingsScreen() {
 
             {isConnected && (
               <Text className="text-sm text-green-600 text-center mt-4">
-                ✓ Connecté à l'application de bureau
+                ✓ Connecté à l&apos;application de bureau
               </Text>
             )}
           </View>
