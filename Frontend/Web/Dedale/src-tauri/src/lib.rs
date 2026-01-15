@@ -3,14 +3,15 @@ use tauri::{Emitter, Manager};
 
 mod db;
 mod excel;
+mod geocoding;
 mod map;
-mod map_static;
+mod map_pdf;
 mod pdf;
+mod pmtiles;
 mod seed;
 mod socket;
 mod types;
 mod utils;
-mod geocoding;
 
 #[cfg(test)]
 mod tests;
@@ -57,6 +58,7 @@ pub fn run() {
             socket::send_event_to_mobile,
             socket::terminate_server,
             socket::start_receive_server,
+            socket::start_server_planning,
             db::fetch_obstacle_types,
             db::delete_point,
             db::insert_point,
@@ -109,20 +111,23 @@ pub fn run() {
             db::create_equipement,
             db::fetch_equipements_for_event,
             db::delete_equipement,
-            db::update_equipement,     
+            db::update_equipement,
             db::add_action,
             db::fetch_actions,
             db::delete_action,
             db::fetch_team_actions,
-            // Géocodage local
             geocoding::search_address,
-            // Planning
             db::fetch_teams_for_event,
+            db::fetch_teams_with_actions_for_event,
             db::fetch_actions_for_team,
+            db::fetch_actions_for_equipement,
             db::update_action_status,
             db::export_planning_excel,
             db::create_planning_pdf,
             db::send_equipements_to_mobile,
+            db::send_planning,
+            pmtiles::get_pmtiles_file_path,
+            geocoding::reverse_geocode,
         ])
         .run(tauri::generate_context!())
         .expect("Erreur lors de l'exécution de l'application Tauri");

@@ -1,6 +1,7 @@
 import { useState } from "react";
+import toast from "react-hot-toast";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faMapMarkerAlt } from "@fortawesome/free-solid-svg-icons";
+import { faRoute, faCheck, faTimes } from "@fortawesome/free-solid-svg-icons";
 
 interface ParcoursFormProps {
   onSubmit: (data: {
@@ -15,7 +16,7 @@ interface ParcoursFormProps {
 
 export default function ParcoursForm({ onSubmit, onCancel }: ParcoursFormProps) {
   const [name, setName] = useState("Nouveau Parcours");
-  const [color, setColor] = useState("#ef4444");
+  const [color, setColor] = useState("#16a34a");
   const [startDate, setStartDate] = useState("");
   const [startTime, setStartTime] = useState("");
   const [speedLow, setSpeedLow] = useState<number>(0);
@@ -28,7 +29,7 @@ export default function ParcoursForm({ onSubmit, onCancel }: ParcoursFormProps) 
     if (startDate) {
       const today = new Date().toISOString().split('T')[0];
       if (startDate < today) {
-        alert("La date de début ne peut pas être dans le passé !");
+        toast.error("La date de début ne peut pas être dans le passé !");
         return;
       }
     }
@@ -47,114 +48,127 @@ export default function ParcoursForm({ onSubmit, onCancel }: ParcoursFormProps) 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
-        <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-          <span className="text-2xl"><FontAwesomeIcon icon={faMapMarkerAlt} /></span>
-          Nouveau Parcours
-        </h3>
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden max-h-[90vh] flex flex-col">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-green-500 to-green-600 px-6 py-4 flex items-center justify-between shrink-0">
+          <h3 className="text-lg font-bold text-white flex items-center gap-3">
+            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+              <FontAwesomeIcon icon={faRoute} className="text-xl" />
+            </div>
+            Nouveau Parcours
+          </h3>
+          <button
+            onClick={onCancel}
+            className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/20 hover:bg-white/30 text-white transition-colors cursor-pointer"
+          >
+            <FontAwesomeIcon icon={faTimes} />
+          </button>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Content */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
           {/* Nom */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
               Nom du parcours
             </label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-gray-50"
               required
             />
           </div>
 
           {/* Couleur */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
               Couleur
             </label>
-            <div className="flex gap-2 items-center">
+            <div className="flex gap-3 items-center">
               <input
                 type="color"
                 value={color}
                 onChange={(e) => setColor(e.target.value)}
-                className="h-10 w-16 rounded cursor-pointer border border-gray-300"
+                className="w-14 h-12 rounded-xl border-2 border-gray-200 cursor-pointer"
               />
               <input
                 type="text"
                 value={color}
                 onChange={(e) => setColor(e.target.value)}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary font-mono text-sm"
+                className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-gray-50 font-mono text-sm"
               />
             </div>
           </div>
 
           {/* Date et heure de début */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
               Date et heure de début
             </label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-3">
               <input
                 type="date"
                 value={startDate}
-                min={new Date().toISOString().split('T')[0]} // Empêche la sélection de dates passées
+                min={new Date().toISOString().split('T')[0]}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                className="px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-gray-50"
               />
               <input
                 type="time"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                className="px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-gray-50"
               />
             </div>
           </div>
 
-          {/* Vitesse la plus basse */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Vitesse la plus basse (km/h)
-            </label>
-            <input
-              type="number"
-              step="0.1"
-              min="0"
-              value={speedLow}
-              onChange={(e) => setSpeedLow(parseFloat(e.target.value) || 0)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
-
-          {/* Vitesse la plus haute */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Vitesse la plus haute (km/h)
-            </label>
-            <input
-              type="number"
-              step="0.1"
-              min="0"
-              value={speedHigh}
-              onChange={(e) => setSpeedHigh(parseFloat(e.target.value) || 0)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-            />
+          {/* Vitesses */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Vitesse min (km/h)
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                value={speedLow}
+                onChange={(e) => setSpeedLow(parseFloat(e.target.value) || 0)}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-gray-50"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Vitesse max (km/h)
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                value={speedHigh}
+                onChange={(e) => setSpeedHigh(parseFloat(e.target.value) || 0)}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-gray-50"
+              />
+            </div>
           </div>
 
           {/* Boutons */}
-          <div className="flex gap-2 pt-2">
-            <button
-              type="submit"
-              className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg font-medium transition-colors"
-            >
-              Créer
-            </button>
+          <div className="flex gap-3 pt-2">
             <button
               type="button"
               onClick={onCancel}
-              className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 py-2 rounded-lg font-medium transition-colors"
+              className="flex-1 px-4 py-3 border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 font-medium transition-colors"
             >
               Annuler
+            </button>
+            <button
+              type="submit"
+              className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
+            >
+              <FontAwesomeIcon icon={faCheck} />
+              Créer
             </button>
           </div>
         </form>
