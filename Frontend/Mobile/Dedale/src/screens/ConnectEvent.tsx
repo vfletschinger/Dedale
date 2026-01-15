@@ -1,7 +1,7 @@
 import { View, Text, Pressable, FlatList } from "react-native";
 import {
-  SafeAreaView,
   useSafeAreaInsets,
+  SafeAreaView,
 } from "react-native-safe-area-context";
 import QRCodeScanner from "../components/QrCodeScanner";
 import { useState, useEffect } from "react";
@@ -12,7 +12,6 @@ import { useEvent, EventWithStatus } from "../context/EventContext";
 import { EventType } from "../types/database";
 import { getDatabase } from "../../assets/migrations";
 
-// Fonction utilitaire exportée pour les tests
 export function sortEventsByStatus(
   events: (EventType | EventWithStatus)[]
 ): (EventType | EventWithStatus)[] {
@@ -23,7 +22,6 @@ export function sortEventsByStatus(
   };
 
   return [...events].sort((a, b) => {
-    // Support both 'status' and 'statut' properties
     const statusA = (
       (a as any).status ||
       (a as any).statut ||
@@ -53,7 +51,6 @@ export default function ConnectEvent() {
   const handleEventSelect = (event: EventType | EventWithStatus) => {
     const db = getDatabase();
 
-    // Compter les différentes entités liées à l'événement
     const pointCount = db.getFirstSync<{ count: number }>(
       "SELECT COUNT(*) as count FROM point WHERE event_id = ?",
       [event.id]
@@ -78,8 +75,7 @@ export default function ConnectEvent() {
     );
     const equipementCount = db.getFirstSync<{ count: number }>(
       `SELECT COUNT(*) as count FROM equipement e 
-       INNER JOIN point pt ON e.point_id = pt.id 
-       WHERE pt.event_id = ?`,
+       WHERE e.event_id = ?`,
       [event.id]
     );
 
@@ -101,6 +97,7 @@ export default function ConnectEvent() {
     console.log("Équipes:", teamCount?.count ?? 0);
     console.log("Photos:", pictureCount?.count ?? 0);
     console.log("Équipements:", equipementCount?.count ?? 0);
+    console.log("actions:", (event as any).actionCount ?? 0);
     console.log("--- DONNÉES COMPLÈTES ---");
     console.log(JSON.stringify(event, null, 2));
     console.log("========================");
@@ -111,9 +108,12 @@ export default function ConnectEvent() {
 
   if (scanQR) {
     return (
-      <SafeAreaView className="container" edges={["top"]}>
-        <View className="header header-row">
-          <Pressable onPress={() => setScanQR(false)} className="row gap-2">
+      <SafeAreaView className="flex-1 bg-gray-50" edges={["top"]}>
+        <View className="bg-primary pt-4 pb-4 px-4 shadow-sm flex-row items-center justify-between">
+          <Pressable
+            onPress={() => setScanQR(false)}
+            className="flex-row items-center gap-2"
+          >
             <Feather name="arrow-left" size={24} color="#fff" />
             <Text className="text-white text-lg font-semibold">Retour</Text>
           </Pressable>
@@ -124,10 +124,12 @@ export default function ConnectEvent() {
   }
 
   return (
-    <View className="container">
-      <SafeAreaView edges={["top"]} className="bg-blue-500">
-        <View className="bg-blue-500 pb-4 px-4">
-          <Text className="header-title">Sélectionner un événement</Text>
+    <View className="flex-1 bg-gray-50">
+      <SafeAreaView edges={["top"]} className="bg-primary">
+        <View className="bg-primary pb-4 px-4">
+          <Text className="text-accent text-2xl font-bold">
+            Sélectionner un événement
+          </Text>
         </View>
       </SafeAreaView>
 
@@ -140,7 +142,7 @@ export default function ConnectEvent() {
         contentContainerClassName="py-4 flex-grow"
         contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
         ListEmptyComponent={
-          <View className="center py-16">
+          <View className="flex-1 justify-center items-center py-16">
             <Text className="text-base text-gray-400 mt-4">
               Aucun événement disponible
             </Text>
@@ -153,7 +155,7 @@ export default function ConnectEvent() {
         style={{ paddingBottom: Math.max(insets.bottom, 16) }}
       >
         <Pressable
-          className="bg-blue-500 flex-row items-center justify-center gap-3 py-4 rounded-xl shadow-lg active:bg-blue-600"
+          className="bg-secondary flex-row items-center justify-center gap-3 py-4 rounded-xl shadow-lg active:bg-secondary-dark"
           onPress={() => setScanQR(true)}
         >
           <Feather name="camera" size={24} color="#fff" />

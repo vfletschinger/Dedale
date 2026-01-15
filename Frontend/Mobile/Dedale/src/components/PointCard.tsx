@@ -74,11 +74,6 @@ export default function PointCard({
           {/* Badge numéro */}
           <View className="flex-row items-center justify-between mb-3">
             <View className="flex-row items-center">
-              <View className="bg-blue-500 rounded-full w-10 h-10 items-center justify-center mr-3">
-                <Text className="text-white font-bold text-base">
-                  #{shortId(item.id)}
-                </Text>
-              </View>
               <View>
                 <Text className="text-gray-800 font-bold text-lg">
                   {item.name || `Point #${shortId(item.id)}`}
