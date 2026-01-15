@@ -239,15 +239,18 @@ async fn fetch_events_for_transfer(
 
             let parcours: Vec<TransferParcours> = parcours_rows
                 .iter()
-                .map(|row| TransferParcours {
-                    id: row.get("id"),
-                    event_id: row.get("event_id"),
-                    name: row.get("name"),
-                    color: row.get("color"),
-                    start_time: row.get("start_time"),
-                    speed_low: row.get("speed_low"),
-                    speed_high: row.get("speed_high"),
-                    geometry_json: row.get("geometry_json"),
+                .map(|row| {
+                    let start_time_i64: Option<i64> = row.get("start_time");
+                    TransferParcours {
+                        id: row.get("id"),
+                        event_id: row.get("event_id"),
+                        name: row.get("name"),
+                        color: row.get("color"),
+                        start_time: start_time_i64.map(|t| t.to_string()),
+                        speed_low: row.get("speed_low"),
+                        speed_high: row.get("speed_high"),
+                        geometry_json: row.get("geometry_json"),
+                    }
                 })
                 .collect();
 
@@ -1081,5 +1084,16 @@ async fn handle_receive_planning(
         .map_err(|e| format!("Erreur flush: {}", e))?;
 
     println!("✅ [PLANNING EXPORT] Planning envoyé (teams/actions/équipements uniquement)");
+
+    // Envoyer goodbye et fermer proprement la connexion
+    let goodbye = serde_json::json!({
+        "type": "goodbye",
+        "message": "Planning envoyé avec succès"
+    });
+    let _ = websocket.write(Message::Text(goodbye.to_string().into()));
+    let _ = websocket.flush();
+    let _ = websocket.close(None);
+    println!("👋 [PLANNING EXPORT] Connexion fermée proprement");
+
     Ok(())
 }

@@ -238,7 +238,7 @@ export default function SettingsScreen() {
 
   return (
     <View className="flex-1 bg-gray-50">
-      <View className="bg-primary pt-4 pb-4 px-4 shadow-sm flex-row items-center justify-between">
+      <View className="bg-primary pt-12 pb-6 px-4 shadow-sm flex-row items-center justify-between">
         {scanQR && (
           <TouchableOpacity onPress={() => setScanQR(false)} className="mr-4">
             <Feather name="arrow-left" size={24} color="white" />
