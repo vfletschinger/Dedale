@@ -45,10 +45,10 @@ function TabNavigator() {
         tabBarIcon: ({ color, size }) => {
           let iconName: keyof typeof Feather.glyphMap;
 
-          if (route.name === "Points d'intérêt") {
-            iconName = "map-pin";
-          } else if (route.name === "Accueil") {
+          if (route.name === "Accueil") {
             iconName = "plus-circle";
+          } else if (route.name === "Points d'intérêt") {
+            iconName = "map-pin";
           } else if (route.name === "Paramètres") {
             iconName = "settings";
           } else if (route.name === "Planning") {
@@ -61,8 +61,9 @@ function TabNavigator() {
         },
       })}
     >
-      <Tab.Screen name="Points d'intérêt" component={InterestPointsScreen} />
       <Tab.Screen name="Accueil" component={RegisterPointScreen} />
+      <Tab.Screen name="Points d'intérêt" component={InterestPointsScreen} />
+
       <Tab.Screen name="Planning" component={PlanningScreen} />
       <Tab.Screen name="Paramètres" component={SettingsScreen} />
     </Tab.Navigator>

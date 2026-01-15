@@ -235,7 +235,7 @@ export default function InterestPointsScreen() {
           </Text>
           <Pressable
             className="mt-8 bg-blue-500 px-8 py-4 rounded-full shadow-md active:bg-blue-600"
-            onPress={() => navigation.navigate("RegisterPoint")}
+            onPress={() => navigation.navigate("Accueil")}
           >
             <Text className="text-white font-semibold text-base">
               + Ajouter un point

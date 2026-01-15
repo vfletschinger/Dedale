@@ -1,9 +1,7 @@
 export type TabParamList = {
-  Home: undefined;
-  InterestPoints: undefined;
-  RegisterPoint: undefined;
-  Planning: undefined;
-  Settings: undefined;
+  Accueil: undefined;
+  "Points d'intérêt": undefined;  Planning: undefined;
+  Paramètres: undefined;
 };
 
 export type RootStackParamList = {
