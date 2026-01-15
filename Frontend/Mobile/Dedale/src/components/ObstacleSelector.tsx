@@ -10,15 +10,13 @@ import {
 import { getDatabase } from "../../assets/migrations";
 
 type ObstacleType = {
-  id: number;
+  id: string;
   name: string;
   description?: string;
-  width?: number;
-  length?: number;
 };
 
-type SelectedObstacle = {
-  type_id: number;
+export type SelectedObstacle = {
+  type_id: string;
   name: string;
   number: number;
 };
@@ -62,7 +60,7 @@ export default function ObstacleSelector({
   const fetchObstacleTypes = () => {
     try {
       const types = db.getAllSync<ObstacleType>(
-        "SELECT * FROM equipement_type"
+        "SELECT * FROM type"
       );
       setAvailableObstacles(types || []);
     } catch (error) {
