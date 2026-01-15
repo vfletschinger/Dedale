@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Person } from "../types";
+import { Person } from "../../types";
 
 interface CreatePersonProps {
     onClose: () => void;

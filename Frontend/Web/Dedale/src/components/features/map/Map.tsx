@@ -5,24 +5,24 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
 
 // Composants
-import PointDetails from "./PointDetails";
-import AddPointForm from "./AddPointForm";
+import PointDetails from "../../PointDetails";
+import AddPointForm from "../../AddPointForm";
 import TimelineBar from "./TimelineBar";
-import AddressSearch from "./AdressSearch";
-import ParcoursForm from "./ParcoursForm";
-import InterestForm from "./InterestForm";
-import EquipementForm from "./EquipementForm";
-import EquipementTypeFilter, { VisibilityFilters } from "./EquipementTypeFilter";
-import ZoneForm from "./ZoneForm";
+import AddressSearch from "../../AdressSearch";
+import ParcoursForm from "../../ParcoursForm";
+import InterestForm from "../../InterestForm";
+import EquipementForm from "../../EquipementForm";
+import EquipementTypeFilter, { VisibilityFilters } from "../../EquipementTypeFilter";
+import ZoneForm from "../../ZoneForm";
 
 // Hooks personnalisés
-import { useMapPoints } from "../hooks/useMapPoints";
-import { useMapGeometries } from "../hooks/useMapGeometries";
-import { useEvents } from "../hooks/useEvents";
+import { useMapPoints } from "../../../hooks/useMapPoints";
+import { useMapGeometries } from "../../../hooks/useMapGeometries";
+import { useEvents } from "../../../hooks/useEvents";
 
 // Types et Utils
-import { SearchResult, MapEvent, Equipement, MapInterest } from "../types/map";
-import { getMapStyle } from "../utils/mapStyles";
+import { SearchResult, MapEvent, Equipement, MapInterest } from "../../../types";
+import { getMapStyle } from "../../../utils/mapStyles";
 import { Protocol } from "pmtiles";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -47,7 +47,7 @@ import {
 
 // Composant pour l'affichage d'un point dans la liste avec chargement d'adresse asynchrone
 function PointListItem({ point, onClick, cachedAddress, onCacheAddress }: {
-  point: import("../types/map").MapPoint;
+  point: import("../../../types").MapPoint;
   onClick: () => void;
   cachedAddress?: string;
   onCacheAddress: (id: string, address: string) => void;

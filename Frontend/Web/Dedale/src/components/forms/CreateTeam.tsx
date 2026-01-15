@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Team } from "../types";
+import { Team } from "../../types";
 
 interface CreateTeamProps {
     activeEventId: string;

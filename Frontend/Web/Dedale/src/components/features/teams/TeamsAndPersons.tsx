@@ -2,13 +2,13 @@ import { invoke } from "@tauri-apps/api/core";
 import toast from "react-hot-toast";
 import { emit } from "@tauri-apps/api/event";
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Team, Person, TeamEvent, TeamDetailData, EquipementAction } from "../types";
+import { Team, Person, TeamEvent, TeamDetailData, EquipementAction } from "../../../types";
 import TeamDetails from "./TeamDetails";
-import CreateTeam from "./CreateTeam";
-import CreatePerson from "./CreatePerson";
+import CreateTeam from "../../forms/CreateTeam";
+import CreatePerson from "../../forms/CreatePerson";
 import PersonDetails from "./PersonDetails";
 import { listen } from "@tauri-apps/api/event";
-import MultiRangeSlider from "./MultiRangeSlider";
+import MultiRangeSlider from "../../common/MultiRangeSlider";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSearch, faUsers, faUser, faPlus } from "@fortawesome/free-solid-svg-icons";
 

@@ -2,9 +2,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { emit } from "@tauri-apps/api/event";
-import SelectableList from "./SelectableList";
-import SearchableSelect from "./SearchableSelect";
-import { Equipement, Person, TeamEvent, TeamDetailData, EquipementAction } from "../types";
+import SelectableList from "../../common/SelectableList";
+import SearchableSelect from "../../common/SearchableSelect";
+import { Equipement, Person, TeamEvent, TeamDetailData, EquipementAction } from "../../../types";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUsers, faTools, faPen, faTrash, faTimes, faPlus, faCheck } from "@fortawesome/free-solid-svg-icons";
 

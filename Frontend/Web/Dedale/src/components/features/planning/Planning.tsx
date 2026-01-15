@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { TeamWithActions, Team, Action, Planning as Plan } from "../types/equipement";
+import { TeamWithActions, Team, Action, Planning as Plan } from "../../../types";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faFilePdf,

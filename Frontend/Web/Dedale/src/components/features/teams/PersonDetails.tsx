@@ -1,11 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useState, useEffect } from "react";
-import { Person, Team } from "../types";
+import { Person, Team } from "../../../types";
 import toast from "react-hot-toast";
 import { emit } from "@tauri-apps/api/event";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPen, faTimes, faTrash } from "@fortawesome/free-solid-svg-icons";
-import SearchableSelect from "./SearchableSelect";
+import SearchableSelect from "../../common/SearchableSelect";
 
 interface PersonDetailsProps {
   person: Person;

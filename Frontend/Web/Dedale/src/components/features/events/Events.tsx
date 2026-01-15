@@ -19,10 +19,10 @@ import {
   faFilter,
 } from "@fortawesome/free-solid-svg-icons";
 import toast from 'react-hot-toast';
-import { Event } from "../types";
+import { Event } from "../../../types";
 
 // Re-export Event for backward compatibility with App.tsx
-export type { Event } from "../types";
+export type { Event } from "../../../types";
 
 interface EventsProps {
   onEventClick?: (eventId: string) => void;

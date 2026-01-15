@@ -1,5 +1,5 @@
-import logoStrasbourg from "../../public/dedale.png";
-import type { PageKey } from "../hooks/useNavigation";
+import logoStrasbourg from "../../../public/dedale.png";
+import type { PageKey } from "../../hooks/useNavigation";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCalendarAlt, faTimes } from "@fortawesome/free-solid-svg-icons";
 

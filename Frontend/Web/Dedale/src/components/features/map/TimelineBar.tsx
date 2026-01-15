@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from "react";
-import { MapPoint, MapEvent, Equipement, MapBounds, Team } from "../types";
+import { MapPoint, MapEvent, Equipement, MapBounds, Team } from "../../../types";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
