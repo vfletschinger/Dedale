@@ -203,6 +203,7 @@ function TimelineBar({
       console.log("[TimelineBar] Map finale des actions:", newMap);
       setEquipmentsActionsMap(newMap);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [event?.id, equipementIdsKey]);
 
   // 1. Calcul des bornes (Start / End) ET de la position initiale du slider
