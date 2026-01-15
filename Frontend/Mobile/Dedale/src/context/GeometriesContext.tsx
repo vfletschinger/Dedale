@@ -46,21 +46,27 @@ export function GeometriesProvider({ children }: { children: ReactNode }) {
 
       // Ajouter les parcours
       for (const parcours of allParcours) {
-        if (!groupedGeometries[parcours.event_id]) {
-          groupedGeometries[parcours.event_id] = [];
+        if (parcours.event_id !== undefined) {
+          const eventId = String(parcours.event_id);
+          if (!groupedGeometries[eventId]) {
+            groupedGeometries[eventId] = [];
+          }
+          groupedGeometries[eventId].push({
+            ...parcours,
+            type: "parcours",
+          });
         }
-        groupedGeometries[parcours.event_id].push({
-          ...parcours,
-          type: "parcours",
-        });
       }
 
       // Ajouter les zones
       for (const zone of allZones) {
-        if (!groupedGeometries[zone.event_id]) {
-          groupedGeometries[zone.event_id] = [];
+        if (zone.event_id !== undefined) {
+          const eventId = String(zone.event_id);
+          if (!groupedGeometries[eventId]) {
+            groupedGeometries[eventId] = [];
+          }
+          groupedGeometries[eventId].push({ ...zone, type: "zone" });
         }
-        groupedGeometries[zone.event_id].push({ ...zone, type: "zone" });
       }
 
       setGeometriesByEvent(groupedGeometries);

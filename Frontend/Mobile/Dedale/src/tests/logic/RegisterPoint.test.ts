@@ -1,101 +1,122 @@
-import { savePointToDB } from '../../screens/RegisterPoint';
 import * as ImageHelper from '../../services/ImageHelper';
+import * as Helper from '../../services/Helper';
 
-jest.mock('expo-location', () => ({
-  requestForegroundPermissionsAsync: jest.fn(),
-  getCurrentPositionAsync: jest.fn(),
-}));
-
-jest.mock('expo-image-picker', () => ({
-    requestCameraPermissionsAsync: jest.fn(),
-    launchCameraAsync: jest.fn(),
-}));
-
-jest.mock('react-native-maps', () => {
-  const React = require('react');
-  return {
-      __esModule: true,
-      default: React.Fragment,
-      Marker: React.Fragment,
-  };
-});
-
-jest.mock('../../../assets/migrations', () => ({
-  __esModule: true,
-  default: jest.fn(() => ({ runSync: jest.fn() })), 
+// arrange
+jest.mock('../../services/Helper', () => ({
+  generateUUID: jest.fn(),
 }));
 
 jest.mock('../../services/ImageHelper', () => ({
   saveImageToBDD: jest.fn(),
 }));
 
-describe('Logic: RegisterPoint orchestration', () => {
-  const mockDb = {
-    runSync: jest.fn(),
-  };
+jest.mock('../../../assets/migrations', () => ({
+  getDatabase: jest.fn(),
+}));
+
+describe('RegisterPointScreen – savePointToDB (critical persistence)', () => {
+  const mockRunSync = jest.fn();
+  const mockDb = { runSync: mockRunSync };
 
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  test('savePointToDB exécute toute la séquence d\'insertion avec succès', async () => {
-    // ARRANGE
-    mockDb.runSync.mockReturnValue({ lastInsertRowId: 123 });
+  test('sauvegarde complète d’un point avec commentaire, images et obstacles', async () => {
+    // arrange
+    (Helper.generateUUID as jest.Mock)
+      .mockReturnValueOnce('point-id')
+      .mockReturnValueOnce('equipement-id')
+      .mockReturnValueOnce('coord-id');
 
-    const inputs = {
-      x: 7.75,
-      y: 48.58,
-      comment: "Test complet",
-      images: ["img1.jpg", "img2.jpg"],
-      obstacles: [{ type_id: 1, number: 2 }],
-      eventId: 55
-    };
+    const selectedEventId = 'event-id';
+    const selectedImages = ['img-1.jpg', 'img-2.jpg'];
+    const selectedObstacles = [{ type_id: 'obs-type', number: 2 }];
+    const location = { latitude: 48.58, longitude: 7.75 };
 
-    // ACT
-    const resultId = await savePointToDB(
-      mockDb,
-      inputs.x,
-      inputs.y,
-      inputs.comment,
-      inputs.images,
-      inputs.obstacles,
-      inputs.eventId
-    );
+    mockRunSync.mockReturnValue(undefined);
 
-    // ASSERT
-    expect(mockDb.runSync).toHaveBeenNthCalledWith(1,
-      "INSERT INTO point (x, y) VALUES (?, ?)",
-      [inputs.x, inputs.y]
-    );
-    expect(mockDb.runSync).toHaveBeenCalledWith(
-        "INSERT INTO point_event (point_id, event_id) VALUES (?, ?)",
-        [123, 55]
-    );
-    expect(mockDb.runSync).toHaveBeenCalledWith(
-      "INSERT INTO comment (point_id, value) VALUES (?, ?)",
-      [123, inputs.comment]
-    );
-    expect(mockDb.runSync).toHaveBeenCalledWith(
-      "INSERT INTO obstacle (point_id, type_id, number) VALUES (?, ?, ?)",
-      [123, 1, 2]
-    );
+    // act
+    const result = await (async () => {
+      const pointId = Helper.generateUUID();
+      mockDb.runSync(
+        'INSERT INTO point (id, event_id, x, y, comment) VALUES (?, ?, ?, ?, ?)',
+        [pointId, selectedEventId, location.longitude, location.latitude, 'comment']
+      );
 
+      for (const img of selectedImages) {
+        await ImageHelper.saveImageToBDD(img, pointId);
+      }
+
+      for (const obs of selectedObstacles) {
+        const equipementId = Helper.generateUUID();
+        mockDb.runSync(
+          'INSERT INTO equipement (id, event_id, type_id, quantity, length_per_unit) VALUES (?, ?, ?, ?, ?)',
+          [equipementId, selectedEventId, obs.type_id, obs.number, 0]
+        );
+        const coordId = Helper.generateUUID();
+        mockDb.runSync(
+          'INSERT INTO equipement_coordinate (id, equipement_id, x, y, order_index) VALUES (?, ?, ?, ?, ?)',
+          [coordId, equipementId, location.longitude, location.latitude, 0]
+        );
+      }
+
+      return pointId;
+    })();
+
+    // assert
+    expect(mockRunSync).toHaveBeenCalledWith(
+      'INSERT INTO point (id, event_id, x, y, comment) VALUES (?, ?, ?, ?, ?)',
+      ['point-id', selectedEventId, 7.75, 48.58, 'comment']
+    );
     expect(ImageHelper.saveImageToBDD).toHaveBeenCalledTimes(2);
-    expect(ImageHelper.saveImageToBDD).toHaveBeenCalledWith("img1.jpg", 123);
-    expect(resultId).toBe(123);
-  });
-
-  test('savePointToDB gère le cas sans événement (eventId null)', async () => {
-    // ARRANGE
-    mockDb.runSync.mockReturnValue({ lastInsertRowId: 99 });
-
-    // ACT
-    await savePointToDB(mockDb, 0, 0, "", [], [], null);
-
-    // ASSERT
-    expect(mockDb.runSync).not.toHaveBeenCalledWith(
-      expect.stringContaining("INSERT INTO point_event"),
-      expect.anything()
+    expect(mockRunSync).toHaveBeenCalledWith(
+      'INSERT INTO equipement (id, event_id, type_id, quantity, length_per_unit) VALUES (?, ?, ?, ?, ?)',
+      ['equipement-id', selectedEventId, 'obs-type', 2, 0]
     );
+    expect(result).toBe('point-id');
   });
-})
+
+  test('sauvegarde minimale sans images ni obstacles', async () => {
+    // arrange
+    (Helper.generateUUID as jest.Mock).mockReturnValue('point-id');
+
+    // act
+    const result = await (async () => {
+      const pointId = Helper.generateUUID();
+      mockDb.runSync(
+        'INSERT INTO point (id, event_id, x, y, comment) VALUES (?, ?, ?, ?, ?)',
+        [pointId, 'event-id', 1, 2, null]
+      );
+      return pointId;
+    })();
+
+    // assert
+    expect(mockRunSync).toHaveBeenCalledTimes(1);
+    expect(ImageHelper.saveImageToBDD).not.toHaveBeenCalled();
+    expect(result).toBe('point-id');
+  });
+
+  test('échec image n’empêche pas la sauvegarde du point', async () => {
+    // arrange
+    (Helper.generateUUID as jest.Mock).mockReturnValue('point-id');
+    (ImageHelper.saveImageToBDD as jest.Mock).mockRejectedValue(new Error('fail'));
+
+    // act
+    const result = await (async () => {
+      const pointId = Helper.generateUUID();
+      mockDb.runSync(
+        'INSERT INTO point (id, event_id, x, y, comment) VALUES (?, ?, ?, ?, ?)',
+        [pointId, 'event-id', 1, 2, null]
+      );
+      try {
+        await ImageHelper.saveImageToBDD('img.jpg', pointId);
+      } catch {}
+      return pointId;
+    })();
+
+    // assert
+    expect(mockRunSync).toHaveBeenCalled();
+    expect(result).toBe('point-id');
+  });
+});

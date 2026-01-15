@@ -22,8 +22,8 @@ const TestConsumer = () => {
 
   return (
     <>
-      <Text testID="event-1-count">Event 1: {geometriesByEvent[1]?.length || 0}</Text>
-      <Text testID="event-2-count">Event 2: {geometriesByEvent[2]?.length || 0}</Text>
+      <Text testID="event-1-count">Event 1: {geometriesByEvent['1']?.length || 0}</Text>
+      <Text testID="event-2-count">Event 2: {geometriesByEvent['2']?.length || 0}</Text>
       <Button title="Refresh" onPress={refreshGeometries} testID="refresh-btn" />
     </>
   );
@@ -32,7 +32,8 @@ const TestConsumer = () => {
 describe('Context: GeometriesContext Integration', () => {
   
   beforeEach(() => {
-    jest.clearAllMocks();
+    // Important : Reset complet pour éviter que les mocks des tests précédents ne bavent
+    jest.resetAllMocks(); 
   });
 
   test('Charge et groupe les géométries par event_id', async () => {
@@ -42,7 +43,13 @@ describe('Context: GeometriesContext Integration', () => {
       { id: 2, event_id: 1, wkt: 'POLYGON(...)', created_at: '2023-01-01' },
       { id: 3, event_id: 2, wkt: 'LINESTRING(...)', created_at: '2023-01-01' },
     ];
-    mockGetAllAsync.mockResolvedValue(fakeGeometries);
+
+    // On configure le mock pour DEUX appels consécutifs (Parcours puis Zones)
+    // 1er appel (Parcours) : renvoie les données
+    // 2ème appel (Zones) : renvoie vide (pour ne pas doubler les résultats)
+    mockGetAllAsync
+      .mockResolvedValueOnce(fakeGeometries) 
+      .mockResolvedValueOnce([]); 
 
     // ACT
     const { getByText, queryByText } = render(
@@ -59,7 +66,11 @@ describe('Context: GeometriesContext Integration', () => {
 
   test('Gère le rafraîchissement des données', async () => {
     // ARRANGE
-    mockGetAllAsync.mockResolvedValueOnce([]); 
+    // Phase 1 : Chargement initial (Vide)
+    // Il faut Mocker les DEUX appels du chargement initial
+    mockGetAllAsync
+        .mockResolvedValueOnce([]) // Parcours initiaux
+        .mockResolvedValueOnce([]); // Zones initiales
     
     const { getByTestId, queryByText, getByText } = render(
       <GeometriesProvider>
@@ -70,9 +81,11 @@ describe('Context: GeometriesContext Integration', () => {
     await waitFor(() => expect(queryByText('Loading...')).toBeNull());
     expect(getByText('Event 1: 0')).toBeTruthy();
     
-    mockGetAllAsync.mockResolvedValueOnce([
-        { id: 99, event_id: 1, wkt: 'POINT(1 1)', created_at: '2023' }
-    ]);
+    // Phase 2 : Préparation du Refresh
+    // On prépare les données pour les DEUX appels suivants (ceux du refresh)
+    mockGetAllAsync
+        .mockResolvedValueOnce([{ id: 99, event_id: 1, wkt: 'POINT(1 1)', created_at: '2023' }]) // Parcours après refresh
+        .mockResolvedValueOnce([]); // Zones après refresh
 
     // ACT
     await act(async () => {
