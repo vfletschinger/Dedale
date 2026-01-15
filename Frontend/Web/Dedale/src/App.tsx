@@ -3,14 +3,14 @@ import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 
 import { useNavigation } from "./hooks/useNavigation";
-import Navigation from "./components/Navigation";
+import Navigation from "./components/layout/Navigation";
 import Data from "./components/Data";
-import TeamsAndPersons from "./components/TeamsAndPersons";
-import Map from "./components/Map";
-import Event from "./components/Events";
+import TeamsAndPersons from "./components/features/teams/TeamsAndPersons";
+import Map from "./components/features/map/Map";
+import Event from "./components/features/events/Events";
 import AdminForm from "./components/AdminForm";
-import Planning from "./components/Planning";
-import { Event as AppEvent } from "./components/Events";
+import Planning from "./components/features/planning/Planning";
+import { Event as AppEvent } from "./types";
 
 import LoadingScreen from "./components/LoadingScreen";
 import { Toaster } from 'react-hot-toast';
@@ -199,7 +199,7 @@ function App() {
           {/* Data - kept mounted once visited */}
           {hasVisited("data") && (
             <PageWrapper isVisible={currentPage === "data"}>
-              <Data />
+              <Data selectedEventId={selectedEventId} />
             </PageWrapper>
           )}
 

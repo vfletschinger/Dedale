@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from "react";
-import { MapPoint, MapEvent, Equipement } from "../types/map";
+import { MapPoint, MapEvent, Equipement, MapBounds, Team } from "../../../types";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -9,14 +9,6 @@ import {
   faMap,
   faTimes,
 } from "@fortawesome/free-solid-svg-icons";
-
-// --- Types ---
-interface MapBounds {
-  north: number;
-  south: number;
-  east: number;
-  west: number;
-}
 
 interface TimelineBarProps {
   event: MapEvent;
@@ -29,15 +21,9 @@ interface TimelineBarProps {
   mapBounds?: MapBounds | null;
 }
 
-interface Team {
-  id: string;
-  name: string;
-  event_id: string;
-}
-
 // --- Fonctions utilitaires ---
 
-// D�termine l'intervalle d'affichage des heures (en ms) selon la dur�e totale
+// Détermine l'intervalle d'affichage des heures (en ms) selon la durée totale
 const getSmartInterval = (durationMs: number) => {
   const hour = 3600 * 1000;
   if (durationMs <= 24 * hour) return 1 * hour; // < 24h : toutes les 1h
@@ -70,7 +56,7 @@ function TimelineBar({
     Map<string, { pose: string | null; depose: string | null }>
   >(new Map());
 
-  // Cr�er une cl� stable bas�e sur les IDs des �quipements
+  // Créer une clé stable basée sur les IDs des équipements
   const equipementIdsKey = useMemo(
     () =>
       equipements
@@ -80,12 +66,12 @@ function TimelineBar({
     [equipements]
   );
 
-  // Charger les �quipes
+  // Charger les équipes
   useEffect(() => {
     if (event?.id) {
       invoke<Team[]>("fetch_teams_for_event", { eventId: event.id })
         .then(setTeams)
-        .catch((err) => console.error("Erreur chargement �quipes:", err));
+        .catch((err) => console.error("Erreur chargement équipes:", err));
     }
   }, [event?.id]);
 
@@ -103,7 +89,7 @@ function TimelineBar({
     };
   }, [event?.id]);
 
-  // Calculer les �quipes communes pour les �quipements s�lectionn�s
+  // Calculer les équipes communes pour les équipements sélectionnés
   useEffect(() => {
     if (selectedEquipements.length === 0) {
       setPoseTeamId("");
@@ -113,7 +99,7 @@ function TimelineBar({
       return;
     }
 
-    // R�cup�rer les actions pour tous les �quipements s�lectionn�s
+    // Récupérer les actions pour tous les équipements sélectionnés
     const poseTeams = new Set<string>();
     const deposeTeams = new Set<string>();
     let allHavePose = true;
@@ -158,7 +144,7 @@ function TimelineBar({
     console.log(
       "[TimelineBar] Chargement des actions pour",
       equipements.length,
-      "�quipements"
+      "équipements"
     );
 
     Promise.all(
@@ -174,7 +160,7 @@ function TimelineBar({
         >("fetch_actions_for_equipement", { equipementId: eq.id })
           .then((actions) => {
             console.log(
-              `[TimelineBar] Actions pour �quipement ${eq.id}:`,
+              `[TimelineBar] Actions pour équipement ${eq.id}:`,
               actions
             );
             return { equipementId: eq.id, actions };
@@ -203,6 +189,7 @@ function TimelineBar({
       console.log("[TimelineBar] Map finale des actions:", newMap);
       setEquipmentsActionsMap(newMap);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [event?.id, equipementIdsKey]);
 
   // 1. Calcul des bornes (Start / End) ET de la position initiale du slider
@@ -234,7 +221,7 @@ function TimelineBar({
       const minDate = new Date(Math.min(...allDates));
       const maxDate = new Date(Math.max(...allDates));
 
-      // Padding : on commence au d�but de l'heure min et finit � la fin de l'heure max + margin
+      // Padding : on commence au début de l'heure min et finit à la fin de l'heure max + margin
       const start = new Date(minDate);
       start.setMinutes(0, 0, 0);
       start.setHours(start.getHours() - 1); // -1h de marge
@@ -245,7 +232,7 @@ function TimelineBar({
 
       const duration = end.getTime() - start.getTime();
 
-      // Calculer la position initiale au niveau de la premi�re date de pose
+      // Calculer la position initiale au niveau de la première date de pose
       const initialPercent =
         duration > 0
           ? Math.max(
@@ -265,10 +252,10 @@ function TimelineBar({
       };
     }, [equipements]);
 
-  // �tat du slider initialis� avec la valeur calcul�e
+  // État du slider initialisé avec la valeur calculée
   const [sliderValue, setSliderValue] = useState<number>(initialSliderValue);
 
-  // Mettre � jour le slider quand la valeur initiale change (nouveaux �quipements)
+  // Mettre à jour le slider quand la valeur initiale change (nouveaux équipements)
   useEffect(() => {
     setSliderValue(initialSliderValue);
   }, [initialSliderValue]);
@@ -480,7 +467,7 @@ function TimelineBar({
       }
 
       alert(
-        `�quipes attribu�es avec succ�s � ${selectedEquipements.length} �quipement(s) !`
+        `Équipes attribuées avec succès à ${selectedEquipements.length} équipement(s) !`
       );
     } catch (error) {
       console.error("Erreur attribution:", error);
@@ -557,7 +544,7 @@ function TimelineBar({
           </div>
         )}
 
-        {/* Input Range Invisible (Contr�le total) */}
+        {/* Input Range Invisible (Contrôle total) */}
         {isFilterActive && (
           <input
             type="range"
@@ -615,7 +602,7 @@ function TimelineBar({
                 style={{ left: `${tick.percent}%`, top: "64px" }}
               />
             ))}
-            {/* S�parateurs de jours plus forts */}
+            {/* Séparateurs de jours plus forts */}
             {dayBlocks.map((d, i) => (
               <div
                 key={`d-${i}`}
@@ -625,7 +612,7 @@ function TimelineBar({
             ))}
           </div>
 
-          {/* Liste des �quipements */}
+          {/* Liste des équipements */}
           <div className="p-2 space-y-1 relative z-10">
             {equipementsWithDates.map((eq) => {
               const startP = getPositionPercent(eq.date_pose, eq.hour_pose);
@@ -656,12 +643,12 @@ function TimelineBar({
                     {eq.type_name || `EQ #${eq.id}`}
                   </div>
 
-                  {/* Barre - commence apr�s le label */}
+                  {/* Barre - commence après le label */}
                   <div className="relative flex-1 h-full">
-                    {/* Barre divis�e en deux moiti�s */}
+                    {/* Barre divisée en deux moitiés */}
                     {hasStart && hasEnd && (
                       <>
-                        {/* Moiti� gauche (pose) - verte si attribu�e, bleue sinon */}
+                        {/* Moitié gauche (pose) - verte si attribuée, bleue sinon */}
                         <div
                           className={`absolute h-1.5 top-1/2 -translate-y-1/2 rounded-l-full group-hover:brightness-110 ${existingActions.pose
                             ? "bg-green-500"
@@ -672,7 +659,7 @@ function TimelineBar({
                             width: `${Math.max(0.5, (endP - startP) / 2)}%`,
                           }}
                         />
-                        {/* Moiti� droite (d�pose) - rouge si attribu�e, bleue sinon */}
+                        {/* Moitié droite (dépose) - rouge si attribuée, bleue sinon */}
                         <div
                           className={`absolute h-1.5 top-1/2 -translate-y-1/2 rounded-r-full group-hover:brightness-110 ${existingActions.depose
                             ? "bg-red-500"
@@ -693,12 +680,12 @@ function TimelineBar({
                         title="Pose"
                       />
                     )}
-                    {/* Point de D�pose (rouge) */}
+                    {/* Point de Dépose (rouge) */}
                     {hasEnd && (
                       <div
                         className="absolute w-3 h-3 top-1/2 -translate-y-1/2 -translate-x-1/2 bg-red-500 rounded-full z-20 border border-white shadow-sm"
                         style={{ left: `${endP}%` }}
-                        title="D�pose"
+                        title="Dépose"
                       />
                     )}
                   </div>
@@ -717,24 +704,24 @@ function TimelineBar({
         {selectedEquipements.length > 0 && (
           <div className="p-4 flex-1 flex flex-col">
             <h3 className="text-sm font-bold text-slate-700 mb-3">
-              Attribution des �quipes
+              Attribution des équipes
               {selectedEquipements.length === 1
-                ? ` pour : ${selectedEquipements[0].type_name || "�quipement"}`
-                : ` pour ${selectedEquipements.length} �quipements`}
+                ? ` pour : ${selectedEquipements[0].type_name || "équipement"}`
+                : ` pour ${selectedEquipements.length} équipements`}
             </h3>
 
             <div className="grid grid-cols-2 gap-4 flex-1">
               {/* Pose */}
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-2">
-                  ?? �quipe pour la pose
+                  Équipe pour la pose
                 </label>
                 <select
                   value={poseTeamId}
                   onChange={(e) => setPoseTeamId(e.target.value)}
                   className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
-                  <option value="">-- S�lectionner une �quipe --</option>
+                  <option value="">-- Sélectionner une équipe --</option>
                   {teams.map((team) => (
                     <option key={team.id} value={team.id}>
                       {team.name}
@@ -743,17 +730,17 @@ function TimelineBar({
                 </select>
               </div>
 
-              {/* D�pose */}
+              {/* Dépose */}
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-2">
-                  ?? �quipe pour la d�pose
+                  Équipe pour la dépose
                 </label>
                 <select
                   value={deposeTeamId}
                   onChange={(e) => setDeposeTeamId(e.target.value)}
                   className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
-                  <option value="">-- S�lectionner une �quipe --</option>
+                  <option value="">-- Sélectionner une équipe --</option>
                   {teams.map((team) => (
                     <option key={team.id} value={team.id}>
                       {team.name}
@@ -763,7 +750,7 @@ function TimelineBar({
               </div>
             </div>
 
-            {/* Boutons d'action - Positionn�s en bas */}
+            {/* Boutons d'action - Positionnés en bas */}
             <div className="flex gap-3 mt-4 justify-end pt-4 border-t border-slate-200">
               <button
                 onClick={() => setSelectedEquipements([])}
@@ -797,7 +784,7 @@ function TimelineBar({
                     Attribution...
                   </>
                 ) : (
-                  "Attribuer les �quipes"
+                  "Attribuer les équipes"
                 )}
               </button>
             </div>

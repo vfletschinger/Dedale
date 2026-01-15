@@ -2,21 +2,15 @@ import { invoke } from "@tauri-apps/api/core";
 import toast from "react-hot-toast";
 import { emit } from "@tauri-apps/api/event";
 import { useState, useEffect, useMemo, useCallback } from "react";
-import TeamDetails, { TeamDetailData, Person, Event, EquipementAction } from "./TeamDetails";
-import CreateTeam from "./CreateTeam";
-import CreatePerson from "./CreatePerson";
+import { Team, Person, TeamEvent, TeamDetailData, EquipementAction } from "../../../types";
+import TeamDetails from "./TeamDetails";
+import CreateTeam from "../../forms/CreateTeam";
+import CreatePerson from "../../forms/CreatePerson";
 import PersonDetails from "./PersonDetails";
 import { listen } from "@tauri-apps/api/event";
-import MultiRangeSlider from "./MultiRangeSlider";
+import MultiRangeSlider from "../../common/MultiRangeSlider";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSearch, faUsers, faUser, faPlus } from "@fortawesome/free-solid-svg-icons";
-
-interface Team {
-    id: string;
-    name: string;
-    number: number;
-    eventId: string;
-}
 
 interface SelectedTeamState {
     info: Team;
@@ -108,7 +102,7 @@ function TeamsAndPersons({ activeEventId }: { activeEventId: string }) {
                 .includes(filterTeamName.toLowerCase());
             const SLIDER_MAX = 10;
             const effectiveMax = filterMaxMembers === SLIDER_MAX ? Infinity : filterMaxMembers;
-            const matchMembers = team.number >= filterMinMembers && team.number <= effectiveMax;
+            const matchMembers = (team.number ?? 0) >= filterMinMembers && (team.number ?? 0) <= effectiveMax;
             return matchName && matchMembers;
         });
     }, [teams, filterTeamName, filterMinMembers, filterMaxMembers]);
@@ -118,7 +112,7 @@ function TeamsAndPersons({ activeEventId }: { activeEventId: string }) {
         try {
             const [members, events, rawActions] = await Promise.all([
                 invoke<Person[]>("fetch_team_members", { teamId }),
-                invoke<Event[]>("fetch_team_events", { teamId }),
+                invoke<TeamEvent[]>("fetch_team_events", { teamId }),
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 invoke<any[]>("fetch_team_actions", { teamId }),
             ]);
@@ -329,7 +323,7 @@ function TeamsAndPersons({ activeEventId }: { activeEventId: string }) {
                                     <div className="flex items-center gap-2 text-sm text-gray-500">
                                         <div className="bg-gray-100 px-2 py-1 rounded text-xs font-medium flex items-center gap-1.5 text-gray-600">
                                             <FontAwesomeIcon icon={faUser} className="text-[10px]" />
-                                            {team.number} membre{team.number > 1 ? "s" : ""}
+                                            {team.number ?? 0} membre{(team.number ?? 0) > 1 ? "s" : ""}
                                         </div>
                                     </div>
                                 </div>

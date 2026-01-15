@@ -146,7 +146,7 @@ test_front:
   script:
     - cd $WEB_PATH
     - npm ci --prefer-offline
-    - npm test -- --ci --reporters=default --reporters=jest-junit
+    - npm test -- --run --reporter=default --reporter=junit --outputFile=$CI_PROJECT_DIR/$PROJECT_PATH/reports/junit.xml
   artifacts:
     when: always
     paths:

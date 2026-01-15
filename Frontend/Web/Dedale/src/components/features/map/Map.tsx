@@ -5,24 +5,24 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
 
 // Composants
-import PointDetails from "./PointDetails";
-import AddPointForm from "./AddPointForm";
+import PointDetails from "../../PointDetails";
+import AddPointForm from "../../AddPointForm";
 import TimelineBar from "./TimelineBar";
-import AddressSearch from "./AdressSearch";
-import ParcoursForm from "./ParcoursForm";
-import InterestForm from "./InterestForm";
-import EquipementForm from "./EquipementForm";
-import EquipementTypeFilter, { VisibilityFilters } from "./EquipementTypeFilter";
-import ZoneForm from "./ZoneForm";
+import AddressSearch from "../../AdressSearch";
+import ParcoursForm from "../../ParcoursForm";
+import InterestForm from "../../InterestForm";
+import EquipementForm from "../../EquipementForm";
+import EquipementTypeFilter, { VisibilityFilters } from "../../EquipementTypeFilter";
+import ZoneForm from "../../ZoneForm";
 
 // Hooks personnalisés
-import { useMapPoints } from "../hooks/useMapPoints";
-import { useMapGeometries } from "../hooks/useMapGeometries";
-import { useEvents } from "../hooks/useEvents";
+import { useMapPoints } from "../../../hooks/useMapPoints";
+import { useMapGeometries } from "../../../hooks/useMapGeometries";
+import { useEvents } from "../../../hooks/useEvents";
 
 // Types et Utils
-import { SearchResult, MapEvent, Equipement, MapInterest } from "../types/map";
-import { getMapStyle } from "../utils/mapStyles";
+import { SearchResult, MapEvent, Equipement, MapInterest } from "../../../types";
+import { getMapStyle } from "../../../utils/mapStyles";
 import { Protocol } from "pmtiles";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -47,7 +47,7 @@ import {
 
 // Composant pour l'affichage d'un point dans la liste avec chargement d'adresse asynchrone
 function PointListItem({ point, onClick, cachedAddress, onCacheAddress }: {
-  point: import("../types/map").MapPoint;
+  point: import("../../../types").MapPoint;
   onClick: () => void;
   cachedAddress?: string;
   onCacheAddress: (id: string, address: string) => void;
@@ -201,12 +201,12 @@ function OfflineMapLibre({
     selectedPoint,
     setSelectedPoint,
     addingPointCoords,
-    setAddingPointCoords,
     awaitingMapClick,
     handleAddPointClick,
     refreshPoints,
     refreshInterest,
     openPopupForPoint,
+    cancelAddPoint,
   } = useMapPoints(map, selectedEventId, visibilityFilters.showInterests);
 
   // 2. Logique des GÉOMÉTRIES (Zones & Parcours)
@@ -519,9 +519,9 @@ function OfflineMapLibre({
                 <div className="flex-1 overflow-y-auto">
                   <AddPointForm
                     initialCoords={addingPointCoords}
-                    onClose={() => setAddingPointCoords(null)}
+                    onClose={cancelAddPoint}
                     onSaved={() => {
-                      setAddingPointCoords(null);
+                      cancelAddPoint();
                       refreshPoints();
                     }}
                     eventId={selectedEventId}
@@ -936,8 +936,7 @@ function OfflineMapLibre({
                     onClick={() => {
                       if (drawingMode !== "none") cancelDrawing();
                       if (awaitingMapClick) {
-                        setAddingPointCoords(null);
-                        window.dispatchEvent(new Event("cancel-map-action"));
+                        cancelAddPoint();
                       }
                     }}
                     className="px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg shadow-lg text-sm font-semibold flex items-center gap-1"

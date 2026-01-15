@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
-import { TeamWithActions, Team, Action, Planning as Plan } from "../types/equipement";
+import { TeamWithActions, Planning as Plan } from "../../../types";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faFilePdf,
@@ -42,38 +41,63 @@ export default function Planning({
   });
 
   const [generatingPdfForTeam, setGeneratingPdfForTeam] = useState<string | null>(null);
-  const [isMobileConnected, setIsMobileConnected] = useState(false);
 
-  // 1. Écouter la connexion mobile
-  useEffect(() => {
-    const unlistenConnect = listen("mobile-connected", () => {
-      console.log("📱 Mobile connecté !");
-      setIsMobileConnected(true);
-      if (syncState.step === "waiting_for_scan") {
-        toast.success("Mobile connecté !");
+  // 4. Fonction d'envoi réelle
+  const sendPlanningToTeam = useCallback(async (teamId: string, teamName: string) => {
+    setSyncState(prev => ({ ...prev, step: "sending" }));
+
+    try {
+      console.log("📤 Appel send_planning avec teamId:", teamId);
+      const planning = await invoke<Plan>("send_planning", { teamId });
+
+      if (!planning.actions || planning.actions.length === 0) {
+        setSyncState(prev => ({
+          ...prev,
+          step: "error",
+          errorMessage: `Aucune action trouvée pour l'équipe ${teamName}.`
+        }));
+        toast.error(`Aucune action à envoyer pour ${teamName}.`);
+        return;
       }
-    });
 
-    const unlistenDisconnect = listen("mobile-disconnected", () => {
-      console.log("👋 Mobile déconnecté !");
-      setIsMobileConnected(false);
-    });
+      setSyncState(prev => ({ ...prev, step: "success" }));
+      toast.success(`Planning envoyé à ${teamName} (${planning.actions.length} actions)`);
+
+      setTimeout(() => {
+        closeSyncModal();
+      }, 1500);
+
+    } catch (error) {
+      console.error("Erreur envoi:", error);
+      setSyncState(prev => ({
+        ...prev,
+        step: "error",
+        errorMessage: `Erreur envoi: ${String(error)}`
+      }));
+      toast.error(`Erreur lors de l'envoi : ${error}`);
+    }
+  }, []);
+
+  // Note: Les listeners pour 'mobile-connected' et 'mobile-disconnected' sont gérés de manière centralisée
+  // dans Data.tsx pour éviter les doublons et les toasts multiples
+  // Planning écoute les événements custom émis par Data.tsx
+  useEffect(() => {
+    const handleMobileConnected = () => {
+      // Déclencher l'envoi si on est en attente
+      if (syncState.step === "waiting_for_scan" && syncState.teamId) {
+        console.log("🚀 Connexion détectée, lancement de l'envoi...");
+        sendPlanningToTeam(syncState.teamId, syncState.teamName!);
+      }
+    };
+
+    window.addEventListener("app-mobile-connected", handleMobileConnected);
 
     return () => {
-      unlistenConnect.then((fn) => fn());
-      unlistenDisconnect.then((fn) => fn());
+      window.removeEventListener("app-mobile-connected", handleMobileConnected);
     };
-  }, [syncState.step]);
+  }, [syncState.step, syncState.teamId, syncState.teamName, sendPlanningToTeam]);
 
-  // 2. Réagir automatiquement à la connexion pour envoyer le planning
-  useEffect(() => {
-    if (syncState.step === "waiting_for_scan" && isMobileConnected && syncState.teamId) {
-      console.log("🚀 Connexion détectée, lancement de l'envoi...");
-      sendPlanningToTeam(syncState.teamId, syncState.teamName!);
-    }
-  }, [isMobileConnected, syncState.step, syncState.teamId]);
-
-  // Charger les données
+  // Charger les données - Appel unique optimisé
   const loadTeamsWithActions = useCallback(async () => {
     if (!activeEventId) {
       setTeams([]);
@@ -81,22 +105,11 @@ export default function Planning({
     }
     setIsLoading(true);
     try {
-      const fetchedTeams = await invoke<Team[]>("fetch_teams_for_event", {
+      // Un seul appel au backend pour tout récupérer
+      const teamsWithActions = await invoke<TeamWithActions[]>("fetch_teams_with_actions_for_event", {
         eventId: activeEventId,
       });
 
-      const teamsWithActions: TeamWithActions[] = [];
-      for (const team of fetchedTeams) {
-        const actions = await invoke<Action[]>("fetch_actions_for_team", {
-          teamId: team.id
-        });
-        console.log(actions)
-
-        teamsWithActions.push({
-          ...team,
-          actions: actions
-        });
-      }
       setTeams(teamsWithActions);
     } catch (error) {
       console.error("Erreur chargement:", error);
@@ -146,45 +159,8 @@ export default function Planning({
     }
   }, []);
 
-  // 4. Fonction d'envoi réelle
-  const sendPlanningToTeam = async (teamId: string, teamName: string) => {
-    setSyncState(prev => ({ ...prev, step: "sending" }));
-
-    try {
-      console.log("📤 Appel send_planning avec teamId:", teamId);
-      const planning = await invoke<Plan>("send_planning", { teamId });
-
-      if (!planning.actions || planning.actions.length === 0) {
-        setSyncState(prev => ({
-          ...prev,
-          step: "error",
-          errorMessage: `Aucune action trouvée pour l'équipe ${teamName}.`
-        }));
-        toast.error(`Aucune action à envoyer pour ${teamName}.`);
-        return;
-      }
-
-      setSyncState(prev => ({ ...prev, step: "success" }));
-      toast.success(`Planning envoyé à ${teamName} (${planning.actions.length} actions)`);
-
-      setTimeout(() => {
-        closeSyncModal();
-      }, 1500);
-
-    } catch (error) {
-      console.error("Erreur envoi:", error);
-      setSyncState(prev => ({
-        ...prev,
-        step: "error",
-        errorMessage: `Erreur envoi: ${String(error)}`
-      }));
-      toast.error(`Erreur lors de l'envoi : ${error}`);
-    }
-  };
-
   const closeSyncModal = () => {
     setSyncState({ step: "idle", teamId: null, teamName: null, qrCodeBase64: null, errorMessage: null });
-    setIsMobileConnected(false);
   };
 
   const generateTeamPDF = useCallback(async (teamId: string, teamName: string) => {

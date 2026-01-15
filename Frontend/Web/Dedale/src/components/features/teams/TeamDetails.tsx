@@ -2,40 +2,15 @@ import { invoke } from "@tauri-apps/api/core";
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { emit } from "@tauri-apps/api/event";
-import SelectableList from "./SelectableList";
-import SearchableSelect from "./SearchableSelect";
-import { Equipement } from "../types/map";
+import SelectableList from "../../common/SelectableList";
+import SearchableSelect from "../../common/SearchableSelect";
+import { Equipement, Person, TeamEvent, TeamDetailData, EquipementAction } from "../../../types";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUsers, faTools, faPen, faTrash, faTimes, faPlus, faCheck } from "@fortawesome/free-solid-svg-icons";
 
 interface AvailableActionOption extends Equipement {
     temp_type: 'pose' | 'retrait';
     label: string;
-}
-
-export interface EquipementAction extends Equipement {
-    action_id: string;
-    action_type: string;
-}
-
-export interface TeamDetailData {
-    members: Person[];
-    events: Event[];
-    actions: EquipementAction[];
-}
-
-export interface Person {
-    id: string;
-    firstname: string;
-    lastname: string;
-    email: string;
-    phone_number: string;
-}
-
-export interface Event {
-    id: number;
-    name: string;
-    statut: string;
 }
 
 interface TeamDetailsProps {
@@ -61,7 +36,7 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
 
     // --- ÉTATS LOCAUX ---
     const [currentMembers, setCurrentMembers] = useState<Person[]>(data?.members || []);
-    const [currentEvents, setCurrentEvents] = useState<Event[]>(data?.events || []);
+    const [currentEvents, setCurrentEvents] = useState<TeamEvent[]>(data?.events || []);
 
     const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
     const [showMultiDeleteConfirm, setShowMultiDeleteConfirm] = useState(false);
@@ -83,7 +58,7 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
             try {
                 const [m, e, eq] = await Promise.all([
                     invoke<Person[]>("fetch_team_members", { teamId }),
-                    invoke<Event[]>("fetch_team_events", { teamId }),
+                    invoke<TeamEvent[]>("fetch_team_events", { teamId }),
                     invoke<EquipementAction[]>("fetch_team_actions", { teamId }),
                 ]);
                 setCurrentMembers(m);
