@@ -207,6 +207,7 @@ function OfflineMapLibre({
     refreshPoints,
     refreshInterest,
     openPopupForPoint,
+    cancelAddPoint,
   } = useMapPoints(map, selectedEventId, visibilityFilters.showInterests);
 
   // 2. Logique des GÉOMÉTRIES (Zones & Parcours)
@@ -936,8 +937,7 @@ function OfflineMapLibre({
                     onClick={() => {
                       if (drawingMode !== "none") cancelDrawing();
                       if (awaitingMapClick) {
-                        setAddingPointCoords(null);
-                        window.dispatchEvent(new Event("cancel-map-action"));
+                        cancelAddPoint();
                       }
                     }}
                     className="px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg shadow-lg text-sm font-semibold flex items-center gap-1"
