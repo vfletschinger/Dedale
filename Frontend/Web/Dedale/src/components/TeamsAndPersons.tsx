@@ -234,295 +234,291 @@ function TeamsAndPersons({ activeEventId }: { activeEventId: string }) {
     };
 
     return (
-        <div className="flex flex-col gap-6 relative h-full p-6 overflow-y-auto">
+        <div className="flex flex-col h-full w-full bg-gray-50 overflow-hidden">
             {/* === TEAMS SECTION === */}
-            <div className="flex gap-6 relative min-h-0">
-                {isCreateTeamModalOpen && (
-                    <CreateTeam
-                        activeEventId={activeEventId}
-                        onClose={() => setIsCreateTeamModalOpen(false)}
-                        onTeamCreated={handleTeamCreated}
-                    />
-                )}
-                {selectedTeamData && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4 animate-in fade-in duration-200">
-                        <TeamDetails
-                            teamId={selectedTeamData.info.id}
-                            teamName={selectedTeamData.info.name}
-                            data={selectedTeamData.data}
-                            onClose={() => setSelectedTeamData(null)}
-                            onDelete={handleTeamDeleted}
-                            onMemberClick={(person) => setViewingPerson(person)}
-                            activeEventId={activeEventId}
-                        />
-                        <div
-                            className="absolute inset-0 -z-10"
-                            onClick={() => setSelectedTeamData(null)}
-                        ></div>
-                    </div>
-                )}
-                {viewingPerson && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-md p-4 animate-in fade-in zoom-in-95 duration-200">
-                        <PersonDetails
-                            person={viewingPerson}
-                            activeEventId={activeEventId}
-                            onClose={() => setViewingPerson(null)}
-                            onDelete={() => {
-                                setViewingPerson(null);
-                            }}
-                            onUpdate={(updatedPerson) => {
-                                setViewingPerson(updatedPerson);
-                                if (selectedTeamData && selectedTeamData.data) {
-                                    const updatedMembers = selectedTeamData.data.members.map((m) =>
-                                        m.id === updatedPerson.id ? updatedPerson : m
-                                    );
-                                    setSelectedTeamData({
-                                        ...selectedTeamData,
-                                        data: {
-                                            ...selectedTeamData.data,
-                                            members: updatedMembers,
-                                        },
-                                    });
-                                }
-                            }}
-                            onTeamClick={(team) => {
-                                setViewingPerson(null);
-                                handleOpenTeam({
-                                    id: team.id,
-                                    name: team.name,
-                                    number: team.number,
-                                    eventId: activeEventId,
-                                });
-                            }}
-                        />
-                        <div
-                            className="absolute inset-0 -z-10"
-                            onClick={() => setViewingPerson(null)}
-                        ></div>
-                    </div>
-                )}
-
-                {/* TEAMS SIDEBAR */}
-                <div className="w-64 p-6 bg-white rounded-lg shadow-lg shrink-0 flex flex-col gap-6">
-                    <h2 className="text-xl font-bold text-gray-800 border-b pb-2 flex items-center gap-2">
-                        <FontAwesomeIcon icon={faSearch} /> Filtres Équipes
-                    </h2>
-
-                    <div>
-                        <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase">
-                            Nom
-                        </label>
-                        <input
-                            type="text"
-                            placeholder="Rechercher..."
-                            value={filterTeamName}
-                            onChange={(e) => setFilterTeamName(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary outline-none"
-                        />
+            <div className="flex-1 flex flex-col min-h-0 border-b border-gray-200">
+                {/* TEAMS HEADER & FILTERS */}
+                <div className="px-6 py-4 bg-white border-b border-gray-200 flex items-center justify-between shrink-0 gap-4">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                            <FontAwesomeIcon icon={faUsers} className="text-xl" />
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-bold text-gray-800 leading-tight">Équipes</h2>
+                            <p className="text-xs text-gray-500">{filteredTeams.length} équipe(s)</p>
+                        </div>
                     </div>
 
-                    <div>
-                        <div className="flex justify-between items-end mb-4">
-                            <label className="text-xs font-semibold text-gray-500 uppercase">
-                                Membres
-                            </label>
-                            <div className="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">
-                                {filterMinMembers} -{" "}
-                                {filterMaxMembers === 10 ? "10+" : filterMaxMembers}
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center bg-gray-50 p-1.5 rounded-xl border border-gray-200 shadow-sm transition-all focus-within:shadow-md focus-within:border-primary/30 focus-within:ring-2 focus-within:ring-primary/10">
+                            {/* Filter Name */}
+                            <div className="relative group w-48 lg:w-64">
+                                <FontAwesomeIcon icon={faSearch} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors text-xs" />
+                                <input
+                                    type="text"
+                                    placeholder="Rechercher une équipe..."
+                                    value={filterTeamName}
+                                    onChange={(e) => setFilterTeamName(e.target.value)}
+                                    className="w-full pl-8 pr-3 py-1.5 bg-transparent border-none rounded-lg text-sm text-gray-700 placeholder-gray-400 outline-none focus:ring-0"
+                                />
+                            </div>
+
+                            {/* Divider */}
+                            <div className="w-px h-6 bg-gray-300 mx-2 hidden md:block"></div>
+
+                            {/* Filter Members */}
+                            <div className="hidden md:flex items-center gap-3 px-2">
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Membres</span>
+                                <div className="w-32 px-2">
+                                    <MultiRangeSlider
+                                        min={0}
+                                        max={10}
+                                        onChange={(min, max) => {
+                                            setFilterMinMembers(min);
+                                            setFilterMaxMembers(max);
+                                        }}
+                                    />
+                                </div>
+                                <div className="text-xs font-bold text-primary bg-white px-2 py-0.5 rounded shadow-sm border border-gray-100 min-w-[36px] text-center">
+                                    {filterMinMembers}-{filterMaxMembers === 10 ? "10+" : filterMaxMembers}
+                                </div>
                             </div>
                         </div>
 
-                        <div className="px-1">
-                            <MultiRangeSlider
-                                min={0}
-                                max={10}
-                                onChange={(min, max) => {
-                                    setFilterMinMembers(min);
-                                    setFilterMaxMembers(max);
-                                }}
-                            />
-                        </div>
-
-                        <div className="flex justify-between text-[10px] text-gray-400 mt-2 px-0.5">
-                            <span>0</span>
-                            <span>10+</span>
-                        </div>
-                    </div>
-
-                    <div className="mt-auto pt-4 text-xs text-gray-400 text-center border-t border-gray-100">
-                        <p className="mb-2">
-                            <b>{filteredTeams.length}</b> / {teams.length} équipes
-                        </p>
-
-                        {(filterTeamName || filterMinMembers > 0 || filterMaxMembers < 10) && (
-                            <button
-                                onClick={() => {
-                                    setFilterTeamName("");
-                                    setFilterMinMembers(0);
-                                    setFilterMaxMembers(10);
-                                }}
-                                className="text-primary hover:text-primary/80 hover:underline font-medium transition-colors"
-                            >
-                                Réinitialiser tout
-                            </button>
-                        )}
+                        <button
+                            onClick={() => setIsCreateTeamModalOpen(true)}
+                            className="flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-3 rounded-xl text-sm font-bold transition-all shadow-md hover:shadow-lg active:scale-95 group"
+                        >
+                            <FontAwesomeIcon icon={faPlus} className="group-hover:rotate-90 transition-transform" />
+                            <span className="hidden xl:inline">Nouvelle équipe</span>
+                        </button>
                     </div>
                 </div>
 
-                {/* TEAMS CONTENT */}
-                <div className="flex-1 p-6 bg-white rounded-lg shadow-lg flex flex-col relative overflow-hidden">
-                    <h2 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-                        <FontAwesomeIcon icon={faUsers} /> Équipes
-                        {filteredTeams.length !== teams.length && (
-                            <span className="text-sm font-normal text-gray-500 ml-2">
-                                (Filtrées)
-                            </span>
-                        )}
-                    </h2>
-
+                {/* TEAMS GRID */}
+                <div className="flex-1 overflow-y-auto p-6 bg-gray-50/50">
                     {loadingTeams ? (
-                        <div className="flex justify-center items-center py-8">
-                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                        <div className="flex h-full items-center justify-center">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                        </div>
+                    ) : filteredTeams.length === 0 ? (
+                        <div className="flex h-full flex-col items-center justify-center text-gray-400">
+                            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                                <FontAwesomeIcon icon={faUsers} className="text-2xl opacity-50" />
+                            </div>
+                            <p>Aucune équipe trouvée.</p>
                         </div>
                     ) : (
-                        <div className="overflow-y-auto flex-1 pb-4">
-                            <div className="grid grid-cols-2 gap-4 pr-2 p-1">
-                                {filteredTeams.length === 0 ? (
-                                    <div className="col-span-2 flex flex-col items-center justify-center py-12 text-gray-400">
-                                        <p>Aucune équipe ne correspond aux filtres.</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                            {filteredTeams.map((team) => (
+                                <div
+                                    key={team.id}
+                                    onMouseEnter={() => handleMouseEnter(team.id)}
+                                    onClick={() => handleOpenTeam(team)}
+                                    className="group bg-white rounded-xl border border-gray-200 p-4 hover:shadow-lg hover:border-primary/30 transition-all duration-200 cursor-pointer relative overflow-hidden"
+                                >
+                                    <div className="absolute top-0 left-0 w-1 h-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                    <div className="flex justify-between items-start mb-2">
+                                        <h3 className="font-bold text-gray-800 text-lg truncate pr-2 capitalize group-hover:text-primary transition-colors">
+                                            {team.name}
+                                        </h3>
+                                        {loadingTeamId === team.id && (
+                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary shrink-0"></div>
+                                        )}
                                     </div>
-                                ) : (
-                                    filteredTeams.map((team) => (
-                                        <div
-                                            key={team.id}
-                                            onMouseEnter={() => handleMouseEnter(team.id)}
-                                            onClick={() => handleOpenTeam(team)}
-                                            className="relative p-3 bg-linear-to-br from-primary/5 to-primary/20 rounded-lg border border-primary/20 hover:shadow-md hover:scale-[1.02] transition-all cursor-pointer flex flex-col justify-between"
-                                        >
-                                            {loadingTeamId === team.id && (
-                                                <div className="absolute top-2 right-2">
-                                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                                                </div>
-                                            )}
-                                            <div>
-                                                <h3 className="font-semibold text-gray-800 text-transform: capitalize">
-                                                    {team.name}
-                                                </h3>
-                                            </div>
-                                            <p className="text-xs text-gray-500 mt-4">
-                                                <FontAwesomeIcon icon={faUser} /> {team.number} membre{team.number > 1 ? "s" : ""}
-                                            </p>
+                                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                                        <div className="bg-gray-100 px-2 py-1 rounded text-xs font-medium flex items-center gap-1.5 text-gray-600">
+                                            <FontAwesomeIcon icon={faUser} className="text-[10px]" />
+                                            {team.number} membre{team.number > 1 ? "s" : ""}
                                         </div>
-                                    ))
-                                )}
-                            </div>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     )}
-
-                    <button
-                        onClick={() => setIsCreateTeamModalOpen(true)}
-                        className="absolute bottom-4 right-4 w-10 h-10 bg-primary hover:opacity-90 text-white rounded-full shadow-lg hover:shadow-xl hover:scale-110 cursor-pointer active:scale-95 transition-all duration-200 flex items-center justify-center z-10 group"
-                        title="Créer une nouvelle équipe"
-                    >
-                        <FontAwesomeIcon icon={faPlus} className="h-6 w-6 transition-transform group-hover:rotate-90" />
-                    </button>
                 </div>
             </div>
 
             {/* === PERSONS SECTION === */}
-            <div className="flex gap-6 relative min-h-0">
-                {isCreatePersonOpen && <CreatePerson onClose={() => setIsCreatePersonOpen(false)} onPersonCreated={handlePersonCreated} />}
-                {selectedPerson && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4 animate-in fade-in duration-200">
-                        <PersonDetails
-                            person={selectedPerson}
-                            activeEventId={activeEventId}
-                            onClose={() => setSelectedPerson(null)}
-                            onDelete={handlePersonDeleted}
-                            onUpdate={handlePersonUpdate}
-                            onTeamClick={(team) => setViewingTeam(team)}
-                        />
-                        <div className="absolute inset-0 -z-10" onClick={() => setSelectedPerson(null)}></div>
+            <div className="flex-1 flex flex-col min-h-0 bg-white">
+                {/* PERSONS HEADER & FILTERS */}
+                <div className="px-6 py-4 bg-white border-b border-gray-200 flex items-center justify-between shrink-0 gap-4 shadow-sm z-10">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center text-secondary">
+                            <FontAwesomeIcon icon={faUser} className="text-xl" />
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-bold text-gray-800 leading-tight">Personnes</h2>
+                            <p className="text-xs text-gray-500">{filteredPeople.length} personne(s)</p>
+                        </div>
                     </div>
-                )}
-                {viewingTeam && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-md p-4 animate-in fade-in zoom-in-95 duration-200">
-                        <TeamDetails
-                            teamId={viewingTeam.id}
-                            teamName={viewingTeam.name}
-                            activeEventId={activeEventId}
-                            onClose={() => setViewingTeam(null)}
-                            onDelete={() => {
-                                setViewingTeam(null);
-                            }}
-                            onMemberClick={(member) => {
-                                setViewingTeam(null);
-                                setSelectedPerson(member);
-                            }
-                            }
-                        />
-                        <div className="absolute inset-0 -z-10" onClick={() => setViewingTeam(null)}></div>
-                    </div>
-                )}
 
-                {/* PERSONS SIDEBAR */}
-                <div className="w-64 p-6 bg-white rounded-lg shadow-lg shrink-0 flex flex-col gap-6">
-                    <h2 className="text-xl font-bold text-gray-800 border-b pb-2 flex items-center gap-2"><FontAwesomeIcon icon={faSearch} /> Filtres Personnes</h2>
-                    <div>
-                        <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase">Recherche</label>
-                        <input
-                            type="text"
-                            placeholder="Nom, prénom, email..."
-                            value={filterPersonName}
-                            onChange={(e) => setFilterPersonName(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary outline-none"
-                        />
-                    </div>
-                    <div className="mt-auto text-center text-xs text-gray-400">
-                        {filteredPeople.length} personne(s)
-                    </div>
-                </div>
-
-                {/* PERSONS CONTENT */}
-                <div className="flex-1 p-6 bg-white rounded-lg shadow-lg flex flex-col relative overflow-hidden">
-                    <h2 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2"><FontAwesomeIcon icon={faUser} /> Personnes</h2>
-
-                    {loadingPersons ? (
-                        <div className="flex justify-center items-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div></div>
-                    ) : (
-                        <div className="overflow-y-auto flex-1 pb-4">
-                            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 pr-2 p-1">
-                                {filteredPeople.length === 0 ? (
-                                    <div className="col-span-full text-center text-gray-400 py-10">Aucune personne trouvée.</div>
-                                ) : (
-                                    filteredPeople.map(person => (
-                                        <div
-                                            key={person.id}
-                                            onClick={() => setSelectedPerson(person)}
-                                            className="p-4 bg-white border border-gray-300 rounded-xl hover:shadow-md hover:border-primary/50 transition-all cursor-pointer flex items-center gap-4 group"
-                                        >
-                                            <div className="w-10 h-10 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center font-bold text-sm group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-                                                {person.firstname[0].toUpperCase()}{person.lastname[0].toUpperCase()}
-                                            </div>
-                                            <div className="overflow-hidden">
-                                                <h3 className="font-semibold text-gray-800 truncate text-transform: capitalize">{person.firstname} {person.lastname}</h3>
-                                                <p className="text-xs text-gray-500 truncate">{person.email || "Pas d'email"}</p>
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center bg-gray-50 p-1.5 rounded-xl border border-gray-200 shadow-sm transition-all focus-within:shadow-md focus-within:border-secondary/30 focus-within:ring-2 focus-within:ring-secondary/10">
+                            <div className="relative group w-64">
+                                <FontAwesomeIcon icon={faSearch} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-secondary transition-colors text-xs" />
+                                <input
+                                    type="text"
+                                    placeholder="Rechercher une personne..."
+                                    value={filterPersonName}
+                                    onChange={(e) => setFilterPersonName(e.target.value)}
+                                    className="w-full pl-8 pr-3 py-1.5 bg-transparent border-none rounded-lg text-sm text-gray-700 placeholder-gray-400 outline-none focus:ring-0"
+                                />
                             </div>
                         </div>
-                    )}
 
-                    <button
-                        onClick={() => setIsCreatePersonOpen(true)}
-                        className="absolute bottom-4 right-4 w-10 h-10 bg-primary hover:opacity-90 text-white rounded-full shadow-lg hover:shadow-xl hover:scale-110 cursor-pointer active:scale-95 transition-all duration-200 flex items-center justify-center z-10 group"
-                    >
-                        <FontAwesomeIcon icon={faPlus} className="h-6 w-6 transition-transform group-hover:rotate-90" />
-                    </button>
+                        <button
+                            onClick={() => setIsCreatePersonOpen(true)}
+                            className="flex items-center justify-center gap-2 bg-secondary hover:bg-secondary/90 text-white px-4 py-3 rounded-xl text-sm font-bold transition-all shadow-md hover:shadow-lg active:scale-95 group"
+                        >
+                            <FontAwesomeIcon icon={faPlus} className="group-hover:rotate-90 transition-transform" />
+                            <span className="hidden xl:inline">Nouvelle personne</span>
+                        </button>
+                    </div>
+                </div>
+
+                {/* PERSONS GRID */}
+                <div className="flex-1 overflow-y-auto p-6">
+                    {loadingPersons ? (
+                        <div className="flex h-full items-center justify-center">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-secondary"></div>
+                        </div>
+                    ) : filteredPeople.length === 0 ? (
+                        <div className="flex h-full flex-col items-center justify-center text-gray-400">
+                            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                                <FontAwesomeIcon icon={faUser} className="text-2xl opacity-50" />
+                            </div>
+                            <p>Aucune personne trouvée.</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                            {filteredPeople.map((person) => (
+                                <div
+                                    key={person.id}
+                                    onClick={() => setSelectedPerson(person)}
+                                    className="group flex items-center gap-4 p-3 bg-white border border-gray-200 rounded-xl hover:shadow-md hover:border-secondary/50 transition-all cursor-pointer"
+                                >
+                                    <div className="w-10 h-10 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center font-bold text-sm group-hover:bg-secondary/10 group-hover:text-secondary transition-colors shrink-0">
+                                        {person.firstname?.[0]?.toUpperCase()}{person.lastname?.[0]?.toUpperCase()}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h3 className="font-semibold text-gray-800 truncate capitalize text-sm group-hover:text-secondary transition-colors">
+                                            {person.firstname} {person.lastname}
+                                        </h3>
+                                        <p className="text-xs text-gray-500 truncate">{person.email || "Pas d'email"}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
+
+            {/* MODALS SECTION */}
+            {isCreateTeamModalOpen && (
+                <CreateTeam
+                    activeEventId={activeEventId}
+                    onClose={() => setIsCreateTeamModalOpen(false)}
+                    onTeamCreated={handleTeamCreated}
+                />
+            )}
+
+            {/* Team Details Modal */}
+            {selectedTeamData && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <TeamDetails
+                        teamId={selectedTeamData.info.id}
+                        teamName={selectedTeamData.info.name}
+                        data={selectedTeamData.data}
+                        onClose={() => setSelectedTeamData(null)}
+                        onDelete={handleTeamDeleted}
+                        onMemberClick={(person) => setViewingPerson(person)}
+                        activeEventId={activeEventId}
+                    />
+                    <div
+                        className="absolute inset-0 -z-10"
+                        onClick={() => setSelectedTeamData(null)}
+                    ></div>
+                </div>
+            )}
+
+            {isCreatePersonOpen && <CreatePerson onClose={() => setIsCreatePersonOpen(false)} onPersonCreated={handlePersonCreated} />}
+
+            {selectedPerson && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <PersonDetails
+                        person={selectedPerson}
+                        activeEventId={activeEventId}
+                        onClose={() => setSelectedPerson(null)}
+                        onDelete={handlePersonDeleted}
+                        onUpdate={handlePersonUpdate}
+                        onTeamClick={(team) => setViewingTeam(team)}
+                    />
+                    <div className="absolute inset-0 -z-10" onClick={() => setSelectedPerson(null)}></div>
+                </div>
+            )}
+
+            {/* Sub-modals inside modals (e.g. clicking a team from person details) */}
+            {viewingPerson && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-md p-4 animate-in fade-in zoom-in-95 duration-200">
+                    <PersonDetails
+                        person={viewingPerson}
+                        activeEventId={activeEventId}
+                        onClose={() => setViewingPerson(null)}
+                        onDelete={() => {
+                            setViewingPerson(null);
+                        }}
+                        onUpdate={(updatedPerson) => {
+                            setViewingPerson(updatedPerson);
+                            // Update parent modal data if needed
+                            if (selectedTeamData && selectedTeamData.data) {
+                                const updatedMembers = selectedTeamData.data.members.map((m) =>
+                                    m.id === updatedPerson.id ? updatedPerson : m
+                                );
+                                setSelectedTeamData({
+                                    ...selectedTeamData,
+                                    data: {
+                                        ...selectedTeamData.data,
+                                        members: updatedMembers,
+                                    },
+                                });
+                            }
+                        }}
+                        onTeamClick={(team) => {
+                            setViewingPerson(null);
+                            handleOpenTeam({
+                                id: team.id,
+                                name: team.name,
+                                number: team.number,
+                                eventId: activeEventId,
+                            });
+                        }}
+                    />
+                    <div
+                        className="absolute inset-0 -z-10"
+                        onClick={() => setViewingPerson(null)}
+                    ></div>
+                </div>
+            )}
+
+            {viewingTeam && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-md p-4 animate-in fade-in zoom-in-95 duration-200">
+                    <TeamDetails
+                        teamId={viewingTeam.id}
+                        teamName={viewingTeam.name}
+                        activeEventId={activeEventId}
+                        onClose={() => setViewingTeam(null)}
+                        onDelete={() => {
+                            setViewingTeam(null);
+                        }}
+                        onMemberClick={(member) => {
+                            setViewingTeam(null);
+                            setSelectedPerson(member);
+                        }}
+                    />
+                    <div className="absolute inset-0 -z-10" onClick={() => setViewingTeam(null)}></div>
+                </div>
+            )}
         </div>
     );
 }

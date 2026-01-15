@@ -3,9 +3,10 @@ import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { emit } from "@tauri-apps/api/event";
 import SelectableList from "./SelectableList";
+import SearchableSelect from "./SearchableSelect";
 import { Equipement } from "../types/map";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faUsers, faTools, faPen, faTrash, faTimes } from "@fortawesome/free-solid-svg-icons";
+import { faUsers, faTools, faPen, faTrash, faTimes, faPlus, faCheck } from "@fortawesome/free-solid-svg-icons";
 
 interface AvailableActionOption extends Equipement {
     temp_type: 'pose' | 'retrait';
@@ -172,6 +173,37 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
     const [availableEquipements, setavailableEquipements] = useState<Equipement[]>([]);
     const [selectedEquipementId, setSelectedEquipementId] = useState<string>("");
 
+    // Filtres
+    const [filterDate, setFilterDate] = useState("");
+    const [filterTime, setFilterTime] = useState("");
+
+    // Helper pour extraire date/heure d'un string ISO ou date
+    const matchesFilter = (item: AvailableActionOption) => {
+        const dateStr = item.temp_type === 'pose' ? item.date_pose : item.date_depose;
+        if (!dateStr) return false;
+
+        // Date match
+        if (filterDate) {
+            const d = new Date(dateStr);
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            const itemDate = `${yyyy}-${mm}-${dd}`;
+            if (itemDate !== filterDate) return false;
+        }
+
+        // Time match (simple "starts with" usually enough for HH:mm)
+        if (filterTime) {
+            const d = new Date(dateStr);
+            const hh = String(d.getHours()).padStart(2, '0');
+            const min = String(d.getMinutes()).padStart(2, '0');
+            const itemTime = `${hh}:${min}`;
+            if (!itemTime.startsWith(filterTime)) return false;
+        }
+
+        return true;
+    };
+
     const handleRemoveEquipementAction = async (actionId: string) => {
         try {
             await invoke("delete_action", { actionId });
@@ -207,7 +239,7 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
                 // Récupérer toutes les actions de cet équipement (toutes équipes)
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const allEquipementActions = await invoke<any[]>("fetch_actions_for_equipement", { equipementId: eq.id });
-                
+
                 const takenTypes = new Set(allEquipementActions.map(a => a.action_type));
 
                 if (!takenTypes.has('pose')) {
@@ -319,284 +351,399 @@ export default function TeamDetails({ teamId, teamName, data, onClose, onDelete,
     };
 
     return (
-        <div className="bg-white w-full max-w-md h-[500px] rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 relative">
+        <div className="bg-white w-full max-w-xl h-[600px] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 relative ring-1 ring-black/5">
 
             {/* OVERLAY CONFIRMATION */}
             {showConfirm && (
                 <div className="absolute inset-0 z-50 bg-white/95 backdrop-blur-sm flex flex-col items-center justify-center p-6 animate-in fade-in duration-200">
-                    <div className="bg-red-50 p-4 rounded-full mb-4">
+                    <div className="bg-red-50 p-4 rounded-full mb-4 ring-8 ring-red-50/50">
                         <FontAwesomeIcon icon={faTrash} className="h-8 w-8 text-red-600" />
                     </div>
-                    <h3 className="text-lg font-bold text-gray-800 mb-2">Supprimer l'équipe ?</h3>
-                    <div className="flex gap-3 w-full mt-4">
-                        <button onClick={() => setShowConfirm(false)} className="flex-1 px-4 py-2 bg-gray-100 rounded-lg text-gray-700">Annuler</button>
-                        <button onClick={handleDeleteTeam} disabled={isDeleting} className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg">{isDeleting ? "..." : "Confirmer"}</button>
+                    <h3 className="text-xl font-bold text-gray-800 mb-2">Supprimer l'équipe ?</h3>
+                    <p className="text-gray-500 text-center mb-6 max-w-xs">Cette action est irréversible et supprimera toutes les données associées.</p>
+                    <div className="flex gap-3 w-full max-w-xs">
+                        <button onClick={() => setShowConfirm(false)} className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors">Annuler</button>
+                        <button onClick={handleDeleteTeam} disabled={isDeleting} className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold shadow-lg shadow-red-600/20">{isDeleting ? "..." : "Confirmer"}</button>
                     </div>
                 </div>
             )}
 
             {/* HEADER */}
-            <div className="bg-gray-50 border-b border-gray-100 p-4 flex justify-between items-center shrink-0 relative">
+            <div className="px-6 py-5 border-b border-gray-100 flex justify-between items-start shrink-0 bg-gray-50/30">
                 <div className="flex-1 mr-4">
                     {isEditing ? (
-                        <input
-                            type="text"
-                            value={editedName}
-                            onChange={(e) => setEditedName(e.target.value)}
-                            className="w-full text-lg font-bold text-gray-800 bg-white border border-primary/50 rounded px-2 py-1 outline-none focus:ring-2 focus:ring-primary/30 text-transform: capitalize"
-                            autoFocus
-                        />
+                        <div className="flex flex-col gap-1">
+                            <input
+                                type="text"
+                                value={editedName}
+                                onChange={(e) => setEditedName(e.target.value)}
+                                className="w-full text-xl font-bold text-gray-800 bg-white border border-primary/50 rounded-lg px-3 py-1 outline-none focus:ring-4 focus:ring-primary/10 text-transform: capitalize"
+                                autoFocus
+                            />
+                            <div className="flex gap-2 mt-2">
+                                <button onClick={handleSaveName} disabled={isSaving} className="text-xs bg-green-600 text-white px-2 py-1 rounded font-bold hover:bg-green-700 transition-colors">Enregistrer</button>
+                                <button onClick={() => { setIsEditing(false); setEditedName(teamName); }} className="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded font-bold hover:bg-gray-300 transition-colors">Annuler</button>
+                            </div>
+                        </div>
                     ) : (
-                        <h2 className="text-lg font-bold text-gray-800 truncate text-transform: capitalize">{editedName}</h2>
+                        <div>
+                            <div className="flex items-center gap-2 group">
+                                <h2 className="text-2xl font-bold text-gray-800 truncate text-transform: capitalize">{editedName}</h2>
+                                <button
+                                    onClick={() => setIsEditing(true)}
+                                    className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-all"
+                                    title="Modifier le nom"
+                                >
+                                    <FontAwesomeIcon icon={faPen} className="h-3 w-3" />
+                                </button>
+                            </div>
+                            <div className="flex items-center gap-2 mt-1">
+                                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary uppercase tracking-wider">
+                                    {currentEvents.length > 0 ? currentEvents[0].name : "Aucun événement"}
+                                </span>
+                            </div>
+                        </div>
                     )}
-                    <p className="text-xs text-gray-500 text-transform: capitalize">{currentEvents.length === 0 ? "" : currentEvents[0].name}</p>
                 </div>
 
                 <div className="flex items-center gap-2">
                     {!isEditing && (
                         <button
                             onClick={() => invoke("create_team_mission_pdf", { teamId: teamId, eventId: activeEventId })}
-                            className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-colors cursor-pointer"
-                            title="Créer pdf avec planning"
+                            className="px-3 py-1.5 text-sm font-medium text-primary bg-primary/5 hover:bg-primary/10 rounded-lg transition-colors border border-primary/10"
                         >
-                            Créer pdf
+                            <span className="mr-2">📄</span>PDF
                         </button>
                     )}
-                    {/* Bouton Edit (Crayon) */}
-                    {!isEditing && (
-                        <button
-                            onClick={() => setIsEditing(true)}
-                            className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-colors cursor-pointer"
-                            title="Modifier le nom"
-                        >
-                            <FontAwesomeIcon icon={faPen} className="h-4 w-4" />
-                        </button>
-                    )}
-                    <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-200 text-gray-400 cursor-pointer">✕</button>
+                    <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors">
+                        <FontAwesomeIcon icon={faTimes} className="h-5 w-5" />
+                    </button>
                 </div>
             </div>
 
             {/* ONGLETS */}
-            <div className="flex border-b border-gray-100 shrink-0">
-                <button onClick={() => { if (!isEditing) setActiveTab('members'); setSelectedItemIds([]); }} className={`flex-1 py-3 text-sm font-medium transition-colors ${activeTab === 'members' ? 'text-primary border-b-2 border-primary bg-primary/5' : 'text-gray-500 hover:text-gray-700'}`}>
-                    <FontAwesomeIcon icon={faUsers} /> Membres ({currentMembers.length})
+            <div className="flex px-6 border-b border-gray-100 gap-6">
+                <button
+                    onClick={() => { if (!isEditing) setActiveTab('members'); setSelectedItemIds([]); }}
+                    className={`pb-3 pt-4 text-sm font-bold border-b-2 transition-all ${activeTab === 'members' ? 'text-primary border-primary' : 'text-gray-400 border-transparent hover:text-gray-600'}`}
+                >
+                    <FontAwesomeIcon icon={faUsers} className="mr-2" />
+                    Membres <span className="bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-md text-[10px] ml-1">{currentMembers.length}</span>
                 </button>
-                <button onClick={() => { if (!isEditing) setActiveTab('equipements'); setSelectedItemIds([]); }} className={`flex-1 py-3 text-sm font-medium transition-colors ${activeTab === 'equipements' ? 'text-primary border-b-2 border-primary bg-primary/5' : 'text-gray-500 hover:text-gray-700'}`}>
-                    <FontAwesomeIcon icon={faTools} /> Equipements ({currentActions.length})
+                <button
+                    onClick={() => { if (!isEditing) setActiveTab('equipements'); setSelectedItemIds([]); }}
+                    className={`pb-3 pt-4 text-sm font-bold border-b-2 transition-all ${activeTab === 'equipements' ? 'text-primary border-primary' : 'text-gray-400 border-transparent hover:text-gray-600'}`}
+                >
+                    <FontAwesomeIcon icon={faTools} className="mr-2" />
+                    Équipements <span className="bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-md text-[10px] ml-1">{currentActions.length}</span>
                 </button>
             </div>
 
-            {/* CONTENU */}
-            < div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-                <div className="flex items-center justify-center gap-2 bg-primary/10 p-2 rounded-lg border border-primary/20 animate-in slide-in-from-top-2 duration-200"><button
-                    onClick={() => activeTab == "equipements" ? setSelectedItemIds(currentActions.map((action) => action.action_id)) : activeTab == "members" ? setSelectedItemIds(currentMembers.map((member) => member.id)) : ""}
-                    className="text-[10px] sm:text-xs bg-gray-500 text-white px-3 py-1.5 rounded-md hover:bg-gray-700 transition-colors font-bold whitespace-nowrap"
-                >
-                    Tout sélectionner
-                </button>
-
+            {/* TOOLBAR ACTIONS */}
+            <div className="px-6 py-3 bg-gray-50/50 flex items-center justify-between min-h-[52px]">
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => activeTab == "equipements" ? setSelectedItemIds(currentActions.map((action) => action.action_id)) : activeTab == "members" ? setSelectedItemIds(currentMembers.map((member) => member.id)) : ""}
+                        className="text-xs font-medium text-gray-600 hover:text-primary transition-colors hover:underline"
+                    >
+                        Tout sélectionner
+                    </button>
                     {selectedItemIds.length > 0 && (
                         <>
-                            <button
-                                onClick={() => setSelectedItemIds([])}
-                                className="text-[10px] sm:text-xs bg-gray-500 text-white px-3 py-1.5 rounded-md hover:bg-gray-700 transition-colors font-bold whitespace-nowrap"
-                            >
-                                Tout déselectionner
-                            </button>
-                            <button
-                                onClick={() => setShowMultiDeleteConfirm(true)}
-                                className="text-[10px] sm:text-xs bg-red-600 text-white px-3 py-1.5 rounded-md hover:bg-red-700 transition-colors font-bold whitespace-nowrap"
-                            >
-                                Supprimer sélection
+                            <span className="text-gray-300">|</span>
+                            <button onClick={() => setSelectedItemIds([])} className="text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors">
+                                Annuler
                             </button>
                         </>
                     )}
                 </div>
-                <span className="text-xs font-medium text-primary">
-                    {selectedItemIds.length} élément(s) sélectionné(s)
-                </span>
-                {loading ?
-                    <div className="flex justify-center items-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div></div>
-                    :
-                    activeTab == "members"
-                    &&
-                    (<div>
-                        {!isEditing && (isAddingMember ? (
-                            <div className="mt-4 p-3 bg-primary/10 rounded-lg border border-primary/20">
-                                <p className="text-xs font-bold text-primary mb-2">Ajouter un membre</p>
-                                <div className="flex gap-2">
-                                    <select value={selectedPersonId} onChange={(e) => setSelectedPersonId(e.target.value)} className="flex-1 text-sm border border-primary/30 rounded px-2 py-1 outline-none cursor-pointer">
-                                        <option value="">Choisir...</option>
-                                        {availablePeople.map(p => <option key={p.id} value={p.id}>{p.firstname} {p.lastname}</option>)}
-                                    </select>
-                                    <button onClick={confirmAddMember} disabled={!selectedPersonId} className="bg-secondary text-white px-3 py-1 rounded text-sm hover:bg-secondary/90 cursor-pointer">OK</button>
-                                    <button onClick={() => setIsAddingMember(false)} className="text-gray-500 px-2 cursor-pointer">✕</button>
-                                </div>
-                            </div>
-                        ) : (
-                            <button onClick={startAddingMember} className="w-full py-2 mt-2 border border-dashed border-gray-300 rounded-lg text-gray-500 text-xs hover:border-primary/50 hover:text-primary hover:bg-primary/5 transition-all flex items-center justify-center gap-1 cursor-pointer">
-                                <span>+</span> Ajouter un membre
-                            </button>
-                        ))}
-                        <SelectableList
-                            items={currentMembers}
-                            selectedIds={selectedItemIds}
-                            onSelectionChange={setSelectedItemIds}
-                            renderItem={(member, isSelected) => (
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3 overflow-hidden flex-1">
-                                        <div className="w-8 h-8 rounded-full bg-primary/10 shrink-0 flex items-center justify-center text-primary font-bold text-xs">
-                                            {member.firstname[0].toUpperCase()}{member.lastname[0].toUpperCase()}
-                                        </div>
-                                        <input type="checkbox" checked={isSelected} readOnly />
-                                        <div className="overflow-hidden">
-                                            <button
-                                                data-no-select
-                                                onClick={(e) => {
-                                                    if (!isEditing) {
-                                                        e.stopPropagation();
-                                                        onMemberClick(member);
-                                                    }
-                                                }}>
-                                                <p className="hover:text-primary transition-colors cursor-pointer text-sm font-medium text-gray-800 truncate text-transform: capitalize">
-                                                    {member.firstname} {member.lastname}
-                                                </p>
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <button
-                                        data-no-select
-                                        onClick={(e) => {
-                                            if (!isEditing) {
-                                                e.stopPropagation();
-                                                handleRemoveMember(member.id);
-                                            }
-                                        }}
-                                        className="text-gray-300 hover:text-red-500 p-1 cursor-pointer"
-                                    >
-                                        <FontAwesomeIcon icon={faTimes} className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            )}
-                        />
-                    </div>)
-                    ||
-                    activeTab == "equipements"
-                    &&
-                    (<div>
-                        {!isEditing && (isAddingEquipementAction ? (
-                            <div className="mt-4 p-3 bg-primary/10 rounded-lg border border-primary/20">
-                                <p className="text-xs font-bold text-primary mb-2">Ajouter un membre</p>
-                                <div className="flex gap-2">
-                                    <select value={selectedEquipementId} onChange={(e) => setSelectedEquipementId(e.target.value)} className="flex-1 text-sm border border-primary/30 rounded px-2 py-1 outline-none cursor-pointer">
-                                        <option value="">Choisir...</option>
-                                        {availableEquipements.map((action) => {
-                                            const item = action as unknown as AvailableActionOption;
-                                            return (
-                                                <option key={`${item.id}-${item.temp_type}`} value={`${item.id}|${item.temp_type}`}>
-                                                    {item.label}
-                                                </option>
-                                            );
-                                        })}
-                                    </select>
-                                    <button onClick={confirmAddEquipementAction} disabled={!selectedEquipementId} className="bg-secondary text-white px-3 py-1 rounded text-sm hover:bg-secondary/90 cursor-pointer">OK</button>
-                                    <button onClick={() => setIsAddingEquipementAction(false)} className="text-gray-500 px-2 cursor-pointer">✕</button>
-                                </div>
-                            </div>
-                        ) : (
-                            <button onClick={startAddingEquipementAction} className="w-full py-2 mt-2 border border-dashed border-gray-300 rounded-lg text-gray-500 text-xs hover:border-primary/50 hover:text-primary hover:bg-primary/5 transition-all flex items-center justify-center gap-1 cursor-pointer">
-                                <span>+</span> Ajouter un Equipement
-                            </button>
-                        ))}
-                        <SelectableList
-                            items={currentActions.map(a => ({ ...a, id: a.action_id }))}
-                            selectedIds={selectedItemIds}
-                            onSelectionChange={setSelectedItemIds}
-                            renderItem={(equipement, isSelected) => (
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3 overflow-hidden flex-1">
-                                        <input type="checkbox" checked={isSelected} readOnly />
-                                        <div className="overflow-hidden">
-                                            <p className="hover:text-primary transition-colors cursor-pointer text-sm font-medium text-gray-800 truncate text-transform: capitalize">
-                                                {equipement.type_name}
-                                                <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary uppercase">
-                                                    {equipement.action_type}
-                                                </span>
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <button
-                                        data-no-select
-                                        onClick={(e) => {
-                                            if (!isEditing) {
-                                                e.stopPropagation();
-                                                handleRemoveEquipementAction(equipement.action_id);
-                                            }
-                                        }}
-                                        className="text-gray-300 hover:text-red-500 p-1 cursor-pointer"
-                                    >
-                                        <FontAwesomeIcon icon={faTimes} className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            )}
-                        />
-                    </div>)
-                }
-            </div>
 
-
-            {showMultiDeleteConfirm && (
-                <div className="absolute inset-0 z-[60] bg-white/95 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-200">
-                    <div className="bg-red-100 p-4 rounded-full mb-4">
-                        <svg className="h-8 w-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                    </div>
-                    <h3 className="text-lg font-bold text-gray-800">Supprimer les éléments sélectionnés ?</h3>
-                    <p className="text-sm text-gray-500 mt-2">
-                        Vous allez retirer {selectedItemIds.length} éléments de l'équipe "{teamName}".
-                    </p>
-                    <div className="flex gap-3 w-full mt-6">
+                {selectedItemIds.length > 0 ? (
+                    <div className="flex items-center gap-3 animate-in slide-in-from-right-2 duration-200">
+                        <span className="text-xs font-semibold text-primary">{selectedItemIds.length} sélectionné(s)</span>
                         <button
-                            onClick={() => setShowMultiDeleteConfirm(false)}
-                            className="flex-1 px-4 py-2 bg-gray-100 rounded-lg text-gray-700 hover:bg-gray-200 transition-colors"
+                            onClick={() => setShowMultiDeleteConfirm(true)}
+                            className="bg-red-50 text-red-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-100 transition-colors flex items-center gap-2"
                         >
-                            Annuler
-                        </button>
-                        <button
-                            onClick={() => {
-                                if (activeTab === "members") {
-                                    handleRemoveSelectedMembers();
-                                } else if (activeTab === "equipements") {
-                                    handleRemoveSelectedEquipements();
-                                }
-                            }} className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-bold"
-                        >
-                            Confirmer
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* FOOTER */}
-            <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-between items-center shrink-0">
-                {isEditing ? (
-                    <div className="flex gap-2 w-full">
-                        <button onClick={() => { setIsEditing(false); setEditedName(teamName); }} className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">Annuler</button>
-                        <button onClick={handleSaveName} disabled={isSaving} className="flex-1 px-3 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700 flex items-center justify-center gap-2 cursor-pointer">
-                            {isSaving && <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>}
-                            Enregistrer
+                            <FontAwesomeIcon icon={faTrash} /> Supprimer
                         </button>
                     </div>
                 ) : (
+                    <div></div>
+                )}
+            </div>
+
+            {/* CONTENU SCANROLLABLE */}
+            <div className="flex-1 overflow-y-auto px-6 py-4 custom-scrollbar bg-white">
+                {loading ? (
+                    <div className="flex flex-col items-center justify-center h-48 gap-3 text-gray-400">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                        <p className="text-sm">Chargement...</p>
+                    </div>
+                ) : (
                     <>
-                        <button onClick={() => setShowConfirm(true)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg cursor-pointer">
-                            <FontAwesomeIcon icon={faTrash} className="h-5 w-5" />
-                        </button>
-                        <button onClick={onClose} className="px-4 py-2 bg-white border border-gray-300 rounded text-xs font-medium text-gray-700 hover:bg-gray-100 cursor-pointer">Fermer</button>
+                        {activeTab === "members" && (
+                            <div className="flex flex-col gap-4">
+                                {!isEditing && (isAddingMember ? (
+                                    <div className="p-4 bg-primary/5 rounded-xl border border-primary/10 animate-in slide-in-from-top-2">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <p className="text-xs font-bold text-primary uppercase tracking-wider">Ajouter un membre</p>
+                                            <button onClick={() => setIsAddingMember(false)} className="text-gray-400 hover:text-gray-600"><FontAwesomeIcon icon={faTimes} /></button>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <SearchableSelect
+                                                options={availablePeople.map(p => ({
+                                                    value: p.id,
+                                                    label: `${p.firstname} ${p.lastname}`,
+                                                    data: p
+                                                }))}
+                                                value={selectedPersonId}
+                                                onChange={setSelectedPersonId}
+                                                placeholder="Sélectionner une personne..."
+                                                searchPlaceholder="Rechercher par nom..."
+                                                className="flex-1"
+                                            />
+                                            <button onClick={confirmAddMember} disabled={!selectedPersonId} className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm">
+                                                Ajouter
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={startAddingMember}
+                                        className="w-full py-3 border border-dashed border-gray-300 rounded-xl text-gray-500 text-sm font-medium hover:border-primary hover:text-primary hover:bg-primary/5 transition-all flex items-center justify-center gap-2 group"
+                                    >
+                                        <div className="w-6 h-6 rounded-full bg-gray-100 group-hover:bg-primary/20 flex items-center justify-center transition-colors">
+                                            <FontAwesomeIcon icon={faPlus} className="text-xs" />
+                                        </div>
+                                        Ajouter un membre
+                                    </button>
+                                ))}
+
+                                <div className="space-y-1">
+                                    <SelectableList
+                                        items={currentMembers}
+                                        selectedIds={selectedItemIds}
+                                        onSelectionChange={setSelectedItemIds}
+                                        renderItem={(member, isSelected) => (
+                                            <div className="flex items-center justify-between w-full">
+                                                <div className="flex items-center gap-3 overflow-hidden flex-1">
+                                                    <div
+                                                        className={`w-5 h-5 rounded border flex items-center justify-center transition-colors cursor-pointer ${isSelected ? 'bg-primary border-primary text-white' : 'border-gray-300 bg-white'}`}
+                                                    >
+                                                        {isSelected && <FontAwesomeIcon icon={faCheck} className="text-[10px]" />}
+                                                    </div>
+
+                                                    <div className="w-10 h-10 rounded-full bg-linear-to-br from-gray-100 to-gray-200 shrink-0 flex items-center justify-center text-gray-600 font-bold text-sm shadow-inner">
+                                                        {member.firstname[0].toUpperCase()}{member.lastname[0].toUpperCase()}
+                                                    </div>
+
+                                                    <div className="overflow-hidden">
+                                                        <button
+                                                            data-no-select
+                                                            className="text-left w-full"
+                                                            onClick={(e) => {
+                                                                if (!isEditing) {
+                                                                    e.stopPropagation();
+                                                                    onMemberClick(member);
+                                                                }
+                                                            }}>
+                                                            <p className="font-semibold text-gray-800 truncate text-transform: capitalize hover:text-primary transition-colors">
+                                                                {member.firstname} {member.lastname}
+                                                            </p>
+                                                            <p className="text-xs text-gray-400 truncate">{member.email}</p>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    data-no-select
+                                                    onClick={(e) => {
+                                                        if (!isEditing) {
+                                                            e.stopPropagation();
+                                                            handleRemoveMember(member.id);
+                                                        }
+                                                    }}
+                                                    className="text-gray-300 hover:text-red-500 p-2 rounded-lg hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
+                                                >
+                                                    <FontAwesomeIcon icon={faTrash} className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        )}
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === "equipements" && (
+                            <div className="flex flex-col gap-4">
+                                {!isEditing && (isAddingEquipementAction ? (
+                                    <div className="p-4 bg-primary/5 rounded-xl border border-primary/10 animate-in slide-in-from-top-2">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <p className="text-xs font-bold text-primary uppercase tracking-wider">Ajouter un équipement</p>
+                                            <button onClick={() => setIsAddingEquipementAction(false)} className="text-gray-400 hover:text-gray-600"><FontAwesomeIcon icon={faTimes} /></button>
+                                        </div>
+                                        <div className="flex gap-2 mb-2">
+                                            <input
+                                                type="date"
+                                                value={filterDate}
+                                                onChange={(e) => setFilterDate(e.target.value)}
+                                                className="flex-1 text-xs border border-gray-200 rounded px-2 py-1 focus:ring-1 focus:ring-primary/20 outline-none"
+                                            />
+                                            <input
+                                                type="time"
+                                                value={filterTime}
+                                                onChange={(e) => setFilterTime(e.target.value)}
+                                                className="flex-1 text-xs border border-gray-200 rounded px-2 py-1 focus:ring-1 focus:ring-primary/20 outline-none"
+                                            />
+                                            {(filterDate || filterTime) && (
+                                                <button
+                                                    onClick={() => { setFilterDate(""); setFilterTime(""); }}
+                                                    className="text-gray-400 hover:text-gray-600 px-1"
+                                                    title="Effacer les filtres"
+                                                >
+                                                    <FontAwesomeIcon icon={faTimes} />
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <SearchableSelect
+                                                options={availableEquipements
+                                                    .filter(action => matchesFilter(action as unknown as AvailableActionOption))
+                                                    .map((action) => {
+                                                        const item = action as unknown as AvailableActionOption;
+                                                        return {
+                                                            value: `${item.id}|${item.temp_type}`,
+                                                            label: item.label,
+                                                            data: item
+                                                        };
+                                                    })}
+                                                value={selectedEquipementId}
+                                                onChange={setSelectedEquipementId}
+                                                placeholder="Choisir un équipement..."
+                                                searchPlaceholder="Rechercher un équipement..."
+                                                className="flex-1"
+                                                renderOption={(opt) => (
+                                                    <div className="flex items-center justify-between w-full">
+                                                        <span>{opt.data.label.split('(')[0]}</span>
+                                                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${opt.data.temp_type === 'pose' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
+                                                            {opt.data.temp_type}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            />
+                                            <button onClick={confirmAddEquipementAction} disabled={!selectedEquipementId} className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm">Ajouter</button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={startAddingEquipementAction}
+                                        className="w-full py-3 border border-dashed border-gray-300 rounded-xl text-gray-500 text-sm font-medium hover:border-primary hover:text-primary hover:bg-primary/5 transition-all flex items-center justify-center gap-2 group"
+                                    >
+                                        <div className="w-6 h-6 rounded-full bg-gray-100 group-hover:bg-primary/20 flex items-center justify-center transition-colors">
+                                            <FontAwesomeIcon icon={faPlus} className="text-xs" />
+                                        </div>
+                                        Ajouter un équipement
+                                    </button>
+                                ))}
+
+                                <div className="space-y-1">
+                                    <SelectableList
+                                        items={currentActions.map(a => ({ ...a, id: a.action_id }))}
+                                        selectedIds={selectedItemIds}
+                                        onSelectionChange={setSelectedItemIds}
+                                        renderItem={(equipement, isSelected) => (
+                                            <div className="flex items-center justify-between w-full">
+                                                <div className="flex items-center gap-3 overflow-hidden flex-1">
+                                                    <div
+                                                        className={`w-5 h-5 rounded border flex items-center justify-center transition-colors cursor-pointer ${isSelected ? 'bg-primary border-primary text-white' : 'border-gray-300 bg-white'}`}
+                                                    >
+                                                        {isSelected && <FontAwesomeIcon icon={faCheck} className="text-[10px]" />}
+                                                    </div>
+
+                                                    <div className="overflow-hidden">
+                                                        <p className="font-semibold text-gray-800 text-sm truncate text-transform: capitalize">
+                                                            {equipement.type_name}
+                                                        </p>
+                                                        <div className="flex items-center gap-2 mt-1">
+                                                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${equipement.action_type === 'pose' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
+                                                                {equipement.action_type}
+                                                            </span>
+                                                            <span className="text-[10px] text-gray-400">
+                                                                {/* Optional: Add date here if available in object */}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    data-no-select
+                                                    onClick={(e) => {
+                                                        if (!isEditing) {
+                                                            e.stopPropagation();
+                                                            handleRemoveEquipementAction(equipement.action_id);
+                                                        }
+                                                    }}
+                                                    className="text-gray-300 hover:text-red-500 p-2 rounded-lg hover:bg-red-50 transition-colors"
+                                                >
+                                                    <FontAwesomeIcon icon={faTimes} className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        )}
+                                    />
+                                </div>
+                            </div>)
+                        }
                     </>
                 )}
             </div>
-        </div>
+
+            {
+                showMultiDeleteConfirm && (
+                    <div className="absolute inset-x-4 bottom-4 z-[60] bg-white rounded-xl shadow-2xl p-4 border border-gray-100 animate-in slide-in-from-bottom-2 duration-200">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="bg-red-100 p-2 rounded-full">
+                                    <FontAwesomeIcon icon={faTrash} className="text-red-600" />
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-gray-900 text-sm">Supprimer {selectedItemIds.length} élément(s) ?</h4>
+                                    <p className="text-xs text-gray-500">Cette action est immédiate.</p>
+                                </div>
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => setShowMultiDeleteConfirm(false)}
+                                    className="px-3 py-1.5 bg-gray-100 rounded-lg text-xs font-bold text-gray-600 hover:bg-gray-200"
+                                >
+                                    Annuler
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        if (activeTab === "members") {
+                                            handleRemoveSelectedMembers();
+                                        } else if (activeTab === "equipements") {
+                                            handleRemoveSelectedEquipements();
+                                        }
+                                    }}
+                                    className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-bold hover:bg-red-700"
+                                >
+                                    Confirmer
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+
+            {/* FOOTER */}
+            <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-between items-center shrink-0">
+                <button onClick={() => setShowConfirm(true)} className="flex items-center gap-2 text-red-500 hover:text-red-700 px-3 py-2 rounded-lg hover:bg-red-50 transition-colors text-sm font-medium">
+                    <FontAwesomeIcon icon={faTrash} className="h-4 w-4" />
+                    <span>Supprimer l'équipe</span>
+                </button>
+                <button onClick={onClose} className="px-5 py-2 bg-white border border-gray-300 rounded-lg text-sm font-bold text-gray-700 hover:bg-gray-100 hover:shadow-sm transition-all shadow-xs">
+                    Fermer
+                </button>
+            </div>
+        </div >
     );
 }

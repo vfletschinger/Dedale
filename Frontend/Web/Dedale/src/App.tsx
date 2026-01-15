@@ -220,9 +220,6 @@ function App() {
             </div>
             <div>
               <div className="text-sm font-semibold text-white">Événements au total</div>
-              <div className="text-xs text-gray-400">
-                {events.filter((e) => e.statut === 'active' || e.statut === 'Actif').length} actif(s)
-              </div>
             </div>
           </div>
         </div>

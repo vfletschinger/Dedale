@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import { emit } from "@tauri-apps/api/event";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPen, faTimes, faTrash } from "@fortawesome/free-solid-svg-icons";
+import SearchableSelect from "./SearchableSelect";
 
 // On a besoin de l'interface Team ici
 interface Team {
@@ -287,29 +288,26 @@ export default function PersonDetails({
               {!isEditing &&
                 (isAddingTeam ? (
                   <div className="mt-4 p-3 bg-primary/10 rounded-lg border border-primary/20 animate-in fade-in slide-in-from-top-2">
-                    <div className="flex gap-2">
-                      <select
-                        value={selectedTeamId}
-                        onChange={(e) => setSelectedTeamId(e.target.value)}
-                        className="flex-1 text-transform: capitalize text-sm border border-primary/30 rounded px-2 py-1 outline-none cursor-pointer"
-                      >
-                        <option value="">Choisir...</option>
-                        {availableTeams.map((t) => (
-                          <option key={t.id} value={t.id}>
-                            {t.name}
-                          </option>
-                        ))}
-                      </select>
+                    <div className="flex gap-2 items-center">
+                      <div className="flex-1">
+                        <SearchableSelect
+                          options={availableTeams.map(t => ({ value: t.id, label: t.name }))}
+                          value={selectedTeamId}
+                          onChange={setSelectedTeamId}
+                          placeholder="Choisir une équipe..."
+                          searchPlaceholder="Rechercher..."
+                        />
+                      </div>
                       <button
                         onClick={() => confirmAddTeam()}
                         disabled={!selectedTeamId}
-                        className="bg-secondary text-white px-3 py-1 rounded text-sm hover:bg-secondary/90 cursor-pointer"
+                        className="bg-secondary text-white px-3 py-2 rounded-lg text-sm hover:bg-secondary/90 cursor-pointer h-[38px]"
                       >
                         OK
                       </button>
                       <button
                         onClick={() => setIsAddingTeam(false)}
-                        className="text-gray-500 px-2 cursor-pointer"
+                        className="text-gray-500 px-2 cursor-pointer hover:text-gray-700"
                       >
                         ✕
                       </button>

@@ -162,7 +162,7 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
 
       const newEvent = {
         name: formData.name.trim(),
-        start_date: formData.dateDebut, 
+        start_date: formData.dateDebut,
         end_date: formData.dateFin,
       };
 
@@ -362,11 +362,6 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
                     <h3 className="text-xl font-bold text-gray-800 group-hover:text-primary transition-colors mb-1">
                       {event.name}
                     </h3>
-                    <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-gray-400">
-                      <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-500 border border-gray-200">
-                        {event.statut || "Actif"}
-                      </span>
-                    </div>
                   </div>
                 </div>
 
