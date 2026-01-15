@@ -162,11 +162,13 @@ export default function PlanningScreen() {
   if (scanQR) {
     return (
       <SafeAreaView style={styles.container} edges={["top"]}>
-        <View style={styles.scannerHeader}>
-          <Pressable onPress={() => setScanQR(false)} style={styles.backButton}>
-            <Feather name="arrow-left" size={24} color="#fff" />
-            <Text style={styles.backText}>Retour</Text>
+        <View className="bg-primary pt-12 pb-6 px-4 shadow-sm flex-row items-center justify-between">
+          <Pressable onPress={() => setScanQR(false)} className="mr-4">
+            <Feather name="arrow-left" size={24} color="white" />
           </Pressable>
+          <View className="flex-row items-center flex-1">
+            <Text className="text-accent text-2xl font-bold">Scanner QR</Text>
+          </View>
         </View>
         <QRCodeScanner
           setScanQR={setScanQR}
@@ -188,8 +190,15 @@ export default function PlanningScreen() {
   if (!selectedEventId) {
     return (
       <View style={styles.container}>
-        <Text style={styles.mainTitle}>Planning</Text>
-        <Text style={styles.emptyText}>Veuillez sélectionner un événement</Text>
+        <View className="bg-primary pt-12 pb-6 px-4 shadow-sm flex-row items-center justify-between">
+          <View className="flex-row items-center flex-1">
+            <MaterialCommunityIcons name="calendar-check" size={28} color="white" style={{ marginRight: 8 }} />
+            <Text className="text-accent text-2xl font-bold">Planning</Text>
+          </View>
+        </View>
+        <View className="flex-1 flex justify-center items-center p-6">
+          <Text style={styles.emptyText}>Veuillez sélectionner un événement</Text>
+        </View>
       </View>
     );
   }
@@ -197,8 +206,11 @@ export default function PlanningScreen() {
   if (!team) {
     return (
       <View style={styles.container}>
-        <View style={styles.headerRow}>
-          <Text style={styles.mainTitle}>Planning</Text>
+        <View className="bg-primary pt-12 pb-6 px-4 shadow-sm flex-row items-center justify-between">
+          <View className="flex-row items-center flex-1">
+            <MaterialCommunityIcons name="calendar-check" size={28} color="white" style={{ marginRight: 8 }} />
+            <Text className="text-accent text-2xl font-bold">Planning</Text>
+          </View>
           <Pressable
             style={({ pressed }) => [
               styles.qrIconButton,
@@ -209,16 +221,42 @@ export default function PlanningScreen() {
             <MaterialCommunityIcons
               name="qrcode-scan"
               size={24}
-              color={Colors.secondary}
+              color="white"
             />
           </Pressable>
         </View>
-        {selectedEvent && (
-          <Text style={styles.eventName}>{selectedEvent.name}</Text>
-        )}
-        <View style={styles.emptyState}>
-          <Feather name="users" size={48} color={Colors.textMuted} />
-          <Text style={styles.emptyText}>Aucune équipe pour cet événement</Text>
+        <View className="flex-1 flex justify-center items-center p-6">
+          <Text style={styles.eventName}>
+            {selectedEvent?.name || "Événement"}
+          </Text>
+          <View style={styles.emptyState}>
+            <Feather name="users" size={48} color={Colors.textMuted} />
+            <Text style={styles.emptyText}>Aucune équipe pour cet événement</Text>
+          </View>
+          <Pressable
+            style={({ pressed }) => [{
+              backgroundColor: Colors.secondary,
+              paddingVertical: 16,
+              paddingHorizontal: 32,
+              borderRadius: 12,
+              marginTop: 24,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: pressed ? 0.8 : 1,
+            }]}
+            onPress={() => setScanQR(true)}
+          >
+            <MaterialCommunityIcons
+              name="qrcode-scan"
+              size={28}
+              color="white"
+              style={{ marginRight: 12 }}
+            />
+            <Text style={{ color: 'white', fontSize: 16, fontWeight: 'bold' }}>
+              Importer le planning
+            </Text>
+          </Pressable>
         </View>
       </View>
     );
@@ -226,30 +264,43 @@ export default function PlanningScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView style={styles.scrollContent}>
-        <View style={styles.headerRow}>
-          <Text style={styles.mainTitle}>Planning</Text>
-          <Pressable
-            style={({ pressed }) => [
-              styles.qrIconButton,
-              pressed && styles.qrIconButtonPressed,
-            ]}
-            onPress={() => setScanQR(true)}
-          >
-            <MaterialCommunityIcons
-              name="qrcode-scan"
-              size={24}
-              color={Colors.secondary}
-            />
-          </Pressable>
+      <View className="bg-primary pt-12 pb-6 px-4 shadow-sm flex-row items-center justify-between">
+        <View className="flex-row items-center flex-1">
+          <MaterialCommunityIcons name="calendar-check" size={28} color="white" style={{ marginRight: 8 }} />
+          <Text className="text-accent text-2xl font-bold">Planning</Text>
         </View>
-        {selectedEvent && (
-          <Text style={styles.eventName}>{selectedEvent.name}</Text>
-        )}
+        <Pressable
+          style={({ pressed }) => [
+            styles.qrIconButton,
+            pressed && styles.qrIconButtonPressed,
+          ]}
+          onPress={() => setScanQR(true)}
+        >
+          <MaterialCommunityIcons
+            name="qrcode-scan"
+            size={24}
+            color="white"
+          />
+        </Pressable>
+      </View>
+
+      <ScrollView style={styles.scrollContent}>
+        <View style={styles.eventCard}>
+          <MaterialCommunityIcons name="calendar" size={24} color={Colors.secondary} style={{ marginRight: 12 }} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 12, color: "#999", fontWeight: "600", marginBottom: 4 }}>ÉVÉNEMENT</Text>
+            <Text style={styles.eventName}>
+              {selectedEvent?.name || "Événement"}
+            </Text>
+          </View>
+        </View>
 
         <View style={styles.teamHeader}>
-          <Feather name="users" size={32} color={Colors.secondary} />
-          <Text style={styles.teamName}>{team.name}</Text>
+          <Feather name="users" size={24} color={Colors.secondary} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 12, color: "#999", fontWeight: "600", marginBottom: 4 }}>ÉQUIPE</Text>
+            <Text style={styles.teamName}>{team.name}</Text>
+          </View>
         </View>
 
         <View style={styles.summaryCard}>
@@ -273,7 +324,7 @@ export default function PlanningScreen() {
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Actions de l'équipe</Text>
+        <Text style={[styles.sectionTitle, { paddingHorizontal: 16 }]}>Actions de l'équipe</Text>
 
         {actions.length > 0 ? (
           actions.map((action) => (
@@ -281,6 +332,7 @@ export default function PlanningScreen() {
               key={action.id}
               style={[
                 styles.actionCard,
+                { marginHorizontal: 16 },
                 action.is_done ? styles.actionCardDone : undefined,
               ]}
             >
@@ -393,21 +445,48 @@ const styles = StyleSheet.create({
     backgroundColor: "#DBEAFE",
   },
   eventName: {
-    fontSize: 16,
-    color: Colors.secondary,
-    marginBottom: 16,
-    fontWeight: "500",
-    paddingHorizontal: 16,
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#333",
+  },
+  eventCard: {
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    padding: 16,
+    marginHorizontal: 16,
+    marginBottom: 20,
+    marginTop: 16,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 14,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.secondary,
   },
   teamHeader: {
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    padding: 16,
+    marginHorizontal: 16,
+    marginBottom: 20,
     flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 16,
+    alignItems: "flex-start",
+    gap: 14,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.secondary,
   },
   teamName: {
-    fontSize: 24,
-    fontWeight: "bold",
+    fontSize: 18,
+    fontWeight: "700",
     color: "#333",
   },
   summaryCard: {
@@ -417,6 +496,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
+    marginHorizontal: 16,
     marginBottom: 24,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
