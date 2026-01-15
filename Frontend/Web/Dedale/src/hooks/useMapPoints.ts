@@ -20,6 +20,7 @@ export function useMapPoints(
   const [addingPointCoords, setAddingPointCoords] = useState<{ lng: number; lat: number } | null>(null);
   const [awaitingMapClick, setAwaitingMapClick] = useState(false);
   const awaitingMapClickRef = useRef(false);
+  const tempMarkerRef = useRef<maplibregl.Marker | null>(null);
 
   // --- FONCTIONS UTILITAIRES ---
 
@@ -108,6 +109,18 @@ export function useMapPoints(
     awaitingMapClickRef.current = true;
   };
 
+  // Fonction pour annuler l'ajout de point
+  const cancelAddPoint = useCallback(() => {
+    setAwaitingMapClick(false);
+    awaitingMapClickRef.current = false;
+    setAddingPointCoords(null);
+    // Supprimer le marqueur temporaire s'il existe
+    if (tempMarkerRef.current) {
+      tempMarkerRef.current.remove();
+      tempMarkerRef.current = null;
+    }
+  }, []);
+
   // --- AJOUTER CE BLOC DANS useMapPoints.ts ---
 
   const addPoint = async (pointData: { x: number; y: number; obstacles?: string; comments?: string; pictures?: string }) => {
@@ -138,6 +151,11 @@ export function useMapPoints(
       // 3. Rafraîchir la carte et fermer le mode ajout
       await refreshPoints();
       setAddingPointCoords(null); // Ferme le formulaire
+      // Supprimer le marqueur temporaire
+      if (tempMarkerRef.current) {
+        tempMarkerRef.current.remove();
+        tempMarkerRef.current = null;
+      }
 
     } catch (e) {
       console.error("❌ Erreur lors de l'ajout du point :", e);
@@ -260,6 +278,15 @@ export function useMapPoints(
           // Désactiver le mode ajout
           awaitingMapClickRef.current = false;
           setAwaitingMapClick(false);
+
+          // Créer un marqueur temporaire à l'emplacement du clic
+          if (tempMarkerRef.current) {
+            tempMarkerRef.current.remove();
+          }
+          const marker = new maplibregl.Marker({ color: '#FF5722' })
+            .setLngLat([e.lngLat.lng, e.lngLat.lat])
+            .addTo(map);
+          tempMarkerRef.current = marker;
 
           // Ouvrir le formulaire
           setSelectedPoint(null);
@@ -392,7 +419,7 @@ export function useMapPoints(
   // 2b. Charger les points d'intérêt
   useEffect(() => {
     if (!map || !map.getSource("db-interests")) return;
-    
+
     // Appel asynchrone pour éviter le setState synchrone dans useEffect
     const loadInterests = async () => {
       await refreshInterest();
@@ -451,7 +478,7 @@ export function useMapPoints(
   // 6. Contrôler la visibilité du layer de points d'intérêt
   useEffect(() => {
     if (!map) return;
-    
+
     const layer = map.getLayer("db-interests-layer");
     if (layer) {
       map.setLayoutProperty(
@@ -475,6 +502,7 @@ export function useMapPoints(
     refreshInterest,
     openPopupForPoint,
     addPoint,
+    cancelAddPoint,
     //updateMapSource, // Exposé pour permettre le filtrage externe
   };
 }

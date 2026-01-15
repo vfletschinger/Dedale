@@ -240,13 +240,13 @@ async fn fetch_events_for_transfer(
             let parcours: Vec<TransferParcours> = parcours_rows
                 .iter()
                 .map(|row| {
-                    let start_time_i64: Option<i64> = row.get("start_time");
+                    let start_time_int: Option<i64> = row.try_get("start_time").ok();
                     TransferParcours {
                         id: row.get("id"),
                         event_id: row.get("event_id"),
                         name: row.get("name"),
                         color: row.get("color"),
-                        start_time: start_time_i64.map(|t| t.to_string()),
+                        start_time: start_time_int.map(|t| t.to_string()),
                         speed_low: row.get("speed_low"),
                         speed_high: row.get("speed_high"),
                         geometry_json: row.get("geometry_json"),

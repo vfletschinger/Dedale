@@ -145,6 +145,7 @@ export function useMapGeometries(
         "event-geometries-line",
         "event-geometries-point",
         "event-equipements-line",
+        "event-vehicules-symbol",
       ];
       layersToRemove.forEach((layer) => {
         if (mapObj.getLayer(layer)) mapObj.removeLayer(layer);
@@ -153,6 +154,8 @@ export function useMapGeometries(
         mapObj.removeSource("event-geometries");
       if (mapObj.getSource("event-equipements"))
         mapObj.removeSource("event-equipements");
+      if (mapObj.getSource("event-vehicules"))
+        mapObj.removeSource("event-vehicules");
 
       // Filtrer les zones et parcours selon les filtres de visibilité
       const filteredZones = visFilters.showZones ? currentZones : [];
@@ -289,10 +292,6 @@ export function useMapGeometries(
         const getLineWidth = (typeName?: string): number => {
           if (!typeName) return 3;
           const name = typeName.toLowerCase();
-          // Véhicules et engins de blocage : trait très épais
-          if (name.includes("véhicule") || name.includes("vehicule") || name.includes("engin")) {
-            return 8;
-          }
           // Blocs de béton et glissières : trait épais
           if (name.includes("bloc") || name.includes("glissière") || name.includes("glissiere")) {
             return 5;
@@ -305,7 +304,19 @@ export function useMapGeometries(
           return 3;
         };
 
-        const equipementFeatures = filteredEquipements
+        // Fonction pour vérifier si un équipement est de type véhicule
+        const isVehicule = (typeName?: string): boolean => {
+          if (!typeName) return false;
+          const name = typeName.toLowerCase();
+          return name.includes("véhicule") || name.includes("vehicule") || name.includes("engin");
+        };
+
+        // Séparer les véhicules des autres équipements
+        const vehiculeEquipements = filteredEquipements.filter((eq) => isVehicule(eq.type_name));
+        const otherEquipements = filteredEquipements.filter((eq) => !isVehicule(eq.type_name));
+
+        // Features pour les équipements non-véhicules (lignes)
+        const equipementFeatures = otherEquipements
           .map((eq) => {
             if (!eq.coordinates || eq.coordinates.length < 2) return null;
             const coords = eq.coordinates
@@ -319,6 +330,27 @@ export function useMapGeometries(
                 type: "equipement",
                 type_name: eq.type_name,
                 line_width: getLineWidth(eq.type_name),
+              },
+            } as GeoJSON.Feature;
+          })
+          .filter((f): f is GeoJSON.Feature => f !== null);
+
+        // Features pour les véhicules (points avec emoji)
+        const vehiculeFeatures = vehiculeEquipements
+          .map((eq) => {
+            if (!eq.coordinates || eq.coordinates.length === 0) return null;
+            const coords = eq.coordinates
+              .sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+            // Prendre le point central du véhicule
+            const midIndex = Math.floor(coords.length / 2);
+            const centerCoord = coords[midIndex];
+            return {
+              type: "Feature",
+              geometry: { type: "Point", coordinates: [centerCoord.x, centerCoord.y] },
+              properties: {
+                id: eq.id,
+                type: "equipement",
+                type_name: eq.type_name,
               },
             } as GeoJSON.Feature;
           })
@@ -339,6 +371,49 @@ export function useMapGeometries(
               "line-width": ["get", "line_width"], // Épaisseur variable selon le type
             },
           });
+        }
+
+        // Ajouter les véhicules comme symboles avec image
+        if (vehiculeFeatures.length > 0) {
+          // Fonction pour ajouter la source et le layer des véhicules
+          const addVehiculesLayer = () => {
+            if (mapObj.getSource("event-vehicules")) return;
+            
+            mapObj.addSource("event-vehicules", {
+              type: "geojson",
+              data: { type: "FeatureCollection", features: vehiculeFeatures },
+            });
+
+            mapObj.addLayer({
+              id: "event-vehicules-symbol",
+              type: "symbol",
+              source: "event-vehicules",
+              layout: {
+                "icon-image": "vehicule-icon",
+                "icon-size": 0.15,
+                "icon-allow-overlap": true,
+                "icon-ignore-placement": true,
+              },
+            });
+          };
+
+          // Charger l'image du véhicule si elle n'existe pas encore
+          if (!mapObj.hasImage("vehicule-icon")) {
+            const img = new Image();
+            img.onload = () => {
+              if (!mapObj.hasImage("vehicule-icon")) {
+                mapObj.addImage("vehicule-icon", img);
+              }
+              addVehiculesLayer();
+            };
+            img.onerror = (err) => {
+              console.error("Erreur chargement image véhicule:", err);
+            };
+            img.src = "/vehicule.png";
+          } else {
+            // L'image est déjà chargée, ajouter directement la source et le layer
+            addVehiculesLayer();
+          }
         }
       }
     },

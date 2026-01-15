@@ -17,13 +17,9 @@ fn get_addresses_db_path() -> Result<PathBuf, String> {
     let exe_path = std::env::current_exe()
         .map_err(|e| format!("Impossible d'obtenir le chemin de l'exécutable: {}", e))?;
 
-    println!("[geocoding] Exécutable: {:?}", exe_path);
-
     let exe_dir = exe_path
         .parent()
         .ok_or_else(|| "Impossible d'obtenir le dossier parent".to_string())?;
-
-    println!("[geocoding] Dossier exécutable: {:?}", exe_dir);
 
     // Liste des chemins possibles à tester
     let possible_paths = vec![
@@ -43,10 +39,8 @@ fn get_addresses_db_path() -> Result<PathBuf, String> {
     ];
 
     for path in &possible_paths {
-        println!("[geocoding] Test du chemin: {:?}", path);
         if path.exists() {
             let canonical = path.canonicalize().unwrap_or_else(|_| path.clone());
-            println!("[geocoding] ✓ Trouvé: {:?}", canonical);
             return Ok(canonical);
         }
     }
@@ -66,17 +60,12 @@ fn get_addresses_db_path() -> Result<PathBuf, String> {
 /// Commande Tauri pour rechercher des adresses localement
 #[tauri::command]
 pub async fn search_address(query: String) -> Result<Vec<SearchResult>, String> {
-    println!("[geocoding] === Nouvelle recherche ===");
-    println!("[geocoding] Query: '{}'", query);
-
     // Ignorer les requêtes trop courtes
     if query.trim().len() < 2 {
-        println!("[geocoding] Query trop courte, ignorée");
         return Ok(vec![]);
     }
 
     let db_path = get_addresses_db_path()?;
-    println!("[geocoding] Utilisation de la base: {:?}", db_path);
 
     // Ouvrir la connexion SQLite en mode lecture seule
     let conn =
@@ -87,13 +76,8 @@ pub async fn search_address(query: String) -> Result<Vec<SearchResult>, String> 
                 err
             })?;
 
-    println!("[geocoding] Connexion SQLite ouverte");
-
-    // Préparer le pattern de recherche pour LIKE
     let search_pattern = format!("%{}%", query.trim());
     let start_pattern = format!("{}%", query.trim());
-
-    println!("[geocoding] Pattern de recherche: {}", search_pattern);
 
     // Utiliser LIKE avec COLLATE NOCASE pour une recherche insensible à la casse
     let mut stmt = conn
@@ -115,8 +99,6 @@ pub async fn search_address(query: String) -> Result<Vec<SearchResult>, String> 
             err
         })?;
 
-    println!("[geocoding] Requête préparée, exécution...");
-
     let results: Vec<SearchResult> = stmt
         .query_map([&search_pattern, &start_pattern], |row| {
             Ok(SearchResult {
@@ -133,17 +115,64 @@ pub async fn search_address(query: String) -> Result<Vec<SearchResult>, String> 
         .filter_map(|r| r.ok())
         .collect();
 
-    println!(
-        "[geocoding] Recherche '{}' -> {} résultats",
-        query,
-        results.len()
-    );
+    Ok(results)
+}
 
-    for (i, r) in results.iter().enumerate() {
-        println!("[geocoding]   {}. {}", i + 1, r.display_name);
+#[tauri::command]
+pub async fn reverse_geocode(lat: f64, lon: f64) -> Result<Option<String>, String> {
+    // 1. Ouvrir la base de données
+    let db_path = get_addresses_db_path()?;
+    let conn =
+        rusqlite::Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+            .map_err(|e| format!("Erreur ouverture DB: {}", e))?;
+
+    // 2. Optimisation : Bounding box de recherche (~100m)
+    // 1 degré de latitude ~= 111 km
+    // 0.001 ~= 111m
+    let buffer = 0.002;
+    let min_lat = lat - buffer;
+    let max_lat = lat + buffer;
+    let min_lon = lon - buffer;
+    let max_lon = lon + buffer;
+
+    // 3. Rechercher les candidats à proximité
+    let mut stmt = conn
+        .prepare(
+            "SELECT lat, lon, display_name 
+         FROM addresses 
+         WHERE lat BETWEEN ?1 AND ?2 
+         AND lon BETWEEN ?3 AND ?4",
+        )
+        .map_err(|e| format!("Erreur préparation requête: {}", e))?;
+
+    let candidates_iter = stmt
+        .query_map([min_lat, max_lat, min_lon, max_lon], |row| {
+            Ok((
+                row.get::<_, f64>(0)?,    // lat
+                row.get::<_, f64>(1)?,    // lon
+                row.get::<_, String>(2)?, // display_name
+            ))
+        })
+        .map_err(|e| format!("Erreur exécution requête: {}", e))?;
+
+    // 4. Trouver le plus proche (Distance Euclidienne simple car très local)
+    let mut nearest_addr: Option<String> = None;
+    let mut min_dist_sq = f64::MAX;
+
+    for candidate in candidates_iter {
+        let (c_lat, c_lon, name) = candidate.map_err(|e| format!("Erreur lecture ligne: {}", e))?;
+
+        let d_lat = lat - c_lat;
+        let d_lon = lon - c_lon;
+        let dist_sq = d_lat * d_lat + d_lon * d_lon; // Pas besoin de sqrt pour comparer
+
+        if dist_sq < min_dist_sq {
+            min_dist_sq = dist_sq;
+            nearest_addr = Some(name);
+        }
     }
 
-    Ok(results)
+    Ok(nearest_addr)
 }
 
 #[cfg(test)]
