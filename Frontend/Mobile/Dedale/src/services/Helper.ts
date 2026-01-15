@@ -54,3 +54,20 @@ export const getAddressFromCoords = async (latitude: number, longitude: number) 
     return null;
   }
 };
+
+export const getShortAddressFromCoords = async (latitude: number, longitude: number) => {
+  try {
+    const [address] = await Location.reverseGeocodeAsync({ latitude, longitude });
+    const parts: string[] = [];
+    if (address.street) {
+      parts.push(address.street);
+    } else if (address.name) {
+      parts.push(address.name);
+    }
+    if (address.city) parts.push(address.city);
+    return parts.length > 0 ? parts.join(', ') : null;
+  } catch (error) {
+    console.error('Error in reverse geocoding:', error);
+    return null;
+  }
+};

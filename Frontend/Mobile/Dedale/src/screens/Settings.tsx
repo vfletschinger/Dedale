@@ -22,6 +22,7 @@ import {
   EquipementType,
 } from "../types/database";
 import Colors from "../constants/colors";
+import { WebSocketResponse } from "../components/WebSocketClient";
 
 type PointWithDetails = InterestPointsType & {
   pictures: PictureType[];
@@ -182,7 +183,7 @@ export default function SettingsScreen() {
             Alert.alert(
               "Import refusé",
               response.message ||
-                "Le serveur a refusé l'import de l'événement.",
+              "Le serveur a refusé l'import de l'événement.",
               [{ text: "OK" }]
             );
             break;
@@ -192,7 +193,7 @@ export default function SettingsScreen() {
             Alert.alert(
               "Échec de l'import",
               response.message ||
-                "Le serveur a accepté mais n'a pas pu importer l'événement.",
+              "Le serveur a accepté mais n'a pas pu importer l'événement.",
               [{ text: "OK" }]
             );
             break;
@@ -202,7 +203,7 @@ export default function SettingsScreen() {
             Alert.alert(
               "Export réussi",
               response.message ||
-                "L'événement a été exporté avec succès. Il sera supprimé de votre appareil.",
+              "L'événement a été exporté avec succès. Il sera supprimé de votre appareil.",
               [
                 {
                   text: "OK",
@@ -272,7 +273,7 @@ export default function SettingsScreen() {
             {selectedEvent ? (
               <EventItem
                 event={selectedEvent}
-                onPress={() => {}}
+                onPress={() => { }}
                 navArrow={false}
               />
             ) : (
@@ -280,7 +281,7 @@ export default function SettingsScreen() {
                 Aucun événement sélectionné
               </Text>
             )}
-            
+
             {/* Bouton pour changer d'événement */}
             <Pressable
               onPress={() => setIsEventModalVisible(true)}
@@ -301,12 +302,12 @@ export default function SettingsScreen() {
             statusBarTranslucent={true}
             onRequestClose={() => setIsEventModalVisible(false)}
           >
-            <Pressable 
+            <Pressable
               className="flex-1 justify-center items-center"
               style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
               onPress={() => setIsEventModalVisible(false)}
             >
-              <Pressable 
+              <Pressable
                 className="bg-white rounded-2xl w-[90%] max-h-[70%]"
                 onPress={(e) => e.stopPropagation()}
               >
@@ -316,7 +317,7 @@ export default function SettingsScreen() {
                     <Feather name="x" size={24} color="#374151" />
                   </TouchableOpacity>
                 </View>
-                
+
                 {events.length > 0 ? (
                   <FlatList
                     data={events}
@@ -327,7 +328,7 @@ export default function SettingsScreen() {
                         onPress={() => handleEventChange(item)}
                         className={
                           item.id === selectedEventId
-                            ? "flex-row items-center justify-between p-4 rounded-lg mb-3 bg-blue-50 border border-blue-200"
+                            ? "flex-row items-center justify-between p-4 rounded-lg mb-3 bg-secondary/10 border border-secondary/30"
                             : "flex-row items-center justify-between p-4 rounded-lg mb-3 bg-gray-50"
                         }
                       >
@@ -338,7 +339,7 @@ export default function SettingsScreen() {
                           </Text>
                         </View>
                         {item.id === selectedEventId && (
-                          <View className="w-8 h-8 rounded-full bg-blue-500 items-center justify-center ml-3">
+                          <View className="w-8 h-8 rounded-full bg-secondary items-center justify-center ml-3">
                             <Feather name="check" size={18} color="white" />
                           </View>
                         )}
@@ -373,6 +374,7 @@ export default function SettingsScreen() {
             <View className="w-full gap-3">
               {/* Bouton pour recevoir (scan QR du desktop) */}
               <CustomButton
+                variant="secondary"
                 onPress={() => {
                   setScanMode("receive");
                   setScanQR(true);
@@ -382,6 +384,7 @@ export default function SettingsScreen() {
 
               {/* Bouton pour envoyer (scan QR du desktop) */}
               <CustomButton
+                variant="secondary"
                 onPress={() => {
                   if (!selectedEvent) {
                     Alert.alert(

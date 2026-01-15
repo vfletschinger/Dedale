@@ -38,9 +38,6 @@ import { shortId } from "../services/Helper";
 import MapView, { Marker, MapPressEvent } from "react-native-maps";
 import CoordinatesDisplay from "../components/CoordinatesDisplay";
 import EditModal from "../components/EditModal";
-import ObstacleSelector, {
-  SelectedObstacle,
-} from "../components/ObstacleSelector";
 import { useEvent } from "../context/EventContext";
 import { usePoints } from "../context/PointsContext";
 import Colors from "../constants/colors";
@@ -69,11 +66,6 @@ export default function PointDetails() {
     latitude: number;
     longitude: number;
   }>({ latitude: 0, longitude: 0 });
-
-  // États pour modal d'obstacles
-  const [isObstacleSelectorVisible, setIsObstacleSelectorVisible] =
-    useState(false);
-  const [editingObstacles, setEditingObstacles] = useState(false);
 
   const fetchPoint = async () => {
     setLoading(true);
@@ -312,11 +304,6 @@ export default function PointDetails() {
       console.error("Erreur:", error);
       Alert.alert("Erreur", "Impossible de sauvegarder les équipements");
     }
-  };
-
-  const handleEditObstacles = () => {
-    setEditingObstacles(true);
-    setIsObstacleSelectorVisible(true);
   };
 
   if (loading) {
@@ -654,25 +641,6 @@ export default function PointDetails() {
         numberOfLines={4}
       />
 
-      {/* Modal de sélection d'équipements */}
-      <ObstacleSelector
-        visible={isObstacleSelectorVisible}
-        onClose={() => {
-          setIsObstacleSelectorVisible(false);
-          setEditingObstacles(false);
-        }}
-        onSave={handleSaveEquipements}
-        initialObstacles={
-          editingObstacles
-            ? pointData?.equipements.map((equipement) => ({
-                type_id: equipement.type_id,
-                name: equipement.name ?? "Nom inconnu",
-                number: equipement.quantity,
-              })) || []
-            : []
-        }
-        editMode={editingObstacles}
-      />
     </>
   );
 }
