@@ -201,7 +201,6 @@ function OfflineMapLibre({
     selectedPoint,
     setSelectedPoint,
     addingPointCoords,
-    setAddingPointCoords,
     awaitingMapClick,
     handleAddPointClick,
     refreshPoints,
@@ -520,9 +519,9 @@ function OfflineMapLibre({
                 <div className="flex-1 overflow-y-auto">
                   <AddPointForm
                     initialCoords={addingPointCoords}
-                    onClose={() => setAddingPointCoords(null)}
+                    onClose={cancelAddPoint}
                     onSaved={() => {
-                      setAddingPointCoords(null);
+                      cancelAddPoint();
                       refreshPoints();
                     }}
                     eventId={selectedEventId}

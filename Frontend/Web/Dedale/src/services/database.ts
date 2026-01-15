@@ -388,7 +388,7 @@ export async function initLegacyDatabase(): Promise<Database> {
     console.log("[DB] Tables existantes:", tables.map(t => t.name).join(", ") || "Aucune");
 
     return db;
-  } catch {
+  } catch (error) {
     console.error("[DB] Erreur lors du chargement:", error);
     throw error;
   }

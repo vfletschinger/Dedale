@@ -10,7 +10,7 @@ import {
   validateEventData,
   sortEventsByDate,
   filterEventsByStatus
-} from '../../utils/mapUtils'
+} from '../../utils/maputils'
 
 describe('mapUtils', () => {
   describe('formatDistance', () => {
@@ -282,21 +282,22 @@ describe('mapUtils', () => {
         start_date: '2024-01-31',
         end_date: '2024-01-01'
       }
-      
+
       expect(validateEventData(invalidEvent)).toBe(false)
     })
   })
 
   describe('sortEventsByDate', () => {
+    // Events with all required fields (id, name, start_date, end_date, statut)
     const events = [
-      { id: '1', name: 'Event C', start_date: '2024-03-01' },
-      { id: '2', name: 'Event A', start_date: '2024-01-01' },
-      { id: '3', name: 'Event B', start_date: '2024-02-01' }
+      { id: '1', name: 'Event C', start_date: '2024-03-01', end_date: '2024-03-15', statut: 'actif' },
+      { id: '2', name: 'Event A', start_date: '2024-01-01', end_date: '2024-01-15', statut: 'actif' },
+      { id: '3', name: 'Event B', start_date: '2024-02-01', end_date: '2024-02-15', statut: 'actif' }
     ]
 
     it('should sort events by start date ascending', () => {
       const sorted = sortEventsByDate(events, 'asc')
-      
+
       expect(sorted[0].name).toBe('Event A')
       expect(sorted[1].name).toBe('Event B')
       expect(sorted[2].name).toBe('Event C')
@@ -312,29 +313,30 @@ describe('mapUtils', () => {
 
     it('should handle empty array', () => {
       const sorted = sortEventsByDate([])
-      
+
       expect(sorted).toEqual([])
     })
 
     it('should not mutate original array', () => {
       const original = [...events]
       sortEventsByDate(events)
-      
+
       expect(events).toEqual(original)
     })
   })
 
   describe('filterEventsByStatus', () => {
+    // Events with all required fields (id, name, start_date, end_date, statut)
     const events = [
-      { id: '1', name: 'Event A', statut: 'actif' },
-      { id: '2', name: 'Event B', statut: 'planifie' },
-      { id: '3', name: 'Event C', statut: 'actif' },
-      { id: '4', name: 'Event D', statut: 'termine' }
+      { id: '1', name: 'Event A', start_date: '2024-01-01', end_date: '2024-01-15', statut: 'actif' },
+      { id: '2', name: 'Event B', start_date: '2024-02-01', end_date: '2024-02-15', statut: 'planifie' },
+      { id: '3', name: 'Event C', start_date: '2024-03-01', end_date: '2024-03-15', statut: 'actif' },
+      { id: '4', name: 'Event D', start_date: '2024-04-01', end_date: '2024-04-15', statut: 'termine' }
     ]
 
     it('should filter events by status', () => {
       const filtered = filterEventsByStatus(events, 'actif')
-      
+
       expect(filtered).toHaveLength(2)
       expect(filtered[0].name).toBe('Event A')
       expect(filtered[1].name).toBe('Event C')
