@@ -55,16 +55,30 @@ export const deleteEquipement = (equipementId: string, db: any) => {
 };
 
 export const addEquipement = (
-  pointId: string,
-  typeId: number,
+  eventId: string,
+  typeId: string,
   quantity: number,
-  db: any
+  db: any,
+  coordinates?: { x: number; y: number }[]
 ) => {
   const equipementId = generateUUID();
-  return db.runSync(
-    "INSERT INTO equipement (id, point_id, type_id, quantity) VALUES (?, ?, ?, ?)",
-    [equipementId, pointId, typeId, quantity]
+  db.runSync(
+    "INSERT INTO equipement (id, event_id, type_id, quantity, length_per_unit) VALUES (?, ?, ?, ?, ?)",
+    [equipementId, eventId, typeId, quantity, 0]
   );
+  
+  // Ajouter les coordonnées si fournies
+  if (coordinates && coordinates.length > 0) {
+    coordinates.forEach((coord, index) => {
+      const coordId = generateUUID();
+      db.runSync(
+        "INSERT INTO equipement_coordinate (id, equipement_id, x, y, order_index) VALUES (?, ?, ?, ?, ?)",
+        [coordId, equipementId, coord.x, coord.y, index]
+      );
+    });
+  }
+  
+  return equipementId;
 };
 
 // Legacy aliases for backward compatibility during migration

@@ -1084,5 +1084,16 @@ async fn handle_receive_planning(
         .map_err(|e| format!("Erreur flush: {}", e))?;
 
     println!("✅ [PLANNING EXPORT] Planning envoyé (teams/actions/équipements uniquement)");
+
+    // Envoyer goodbye et fermer proprement la connexion
+    let goodbye = serde_json::json!({
+        "type": "goodbye",
+        "message": "Planning envoyé avec succès"
+    });
+    let _ = websocket.write(Message::Text(goodbye.to_string().into()));
+    let _ = websocket.flush();
+    let _ = websocket.close(None);
+    println!("👋 [PLANNING EXPORT] Connexion fermée proprement");
+
     Ok(())
 }
