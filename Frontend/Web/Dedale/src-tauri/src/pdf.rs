@@ -67,7 +67,7 @@ pub async fn create_pdf(app: AppHandle, event_id: Option<String>) -> Result<(), 
         "#,
     );
 
-    if let Some(eid) = event_id {
+    if let Some(eid) = &event_id {
         let pool = db::get_db_pool(&app).await?;
 
         let row = sqlx::query("SELECT name, start_date, end_date FROM event WHERE id = ?")
@@ -98,7 +98,39 @@ pub async fn create_pdf(app: AppHandle, event_id: Option<String>) -> Result<(), 
     }
 
     // --- GÉNÉRATION CARTE GLOBALE ---
-    let map_res = map_pdf::generate_cropped_map(&temp_dir, &data).await;
+    // Récupérer les parcours de l'événement
+    let parcours_list = if let Some(eid) = &event_id {
+        match db::fetch_parcours_for_event(app.clone(), eid.clone()).await {
+            Ok(list) => list,
+            Err(e) => {
+                eprintln!("⚠️ Erreur lors de la récupération des parcours : {}", e);
+                vec![]
+            }
+        }
+    } else {
+        vec![]
+    };
+
+    // Récupérer les zones de l'événement
+    let zones_list = if let Some(eid) = &event_id {
+        match db::fetch_zones_for_event(app.clone(), eid.clone()).await {
+            Ok(list) => list,
+            Err(e) => {
+                eprintln!("⚠️ Erreur lors de la récupération des zones : {}", e);
+                vec![]
+            }
+        }
+    } else {
+        vec![]
+    };
+
+    let map_res = map_pdf::generate_cropped_map_with_parcours_and_zones(
+        &temp_dir,
+        &data,
+        &parcours_list,
+        &zones_list,
+    )
+    .await;
 
     match map_res {
         Ok(map) => {
