@@ -1,46 +1,15 @@
-import {
-  View,
-  Text,
-  ActivityIndicator,
-  ScrollView,
-  Image,
-  Alert,
-  Modal,
-  Pressable,
-} from "react-native";
-import {
-  useNavigation,
-  useRoute,
-  useFocusEffect,
-} from "@react-navigation/native";
+import { View, Text, ActivityIndicator, ScrollView, Image, Alert, Modal, Pressable } from "react-native";
+import { useNavigation, useRoute, useFocusEffect, } from "@react-navigation/native";
 import React, { useCallback, useState } from "react";
 import { getDatabase } from "../../assets/migrations";
-import {
-  PointDetailType,
-  PictureType,
-  EquipementType,
-  InterestPointsType,
-} from "../types/database";
-import {
-  deletePoint,
-  updateComment,
-  deleteComment,
-  addComment,
-  deletePicture,
-  addPicture,
-  updatePointCoordinates,
-  addEquipement,
-  deleteEquipement,
-  updateTimeStamp,
-} from "../services/databaseAcces";
+import { PointDetailType, PictureType, EquipementType, InterestPointsType,} from "../types/database";
+import { deletePoint, updateComment, deleteComment, addComment, deletePicture, addPicture, updatePointCoordinates, addEquipement, deleteEquipement, updateTimeStamp, } from "../services/databaseAcces";
 import { imageToBase64, pickImage } from "../services/ImageHelper";
 import { shortId } from "../services/Helper";
 import MapView, { Marker, MapPressEvent } from "react-native-maps";
 import CoordinatesDisplay from "../components/CoordinatesDisplay";
 import EditModal from "../components/EditModal";
-import ObstacleSelector, {
-  SelectedObstacle,
-} from "../components/ObstacleSelector";
+import ObstacleSelector, { SelectedObstacle, } from "../components/ObstacleSelector";
 import { useEvent } from "../context/EventContext";
 import { usePoints } from "../context/PointsContext";
 import Colors from "../constants/colors";
