@@ -7,7 +7,6 @@ const mockInvoke = vi.fn()
 
 // Expose mock globally for tests
 declare global {
-  // eslint-disable-next-line no-var
   var mockInvoke: ReturnType<typeof vi.fn>
 }
 

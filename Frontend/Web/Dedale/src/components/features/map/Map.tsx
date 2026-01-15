@@ -201,7 +201,6 @@ function OfflineMapLibre({
     selectedPoint,
     setSelectedPoint,
     addingPointCoords,
-    setAddingPointCoords,
     awaitingMapClick,
     handleAddPointClick,
     refreshPoints,
