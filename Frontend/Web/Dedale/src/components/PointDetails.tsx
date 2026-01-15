@@ -1,8 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTimes } from "@fortawesome/free-solid-svg-icons";
+import { faTimes, faMapMarkerAlt } from "@fortawesome/free-solid-svg-icons";
 
 // Fonction pour afficher un ID court (8 premiers caractères)
 const shortId = (id: string): string => {
@@ -36,17 +36,64 @@ export default function PointDetails({
   point,
   onClose,
   onRefresh,
+  cachedAddress,
+  onCacheAddress,
 }: {
   point: Point | null;
   onClose?: () => void;
   onRefresh?: () => void;
+  cachedAddress?: string;
+  onCacheAddress?: (id: string, address: string) => void;
 }) {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [address, setAddress] = useState<string | null>(cachedAddress || null);
+  const [loadingAddress, setLoadingAddress] = useState(!cachedAddress);
   const [editingComment, setEditingComment] = useState(false);
   const [newComment, setNewComment] = useState(point?.comment || "");
   const [editingName, setEditingName] = useState(false);
   const [newName, setNewName] = useState(point?.name || "");
   const [updatingStatus, setUpdatingStatus] = useState(false);
+
+  useEffect(() => {
+    if (!point) return;
+
+    // Si on a l'adresse en cache (via prop), on l'utilise
+    if (cachedAddress) {
+      setAddress(cachedAddress);
+      setLoadingAddress(false);
+      return;
+    }
+
+    let mounted = true;
+    const fetchAddress = async () => {
+      try {
+        setLoadingAddress(true);
+        const result = await invoke<string | null>("reverse_geocode", {
+          lat: Number(point.y),
+          lon: Number(point.x),
+        });
+
+        if (mounted) {
+          if (result) {
+            setAddress(result);
+            if (onCacheAddress) onCacheAddress(point.id, result);
+          } else {
+            setAddress(null);
+          }
+        }
+      } catch (err) {
+        console.error("Erreur reverse geocoding details", err);
+      } finally {
+        if (mounted) setLoadingAddress(false);
+      }
+    };
+
+    fetchAddress();
+
+    return () => {
+      mounted = false;
+    };
+  }, [point, cachedAddress, onCacheAddress]);
 
   async function toggleStatus() {
     if (!point) return;
@@ -151,7 +198,16 @@ export default function PointDetails({
             <h2 className="text-2xl font-bold text-gray-900">
               {point.name || `Point #${shortId(point.id)}`}
             </h2>
-            <p className="text-gray-500 text-sm mt-1">ID: {shortId(point.id)}</p>
+            <p className="text-gray-500 text-sm mt-1 flex items-center gap-1">
+              <FontAwesomeIcon icon={faMapMarkerAlt} className="text-gray-400" />
+              {loadingAddress ? (
+                <span className="italic">Recherche adresse...</span>
+              ) : address ? (
+                <span>{address}</span>
+              ) : (
+                <span>Adresse non trouvée</span>
+              )}
+            </p>
           </div>
           <button
             type="button"
