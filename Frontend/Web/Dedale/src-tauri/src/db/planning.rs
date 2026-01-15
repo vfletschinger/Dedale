@@ -1,6 +1,7 @@
 use sqlx::Row;
 use std::fs::File;
 use std::io::Write;
+use std::collections::HashMap;
 use tauri::AppHandle;
 use tauri::Manager;
 
@@ -24,6 +25,15 @@ pub struct PlanningAction {
     pub action_type: String,
     pub scheduled_time: String,
     pub is_done: bool,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+#[serde(crate = "serde")]
+pub struct TeamWithActions {
+    pub id: String,
+    pub name: String,
+    pub event_id: String,
+    pub actions: Vec<PlanningAction>,
 }
 
 /// Récupère les équipes pour un événement
@@ -59,6 +69,77 @@ pub async fn fetch_teams_for_event(
         .collect();
 
     Ok(teams)
+}
+
+/// Récupère les équipes avec leurs actions en une SEULE requête SQL optimisée
+#[tauri::command]
+pub async fn fetch_teams_with_actions_for_event(
+    app: AppHandle,
+    event_id: String,
+) -> Result<Vec<TeamWithActions>, String> {
+    let pool = get_db_pool(&app).await?;
+
+    // Une SEULE requête qui récupère tout : équipes + actions avec JOIN
+    let query = r#"
+        SELECT 
+            t.id as team_id,
+            t.name as team_name,
+            e.id as event_id,
+            a.id as action_id,
+            a.team_id,
+            a.equipement_id,
+            a.type,
+            a.scheduled_time,
+            a.is_done
+        FROM team t
+        JOIN team te ON te.id = t.id
+        JOIN event e ON e.id = te.event_id
+        LEFT JOIN action a ON a.team_id = t.id
+        WHERE e.id = ?
+        ORDER BY t.name ASC, a.scheduled_time ASC
+    "#;
+
+    let rows = sqlx::query(query)
+        .bind(&event_id)
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Grouper les résultats par équipe
+    let mut teams_map: HashMap<String, TeamWithActions> = HashMap::new();
+
+    for row in rows {
+        let team_id: String = row.get("team_id");
+        let team_name: String = row.get("team_name");
+        let team_event_id: String = row.get("event_id");
+
+        // Insérer ou récupérer l'équipe
+        let team = teams_map.entry(team_id.clone()).or_insert_with(|| TeamWithActions {
+            id: team_id.clone(),
+            name: team_name,
+            event_id: team_event_id,
+            actions: Vec::new(),
+        });
+
+        // Ajouter l'action si elle existe
+        if let Ok::<Option<String>, _>(Some(_)) = row.try_get::<Option<String>, _>("action_id") {
+            let action_id: String = row.get("action_id");
+            team.actions.push(PlanningAction {
+                id: action_id,
+                team_id: row.get("team_id"),
+                equipement_id: row.get("equipement_id"),
+                action_type: row.get("type"),
+                scheduled_time: row.get("scheduled_time"),
+                is_done: row.get("is_done"),
+            });
+        }
+    }
+
+    // Retourner les équipes en ordre
+    let mut teams_with_actions: Vec<TeamWithActions> = teams_map.into_values().collect();
+    teams_with_actions.sort_by(|a, b| a.name.cmp(&b.name));
+
+    Ok(teams_with_actions)
 }
 
 /// Récupère les actions pour une équipe

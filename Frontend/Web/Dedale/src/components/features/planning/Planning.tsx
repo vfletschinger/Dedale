@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { TeamWithActions, Team, Action, Planning as Plan } from "../../../types";
+import { TeamWithActions, Planning as Plan } from "../../../types";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faFilePdf,
@@ -42,6 +42,42 @@ export default function Planning({
 
   const [generatingPdfForTeam, setGeneratingPdfForTeam] = useState<string | null>(null);
 
+  // 4. Fonction d'envoi réelle
+  const sendPlanningToTeam = useCallback(async (teamId: string, teamName: string) => {
+    setSyncState(prev => ({ ...prev, step: "sending" }));
+
+    try {
+      console.log("📤 Appel send_planning avec teamId:", teamId);
+      const planning = await invoke<Plan>("send_planning", { teamId });
+
+      if (!planning.actions || planning.actions.length === 0) {
+        setSyncState(prev => ({
+          ...prev,
+          step: "error",
+          errorMessage: `Aucune action trouvée pour l'équipe ${teamName}.`
+        }));
+        toast.error(`Aucune action à envoyer pour ${teamName}.`);
+        return;
+      }
+
+      setSyncState(prev => ({ ...prev, step: "success" }));
+      toast.success(`Planning envoyé à ${teamName} (${planning.actions.length} actions)`);
+
+      setTimeout(() => {
+        closeSyncModal();
+      }, 1500);
+
+    } catch (error) {
+      console.error("Erreur envoi:", error);
+      setSyncState(prev => ({
+        ...prev,
+        step: "error",
+        errorMessage: `Erreur envoi: ${String(error)}`
+      }));
+      toast.error(`Erreur lors de l'envoi : ${error}`);
+    }
+  }, []);
+
   // Note: Les listeners pour 'mobile-connected' et 'mobile-disconnected' sont gérés de manière centralisée
   // dans Data.tsx pour éviter les doublons et les toasts multiples
   // Planning écoute les événements custom émis par Data.tsx
@@ -61,7 +97,7 @@ export default function Planning({
     };
   }, [syncState.step, syncState.teamId, syncState.teamName, sendPlanningToTeam]);
 
-  // Charger les données
+  // Charger les données - Appel unique optimisé
   const loadTeamsWithActions = useCallback(async () => {
     if (!activeEventId) {
       setTeams([]);
@@ -69,24 +105,20 @@ export default function Planning({
     }
     setIsLoading(true);
     try {
-      const fetchedTeams = await invoke<Team[]>("fetch_teams_for_event", {
+      // Un seul appel au backend pour tout récupérer
+      const teamsWithActions = await invoke<TeamWithActions[]>("fetch_teams_with_actions_for_event", {
         eventId: activeEventId,
       });
 
-      const teamsWithActions: TeamWithActions[] = [];
-      for (const team of fetchedTeams) {
-        const actions = await invoke<Action[]>("fetch_actions_for_team", {
-          teamId: team.id,
-        });
-
-        teamsWithActions.push({
-          ...team,
-          actions: actions.sort(
-            (a, b) => new Date(a.scheduled_time).getTime() - new Date(b.scheduled_time).getTime()
-          ),
-        });
-      }
-      setTeams(teamsWithActions);
+      // Trier les actions par date pour chaque équipe
+      const sortedTeams = teamsWithActions.map(team => ({
+        ...team,
+        actions: team.actions.sort(
+          (a, b) => new Date(a.scheduled_time).getTime() - new Date(b.scheduled_time).getTime()
+        ),
+      }));
+      
+      setTeams(sortedTeams);
     } catch (error) {
       console.error("Erreur chargement:", error);
       toast.error("Erreur lors du chargement des plannings.");
@@ -132,42 +164,6 @@ export default function Planning({
         errorMessage: `Erreur génération QR: ${err}`
       }));
       toast.error(`Erreur: ${err}`);
-    }
-  }, []);
-
-  // 4. Fonction d'envoi réelle
-  const sendPlanningToTeam = useCallback(async (teamId: string, teamName: string) => {
-    setSyncState(prev => ({ ...prev, step: "sending" }));
-
-    try {
-      console.log("📤 Appel send_planning avec teamId:", teamId);
-      const planning = await invoke<Plan>("send_planning", { teamId });
-
-      if (!planning.actions || planning.actions.length === 0) {
-        setSyncState(prev => ({
-          ...prev,
-          step: "error",
-          errorMessage: `Aucune action trouvée pour l'équipe ${teamName}.`
-        }));
-        toast.error(`Aucune action à envoyer pour ${teamName}.`);
-        return;
-      }
-
-      setSyncState(prev => ({ ...prev, step: "success" }));
-      toast.success(`Planning envoyé à ${teamName} (${planning.actions.length} actions)`);
-
-      setTimeout(() => {
-        closeSyncModal();
-      }, 1500);
-
-    } catch (error) {
-      console.error("Erreur envoi:", error);
-      setSyncState(prev => ({
-        ...prev,
-        step: "error",
-        errorMessage: `Erreur envoi: ${String(error)}`
-      }));
-      toast.error(`Erreur lors de l'envoi : ${error}`);
     }
   }, []);
 

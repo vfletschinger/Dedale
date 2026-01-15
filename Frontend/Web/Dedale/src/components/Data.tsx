@@ -13,7 +13,7 @@ import {
   faCheck,
   faSpinner,
   faServer,
-  faFileImport,
+  //faFileImport,
   faDownload
 } from "@fortawesome/free-solid-svg-icons";
 import toast from 'react-hot-toast';
@@ -28,6 +28,7 @@ type Event = {
 };
 
 type TransferPhase = "idle" | "qr_displayed" | "connected";
+type SyncMode = "export" | "import";
 
 interface DataProps {
   selectedEventId?: string | null;
@@ -48,6 +49,9 @@ function Data({ selectedEventId: activeEventId }: DataProps) {
   // États pour l'import depuis mobile
   const [receiveQrCode, setReceiveQrCode] = useState<string | null>(null);
   const [receiveStatus, setReceiveStatus] = useState<string>("En attente...");
+
+  // Mode actif (export ou import)
+  const [syncMode, setSyncMode] = useState<SyncMode>("export");
 
   // Ref pour cooldown sur les toasts et listeners
   const lastConnectionToastTime = useRef(0);
@@ -273,14 +277,14 @@ function Data({ selectedEventId: activeEventId }: DataProps) {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
-        {/* Card 1: Synchronisation Mobile */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-300 flex flex-col overflow-hidden group">
+        {/* Card 1: Synchronisation Mobile (Export + Import fusionnés) */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-300 flex flex-col overflow-hidden group lg:col-span-1">
           <div className="px-6 py-5 bg-linear-to-r from-gray-50 to-white border-b border-gray-100 flex justify-between items-center">
             <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
               <FontAwesomeIcon icon={faMobileAlt} className="text-primary" />
               Synchronisation Mobile
             </h3>
-            {transferPhase === "connected" && (
+            {transferPhase === "connected" && syncMode === "export" && (
               <span className="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
                 Connecté
@@ -288,76 +292,193 @@ function Data({ selectedEventId: activeEventId }: DataProps) {
             )}
           </div>
 
-          <div className="p-6 flex-1 flex flex-col items-center justify-center min-h-[300px]">
-            {transferPhase === "idle" ? (
-              <div className="text-center max-w-xs">
-                <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6 text-gray-400 group-hover:scale-110 transition-transform duration-300 group-hover:bg-primary/5 group-hover:text-primary">
-                  <FontAwesomeIcon icon={faWifi} className="text-3xl" />
-                </div>
-                <p className="text-gray-500 mb-8">
-                  Transférez vos événements et points directement vers l'application mobile via le réseau local.
-                </p>
-                <button
-                  onClick={qr_code}
-                  disabled={isLoading}
-                  className="w-full py-3 px-6 bg-primary text-white font-bold rounded-xl shadow-lg shadow-primary/20 hover:bg-primary/90 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
-                >
-                  {isLoading ? <FontAwesomeIcon icon={faSpinner} spin /> : <FontAwesomeIcon icon={faServer} />}
-                  Connecter un appareil
-                </button>
-              </div>
-            ) : transferPhase === "qr_displayed" && qrCodeBase64 ? (
-              <div className="w-full flex flex-col items-center animate-in zoom-in-95 duration-300">
-                <div className="bg-white p-2 rounded-xl border-2 border-primary/20 shadow-xl mb-6">
-                  <img src={getQrCodeUri(qrCodeBase64)} alt="QR Code" className="w-48 h-48 mix-blend-multiply" />
-                </div>
-                <p className="text-sm font-bold text-gray-800 mb-2">Scannez avec l'app mobile</p>
-                <p className="text-xs text-gray-500 mb-6 flex items-center gap-2">
-                  <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></span>
-                  En attente de connexion...
-                </p>
-                <button
-                  onClick={terminateTransfer}
-                  className="text-gray-400 hover:text-gray-600 font-medium text-sm transition-colors border-b border-transparent hover:border-gray-400"
-                >
-                  Annuler
-                </button>
-              </div>
-            ) : (
-              <div className="w-full h-full flex flex-col">
-                <div className="flex-1 overflow-y-auto mb-4 border border-gray-100 rounded-lg bg-gray-50/50 p-2 space-y-2 max-h-[250px] custom-scrollbar">
-                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-2">Événements disponibles</p>
-                  {events.filter(e => selectedEventIds.has(e.id)).map(event => (
-                    <div key={event.id} className="bg-white p-3 rounded-lg border border-gray-100 shadow-xs flex items-center justify-between">
-                      <span className="font-semibold text-gray-700 text-sm">{event.name}</span>
-                      <button
-                        onClick={() => sendEventToMobile(event.id)}
-                        disabled={sendingEventId === event.id || sentEventIds.has(event.id)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all
-                                        ${sentEventIds.has(event.id)
-                            ? 'bg-green-50 text-green-600 border border-green-200'
-                            : 'bg-primary text-white hover:bg-primary/90 shadow-sm shadow-primary/20'
-                          }
-                                     `}
-                      >
-                        {sendingEventId === event.id ? (
-                          <FontAwesomeIcon icon={faSpinner} spin />
-                        ) : sentEventIds.has(event.id) ? (
-                          <>Envoyé <FontAwesomeIcon icon={faCheck} /></>
-                        ) : (
-                          "Transférer"
-                        )}
-                      </button>
+          {/* Onglets Export / Import */}
+          <div className="flex border-b border-gray-100">
+            <button
+              onClick={() => {
+                setSyncMode("export");
+                closeReceiveModal();
+              }}
+              className={`flex-1 py-3 px-4 text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                syncMode === "export"
+                  ? "text-primary border-b-2 border-primary bg-primary/5"
+                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              <FontAwesomeIcon icon={faCloudUploadAlt} />
+              Envoyer au mobile
+            </button>
+            <button
+              onClick={() => {
+                setSyncMode("import");
+                terminateTransfer();
+              }}
+              className={`flex-1 py-3 px-4 text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                syncMode === "import"
+                  ? "text-blue-600 border-b-2 border-blue-600 bg-blue-50/50"
+                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              <FontAwesomeIcon icon={faDownload} />
+              Recevoir du mobile
+            </button>
+          </div>
+
+          <div className="p-6 flex-1 flex flex-col items-center justify-center min-h-[350px]">
+            {/* MODE EXPORT */}
+            {syncMode === "export" && (
+              <>
+                {transferPhase === "idle" ? (
+                  <div className="text-center max-w-xs">
+                    <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6 text-gray-400 group-hover:scale-110 transition-transform duration-300 group-hover:bg-primary/5 group-hover:text-primary">
+                      <FontAwesomeIcon icon={faWifi} className="text-3xl" />
                     </div>
-                  ))}
-                </div>
-                <button
-                  onClick={terminateTransfer}
-                  className="w-full py-3 bg-gray-100 text-gray-600 font-bold rounded-xl hover:bg-red-50 hover:text-red-600 hover:border-red-100 border border-transparent transition-all"
-                >
-                  Arrêter le partage
-                </button>
-              </div>
+                    <p className="text-gray-500 mb-8">
+                      Transférez vos événements et points directement vers l'application mobile via le réseau local.
+                    </p>
+                    <button
+                      onClick={qr_code}
+                      disabled={isLoading}
+                      className="w-full py-3 px-6 bg-primary text-white font-bold rounded-xl shadow-lg shadow-primary/20 hover:bg-primary/90 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
+                    >
+                      {isLoading ? <FontAwesomeIcon icon={faSpinner} spin /> : <FontAwesomeIcon icon={faServer} />}
+                      Connecter un appareil
+                    </button>
+                  </div>
+                ) : transferPhase === "qr_displayed" && qrCodeBase64 ? (
+                  <div className="w-full flex flex-col items-center animate-in zoom-in-95 duration-300">
+                    <div className="bg-white p-2 rounded-xl border-2 border-primary/20 shadow-xl mb-6">
+                      <img src={getQrCodeUri(qrCodeBase64)} alt="QR Code" className="w-48 h-48 mix-blend-multiply" />
+                    </div>
+                    <p className="text-sm font-bold text-gray-800 mb-2">Scannez avec l'app mobile</p>
+                    <p className="text-xs text-gray-500 mb-4 flex items-center gap-2">
+                      <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></span>
+                      En attente de connexion...
+                    </p>
+                    
+                    {/* Liste des événements à envoyer */}
+                    <div className="w-full mt-4 max-h-[120px] overflow-y-auto custom-scrollbar border border-gray-100 rounded-lg bg-gray-50/50 p-2">
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-2">Événements prêts</p>
+                      {events.filter(e => selectedEventIds.has(e.id)).map(event => (
+                        <div key={event.id} className="bg-white p-2 rounded-lg border border-gray-100 mb-1 flex items-center justify-between">
+                          <span className="font-medium text-gray-700 text-xs">{event.name}</span>
+                          <span className="text-xs text-gray-400">Prêt</span>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <button
+                      onClick={terminateTransfer}
+                      className="mt-4 text-gray-400 hover:text-red-500 font-medium text-sm transition-colors"
+                    >
+                      Annuler
+                    </button>
+                  </div>
+                ) : (
+                  <div className="w-full h-full flex flex-col">
+                    <div className="flex-1 overflow-y-auto mb-4 border border-gray-100 rounded-lg bg-gray-50/50 p-2 space-y-2 max-h-[250px] custom-scrollbar">
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-2">Événements disponibles</p>
+                      {events.filter(e => selectedEventIds.has(e.id)).map(event => (
+                        <div key={event.id} className="bg-white p-3 rounded-lg border border-gray-100 shadow-xs flex items-center justify-between">
+                          <span className="font-semibold text-gray-700 text-sm">{event.name}</span>
+                          <button
+                            onClick={() => sendEventToMobile(event.id)}
+                            disabled={sendingEventId === event.id || sentEventIds.has(event.id)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all
+                                            ${sentEventIds.has(event.id)
+                                ? 'bg-green-50 text-green-600 border border-green-200'
+                                : 'bg-primary text-white hover:bg-primary/90 shadow-sm shadow-primary/20'
+                              }
+                                         `}
+                          >
+                            {sendingEventId === event.id ? (
+                              <FontAwesomeIcon icon={faSpinner} spin />
+                            ) : sentEventIds.has(event.id) ? (
+                              <>Envoyé <FontAwesomeIcon icon={faCheck} /></>
+                            ) : (
+                              "Transférer"
+                            )}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      onClick={terminateTransfer}
+                      className="w-full py-3 bg-gray-100 text-gray-600 font-bold rounded-xl hover:bg-red-50 hover:text-red-600 hover:border-red-100 border border-transparent transition-all"
+                    >
+                      Arrêter le partage
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* MODE IMPORT */}
+            {syncMode === "import" && (
+              <>
+                {!receiveQrCode ? (
+                  <div className="text-center max-w-xs">
+                    <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6 text-blue-400 group-hover:scale-110 transition-transform duration-300">
+                      <FontAwesomeIcon icon={faDownload} className="text-3xl" />
+                    </div>
+                    
+                    {/* Affichage de l'événement sélectionné */}
+                    {activeEventId ? (
+                      <div className="mb-6 p-3 bg-blue-50 border border-blue-200 rounded-xl">
+                        <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">Événement de destination</p>
+                        <p className="text-sm font-bold text-gray-800">
+                          {events.find(e => e.id === activeEventId)?.name || "Chargement..."}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="mb-6 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                        <p className="text-xs font-semibold text-amber-600">⚠️ Sélectionnez un événement dans le menu de gauche</p>
+                      </div>
+                    )}
+                    
+                    <p className="text-gray-500 mb-6 text-sm">
+                      Recevez les points collectés sur le terrain depuis l'application mobile.
+                    </p>
+                    <button
+                      onClick={handleReceiveFromMobile}
+                      disabled={!activeEventId}
+                      className="w-full py-3 px-6 bg-blue-600 text-white font-bold rounded-xl shadow-lg shadow-blue-600/20 hover:bg-blue-700 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                    >
+                      <FontAwesomeIcon icon={faServer} />
+                      Attendre le mobile
+                    </button>
+                  </div>
+                ) : (
+                  <div className="w-full flex flex-col items-center animate-in zoom-in-95 duration-300">
+                    <div className="bg-white p-2 rounded-xl border-2 border-blue-200 shadow-xl mb-6">
+                      <img src={`data:image/png;base64,${receiveQrCode}`} alt="QR Code" className="w-48 h-48 mix-blend-multiply" />
+                    </div>
+                    <p className="text-sm font-bold text-gray-800 mb-2">Scannez avec l'app mobile</p>
+                    
+                    <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide mb-4 ${
+                      receiveStatus.includes("connecté") ? "bg-green-100 text-green-700" : "bg-blue-50 text-blue-600"
+                    }`}>
+                      <div className={`w-2 h-2 rounded-full ${receiveStatus.includes("connecté") ? "bg-green-500" : "bg-blue-500 animate-pulse"}`}></div>
+                      {receiveStatus}
+                    </span>
+                    
+                    {/* Événement cible */}
+                    <div className="w-full p-3 bg-blue-50 border border-blue-200 rounded-xl mb-4">
+                      <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">Import vers</p>
+                      <p className="text-sm font-bold text-gray-800">
+                        {events.find(e => e.id === activeEventId)?.name || "Événement"}
+                      </p>
+                    </div>
+                    
+                    <button
+                      onClick={closeReceiveModal}
+                      className="text-gray-400 hover:text-red-500 font-medium text-sm transition-colors"
+                    >
+                      Annuler
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -410,94 +531,7 @@ function Data({ selectedEventId: activeEventId }: DataProps) {
           </div>
         </div>
 
-        {/* Card 3: Import depuis Mobile */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-300 flex flex-col overflow-hidden group">
-          <div className="px-6 py-5 bg-linear-to-r from-gray-50 to-white border-b border-gray-100">
-            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <FontAwesomeIcon icon={faFileImport} className="text-blue-500" />
-              Import depuis Mobile
-            </h3>
-          </div>
-
-          <div className="p-6 flex-1 flex flex-col">
-            <p className="text-gray-500 mb-6 text-sm">
-              Importez les points collectés sur le terrain depuis l'application mobile.
-            </p>
-
-            {/* Affichage de l'événement sélectionné */}
-            {activeEventId && (
-              <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-                <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">Événement de destination</p>
-                <p className="text-sm font-bold text-gray-800">
-                  {events.find(e => e.id === activeEventId)?.name || "Chargement..."}
-                </p>
-              </div>
-            )}
-
-            <button
-              onClick={handleReceiveFromMobile}
-              disabled={!activeEventId}
-              className="w-full py-4 px-6 bg-white border border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all group/btn flex items-center justify-between shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center text-xl group-hover/btn:scale-110 transition-transform">
-                  <FontAwesomeIcon icon={faDownload} />
-                </div>
-                <div className="text-left">
-                  <p className="font-bold text-gray-900">Importer les données</p>
-                  <p className="text-xs text-gray-500">Scanner le QR code avec le mobile</p>
-                </div>
-              </div>
-              <FontAwesomeIcon icon={faFileImport} className="text-gray-300 group-hover/btn:text-blue-500" />
-            </button>
-          </div>
-        </div>
-
       </div>
-
-      {/* Modal QR Code pour réception */}
-      {receiveQrCode && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl p-8 max-w-sm w-full mx-4 shadow-2xl animate-in zoom-in-95 duration-200">
-            <h3 className="text-xl font-extrabold text-center mb-6 flex items-center justify-center gap-3 text-gray-800">
-              <span className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
-                <FontAwesomeIcon icon={faMobileAlt} />
-              </span>
-              Réception Mobile
-            </h3>
-
-            <div className="bg-gray-50 p-6 rounded-2xl border border-dashed border-gray-300 mb-6 flex justify-center relative group">
-              <img
-                src={`data:image/png;base64,${receiveQrCode}`}
-                alt="QR Code"
-                className="w-48 h-48 mix-blend-multiply"
-              />
-            </div>
-
-            <p className="text-gray-600 text-center text-sm mb-6 leading-relaxed">
-              Scannez ce QR code avec l'application mobile pour transférer les points vers cet événement.
-            </p>
-
-            <div className="text-center mb-6">
-              <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${
-                receiveStatus.includes("connecté") ? "bg-green-100 text-green-700" : "bg-blue-50 text-blue-600"
-              }`}>
-                <div className={`w-2 h-2 rounded-full ${receiveStatus.includes("connecté") ? "bg-green-500" : "bg-blue-500 animate-pulse"}`}></div>
-                {receiveStatus}
-              </span>
-            </div>
-
-            <div className="flex justify-center">
-              <button
-                onClick={closeReceiveModal}
-                className="w-full px-6 py-3 bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition-transform active:scale-95 font-bold shadow-lg shadow-gray-900/20"
-              >
-                Fermer
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
