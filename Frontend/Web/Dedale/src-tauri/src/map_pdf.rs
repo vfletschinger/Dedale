@@ -73,7 +73,7 @@ fn parse_linestring_wkt(wkt: &str) -> Vec<(f64, f64)> {
 
             let mut coords = vec![];
             for pair in pairs {
-                let parts: Vec<&str> = pair.trim().split_whitespace().collect();
+                let parts: Vec<&str> = pair.split_whitespace().collect();
                 if parts.len() >= 2 {
                     if let (Ok(lon), Ok(lat)) = (parts[0].parse::<f64>(), parts[1].parse::<f64>()) {
                         coords.push((lon, lat));
@@ -103,7 +103,7 @@ fn parse_polygon_wkt(wkt: &str) -> Vec<(f64, f64)> {
 
             let mut coords = vec![];
             for pair in pairs {
-                let parts: Vec<&str> = pair.trim().split_whitespace().collect();
+                let parts: Vec<&str> = pair.split_whitespace().collect();
                 if parts.len() >= 2 {
                     if let (Ok(lon), Ok(lat)) = (parts[0].parse::<f64>(), parts[1].parse::<f64>()) {
                         coords.push((lon, lat));
