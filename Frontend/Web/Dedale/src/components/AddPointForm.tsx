@@ -15,8 +15,8 @@ export default function AddPointForm({
   onSaved?: () => void;
   eventId?: string | null;
 }) {
-  const [x, setX] = useState<number>(initialCoords.lng);
-  const [y, setY] = useState<number>(initialCoords.lat);
+  const [x, _setX] = useState<number>(initialCoords.lng);
+  const [y, _setY] = useState<number>(initialCoords.lat);
   const [name, setName] = useState<string>("Point 1");
   const [comment, setComment] = useState<string>("");
   const [type, setType] = useState<string>("info");
@@ -27,7 +27,7 @@ export default function AddPointForm({
   useEffect(() => {
     async function loadPointCount() {
       if (!eventId) return;
-      
+
       try {
         const points = await invoke<{ id: string; event_id: string; x: number; y: number; name: string | null; comment: string | null; type: string | null; status: boolean }[]>("fetch_points", { eventId });
         const nextPointNumber = points.length + 1;
@@ -36,7 +36,7 @@ export default function AddPointForm({
         console.error("Erreur lors du chargement des points:", error);
       }
     }
-    
+
     loadPointCount();
   }, [eventId]);
 
