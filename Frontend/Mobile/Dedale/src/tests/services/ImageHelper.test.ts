@@ -1,52 +1,45 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { Alert } from 'react-native';
-// CORRECTION 1 : ./ car on est dans le même dossier
-import { generateUUID } from './Helper'; 
+import { generateUUID } from '../../services/Helper';
+import * as ImageHelper from '../../services/ImageHelper';
+import getDatabase from '../../../assets/migrations';
 
-// --- 1. Mocks globaux ---
+jest.mock('../../../assets/migrations', () => {
+  const mockRunSync = jest.fn();
+  const dbInstance = { runSync: mockRunSync };
+  
+  return {
+    __esModule: true,
+    default: () => dbInstance,
+    getDatabase: () => dbInstance,
+  };
+});
 
-// Mock de la Base de données
-const mockRunSync = jest.fn();
-// CORRECTION 2 : ../../ car on remonte de services -> src -> racine -> assets
-jest.mock('../../assets/migrations', () => ({
-  __esModule: true,
-  default: () => ({
-    runSync: mockRunSync,
-  }),
-}));
-
-// Mock du Helper
-// CORRECTION 3 : ./Helper
-jest.mock('./Helper', () => ({
+jest.mock('../../services/Helper', () => ({
   generateUUID: jest.fn(),
 }));
 
-// Mock du FileSystem
 jest.mock('expo-file-system/legacy', () => ({
   readAsStringAsync: jest.fn(),
 }));
 
-// Mock de l'ImagePicker
 jest.mock('expo-image-picker', () => ({
   requestCameraPermissionsAsync: jest.fn(),
   launchCameraAsync: jest.fn(),
 }));
 
-// Mock de l'Alert React Native
 jest.mock('react-native', () => ({
   Alert: {
     alert: jest.fn(),
   },
 }));
 
-// --- 2. Import du Service après les mocks ---
-// CORRECTION 4 : ./ImageHelper
-import * as ImageHelper from './ImageHelper';
-
 describe('Service: ImageHelper', () => {
+  const db = getDatabase();
   
   beforeEach(() => {
+    // Arrange
     jest.clearAllMocks();
   });
 
@@ -76,7 +69,8 @@ describe('Service: ImageHelper', () => {
       
       (FileSystem.readAsStringAsync as jest.Mock).mockResolvedValue(fakeBase64);
       (generateUUID as jest.Mock).mockReturnValue(fakeUuid);
-      mockRunSync.mockReturnValue({ changes: 1 });
+      
+      (db.runSync as jest.Mock).mockReturnValue({ changes: 1 });
 
       // Act
       await ImageHelper.saveImageToBDD(fakeUri, pointId);
@@ -84,7 +78,7 @@ describe('Service: ImageHelper', () => {
       // Assert
       expect(FileSystem.readAsStringAsync).toHaveBeenCalled();
       
-      expect(mockRunSync).toHaveBeenCalledWith(
+      expect(db.runSync).toHaveBeenCalledWith(
         'INSERT INTO picture (id, point_id, image) VALUES (?, ?, ?)',
         [fakeUuid, pointId, fakeBase64]
       );
@@ -93,9 +87,11 @@ describe('Service: ImageHelper', () => {
     test('should throw error if database fails', async () => {
       // Arrange
       (FileSystem.readAsStringAsync as jest.Mock).mockResolvedValue('data');
-      mockRunSync.mockImplementation(() => {
+      
+      (db.runSync as jest.Mock).mockImplementation(() => {
         throw new Error('DB Full');
       });
+      
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
       // Act & Assert
@@ -137,22 +133,29 @@ describe('Service: ImageHelper', () => {
     });
 
     test('should return undefined if user cancels camera', async () => {
+      // Arrange
       (ImagePicker.requestCameraPermissionsAsync as jest.Mock).mockResolvedValue({ status: 'granted' });
       (ImagePicker.launchCameraAsync as jest.Mock).mockResolvedValue({
         canceled: true,
         assets: null
       });
 
+      // Act
       const result = await ImageHelper.pickImage();
+
+      // Assert
       expect(result).toBeUndefined();
     });
 
     test('should handle errors and show alert', async () => {
+      // Arrange
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
       (ImagePicker.requestCameraPermissionsAsync as jest.Mock).mockRejectedValue(new Error('Camera broken'));
 
+      // Act
       await ImageHelper.pickImage();
 
+      // Assert
       expect(Alert.alert).toHaveBeenCalledWith('Erreur', expect.stringContaining('Impossible'));
       expect(consoleSpy).toHaveBeenCalled();
       
