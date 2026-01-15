@@ -1,5 +1,6 @@
+use crate::pmtiles::get_pmtiles_file_path;
+use ::pmtiles::{AsyncPmTilesReader, TileCoord};
 use image::{DynamicImage, GenericImage, GenericImageView, ImageFormat};
-use pmtiles::{AsyncPmTilesReader, TileCoord};
 use std::path::Path;
 
 pub struct CroppedMap {
@@ -80,9 +81,9 @@ pub async fn generate_cropped_map(
     let t_y2 = tile_max_y_idx + 1;
     let num_tiles_x = t_x2 - t_x1 + 1;
     let num_tiles_y = t_y2 - t_y1 + 1;
-
+    let path_struct = get_pmtiles_file_path()?;
     // 3. Reader
-    let reader = AsyncPmTilesReader::new_with_path("../public/eurometropole_strasbourg.pmtiles")
+    let reader = AsyncPmTilesReader::new_with_path(path_struct.path)
         .await
         .map_err(|e| format!("Erreur ouverture PMTiles : {:?}", e))?;
 
