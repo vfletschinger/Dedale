@@ -37,7 +37,7 @@ describe('Context: GeometriesContext Integration', () => {
   });
 
   test('Charge et groupe les géométries par event_id', async () => {
-    // ARRANGE
+    // Arrange
     const fakeGeometries = [
       { id: 1, event_id: 1, wkt: 'POINT(0 0)', created_at: '2023-01-01' },
       { id: 2, event_id: 1, wkt: 'POLYGON(...)', created_at: '2023-01-01' },
@@ -51,21 +51,21 @@ describe('Context: GeometriesContext Integration', () => {
       .mockResolvedValueOnce(fakeGeometries) 
       .mockResolvedValueOnce([]); 
 
-    // ACT
+    // Act
     const { getByText, queryByText } = render(
       <GeometriesProvider>
         <TestConsumer />
       </GeometriesProvider>
     );
 
-    // ASSERT
+    // Assert
     await waitFor(() => expect(queryByText('Loading...')).toBeNull());
     expect(getByText('Event 1: 2')).toBeTruthy();
     expect(getByText('Event 2: 1')).toBeTruthy();
   });
 
   test('Gère le rafraîchissement des données', async () => {
-    // ARRANGE
+    // Arrange
     // Phase 1 : Chargement initial (Vide)
     // Il faut Mocker les DEUX appels du chargement initial
     mockGetAllAsync
@@ -87,13 +87,13 @@ describe('Context: GeometriesContext Integration', () => {
         .mockResolvedValueOnce([{ id: 99, event_id: 1, wkt: 'POINT(1 1)', created_at: '2023' }]) // Parcours après refresh
         .mockResolvedValueOnce([]); // Zones après refresh
 
-    // ACT
+    // Act
     await act(async () => {
         const btn = getByTestId('refresh-btn');
         fireEvent.press(btn);
     });
 
-    // ASSERT
+    // Assert
     await waitFor(() => {
         expect(getByText('Event 1: 1')).toBeTruthy();
     });

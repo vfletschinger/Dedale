@@ -6,11 +6,11 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import Feather from "@expo/vector-icons/Feather";
 import Colors from "./src/constants/colors";
-import HomeScreen from "./src/screens/Home";
+//import HomeScreen from "./src/screens/Home";
 import PointDetails from "./src/screens/PointDetails";
 import InterestPointsScreen from "./src/screens/InterestPoints";
 import RegisterPointScreen from "./src/screens/RegisterPoint";
-import RouteNavigation from "./src/screens/RouteNavigation";
+//import RouteNavigation from "./src/screens/RouteNavigation";
 import ConnectEvent from "./src/screens/ConnectEvent";
 import SettingsScreen from "./src/screens/Settings";
 import PlanningScreen from "./src/screens/Planning";
@@ -110,12 +110,13 @@ export default function App() {
                     component={PointDetails}
                     options={{ headerShown: false }}
                   />
+                  {/*
                   <Stack.Screen
                     name="RouteNavigation"
                     component={RouteNavigation}
                     options={{ headerShown: false }}
                   />
-                  {/*<Stack.Screen
+                  <Stack.Screen
                     name="TeamDetails"
                     component={TeamDetailsScreen}
                     options={{ headerShown: false }}
