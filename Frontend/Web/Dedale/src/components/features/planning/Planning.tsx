@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { TeamWithActions, Team, Action, Planning as Plan } from "../../../types";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -42,14 +41,12 @@ export default function Planning({
   });
 
   const [generatingPdfForTeam, setGeneratingPdfForTeam] = useState<string | null>(null);
-  const [isMobileConnected, setIsMobileConnected] = useState(false);
 
   // Note: Les listeners pour 'mobile-connected' et 'mobile-disconnected' sont gérés de manière centralisée
   // dans Data.tsx pour éviter les doublons et les toasts multiples
   // Planning écoute les événements custom émis par Data.tsx
   useEffect(() => {
     const handleMobileConnected = () => {
-      setIsMobileConnected(true);
       // Déclencher l'envoi si on est en attente
       if (syncState.step === "waiting_for_scan" && syncState.teamId) {
         console.log("🚀 Connexion détectée, lancement de l'envoi...");
@@ -57,18 +54,12 @@ export default function Planning({
       }
     };
 
-    const handleMobileDisconnected = () => {
-      setIsMobileConnected(false);
-    };
-
     window.addEventListener("app-mobile-connected", handleMobileConnected);
-    window.addEventListener("app-mobile-disconnected", handleMobileDisconnected);
 
     return () => {
       window.removeEventListener("app-mobile-connected", handleMobileConnected);
-      window.removeEventListener("app-mobile-disconnected", handleMobileDisconnected);
     };
-  }, [syncState.step, syncState.teamId, syncState.teamName]);
+  }, [syncState.step, syncState.teamId, syncState.teamName, sendPlanningToTeam]);
 
   // Charger les données
   const loadTeamsWithActions = useCallback(async () => {
@@ -145,7 +136,7 @@ export default function Planning({
   }, []);
 
   // 4. Fonction d'envoi réelle
-  const sendPlanningToTeam = async (teamId: string, teamName: string) => {
+  const sendPlanningToTeam = useCallback(async (teamId: string, teamName: string) => {
     setSyncState(prev => ({ ...prev, step: "sending" }));
 
     try {
@@ -178,11 +169,10 @@ export default function Planning({
       }));
       toast.error(`Erreur lors de l'envoi : ${error}`);
     }
-  };
+  }, []);
 
   const closeSyncModal = () => {
     setSyncState({ step: "idle", teamId: null, teamName: null, qrCodeBase64: null, errorMessage: null });
-    setIsMobileConnected(false);
   };
 
   const generateTeamPDF = useCallback(async (teamId: string, teamName: string) => {
