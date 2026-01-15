@@ -371,158 +371,156 @@ export default function RegisterPointScreen() {
                   ))}
                 </View>
               )}
-          </View>
 
-          {/* Section Photos */}
-          <View className="mb-6">
-            <View className="flex-row items-center mb-2">
-              <Feather name="camera" size={20} color={Colors.secondary} style={{ marginRight: 8 }} />
-              <Text className="font-semibold text-gray-800">Photos</Text>
-            </View>
+              {/* Section Photos */}
+              <View className="mb-6">
+                <View className="flex-row items-center mb-2">
+                  <Feather name="camera" size={20} color={Colors.secondary} style={{ marginRight: 8 }} />
+                  <Text className="font-semibold text-gray-800">Photos</Text>
+                </View>
 
-            {/* Galerie photos */}
-            <View className="flex-row flex-wrap">
-              {/* Photos existantes */}
-              {selectedImages.map((item, index) => (
-                <View key={item} style={{ position: 'relative', marginRight: 12, marginBottom: 12 }}>
-                  <Pressable onPress={() => setPreviewImage(item)}>
-                    <Image
-                      source={{ uri: item }}
-                      style={{
-                        width: 72,
-                        height: 72,
-                        borderRadius: 12,
-                      }}
-                    />
-                  </Pressable>
-                  <TouchableOpacity
-                    onPress={() => removeImage(item)}
+                {/* Galerie photos */}
+                <View className="flex-row flex-wrap">
+                  {/* Photos existantes */}
+                  {selectedImages.map((item, index) => (
+                    <View key={item} style={{ position: 'relative', marginRight: 12, marginBottom: 12 }}>
+                      <Pressable onPress={() => setPreviewImage(item)}>
+                        <Image
+                          source={{ uri: item }}
+                          style={{
+                            width: 72,
+                            height: 72,
+                            borderRadius: 12,
+                          }}
+                        />
+                      </Pressable>
+                      <TouchableOpacity
+                        onPress={() => removeImage(item)}
+                        style={{
+                          position: 'absolute',
+                          top: -6,
+                          right: -6,
+                          backgroundColor: Colors.error,
+                          width: 22,
+                          height: 22,
+                          borderRadius: 11,
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          borderWidth: 2,
+                          borderColor: 'white',
+                        }}
+                      >
+                        <Feather name="x" size={10} color="white" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+
+                  {/* Bouton ajouter photo */}
+                  <Pressable
+                    onPress={pickImage}
                     style={{
-                      position: 'absolute',
-                      top: -6,
-                      right: -6,
-                      backgroundColor: Colors.error,
-                      width: 22,
-                      height: 22,
-                      borderRadius: 11,
+                      width: 72,
+                      height: 72,
+                      borderRadius: 12,
+                      borderWidth: 2,
+                      borderColor: Colors.secondary,
+                      borderStyle: 'dashed',
                       justifyContent: 'center',
                       alignItems: 'center',
-                      borderWidth: 2,
-                      borderColor: 'white',
+                      backgroundColor: Colors.secondary + '10',
                     }}
                   >
-                    <Feather name="x" size={10} color="white" />
-                  </TouchableOpacity>
+                    <Feather name="plus" size={24} color={Colors.secondary} />
+                    <Text style={{ color: Colors.secondary, fontSize: 10, marginTop: 2 }}>Photo</Text>
+                  </Pressable>
                 </View>
-              ))}
+              </View>
 
-              {/* Bouton ajouter photo */}
-              <Pressable
-                onPress={pickImage}
-                style={{
-                  width: 72,
-                  height: 72,
-                  borderRadius: 12,
-                  borderWidth: 2,
-                  borderColor: Colors.secondary,
-                  borderStyle: 'dashed',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  backgroundColor: Colors.secondary + '10',
-                }}
-              >
-                <Feather name="plus" size={24} color={Colors.secondary} />
-                <Text style={{ color: Colors.secondary, fontSize: 10, marginTop: 2 }}>Photo</Text>
-              </Pressable>
-            </View>
-          </View>
+              {/* Boutons d'action */}
+              <View className="mb-6">
+                {/* Bouton Enregistrer */}
+                <Pressable
+                  onPress={async () => {
+                    if (location) {
+                      const insertedId = await savePointToDB(
+                        location.longitude,
+                        location.latitude,
+                        pointComment
+                      );
+                      if (insertedId) {
+                        await refreshPoints();
+                        Alert.alert("Succès", "Point enregistré avec succès");
+                        setIsModalVisible(false);
+                        setPointComment("");
+                        setSelectedImages([]);
+                        setSelectedObstacles([]);
+                        setLocation(null);
+                      }
+                    } else {
+                      Alert.alert("Erreur", "Aucune position à enregistrer.");
+                    }
+                  }}
+                  style={{ backgroundColor: Colors.success }}
+                  className="py-4 rounded-xl flex-row items-center justify-center mb-3"
+                >
+                  <Feather name="check" size={18} color="white" style={{ marginRight: 8 }} />
+                  <Text className="text-white font-bold text-base">Enregistrer le point</Text>
+                </Pressable>
 
-          {/* Boutons d'action */}
-          <View className="mb-6">
-            {/* Bouton Enregistrer */}
-            <Pressable
-              onPress={async () => {
-                if (location) {
-                  const insertedId = await savePointToDB(
-                    location.longitude,
-                    location.latitude,
-                    pointComment
-                  );
-                  if (insertedId) {
-                    await refreshPoints();
-                    Alert.alert("Succès", "Point enregistré avec succès");
+                {/* Bouton Annuler */}
+                <Pressable
+                  onPress={() => {
                     setIsModalVisible(false);
                     setPointComment("");
                     setSelectedImages([]);
                     setSelectedObstacles([]);
-                    setLocation(null);
-                  }
-                } else {
-                  Alert.alert("Erreur", "Aucune position à enregistrer.");
-                }
-              }}
-              style={{ backgroundColor: Colors.success }}
-              className="py-4 rounded-xl flex-row items-center justify-center mb-3"
-            >
-              <Feather name="check" size={18} color="white" style={{ marginRight: 8 }} />
-              <Text className="text-white font-bold text-base">Enregistrer le point</Text>
-            </Pressable>
-
-            {/* Bouton Annuler */}
-            <Pressable
-              onPress={() => {
-                setIsModalVisible(false);
-                setPointComment("");
-                setSelectedImages([]);
-                setSelectedObstacles([]);
-              }}
-              className="py-3 rounded-xl flex-row items-center justify-center border border-gray-300"
-            >
-              <Text className="text-gray-600 font-medium">Annuler</Text>
-            </Pressable>
+                  }}
+                  className="py-3 rounded-xl flex-row items-center justify-center border border-gray-300"
+                >
+                  <Text className="text-gray-600 font-medium">Annuler</Text>
+                </Pressable>
+              </View>
+            </ScrollView>
           </View>
-        </ScrollView>
-    </View>
         </KeyboardAvoidingView >
       </Modal >
 
-    {/* Modal de prévisualisation d'image */ }
-    < Modal
-  visible = { previewImage !== null
-}
-transparent = { true}
-animationType = "fade"
-onRequestClose = {() => setPreviewImage(null)}
+      {/* Modal de prévisualisation d'image */}
+      <Modal
+        visible={previewImage !== null}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setPreviewImage(null)}
       >
-  <View className="flex-1 bg-black/90 justify-center items-center">
-    {previewImage && (
-      <Image
-        source={{ uri: previewImage }}
-        className="w-full h-4/5"
-        resizeMode="contain"
-      />
-    )}
-    <View className="absolute bottom-10 flex-row gap-4">
-      <Pressable
-        onPress={() => setPreviewImage(null)}
-        className="bg-white px-6 py-3 rounded-xl"
-      >
-        <Text className="text-gray-800 font-bold">Fermer</Text>
-      </Pressable>
-      <Pressable
-        onPress={() => {
-          if (previewImage) {
-            removeImage(previewImage);
-            setPreviewImage(null);
-          }
-        }}
-        className="bg-red-500 px-6 py-3 rounded-xl"
-      >
-        <Text className="text-white font-bold">Supprimer</Text>
-      </Pressable>
+        <View className="flex-1 bg-black/90 justify-center items-center">
+          {previewImage && (
+            <Image
+              source={{ uri: previewImage }}
+              className="w-full h-4/5"
+              resizeMode="contain"
+            />
+          )}
+          <View className="absolute bottom-10 flex-row gap-4">
+            <Pressable
+              onPress={() => setPreviewImage(null)}
+              className="bg-white px-6 py-3 rounded-xl"
+            >
+              <Text className="text-gray-800 font-bold">Fermer</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                if (previewImage) {
+                  removeImage(previewImage);
+                  setPreviewImage(null);
+                }
+              }}
+              className="bg-red-500 px-6 py-3 rounded-xl"
+            >
+              <Text className="text-white font-bold">Supprimer</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
-  </View>
-      </Modal >
-    </View >
   );
 }

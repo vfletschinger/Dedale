@@ -18,7 +18,6 @@ import { getDatabase } from "../../assets/migrations";
 import {
   PointDetailType,
   PictureType,
-  EquipementType,
   InterestPointsType,
 } from "../types/database";
 import {
@@ -29,8 +28,6 @@ import {
   deletePicture,
   addPicture,
   updatePointCoordinates,
-  addEquipement,
-  deleteEquipement,
   updateTimeStamp,
 } from "../services/databaseAcces";
 import { imageToBase64, pickImage } from "../services/ImageHelper";
@@ -86,19 +83,10 @@ export default function PointDetails() {
         [pointId]
       );
 
-      const equipements = db.getAllSync<EquipementType>(
-        `SELECT e.*, t.name, t.description
-         FROM equipement e
-         LEFT JOIN type t ON e.type_id = t.id
-         INNER JOIN equipement_coordinate ec ON ec.equipement_id = e.id
-         WHERE ec.x = ? AND ec.y = ?`,
-        [point.x, point.y]
-      );
-
       setPointData({
         point,
         pictures: pictures || [],
-        equipements: equipements || [],
+        equipements: [],
       });
 
       setTempCoordinates({
@@ -242,70 +230,6 @@ export default function PointDetails() {
     }
   };
 
-  const handleSaveEquipements = (equipements: SelectedObstacle[]) => {
-    if (equipements.length === 0) {
-      if (editingObstacles) {
-        // Mode édition : supprimer tous les équipements existants
-        Alert.alert("Confirmer", "Supprimer tous les équipements ?", [
-          { text: "Annuler", style: "cancel" },
-          {
-            text: "Supprimer",
-            style: "destructive",
-            onPress: () => {
-              try {
-                pointData?.equipements.forEach((equipement) => {
-                  deleteEquipement(equipement.id, db);
-                });
-                updateTimeStamp(pointId, db);
-                fetchPoint();
-                Alert.alert("Succès", "Équipements supprimés");
-              } catch (error) {
-                console.error("Erreur:", error);
-                Alert.alert(
-                  "Erreur",
-                  "Impossible de supprimer les équipements"
-                );
-              }
-            },
-          },
-        ]);
-      }
-      return;
-    }
-
-    try {
-      if (editingObstacles) {
-        // Mode édition : supprimer les anciens équipements
-        pointData?.equipements.forEach((equipement) => {
-          deleteEquipement(equipement.id, db);
-        });
-      }
-
-      // Ajouter les nouveaux équipements (maintenant au niveau event)
-      if (selectedEvent?.id) {
-        for (const equipement of equipements) {
-          addEquipement(
-            selectedEvent.id,
-            equipement.type_id,
-            equipement.number,
-            db
-          );
-        }
-      }
-
-      updateTimeStamp(pointId, db);
-      Alert.alert(
-        "Succès",
-        editingObstacles ? "Équipements mis à jour" : "Équipements ajoutés"
-      );
-      fetchPoint();
-      setEditingObstacles(false);
-    } catch (error) {
-      console.error("Erreur:", error);
-      Alert.alert("Erreur", "Impossible de sauvegarder les équipements");
-    }
-  };
-
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center">
@@ -439,54 +363,6 @@ export default function PointDetails() {
                 </View>
               ) : (
                 <Text className="text-sm text-gray-500">Aucun commentaire</Text>
-              )}
-            </View>
-
-            {/* Équipements */}
-            <View className="bg-gray-100 p-4 rounded-lg mb-4">
-              <View className="flex-row justify-between items-center mb-2">
-                <Text className="text-lg font-semibold">
-                  Équipements ({pointData.equipements.length})
-                </Text>
-                <View className="flex-row gap-2">
-                  <Pressable
-                    onPress={handleEditObstacles}
-                    className="px-3 py-1 rounded-lg"
-                    style={{ backgroundColor: Colors.secondary }}
-                  >
-                    <Text className="text-white text-xs font-semibold">
-                      {pointData.equipements.length > 0
-                        ? "✏️ Modifier"
-                        : "+ Ajouter"}
-                    </Text>
-                  </Pressable>
-                </View>
-              </View>
-              {pointData.equipements.length > 0 ? (
-                pointData.equipements.map((equipement) => (
-                  <View
-                    key={equipement.id}
-                    className="bg-white p-3 rounded-lg mb-2"
-                  >
-                    <Text className="font-semibold">{equipement.name}</Text>
-                    {equipement.description && (
-                      <Text className="text-sm text-gray-500">
-                        {equipement.description}
-                      </Text>
-                    )}
-                    <Text className="text-sm mt-1">
-                      Quantité: {equipement.quantity}
-                    </Text>
-                    {equipement.length_per_unit &&
-                      equipement.length_per_unit > 0 && (
-                        <Text className="text-sm">
-                          Longueur par unité: {equipement.length_per_unit}m
-                        </Text>
-                      )}
-                  </View>
-                ))
-              ) : (
-                <Text className="text-sm text-gray-500">Aucun équipement</Text>
               )}
             </View>
 
