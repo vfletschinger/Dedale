@@ -224,7 +224,7 @@ export interface Action {
     id: string;
     team_id: string;
     equipement_id: string;
-    type: string;
+    action_type: string;
     scheduled_time: string;
     is_done: boolean;
 }
