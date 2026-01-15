@@ -111,7 +111,26 @@ pub async fn create_pdf(app: AppHandle, event_id: Option<String>) -> Result<(), 
         vec![]
     };
 
-    let map_res = map_pdf::generate_cropped_map_with_parcours(&temp_dir, &data, &parcours_list).await;
+    // Récupérer les zones de l'événement
+    let zones_list = if let Some(eid) = &event_id {
+        match db::fetch_zones_for_event(app.clone(), eid.clone()).await {
+            Ok(list) => list,
+            Err(e) => {
+                eprintln!("⚠️ Erreur lors de la récupération des zones : {}", e);
+                vec![]
+            }
+        }
+    } else {
+        vec![]
+    };
+
+    let map_res = map_pdf::generate_cropped_map_with_parcours_and_zones(
+        &temp_dir,
+        &data,
+        &parcours_list,
+        &zones_list,
+    )
+    .await;
 
     match map_res {
         Ok(map) => {

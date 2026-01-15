@@ -70,7 +70,37 @@ fn parse_linestring_wkt(wkt: &str) -> Vec<(f64, f64)> {
         if let Some(end) = wkt.rfind(')') {
             let coords_str = &wkt[start + 1..end];
             let pairs: Vec<&str> = coords_str.split(',').collect();
-            
+
+            let mut coords = vec![];
+            for pair in pairs {
+                let parts: Vec<&str> = pair.trim().split_whitespace().collect();
+                if parts.len() >= 2 {
+                    if let (Ok(lon), Ok(lat)) = (parts[0].parse::<f64>(), parts[1].parse::<f64>()) {
+                        coords.push((lon, lat));
+                    }
+                }
+            }
+            return coords;
+        }
+    }
+    vec![]
+}
+
+/// Parse une chaîne WKT POLYGON et retourne une liste de coordonnées (lon, lat)
+fn parse_polygon_wkt(wkt: &str) -> Vec<(f64, f64)> {
+    // Format: "POLYGON((lon1 lat1, lon2 lat2, ..., lon1 lat1))"
+    let wkt = wkt.trim();
+    if !wkt.to_uppercase().starts_with("POLYGON") {
+        return vec![];
+    }
+
+    // Extraire le contenu du premier anneau (outer ring)
+    if let Some(start) = wkt.find('(') {
+        // Trouver la fin du premier anneau (pas du dernier ')')
+        if let Some(first_paren_close) = wkt[start + 1..].find(')') {
+            let inner_coords = &wkt[start + 1..start + 1 + first_paren_close];
+            let pairs: Vec<&str> = inner_coords.split(',').collect();
+
             let mut coords = vec![];
             for pair in pairs {
                 let parts: Vec<&str> = pair.trim().split_whitespace().collect();
@@ -118,7 +148,7 @@ fn draw_line(
     let dx = (x2 - x1).abs();
     let dy = (y2 - y1).abs();
     let steps = dx.max(dy);
-    
+
     if steps == 0 {
         return;
     }
@@ -140,6 +170,73 @@ fn draw_line(
     }
 }
 
+/// Remplit un polygone avec une couleur semi-transparente
+fn fill_polygon(img: &mut DynamicImage, coords_pixel: &[(u32, u32)], color: Rgba<u8>) {
+    if coords_pixel.len() < 3 {
+        return;
+    }
+
+    let width = img.width();
+    let height = img.height();
+
+    // Obtenir les limites du polygone
+    let min_x = coords_pixel.iter().map(|(x, _)| *x).min().unwrap_or(0);
+    let max_x = coords_pixel.iter().map(|(x, _)| *x).max().unwrap_or(0);
+    let min_y = coords_pixel.iter().map(|(_, y)| *y).min().unwrap_or(0);
+    let max_y = coords_pixel.iter().map(|(_, y)| *y).max().unwrap_or(0);
+
+    let alpha = (color.0[3] as f64) / 255.0;
+
+    // Pour chaque pixel dans la bounding box
+    for py in min_y..=max_y {
+        if py >= height {
+            continue;
+        }
+
+        for px in min_x..=max_x {
+            if px >= width {
+                continue;
+            }
+
+            // Vérifier si le point est à l'intérieur du polygone (ray casting)
+            if point_in_polygon(px as f64, py as f64, coords_pixel) {
+                let existing_pixel = img.get_pixel(px, py);
+
+                // Blending alpha correct
+                let r =
+                    (color.0[0] as f64 * alpha + existing_pixel[0] as f64 * (1.0 - alpha)) as u8;
+                let g =
+                    (color.0[1] as f64 * alpha + existing_pixel[1] as f64 * (1.0 - alpha)) as u8;
+                let b =
+                    (color.0[2] as f64 * alpha + existing_pixel[2] as f64 * (1.0 - alpha)) as u8;
+                let a = 255u8;
+
+                img.put_pixel(px, py, Rgba([r, g, b, a]));
+            }
+        }
+    }
+}
+
+/// Algorithme ray casting pour vérifier si un point est dans un polygone
+fn point_in_polygon(x: f64, y: f64, polygon: &[(u32, u32)]) -> bool {
+    let mut inside = false;
+    let n = polygon.len();
+
+    for i in 0..n {
+        let (x1, y1) = polygon[i];
+        let (x2, y2) = polygon[(i + 1) % n];
+
+        let x1 = x1 as f64;
+        let y1 = y1 as f64;
+        let x2 = x2 as f64;
+        let y2 = y2 as f64;
+
+        if ((y1 > y) != (y2 > y)) && (x < (x2 - x1) * (y - y1) / (y2 - y1) + x1) {
+            inside = !inside;
+        }
+    }
+    inside
+}
 
 // --- GÉNÉRATION ---
 
@@ -217,11 +314,22 @@ pub async fn generate_cropped_map(
     })
 }
 
-/// Génère une carte cropped avec les points ET les parcours
+/// Génère une carte cropped avec les points, parcours ET les zones
+#[allow(dead_code)]
 pub async fn generate_cropped_map_with_parcours(
     output_dir: &Path,
     points: &[crate::db::PointWithDetails],
     parcours: &[Parcours],
+) -> Result<CroppedMap, String> {
+    generate_cropped_map_with_parcours_and_zones(output_dir, points, parcours, &[]).await
+}
+
+/// Génère une carte cropped avec les points, parcours ET les zones
+pub async fn generate_cropped_map_with_parcours_and_zones(
+    output_dir: &Path,
+    points: &[crate::db::PointWithDetails],
+    parcours: &[Parcours],
+    zones: &[crate::types::Zone],
 ) -> Result<CroppedMap, String> {
     if points.is_empty() {
         return Err("Aucun point à afficher".to_string());
@@ -237,6 +345,19 @@ pub async fn generate_cropped_map_with_parcours(
     for parcours_item in parcours {
         if let Some(geom_json) = &parcours_item.geometry_json {
             let coords = parse_linestring_wkt(geom_json);
+            for (lon, lat) in coords {
+                min_lon = min_lon.min(lon);
+                max_lon = max_lon.max(lon);
+                min_lat = min_lat.min(lat);
+                max_lat = max_lat.max(lat);
+            }
+        }
+    }
+
+    // Étendre les limites pour inclure les zones
+    for zone in zones {
+        if let Some(geom_json) = &zone.geometry_json {
+            let coords = parse_polygon_wkt(geom_json);
             for (lon, lat) in coords {
                 min_lon = min_lon.min(lon);
                 max_lon = max_lon.max(lon);
@@ -283,7 +404,7 @@ pub async fn generate_cropped_map_with_parcours(
         }
     }
 
-    // 5. Tracer les parcours sur la carte
+    // 5. Tracer les zones d'abord (en arrière-plan)
     let cropped_map = CroppedMap {
         image_path: String::new(),
         zoom,
@@ -293,6 +414,32 @@ pub async fn generate_cropped_map_with_parcours(
         height_tiles: num_tiles_y,
     };
 
+    for zone in zones {
+        if let Some(geom_json) = &zone.geometry_json {
+            let coords = parse_polygon_wkt(geom_json);
+            if coords.len() >= 3 {
+                // Obtenir la couleur de la zone
+                let color_hex = zone.color.as_deref().unwrap_or("#3b82f6");
+                let mut color = hex_to_rgba(color_hex);
+                // Utiliser 60% d'opacité
+                color.0[3] = 153; // 0.6 * 255 = 153
+
+                // Convertir les coordonnées en pixels
+                let mut coords_pixel: Vec<(u32, u32)> = vec![];
+                for (lon, lat) in &coords {
+                    let (pct_x, pct_y) = cropped_map.get_percent_pos(*lon, *lat);
+                    let pixel_x = (pct_x * num_tiles_x as f64 * 256.0) as u32;
+                    let pixel_y = (pct_y * num_tiles_y as f64 * 256.0) as u32;
+                    coords_pixel.push((pixel_x, pixel_y));
+                }
+
+                // Remplir le polygone
+                fill_polygon(&mut final_img, &coords_pixel, color);
+            }
+        }
+    }
+
+    // 6. Tracer les parcours sur la carte
     for parcours_item in parcours {
         if let Some(geom_json) = &parcours_item.geometry_json {
             let coords = parse_linestring_wkt(geom_json);
@@ -315,13 +462,21 @@ pub async fn generate_cropped_map_with_parcours(
                     let pixel_y2 = (pct_y2 * num_tiles_y as f64 * 256.0) as u32;
 
                     // Tracer la ligne avec une épaisseur de 3 pixels
-                    draw_line(&mut final_img, pixel_x1, pixel_y1, pixel_x2, pixel_y2, color, 3);
+                    draw_line(
+                        &mut final_img,
+                        pixel_x1,
+                        pixel_y1,
+                        pixel_x2,
+                        pixel_y2,
+                        color,
+                        3,
+                    );
                 }
             }
         }
     }
 
-    // 6. Sauvegarde
+    // 7. Sauvegarde
     let filename = "map_dynamic.jpg";
     let output_path = output_dir.join(filename);
     final_img
@@ -329,7 +484,7 @@ pub async fn generate_cropped_map_with_parcours(
         .save_with_format(&output_path, ImageFormat::Jpeg)
         .map_err(|e| e.to_string())?;
 
-    // 7. Retour
+    // 8. Retour
     let (_w_lon, _n_lat) = tile_to_lon_lat(t_x1, t_y1, zoom);
     let (_e_lon, _s_lat) = tile_to_lon_lat(t_x2 + 1, t_y2 + 1, zoom);
 
