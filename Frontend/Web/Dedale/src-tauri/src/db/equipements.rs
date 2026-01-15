@@ -365,11 +365,20 @@ pub async fn add_action(
         .map(|(id,)| id)
         .unwrap_or_else(|| Uuid::new_v4().to_string());
 
-    // Utiliser SQLite pour générer la timestamp au format ISO 8601
-    let scheduled_time: String = sqlx::query_scalar("SELECT strftime('%Y-%m-%dT%H:%M:%SZ', 'now')")
-        .fetch_one(&pool)
-        .await
-        .map_err(|e| e.to_string())?;
+    // Récupérer les dates de l'équipement
+    let (date_pose, date_depose): (String, String) =
+        sqlx::query_as("SELECT date_pose, date_depose FROM equipement WHERE id = ?")
+            .bind(&equipement_id)
+            .fetch_one(&pool)
+            .await
+            .map_err(|e| e.to_string())?;
+
+    // Déterminer la scheduled_time en fonction du type d'action
+    let scheduled_time = match action_type.as_str() {
+        "pose" => date_pose,
+        "depose" => date_depose,
+        _ => date_depose, // date_depose par défaut
+    };
 
     // Utiliser INSERT OR REPLACE pour mettre à jour si l'action existe déjà
     sqlx::query(

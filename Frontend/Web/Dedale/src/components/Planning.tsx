@@ -88,14 +88,13 @@ export default function Planning({
       const teamsWithActions: TeamWithActions[] = [];
       for (const team of fetchedTeams) {
         const actions = await invoke<Action[]>("fetch_actions_for_team", {
-          teamId: team.id,
+          teamId: team.id
         });
+        console.log(actions)
 
         teamsWithActions.push({
           ...team,
-          actions: actions.sort(
-            (a, b) => new Date(a.scheduled_time).getTime() - new Date(b.scheduled_time).getTime()
-          ),
+          actions: actions
         });
       }
       setTeams(teamsWithActions);
@@ -266,7 +265,7 @@ export default function Planning({
               {/* Team Header */}
               <div className="px-6 py-5 bg-linear-to-r from-gray-50 to-white border-b border-gray-100 flex items-center justify-between">
                 <div>
-                  <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2 text-transform: capitalize">
                     {team.name}
                     <span className="bg-primary/10 text-primary text-xs font-bold px-2 py-0.5 rounded-full border border-primary/20">
                       {team.actions.length}
@@ -333,7 +332,7 @@ export default function Planning({
                             </div>
                           </td>
                           <td className={`px-4 py-3 ${action.is_done ? 'opacity-50 line-through decoration-gray-400' : ''}`}>
-                            <p className="font-semibold text-gray-800">{action.type}</p>
+                            <p className="font-semibold text-gray-800 text-transform: capitalize">{action.action_type}</p>
                           </td>
                           <td className="px-4 py-3 text-right whitespace-nowrap">
                             <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${action.is_done ? 'bg-gray-100 text-gray-500' : 'bg-blue-50 text-blue-700'}`}>

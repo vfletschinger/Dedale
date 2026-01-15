@@ -79,7 +79,7 @@ pub async fn fetch_actions_for_team(
             a.is_done
         FROM action a
         WHERE a.team_id = ?
-        ORDER BY a.scheduled_time ASC
+        ORDER BY a.is_done ASC, a.scheduled_time ASC
     "#;
 
     let rows = sqlx::query(query)
