@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { TeamWithActions, Team, Action, Planning as Plan } from "../../../types";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -42,37 +41,25 @@ export default function Planning({
   });
 
   const [generatingPdfForTeam, setGeneratingPdfForTeam] = useState<string | null>(null);
-  const [isMobileConnected, setIsMobileConnected] = useState(false);
 
-  // 1. Écouter la connexion mobile
+  // Note: Les listeners pour 'mobile-connected' et 'mobile-disconnected' sont gérés de manière centralisée
+  // dans Data.tsx pour éviter les doublons et les toasts multiples
+  // Planning écoute les événements custom émis par Data.tsx
   useEffect(() => {
-    const unlistenConnect = listen("mobile-connected", () => {
-      console.log("📱 Mobile connecté !");
-      setIsMobileConnected(true);
-      if (syncState.step === "waiting_for_scan") {
-        toast.success("Mobile connecté !");
+    const handleMobileConnected = () => {
+      // Déclencher l'envoi si on est en attente
+      if (syncState.step === "waiting_for_scan" && syncState.teamId) {
+        console.log("🚀 Connexion détectée, lancement de l'envoi...");
+        sendPlanningToTeam(syncState.teamId, syncState.teamName!);
       }
-    });
+    };
 
-    const unlistenDisconnect = listen("mobile-disconnected", () => {
-      console.log("👋 Mobile déconnecté !");
-      setIsMobileConnected(false);
-    });
+    window.addEventListener("app-mobile-connected", handleMobileConnected);
 
     return () => {
-      unlistenConnect.then((fn) => fn());
-      unlistenDisconnect.then((fn) => fn());
+      window.removeEventListener("app-mobile-connected", handleMobileConnected);
     };
-  }, [syncState.step]);
-
-  // 2. Réagir automatiquement à la connexion pour envoyer le planning
-  useEffect(() => {
-    if (syncState.step === "waiting_for_scan" && isMobileConnected && syncState.teamId) {
-      console.log("🚀 Connexion détectée, lancement de l'envoi...");
-      sendPlanningToTeam(syncState.teamId, syncState.teamName!);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMobileConnected, syncState.step, syncState.teamId]);
+  }, [syncState.step, syncState.teamId, syncState.teamName, sendPlanningToTeam]);
 
   // Charger les données
   const loadTeamsWithActions = useCallback(async () => {
@@ -149,7 +136,7 @@ export default function Planning({
   }, []);
 
   // 4. Fonction d'envoi réelle
-  const sendPlanningToTeam = async (teamId: string, teamName: string) => {
+  const sendPlanningToTeam = useCallback(async (teamId: string, teamName: string) => {
     setSyncState(prev => ({ ...prev, step: "sending" }));
 
     try {
@@ -182,11 +169,10 @@ export default function Planning({
       }));
       toast.error(`Erreur lors de l'envoi : ${error}`);
     }
-  };
+  }, []);
 
   const closeSyncModal = () => {
     setSyncState({ step: "idle", teamId: null, teamName: null, qrCodeBase64: null, errorMessage: null });
-    setIsMobileConnected(false);
   };
 
   const generateTeamPDF = useCallback(async (teamId: string, teamName: string) => {

@@ -199,7 +199,7 @@ function App() {
           {/* Data - kept mounted once visited */}
           {hasVisited("data") && (
             <PageWrapper isVisible={currentPage === "data"}>
-              <Data />
+              <Data selectedEventId={selectedEventId} />
             </PageWrapper>
           )}
 

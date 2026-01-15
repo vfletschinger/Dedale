@@ -90,17 +90,12 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
 
   // Écouter les événements de réception de points
   useEffect(() => {
-    let unlistenConnectedFn: (() => void) | null = null;
     let unlistenPointsUpdatedFn: (() => void) | null = null;
     let isMounted = true;
 
     const setupListeners = async () => {
-      unlistenConnectedFn = await listen("mobile-connected", () => {
-        if (!isMounted) return;
-        console.log("Mobile connecté pour réception !");
-        setReceiveStatus("Mobile connecté ! En attente des données...");
-        toast.success("Mobile connecté !");
-      });
+      // Note: Le listener pour 'mobile-connected' est maintenant géré dans Data.tsx
+      // pour éviter les doublons de toasts
 
       unlistenPointsUpdatedFn = await listen<number>(
         "points-updated",
@@ -117,7 +112,6 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
 
     return () => {
       isMounted = false;
-      if (unlistenConnectedFn) unlistenConnectedFn();
       if (unlistenPointsUpdatedFn) unlistenPointsUpdatedFn();
     };
   }, []);
