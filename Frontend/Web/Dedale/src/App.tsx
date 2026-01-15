@@ -10,6 +10,11 @@ import Map from "./components/Map";
 import Event from "./components/Events";
 import AdminForm from "./components/AdminForm";
 import Persons from "./components/Persons";
+import Planning from "./components/Planning";
+import { Event as AppEvent } from "./components/Events";
+
+import LoadingScreen from "./components/LoadingScreen";
+import { Toaster } from 'react-hot-toast';
 
 // Wrapper pour cacher une page tout en la gardant montée
 function PageWrapper({
@@ -43,19 +48,14 @@ function PageWrapper({
   );
 }
 
-interface AppEvent {
-  id: number;
-  name: string;
-  statut: string;
-}
-
 function App() {
-  const { currentPage, navigate, goBack, canGoBack, hasVisited } = useNavigation("event");
-  const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
+  const { currentPage, navigate, goBack, canGoBack, hasVisited, reset } = useNavigation("event");
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [events, setEvents] = useState<AppEvent[]>([]);
   const [firstLaunch, setFirstLaunch] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
 
-  const handleEventClick = (eventId: number) => {
+  const handleEventClick = (eventId: string) => {
     setSelectedEventId(eventId);
     navigate("map");
   };
@@ -64,6 +64,7 @@ function App() {
   useEffect(() => {
     const unlisten = listen('first-launch', () => {
       setFirstLaunch(true);
+      setIsInitializing(false);
     });
 
     (async () => {
@@ -74,11 +75,15 @@ function App() {
         }
       } catch {
         // ignore
+      } finally {
+        setTimeout(() => {
+          setIsInitializing(false);
+        }, 500);
       }
     })();
 
     return () => {
-      unlisten.then(f => f()).catch(() => { });
+      unlisten.then(f => typeof f === 'function' && f()).catch(() => { });
     };
   }, []);
 
@@ -94,16 +99,16 @@ function App() {
     });
 
     // Si on demande d'aller voir un event
-    const unlistenMap = listen<{ eventId: number }>('navigate-to-map', (event) => {
+    const unlistenMap = listen<{ eventId: string }>('navigate-to-map', (event) => {
       const targetEventId = event.payload.eventId;
       setSelectedEventId(targetEventId);
       navigate("map");
     });
 
     return () => {
-      unlistenTeam.then(f => f());
-      unlistenPerson.then(f => f());
-      unlistenMap.then(f => f());
+      unlistenTeam.then(f => typeof f === 'function' && f());
+      unlistenPerson.then(f => typeof f === 'function' && f());
+      unlistenMap.then(f => typeof f === 'function' && f());
     };
   }, [navigate]);
 
@@ -116,7 +121,15 @@ function App() {
     }
   }
 
+  function handleDeselection() {
+    setSelectedEventId(null);
+    navigate("event");
+    reset();
+  }
 
+  if (isInitializing) {
+    return <LoadingScreen />;
+  }
 
   // Si c'est le premier lancement, afficher le formulaire admin
   if (firstLaunch) {
@@ -135,18 +148,23 @@ function App() {
 
   return (
     <div className="w-full min-h-screen bg-linear-to-br from-slate-50 via-indigo-50 to-purple-50 font-sans relative overflow-hidden">
-      {/* Background decorative elements */}
-      <div className="absolute inset-0 bg-grid-slate-100 mask-[linear-gradient(0deg,white,rgba(255,255,255,0.6))] -z-10"></div>
-      <div className="absolute top-0 left-1/4 w-72 h-72 bg-blue-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"></div>
-      <div className="absolute top-0 right-1/4 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse animation-delay-1000"></div>
-      <div className="absolute bottom-0 left-1/3 w-72 h-72 bg-indigo-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse animation-delay-2000"></div>
-
+      <Toaster position="top-center" reverseOrder={false} />
       <header className="relative z-10">
         <Navigation
           currentPage={currentPage}
-          onNavigate={navigate}
+          onNavigate={(page) => {
+            // Empêcher la navigation vers map, team, person, data ou planning si aucun événement sélectionné
+            if (!selectedEventId && (page === "map" || page === "team" || page === "person" || page === "data" || page === "planning")) {
+              alert("Veuillez sélectionner un événement avant d'accéder à cette page.");
+              return;
+            }
+            navigate(page);
+          }}
           canGoBack={canGoBack}
           onGoBack={goBack}
+          eventSelected={selectedEventId === null || undefined ? false : true}
+          eventName={events.find(e => String(e.id) === selectedEventId)?.name}
+          deselectEvent={handleDeselection}
         />
       </header>
 
@@ -162,52 +180,57 @@ function App() {
         className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-8"
         style={{ display: currentPage === "map" ? "none" : "block" }}
       >
-        <div className="bg-white/60 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-8 min-h-[calc(100vh-12rem)]">
-          <div className="relative">
-            <div className="absolute inset-0 bg-linear-to-br from-blue-50/50 via-transparent to-purple-50/50 rounded-3xl -z-10"></div>
+        <div className="relative">
+          <div className="absolute inset-0 bg-linear-to-br from-blue-50/50 via-transparent to-purple-50/50 rounded-3xl -z-10"></div>
 
 
-            {/* Events - kept mounted once visited */}
-            {hasVisited("event") && (
-              <PageWrapper isVisible={currentPage === "event"}>
-                <Event onEventClick={handleEventClick} onEventsLoaded={setEvents} />
-              </PageWrapper>
-            )}
+          {/* Events - kept mounted once visited */}
+          {hasVisited("event") && (
+            <PageWrapper isVisible={currentPage === "event"}>
+              <Event onEventClick={handleEventClick} onEventsLoaded={setEvents} />
+            </PageWrapper>
+          )}
 
-            {/* Teams - kept mounted once visited */}
-            {hasVisited("team") && (
-              <PageWrapper isVisible={currentPage === "team"}>
-                <Teams />
-              </PageWrapper>
-            )}
+          {/* Teams - kept mounted once visited */}
+          {selectedEventId && hasVisited("team") && (
+            <PageWrapper isVisible={currentPage === "team"}>
+              <Teams activeEventId={selectedEventId} />
+            </PageWrapper>
+          )}
 
-            {/* Persons - kept mounted once visited */}
-            {hasVisited("person") && (
-              <PageWrapper isVisible={currentPage === "person"}>
-                <Persons />
-              </PageWrapper>
-            )}
+          {/* Persons - kept mounted once visited */}
+          {hasVisited("person") && (
+            <PageWrapper isVisible={currentPage === "person"}>
+              <Persons activeEventId={selectedEventId} />
+            </PageWrapper>
+          )}
 
-            {/* Data - kept mounted once visited */}
-            {hasVisited("data") && (
-              <PageWrapper isVisible={currentPage === "data"}>
-                <Data />
-              </PageWrapper>
-            )}
-          </div>
+          {/* Data - kept mounted once visited */}
+          {hasVisited("data") && (
+            <PageWrapper isVisible={currentPage === "data"}>
+              <Data />
+            </PageWrapper>
+          )}
+
+          {/* Planning - kept mounted once visited */}
+          {selectedEventId && hasVisited("planning") && (
+            <PageWrapper isVisible={currentPage === "planning"}>
+              <Planning activeEventId={selectedEventId} />
+            </PageWrapper>
+          )}
         </div>
       </main>
 
       {currentPage === "event" && (
-        <div className="fixed bottom-6 right-6 z-50 bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-white/30 p-4">
+        <div className="fixed bottom-6 right-6 z-50 bg-gray-900 rounded-2xl shadow-xl border border-gray-800 p-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-linear-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold">
+            <div className="w-10 h-10 bg-secondary rounded-full flex items-center justify-center text-gray-900 font-bold">
               {events.length}
             </div>
             <div>
-              <div className="text-sm font-semibold text-gray-800">Total Events</div>
-              <div className="text-xs text-gray-500">
-                {events.filter((e) => e.statut === 'active' || e.statut === 'Actif').length} actifs
+              <div className="text-sm font-semibold text-white">Événements au total</div>
+              <div className="text-xs text-gray-400">
+                {events.filter((e) => e.statut === 'active' || e.statut === 'Actif').length} actif(s)
               </div>
             </div>
           </div>

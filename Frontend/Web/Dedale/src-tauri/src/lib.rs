@@ -1,46 +1,45 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-use tauri::Emitter;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 mod db;
 mod excel;
+mod geocoding;
 mod map;
 mod map_static;
 mod pdf;
 mod seed;
 mod socket;
+mod types;
 mod utils;
+
+#[cfg(test)]
+mod tests;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
-            let handle = app.handle();
-            // At startup: run DB seed (idempotent) and check if this is the first launch (no users in DB).
-            tauri::async_runtime::block_on(async {
-                // Ensure schema exists (idempotent) and run seed. Keep output minimal: only show errors.
-                match db::get_db_pool(handle).await {
+            let handle = app.handle().clone();
+
+            // Exécution asynchrone pour ne pas bloquer le thread principal au démarrage
+            tauri::async_runtime::spawn(async move {
+                // 1. Initialisation de la base de données
+                match db::get_db_pool(&handle).await {
                     Ok(pool) => {
-                        if let Err(e) = db::ensure_schema(&pool).await {
-                            eprintln!("[db] ensure_schema error: {}", e);
-                        }
+                        // 2. Seeding (idempotent)
 
-                        if let Err(e) = seed::seed_database(&pool).await {
-                            eprintln!("[seed] error during seeding: {}", e);
-                        }
-
-                        // Notify all windows that this might be a first launch.
+                        // 3. Vérification du premier lancement
                         match db::is_first_launch(&pool).await {
                             Ok(true) => {
                                 if let Some(window) = handle.get_webview_window("main") {
                                     let _ = window.emit("first-launch", true);
                                 }
                             }
-                            Ok(false) => {}
-                            Err(e) => eprintln!("[db] is_first_launch error: {}", e),
+                            Ok(false) => (),
+                            Err(e) => eprintln!("[db] Erreur is_first_launch : {}", e),
                         }
                     }
-                    Err(e) => eprintln!("[db] get_db_pool error: {}", e),
+                    Err(e) => eprintln!("[db] Erreur get_db_pool : {}", e),
                 }
             });
 
@@ -52,12 +51,14 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             excel::export_points_excel,
             pdf::create_pdf,
+            pdf::create_team_mission_pdf,
             map::get_points,
             socket::start_server,
             socket::send_event_to_mobile,
+            socket::terminate_server,
             socket::start_receive_server,
+            socket::start_server_planning,
             db::fetch_obstacle_types,
-            db::insert_obstacles,
             db::delete_point,
             db::insert_point,
             db::is_first_launch_cmd,
@@ -85,11 +86,45 @@ pub fn run() {
             db::update_person,
             db::update_team,
             db::fetch_geometries_for_event,
-            db::create_geometry,
             db::delete_geometry,
             db::update_geometry,
-            db::update_point_dates
+            db::update_point_dates,
+            db::update_parcours,
+            db::update_zone,
+            db::create_zone,
+            db::create_parcours,
+            db::delete_zone,
+            db::delete_parcours,
+            db::fetch_points,
+            db::update_point,
+            db::fetch_zones_for_event,
+            db::fetch_parcours_for_event,
+            db::create_interest_point,
+            db::update_interest_point,
+            db::delete_interest_point,
+            db::fetch_interest_points,
+            // Équipements
+            db::fetch_equipment_types,
+            db::create_equipment_type,
+            db::seed_default_equipment_types,
+            db::create_equipement,
+            db::fetch_equipements_for_event,
+            db::delete_equipement,
+            db::update_equipement,
+            db::add_action,
+            db::fetch_actions,
+            db::delete_action,
+            db::fetch_team_actions,
+            geocoding::search_address,
+            db::fetch_teams_for_event,
+            db::fetch_actions_for_team,
+            db::fetch_actions_for_equipement,
+            db::update_action_status,
+            db::export_planning_excel,
+            db::create_planning_pdf,
+            db::send_equipements_to_mobile,
+            db::send_planning,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .expect("Erreur lors de l'exécution de l'application Tauri");
 }

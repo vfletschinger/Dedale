@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { Event, EventInput, EventGeometryInput, GeometryType } from '../types/event';
+import type { Event, EventInput, EventGeometryInput } from '../types/event';
 
 // ========== SERVICES POUR LES ÉVÉNEMENTS ==========
 
@@ -7,18 +7,18 @@ import type { Event, EventInput, EventGeometryInput, GeometryType } from '../typ
  * Récupère tous les événements avec leurs géométries
  */
 export async function fetchEvents(): Promise<Event[]> {
-    try {
-        return await invoke('fetch_events');
-    } catch (error) {
-        console.error('Erreur lors de la récupération des événements:', error);
-        throw new Error(`Impossible de récupérer les événements: ${error}`);
-    }
+  try {
+    return await invoke("fetch_events");
+  } catch (error) {
+    console.error("Erreur lors de la récupération des événements:", error);
+    throw new Error(`Impossible de récupérer les événements: ${error}`);
+  }
 }
 
 /**
  * Récupère un événement par son ID avec ses géométries
  */
-export async function fetchEventById(eventId: number): Promise<Event | null> {
+export async function fetchEventById(eventId: string): Promise<Event | null> {
     try {
         return await invoke('fetch_event_by_id', { eventId });
     } catch (error) {
@@ -30,7 +30,7 @@ export async function fetchEventById(eventId: number): Promise<Event | null> {
 /**
  * Crée un nouvel événement
  */
-export async function createEvent(event: EventInput): Promise<number> {
+export async function createEvent(event: EventInput): Promise<string> {
     try {
         return await invoke('create_event', { event });
     } catch (error) {
@@ -42,7 +42,7 @@ export async function createEvent(event: EventInput): Promise<number> {
 /**
  * Met à jour un événement existant
  */
-export async function updateEvent(eventId: number, event: EventInput): Promise<void> {
+export async function updateEvent(eventId: string, event: EventInput): Promise<void> {
     try {
         await invoke('update_event', { eventId, event });
     } catch (error) {
@@ -54,7 +54,7 @@ export async function updateEvent(eventId: number, event: EventInput): Promise<v
 /**
  * Supprime un événement
  */
-export async function deleteEvent(eventId: number): Promise<void> {
+export async function deleteEvent(eventId: string): Promise<void> {
     try {
         await invoke('delete_event', { eventId });
     } catch (error) {
@@ -63,56 +63,51 @@ export async function deleteEvent(eventId: number): Promise<void> {
     }
 }
 
-// ========== SERVICES POUR LES TYPES DE GÉOMÉTRIE ==========
-
-/**
- * Récupère tous les types de géométries disponibles
- */
-export async function fetchGeometryTypes(): Promise<GeometryType[]> {
-    try {
-        return await invoke('fetch_geometry_types');
-    } catch (error) {
-        console.error('Erreur lors de la récupération des types de géométrie:', error);
-        throw new Error(`Impossible de récupérer les types de géométrie: ${error}`);
-    }
-}
-
 // ========== SERVICES POUR LES GÉOMÉTRIES D'ÉVÉNEMENTS ==========
 
 /**
  * Crée une nouvelle géométrie pour un événement
  */
-export async function createEventGeometry(geometry: EventGeometryInput): Promise<number> {
-    try {
-        return await invoke('create_event_geometry', { geometry });
-    } catch (error) {
-        console.error('Erreur lors de la création de la géométrie:', error);
-        throw new Error(`Impossible de créer la géométrie: ${error}`);
-    }
+export async function createEventGeometry(
+  geometry: EventGeometryInput,
+): Promise<string> {
+  try {
+    return await invoke("create_event_geometry", { geometry });
+  } catch (error) {
+    console.error("Erreur lors de la création de la géométrie:", error);
+    throw new Error(`Impossible de créer la géométrie: ${error}`);
+  }
 }
 
 /**
  * Met à jour une géométrie d'événement existante
  */
-export async function updateEventGeometry(geometryId: number, geometry: EventGeometryInput): Promise<void> {
-    try {
-        await invoke('update_event_geometry', { geometryId, geometry });
-    } catch (error) {
-        console.error('Erreur lors de la mise à jour de la géométrie:', error);
-        throw new Error(`Impossible de mettre à jour la géométrie ${geometryId}: ${error}`);
-    }
+export async function updateEventGeometry(
+  geometryId: string,
+  geometry: EventGeometryInput,
+): Promise<void> {
+  try {
+    await invoke("update_event_geometry", { geometryId, geometry });
+  } catch (error) {
+    console.error("Erreur lors de la mise à jour de la géométrie:", error);
+    throw new Error(
+      `Impossible de mettre à jour la géométrie ${geometryId}: ${error}`,
+    );
+  }
 }
 
 /**
  * Supprime une géométrie d'événement
  */
-export async function deleteEventGeometry(geometryId: number): Promise<void> {
-    try {
-        await invoke('delete_event_geometry', { geometryId });
-    } catch (error) {
-        console.error('Erreur lors de la suppression de la géométrie:', error);
-        throw new Error(`Impossible de supprimer la géométrie ${geometryId}: ${error}`);
-    }
+export async function deleteEventGeometry(geometryId: string): Promise<void> {
+  try {
+    await invoke("delete_event_geometry", { geometryId });
+  } catch (error) {
+    console.error("Erreur lors de la suppression de la géométrie:", error);
+    throw new Error(
+      `Impossible de supprimer la géométrie ${geometryId}: ${error}`,
+    );
+  }
 }
 
 // ========== UTILITAIRES ==========
@@ -122,7 +117,7 @@ export async function deleteEventGeometry(geometryId: number): Promise<void> {
  */
 export function parseStyleProperties(stylePropertiesJson?: string): Record<string, unknown> | null {
     if (!stylePropertiesJson) return null;
-    
+
     try {
         return JSON.parse(stylePropertiesJson);
     } catch (error) {
@@ -134,8 +129,10 @@ export function parseStyleProperties(stylePropertiesJson?: string): Record<strin
 /**
  * Stringify les propriétés de style pour la base de données
  */
-export function stringifyStyleProperties(styleProperties: Record<string, unknown>): string {
-    return JSON.stringify(styleProperties);
+export function stringifyStyleProperties(
+  styleProperties: Record<string, unknown>,
+): string {
+  return JSON.stringify(styleProperties);
 }
 
 /**
@@ -152,7 +149,7 @@ export function getDefaultColorForGeometryType(geometryTypeId: number): string {
         7: '#FFEB3B', // Ligne de départ/arrivée - Jaune
         8: '#795548', // Zone logistique - Marron
     };
-    
+
     return colorMap[geometryTypeId] || '#000000';
 }
 
@@ -163,13 +160,13 @@ export function validateWKT(wkt: string): boolean {
     if (!wkt || wkt.trim().length === 0) {
         return false;
     }
-    
+
     // Vérifications basiques pour les formats WKT courants
     const wktUpper = wkt.trim().toUpperCase();
     const validTypes = [
-        'POINT', 'LINESTRING', 'POLYGON', 'MULTIPOINT', 
+        'POINT', 'LINESTRING', 'POLYGON', 'MULTIPOINT',
         'MULTILINESTRING', 'MULTIPOLYGON', 'GEOMETRYCOLLECTION'
     ];
-    
+
     return validTypes.some(type => wktUpper.startsWith(type));
 }

@@ -352,6 +352,7 @@ export const migrations: Migration[] = [
           point_id TEXT NOT NULL,
           type_id INTEGER NOT NULL,
           quantity INTEGER DEFAULT 1,
+          description TEXT,
           FOREIGN KEY (point_id) REFERENCES point_new (id) ON DELETE CASCADE,
           FOREIGN KEY (type_id) REFERENCES equipement_type (id)
         );
@@ -384,6 +385,7 @@ export const migrations: Migration[] = [
           id TEXT PRIMARY KEY NOT NULL,
           event_id TEXT NOT NULL,
           wkt TEXT NOT NULL,
+          description TEXT,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY (event_id) REFERENCES event_new (id) ON DELETE CASCADE
         );
@@ -617,6 +619,299 @@ export const migrations: Migration[] = [
       db.execSync(
         "CREATE INDEX IF NOT EXISTS idx_member_person_id ON member(person_id)"
       );
+    },
+  },
+  {
+    version: 4,
+    name: "add_name_type_status_to_point",
+    up: (db: SQLiteDatabase) => {
+      console.log(
+        "🔄 Migration v4: Ajout des colonnes name, type et status à la table point"
+      );
+
+      // Vérifier si les colonnes existent déjà
+      const tableInfo = db.getAllSync("PRAGMA table_info(point)");
+      const columnNames = tableInfo.map((col: any) => col.name);
+
+      // Ajouter la colonne name si elle n'existe pas
+      if (!columnNames.includes("name")) {
+        db.execSync("ALTER TABLE point ADD COLUMN name TEXT DEFAULT 'Point'");
+        console.log("✅ Colonne 'name' ajoutée à la table point");
+      }
+
+      // Ajouter la colonne type si elle n'existe pas
+      if (!columnNames.includes("type")) {
+        db.execSync("ALTER TABLE point ADD COLUMN type TEXT");
+        console.log("✅ Colonne 'type' ajoutée à la table point");
+      }
+
+      // Ajouter la colonne status si elle n'existe pas
+      if (!columnNames.includes("status")) {
+        db.execSync("ALTER TABLE point ADD COLUMN status INTEGER DEFAULT 0");
+        console.log("✅ Colonne 'status' ajoutée à la table point");
+      }
+
+      console.log("✅ Migration v4 terminée");
+    },
+  },
+  {
+    version: 5,
+    name: "create_action_table",
+    up: (db: SQLiteDatabase) => {
+      console.log("🔄 Migration v5: Création de la table action");
+
+      db.execSync(`
+        CREATE TABLE IF NOT EXISTS action (
+          id TEXT PRIMARY KEY,
+          team_id TEXT NOT NULL,
+          equipement_id TEXT NOT NULL,
+          type TEXT,
+          scheduled_time DATETIME,
+          is_done INTEGER DEFAULT 0,
+          FOREIGN KEY (team_id) REFERENCES team (id) ON DELETE CASCADE,
+          FOREIGN KEY (equipement_id) REFERENCES equipement (id) ON DELETE CASCADE
+        )
+      `);
+
+      db.execSync(
+        "CREATE INDEX IF NOT EXISTS idx_action_team_id ON action(team_id)"
+      );
+      db.execSync(
+        "CREATE INDEX IF NOT EXISTS idx_action_equipement_id ON action(equipement_id)"
+      );
+
+      console.log("✅ Migration v5 terminée");
+    },
+  },
+  {
+    version: 6,
+    name: "update_equipement_for_uuid_type",
+    up: (db: SQLiteDatabase) => {
+      console.log("🔄 Migration v6: Mise à jour table equipement pour UUID type_id");
+
+      // Vérifier les colonnes existantes de la table equipement
+      const tableInfo = db.getAllSync("PRAGMA table_info(equipement)");
+      console.log("📋 Colonnes de la table equipement:", JSON.stringify(tableInfo));
+      const columnNames = tableInfo.map((col: any) => col.name);
+      const hasLengthColumn = columnNames.includes("length");
+      console.log("📋 Colonne 'length' existe:", hasLengthColumn);
+
+      // Recréer la table equipement avec type_id en TEXT et point_id nullable
+      db.execSync(`
+        CREATE TABLE IF NOT EXISTS equipement_new (
+          id TEXT PRIMARY KEY NOT NULL,
+          point_id TEXT,
+          type_id TEXT,
+          quantity INTEGER DEFAULT 1,
+          length_per_unit REAL DEFAULT 0,
+          date_pose DATETIME,
+          date_depose DATETIME,
+          event_id TEXT,
+          FOREIGN KEY (point_id) REFERENCES point (id) ON DELETE SET NULL,
+          FOREIGN KEY (event_id) REFERENCES event (id) ON DELETE CASCADE
+        )
+      `);
+
+      // Copier les données existantes (avec ou sans colonne length)
+      if (hasLengthColumn) {
+        db.execSync(`
+          INSERT OR IGNORE INTO equipement_new (id, point_id, type_id, quantity, length_per_unit)
+          SELECT id, point_id, CAST(type_id AS TEXT), quantity, COALESCE(length, 0)
+          FROM equipement
+        `);
+      } else {
+        db.execSync(`
+          INSERT OR IGNORE INTO equipement_new (id, point_id, type_id, quantity, length_per_unit)
+          SELECT id, point_id, CAST(type_id AS TEXT), quantity, 0
+          FROM equipement
+        `);
+      }
+
+      // Supprimer l'ancienne table et renommer
+      db.execSync(`DROP TABLE IF EXISTS equipement`);
+      db.execSync(`ALTER TABLE equipement_new RENAME TO equipement`);
+
+      // Table equipement_type avec UUID
+      db.execSync(`
+        CREATE TABLE IF NOT EXISTS equipement_type_new (
+          id TEXT PRIMARY KEY NOT NULL,
+          name VARCHAR(100) NOT NULL,
+          description TEXT,
+          width REAL,
+          length REAL
+        )
+      `);
+
+      // Copier les types existants avec UUID généré
+      const existingTypes = db.getAllSync<{ id: number; name: string; description: string; width: number; length: number }>(
+        "SELECT * FROM equipement_type"
+      );
+      for (const type of existingTypes) {
+        db.runSync(
+          "INSERT OR IGNORE INTO equipement_type_new (id, name, description, width, length) VALUES (?, ?, ?, ?, ?)",
+          [String(type.id), type.name, type.description, type.width, type.length]
+        );
+      }
+
+      db.execSync(`DROP TABLE IF EXISTS equipement_type`);
+      db.execSync(`ALTER TABLE equipement_type_new RENAME TO equipement_type`);
+
+      // Table pour stocker les coordonnées des équipements
+      db.execSync(`
+        CREATE TABLE IF NOT EXISTS equipement_coordinate (
+          id TEXT PRIMARY KEY NOT NULL,
+          equipement_id TEXT NOT NULL,
+          x REAL NOT NULL,
+          y REAL NOT NULL,
+          order_index INTEGER DEFAULT 0,
+          FOREIGN KEY (equipement_id) REFERENCES equipement (id) ON DELETE CASCADE
+        )
+      `);
+
+      db.execSync(
+        "CREATE INDEX IF NOT EXISTS idx_equipement_coord_equipement_id ON equipement_coordinate(equipement_id)"
+      );
+
+      console.log("✅ Migration v6 terminée");
+    },
+  },
+  {
+    version: 7,
+    name: "align_with_tauri_schema",
+    up: (db: SQLiteDatabase) => {
+      console.log("🔄 Migration v7: Alignement avec le schéma Tauri");
+
+      // 1. Recréer la table equipement conforme au schéma Tauri
+      db.execSync(`
+        CREATE TABLE IF NOT EXISTS equipement_v7 (
+          id TEXT PRIMARY KEY NOT NULL,
+          event_id TEXT NOT NULL,
+          type_id TEXT,
+          quantity INTEGER DEFAULT 1,
+          length_per_unit REAL DEFAULT 0,
+          date_pose DATETIME,
+          date_depose DATETIME,
+          FOREIGN KEY (event_id) REFERENCES event (id) ON DELETE CASCADE,
+          FOREIGN KEY (type_id) REFERENCES type (id)
+        )
+      `);
+
+      // Copier les données existantes (gérer les deux cas: length ou length_per_unit)
+      try {
+        // Essayer d'abord avec length_per_unit (si déjà migré partiellement)
+        db.execSync(`
+          INSERT OR IGNORE INTO equipement_v7 (id, event_id, type_id, quantity, length_per_unit, date_pose, date_depose)
+          SELECT id, COALESCE(event_id, ''), type_id, quantity, COALESCE(length_per_unit, 0), date_pose, date_depose
+          FROM equipement
+        `);
+      } catch (e1) {
+        try {
+          // Sinon essayer avec length (ancien schéma)
+          db.execSync(`
+            INSERT OR IGNORE INTO equipement_v7 (id, event_id, type_id, quantity, length_per_unit, date_pose, date_depose)
+            SELECT id, COALESCE(event_id, ''), type_id, quantity, COALESCE(length, 0), date_pose, date_depose
+            FROM equipement
+          `);
+        } catch (e2) {
+          console.log("Pas de données equipement à migrer:", e2);
+        }
+      }
+
+      db.execSync(`DROP TABLE IF EXISTS equipement`);
+      db.execSync(`ALTER TABLE equipement_v7 RENAME TO equipement`);
+
+      // 2. Créer/recréer la table type (comme dans Tauri)
+      db.execSync(`
+        CREATE TABLE IF NOT EXISTS type (
+          id TEXT PRIMARY KEY NOT NULL,
+          name TEXT,
+          description TEXT
+        )
+      `);
+
+      // Migrer equipement_type vers type si existe
+      try {
+        const existingTypes = db.getAllSync<{ id: string; name: string; description: string }>(
+          "SELECT id, name, description FROM equipement_type"
+        );
+        for (const t of existingTypes) {
+          db.runSync(
+            "INSERT OR IGNORE INTO type (id, name, description) VALUES (?, ?, ?)",
+            [t.id, t.name, t.description]
+          );
+        }
+      } catch (e) {
+        console.log("Pas de table equipement_type à migrer");
+      }
+
+      // 3. Table person (conforme Tauri)
+      db.execSync(`
+        CREATE TABLE IF NOT EXISTS person (
+          id TEXT PRIMARY KEY NOT NULL,
+          firstname TEXT,
+          lastname TEXT,
+          email TEXT,
+          phone_number TEXT
+        )
+      `);
+
+      db.execSync(`
+        CREATE TABLE IF NOT EXISTS member (
+          id TEXT PRIMARY KEY NOT NULL,
+          team_id TEXT NOT NULL,
+          person_id TEXT NOT NULL,
+          FOREIGN KEY (team_id) REFERENCES team (id) ON DELETE CASCADE,
+          FOREIGN KEY (person_id) REFERENCES person (id) ON DELETE CASCADE,
+          UNIQUE(team_id, person_id)
+        )
+      `);
+
+      db.execSync(`
+        CREATE TABLE IF NOT EXISTS interest (
+          id TEXT PRIMARY KEY NOT NULL,
+          event_id TEXT NOT NULL,
+          x REAL NOT NULL,
+          y REAL NOT NULL,
+          description TEXT,
+          FOREIGN KEY (event_id) REFERENCES event (id) ON DELETE CASCADE
+        )
+      `);
+
+      db.execSync(`
+        CREATE TABLE IF NOT EXISTS action_v7 (
+          id TEXT PRIMARY KEY NOT NULL,
+          team_id TEXT NOT NULL,
+          equipement_id TEXT NOT NULL,
+          type TEXT,
+          scheduled_time DATETIME,
+          is_done INTEGER DEFAULT 0,
+          FOREIGN KEY (team_id) REFERENCES team (id) ON DELETE CASCADE,
+          FOREIGN KEY (equipement_id) REFERENCES equipement (id) ON DELETE CASCADE
+        )
+      `);
+
+      // Copier les actions existantes
+      try {
+        db.execSync(`
+          INSERT OR IGNORE INTO action_v7 (id, team_id, equipement_id, type, scheduled_time, is_done)
+          SELECT id, team_id, equipement_id, type, scheduled_time, is_done
+          FROM action
+        `);
+        db.execSync(`DROP TABLE IF EXISTS action`);
+      } catch (e) {
+        console.log("Pas de table action existante");
+      }
+      db.execSync(`ALTER TABLE action_v7 RENAME TO action`);
+
+      // Index pour les performances
+      db.execSync("CREATE INDEX IF NOT EXISTS idx_equipement_event_id ON equipement(event_id)");
+      db.execSync("CREATE INDEX IF NOT EXISTS idx_equipement_type_id ON equipement(type_id)");
+      db.execSync("CREATE INDEX IF NOT EXISTS idx_member_team_id ON member(team_id)");
+      db.execSync("CREATE INDEX IF NOT EXISTS idx_member_person_id ON member(person_id)");
+      db.execSync("CREATE INDEX IF NOT EXISTS idx_action_team_id ON action(team_id)");
+      db.execSync("CREATE INDEX IF NOT EXISTS idx_action_equipement_id ON action(equipement_id)");
+
+      console.log("✅ Migration v7 terminée - Schéma aligné avec Tauri");
     },
   },
 ];

@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import {
-  SafeAreaView,
   View,
   Text,
   TouchableOpacity,
@@ -21,6 +20,7 @@ import {
   PictureType,
   EquipementType,
 } from "../types/database";
+import Colors from "../constants/colors";
 
 type PointWithDetails = InterestPointsType & {
   pictures: PictureType[];
@@ -30,6 +30,7 @@ type PointWithDetails = InterestPointsType & {
 type EventExportData = {
   event: any;
   points: PointWithDetails[];
+  equipements: EquipementType[];
 };
 
 export default function SettingsScreen() {
@@ -94,27 +95,33 @@ export default function SettingsScreen() {
         [eventId]
       );
 
-      // Pour chaque point, récupérer ses photos et équipements
+      // Pour chaque point, récupérer ses photos
       const pointsWithDetails: PointWithDetails[] = points.map((point) => {
         const pictures = db.getAllSync<PictureType>(
           "SELECT * FROM picture WHERE point_id = ?",
-          [point.id]
-        );
-        const equipements = db.getAllSync<EquipementType>(
-          "SELECT * FROM equipement WHERE point_id = ?",
           [point.id]
         );
 
         return {
           ...point,
           pictures,
-          equipements,
+          equipements: [], // Les équipements sont maintenant au niveau event
         };
       });
+
+      // Récupérer les équipements de l'événement avec leurs coordonnées
+      const equipements = db.getAllSync<EquipementType>(
+        `SELECT e.*, t.name, t.description 
+         FROM equipement e 
+         LEFT JOIN type t ON e.type_id = t.id 
+         WHERE e.event_id = ?`,
+        [eventId]
+      );
 
       return {
         event,
         points: pointsWithDetails,
+        equipements: equipements || [],
       };
     } catch (error) {
       console.error(
@@ -230,15 +237,15 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView className="container">
-      <View className="header header-row">
+    <View className="flex-1 bg-gray-50">
+      <View className="bg-primary pt-12 pb-6 px-4 shadow-sm flex-row items-center justify-between">
         {scanQR && (
           <TouchableOpacity onPress={() => setScanQR(false)} className="mr-4">
             <Feather name="arrow-left" size={24} color="white" />
           </TouchableOpacity>
         )}
         <View className="flex-row items-center flex-1">
-          <Text className="header-title">Settings</Text>
+          <Text className="text-accent text-2xl font-bold">Settings</Text>
         </View>
       </View>
 
@@ -259,7 +266,7 @@ export default function SettingsScreen() {
         <View className="flex-1 p-5">
           {/* Section Événement actuel */}
           <View style={isEventListExpanded ? { flex: 0.25 } : { flex: 0.33 }}>
-            <Text className="text-section-title mb-3">Événement actuel</Text>
+            <Text className="text-lg font-semibold mb-3">Événement actuel</Text>
             {selectedEvent ? (
               <EventItem
                 event={selectedEvent}
@@ -267,13 +274,15 @@ export default function SettingsScreen() {
                 navArrow={false}
               />
             ) : (
-              <Text className="text-caption">Aucun événement sélectionné</Text>
+              <Text className="text-sm text-gray-500">
+                Aucun événement sélectionné
+              </Text>
             )}
           </View>
 
           {/* Section Changer d'événement - dynamique */}
           <View
-            className="section-box"
+            className="bg-gray-100 p-4 rounded-lg mb-4"
             style={
               isEventListExpanded
                 ? { flex: 1, maxHeight: "50%" }
@@ -282,9 +291,11 @@ export default function SettingsScreen() {
           >
             <Pressable
               onPress={() => setIsEventListExpanded(!isEventListExpanded)}
-              className="section-header"
+              className="flex-row justify-between items-center mb-2"
             >
-              <Text className="text-section-title">Événements disponibles</Text>
+              <Text className="text-lg font-semibold">
+                Événements disponibles
+              </Text>
               <Feather
                 name={isEventListExpanded ? "chevron-up" : "chevron-down"}
                 size={20}
@@ -303,8 +314,8 @@ export default function SettingsScreen() {
                     }}
                     className={
                       item.id === selectedEventId
-                        ? "modal-select-item-active"
-                        : "modal-select-item"
+                        ? "flex-row items-center justify-between p-3 rounded-lg mb-2 bg-blue-50"
+                        : "flex-row items-center justify-between p-3 rounded-lg mb-2 bg-white"
                     }
                   >
                     <View className="flex-1">
@@ -314,7 +325,7 @@ export default function SettingsScreen() {
                       </Text>
                     </View>
                     {item.id === selectedEventId && (
-                      <View className="modal-checkbox">
+                      <View className="w-8 h-8 rounded-full items-center justify-center border border-gray-300">
                         <Text>✓</Text>
                       </View>
                     )}
@@ -322,7 +333,9 @@ export default function SettingsScreen() {
                 )}
               />
             ) : isEventListExpanded && events.length === 0 ? (
-              <Text className="text-caption">Aucun événement disponible</Text>
+              <Text className="text-sm text-gray-500">
+                Aucun événement disponible
+              </Text>
             ) : null}
           </View>
 
@@ -331,7 +344,7 @@ export default function SettingsScreen() {
             className="items-center justify-center"
             style={isEventListExpanded ? { flex: 0.25 } : { flex: 0.33 }}
           >
-            <Feather name="settings" size={48} color="#3b82f6" />
+            <Feather name="settings" size={48} color={Colors.secondary} />
             <Text className="text-lg font-bold text-gray-800 mt-3 mb-2 text-center">
               Data Synchronization
             </Text>
@@ -376,6 +389,6 @@ export default function SettingsScreen() {
           </View>
         </View>
       )}
-    </SafeAreaView>
+    </View>
   );
 }

@@ -4,16 +4,6 @@ export async function seedDatabase(db: SQLiteDatabase) {
   console.log("Début du seeding...");
 
   try {
-    // Vérifier si des données existent déjà
-    const existingPoints = db.getFirstSync<{ count: number }>(
-      "SELECT COUNT(*) as count FROM point"
-    );
-
-    if (existingPoints && existingPoints.count > 0) {
-      console.log("Des données existent déjà, seeding annulé");
-      return;
-    }
-
     // Helper to generate UUID
     const generateUUID = () => {
       return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
@@ -22,6 +12,136 @@ export async function seedDatabase(db: SQLiteDatabase) {
         return v.toString(16);
       });
     };
+
+    // Vérifier si des données existent déjà
+    const existingPoints = db.getFirstSync<{ count: number }>(
+      "SELECT COUNT(*) as count FROM point"
+    );
+
+    // Si des points existent, faire un seeding partiel (équipes/actions seulement)
+    if (existingPoints && existingPoints.count > 0) {
+      console.log(
+        "Des points existent déjà, seeding partiel (équipes/actions)..."
+      );
+
+      // Vérifier si des équipes existent
+      const existingTeams = db.getFirstSync<{ count: number }>(
+        "SELECT COUNT(*) as count FROM team"
+      );
+
+      if (!existingTeams || existingTeams.count === 0) {
+        // Récupérer les events existants
+        const existingEvents = db.getAllSync<{ id: string }>(
+          "SELECT id FROM event LIMIT 3"
+        );
+
+        if (existingEvents.length > 0) {
+          console.log("Insertion des équipes...");
+          const teams = [
+            {
+              id: generateUUID(),
+              event_id: existingEvents[0].id,
+              name: "Équipe Alpha",
+            },
+            {
+              id: generateUUID(),
+              event_id: existingEvents[0].id,
+              name: "Équipe Bravo",
+            },
+            existingEvents[1]
+              ? {
+                  id: generateUUID(),
+                  event_id: existingEvents[1].id,
+                  name: "Équipe Illkirch",
+                }
+              : null,
+          ].filter(Boolean) as { id: string; event_id: string; name: string }[];
+
+          teams.forEach((team) => {
+            db.runSync(
+              "INSERT INTO team (id, event_id, name) VALUES (?, ?, ?)",
+              [team.id, team.event_id, team.name]
+            );
+          });
+        }
+      }
+
+      // Vérifier si des actions existent
+      const existingActions = db.getFirstSync<{ count: number }>(
+        "SELECT COUNT(*) as count FROM action"
+      );
+
+      if (!existingActions || existingActions.count === 0) {
+        const teamIds = db.getAllSync<{ id: string }>(
+          "SELECT id FROM team LIMIT 5"
+        );
+        const equipementIds = db.getAllSync<{ id: string }>(
+          "SELECT id FROM equipement LIMIT 5"
+        );
+
+        if (teamIds.length > 0 && equipementIds.length > 0) {
+          console.log("Insertion des actions...");
+          const actions = [
+            {
+              id: generateUUID(),
+              team_id: teamIds[0].id,
+              equipement_id: equipementIds[0].id,
+              type: "déploiement",
+              scheduled_time: new Date().toISOString(),
+              is_done: 0,
+            },
+            teamIds[1] && equipementIds[1]
+              ? {
+                  id: generateUUID(),
+                  team_id: teamIds[1].id,
+                  equipement_id: equipementIds[1].id,
+                  type: "retrait",
+                  scheduled_time: new Date(
+                    Date.now() + 3600 * 1000
+                  ).toISOString(),
+                  is_done: 0,
+                }
+              : null,
+            teamIds[2] && equipementIds[2]
+              ? {
+                  id: generateUUID(),
+                  team_id: teamIds[2].id,
+                  equipement_id: equipementIds[2].id,
+                  type: "inspection",
+                  scheduled_time: new Date(
+                    Date.now() + 2 * 3600 * 1000
+                  ).toISOString(),
+                  is_done: 1,
+                }
+              : null,
+          ].filter(Boolean) as {
+            id: string;
+            team_id: string;
+            equipement_id: string;
+            type: string;
+            scheduled_time: string;
+            is_done: number;
+          }[];
+
+          actions.forEach((action) => {
+            db.runSync(
+              "INSERT INTO action (id, team_id, equipement_id, type, scheduled_time, is_done) VALUES (?, ?, ?, ?, ?, ?)",
+              [
+                action.id,
+                action.team_id,
+                action.equipement_id,
+                action.type,
+                action.scheduled_time,
+                action.is_done,
+              ]
+            );
+          });
+        }
+      }
+
+      console.log("Seeding partiel terminé.");
+      return;
+    }
 
     // 1. Seed events (avec UUIDs)
     console.log("Insertion des événements...");
@@ -193,15 +313,24 @@ export async function seedDatabase(db: SQLiteDatabase) {
         width: 2,
         length: 16,
       },
+      {
+        id: 14,
+        name: "Véhicule",
+        description: "Véhicule de blocage ou de sécurisation",
+        width: 2,
+        length: 5,
+      },
     ];
 
-    const typeIds: number[] = [];
+    const typeIds: string[] = [];
     equipementTypes.forEach((type) => {
-      const result = db.runSync(
-        "INSERT INTO equipement_type (id, name, description, width, length) VALUES (?, ?, ?, ?, ?)",
-        [type.id, type.name, type.description, type.width, type.length]
-      );
-      typeIds.push(result.lastInsertRowId);
+      const typeId = generateUUID();
+      db.runSync("INSERT INTO type (id, name, description) VALUES (?, ?, ?)", [
+        typeId,
+        type.name,
+        type.description,
+      ]);
+      typeIds.push(typeId);
     });
 
     // 3. Seed points avec event_id direct et UUIDs
@@ -313,23 +442,92 @@ export async function seedDatabase(db: SQLiteDatabase) {
     // 5. Seed equipements (quelques exemples)
     console.log("Insertion des équipements...");
     const equipements = [
-      { point_id: pointIds[0], type_id: typeIds[0], quantity: 2 },
-      { point_id: pointIds[0], type_id: typeIds[4], quantity: 1 },
-      { point_id: pointIds[1], type_id: typeIds[2], quantity: 1 },
-      { point_id: pointIds[2], type_id: typeIds[1], quantity: 3 },
-      { point_id: pointIds[4], type_id: typeIds[5], quantity: 10 },
-      { point_id: pointIds[5], type_id: typeIds[6], quantity: 8 },
+      { event_id: eventIds[0], type_id: typeIds[0], quantity: 2 },
+      { event_id: eventIds[0], type_id: typeIds[4], quantity: 1 },
+      { event_id: eventIds[0], type_id: typeIds[2], quantity: 1 },
+      { event_id: eventIds[1], type_id: typeIds[1], quantity: 3 },
+      { event_id: eventIds[1], type_id: typeIds[5], quantity: 10 },
+      { event_id: eventIds[1], type_id: typeIds[6], quantity: 8 },
     ];
 
-    equipements.forEach((equipement) => {
+    const equipementIds: string[] = [];
+    equipements.forEach((equipement, index) => {
       const equipementId = generateUUID();
       db.runSync(
-        "INSERT INTO equipement (id, point_id, type_id, quantity) VALUES (?, ?, ?, ?)",
+        "INSERT INTO equipement (id, event_id, type_id, quantity, length_per_unit) VALUES (?, ?, ?, ?, ?)",
         [
           equipementId,
-          equipement.point_id,
+          equipement.event_id,
           equipement.type_id,
           equipement.quantity,
+          0,
+        ]
+      );
+      // Ajouter une coordonnée pour chaque équipement
+      const coordId = generateUUID();
+      const pointIndex = index % pointIds.length;
+      db.runSync(
+        "INSERT INTO equipement_coordinate (id, equipement_id, x, y, order_index) VALUES (?, ?, ?, ?, ?)",
+        [coordId, equipementId, 7.75 + index * 0.01, 48.57 + index * 0.01, 0]
+      );
+      equipementIds.push(equipementId);
+    });
+
+    // 6. Seed teams
+    console.log("Insertion des équipes...");
+    const teams = [
+      { id: generateUUID(), event_id: eventIds[0], name: "Équipe Alpha" },
+      { id: generateUUID(), event_id: eventIds[0], name: "Équipe Bravo" },
+      { id: generateUUID(), event_id: eventIds[1], name: "Équipe Illkirch" },
+    ];
+
+    teams.forEach((team) => {
+      db.runSync("INSERT INTO team (id, event_id, name) VALUES (?, ?, ?)", [
+        team.id,
+        team.event_id,
+        team.name,
+      ]);
+    });
+
+    // 7. Seed actions (liées à des équipes et des équipements)
+    console.log("Insertion des actions...");
+    const actions = [
+      {
+        id: generateUUID(),
+        team_id: teams[0].id,
+        equipement_id: equipementIds[0],
+        type: "déploiement",
+        scheduled_time: new Date().toISOString(),
+        is_done: 0,
+      },
+      {
+        id: generateUUID(),
+        team_id: teams[1].id,
+        equipement_id: equipementIds[2],
+        type: "retrait",
+        scheduled_time: new Date(Date.now() + 3600 * 1000).toISOString(),
+        is_done: 0,
+      },
+      {
+        id: generateUUID(),
+        team_id: teams[2].id,
+        equipement_id: equipementIds[4],
+        type: "inspection",
+        scheduled_time: new Date(Date.now() + 2 * 3600 * 1000).toISOString(),
+        is_done: 1,
+      },
+    ];
+
+    actions.forEach((action) => {
+      db.runSync(
+        "INSERT INTO action (id, team_id, equipement_id, type, scheduled_time, is_done) VALUES (?, ?, ?, ?, ?, ?)",
+        [
+          action.id,
+          action.team_id,
+          action.equipement_id,
+          action.type,
+          action.scheduled_time,
+          action.is_done,
         ]
       );
     });
@@ -339,6 +537,8 @@ export async function seedDatabase(db: SQLiteDatabase) {
     console.log(`   - ${equipementTypes.length} types d'équipements`);
     console.log(`   - ${pointsData.length} points d'intérêt`);
     console.log(`   - ${equipements.length} équipements`);
+    console.log(`   - ${teams.length} équipes`);
+    console.log(`   - ${actions.length} actions`);
   } catch (error) {
     console.error("Erreur lors du seeding:", error);
     throw error;
@@ -387,8 +587,14 @@ export function clearDatabase(db: SQLiteDatabase): void {
     if (tableExists("equipement_type")) {
       db.execSync("DELETE FROM equipement_type");
     }
+    if (tableExists("type")) {
+      db.execSync("DELETE FROM type");
+    }
     if (tableExists("obstacle_type")) {
       db.execSync("DELETE FROM obstacle_type");
+    }
+    if (tableExists("equipement_coordinate")) {
+      db.execSync("DELETE FROM equipement_coordinate");
     }
 
     // New schema: parcours and zone

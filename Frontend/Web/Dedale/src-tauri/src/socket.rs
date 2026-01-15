@@ -1,14 +1,19 @@
-use crate::db::{get_db_pool, insert_point_details, PointDetail};
+#![allow(dead_code)]
+
+use crate::db::equipements::send_planning;
+use crate::db::{get_db_pool, insert_point, PointWithDetails};
+use crate::types::*;
 use base64::{engine::general_purpose, Engine as _};
-use image::Luma;
+use image::codecs::png::PngEncoder;
+use image::{ImageEncoder, Luma};
 use local_ip_address::local_ip;
 use once_cell::sync::Lazy;
 use qrcode::QrCode;
 use rand::Rng;
-use serde::{Deserialize, Serialize};
 use sqlx::{Row, Sqlite, Transaction};
 use std::io::Cursor;
 use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -16,126 +21,143 @@ use tauri::{AppHandle, Emitter};
 use tungstenite::accept;
 use tungstenite::Message;
 
-/// Canal global pour envoyer des événements au thread WebSocket
-static EVENT_SENDER: Lazy<Mutex<Option<Sender<TransferEvent>>>> = Lazy::new(|| Mutex::new(None));
+// ==================== Fonctions helper publiques et testables ====================
 
-/// Structure pour un event envoyé au mobile (avec noms camelCase pour compatibilité)
-#[derive(Debug, Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-struct TransferEvent {
-    id: i64,
-    name: String,
-    description: String,
-    date_debut: String,
-    date_fin: String,
-    statut: String,
-    geometry: Option<String>,
-}
-
-/// Structure pour un accusé de réception d'event du mobile
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[allow(dead_code)]
-struct EventAck {
-    id: i64,
-    name: String,
-    #[serde(default)]
-    description: Option<String>,
-    #[serde(default)]
-    date_debut: Option<String>,
-    #[serde(default)]
-    date_fin: Option<String>,
-    #[serde(default)]
-    statut: Option<String>,
-    #[serde(default)]
-    geometry: Option<String>,
-}
-
-/// Réponse envoyée au mobile
-#[derive(Debug, Serialize)]
-struct AckResponse {
-    code: i32,
-    message: String,
-}
-
-/// Action demandée par le mobile
-#[derive(Debug, Deserialize)]
-struct ClientAction {
-    action: String,
-}
-
-/// Structure pour l'export du mobile vers le desktop (event + points)
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct MobileExport {
-    event: MobileExportEvent,
-    points: Vec<MobilePointDetail>,
-}
-
-/// Structure pour un point dans l'export mobile (format différent du desktop)
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
-struct MobilePointDetail {
-    id: String, // UUID
-    x: f64,
-    y: f64,
-    #[serde(default)]
-    event_id: Option<i64>,
-    #[serde(default)]
-    comments: Vec<MobileComment>,
-    #[serde(default)]
-    pictures: Vec<MobilePicture>,
-    #[serde(default)]
-    obstacles: Vec<MobileObstacle>,
-}
-
-#[derive(Debug, Deserialize)]
-struct MobileComment {
-    id: String,       // UUID
-    point_id: String, // UUID reference
-    value: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct MobilePicture {
-    id: String,       // UUID
-    point_id: String, // UUID reference
-    image: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct MobileObstacle {
-    id: String,       // UUID
-    point_id: String, // UUID reference
-    type_id: i64,
-    number: i32,
-}
-
-/// Structure pour l'event dans l'export mobile
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[allow(dead_code)]
-struct MobileExportEvent {
-    id: i64,
-    name: String,
-    description: Option<String>,
-    date_debut: Option<String>,
-    date_fin: Option<String>,
-    statut: Option<String>,
-    geometry: Option<String>,
-    #[serde(default)]
-    calculated_status: Option<String>,
-}
-
-fn random_port() -> u16 {
+/// Génère un port aléatoire dans la plage valide (1025-65534)
+pub fn random_port() -> u16 {
     let mut rng = rand::rng();
     rng.random_range(1025..65535)
 }
 
+/// Génère des placeholders SQL pour une liste de valeurs (ex: "?, ?, ?")
+pub fn generate_sql_placeholders(count: usize) -> String {
+    if count == 0 {
+        return String::new();
+    }
+    vec!["?"; count].join(", ")
+}
+
+/// Construit une URI WebSocket
+pub fn build_websocket_uri(host: &str, port: u16, path: &str) -> String {
+    format!("ws://{}:{}{}", host, port, path)
+}
+
+/// Génère un QR code en base64 à partir d'une chaîne
+pub fn generate_qr_code_base64(data: &str) -> Result<String, String> {
+    let code =
+        QrCode::new(data.as_bytes()).map_err(|e| format!("Failed to create QR code: {}", e))?;
+
+    let img = code.render::<Luma<u8>>().build();
+
+    let mut buffer = Vec::new();
+    let encoder = PngEncoder::new(&mut buffer);
+
+    encoder
+        .write_image(
+            img.as_raw(),
+            img.width(),
+            img.height(),
+            image::ColorType::L8,
+        )
+        .map_err(|e| format!("Failed to encode QR code image: {}", e))?;
+
+    let base64_str = general_purpose::STANDARD.encode(&buffer);
+    Ok(format!("data:image/png;base64,{}", base64_str))
+}
+
+/// Crée une réponse d'accusé de réception
+pub fn create_ack_response(code: i32, message: &str) -> String {
+    let response = AckResponse {
+        code,
+        message: message.to_string(),
+    };
+    serde_json::to_string(&response)
+        .unwrap_or_else(|_| format!(r#"{{"code":{},"message":"{}"}}"#, code, message))
+}
+
+/// Parse un accusé de réception d'événement
+pub fn parse_event_ack(json_str: &str) -> Result<EventAck, String> {
+    serde_json::from_str(json_str).map_err(|e| format!("Failed to parse event ack: {}", e))
+}
+
+/// Sérialise une liste d'événements de transfert
+pub fn serialize_events(events: &[TransferEvent]) -> Result<String, String> {
+    serde_json::to_string(events).map_err(|e| format!("Failed to serialize events: {}", e))
+}
+
+/// Types de messages WebSocket
+#[derive(Debug, Clone, PartialEq)]
+pub enum WebSocketMessageType {
+    EventAck,
+    ExportData,
+    Action,
+    Unknown,
+}
+
+/// Identifie le type de message WebSocket
+pub fn identify_message_type(json_str: &str) -> WebSocketMessageType {
+    if json_str.contains("\"action\"") {
+        WebSocketMessageType::Action
+    } else if json_str.contains("\"event\"") && json_str.contains("\"points\"") {
+        WebSocketMessageType::ExportData
+    } else if json_str.contains("\"id\"") && json_str.contains("\"name\"") {
+        WebSocketMessageType::EventAck
+    } else {
+        WebSocketMessageType::Unknown
+    }
+}
+
+/// Crée un message d'erreur formaté
+pub fn create_error_message(code: i32, description: &str) -> String {
+    format!(
+        r#"{{"error":true,"code":{},"message":"{}"}}"#,
+        code, description
+    )
+}
+
+/// Crée une adresse socket à partir d'une IP et d'un port
+pub fn create_socket_addr(ip: IpAddr, port: u16) -> SocketAddr {
+    SocketAddr::new(ip, port)
+}
+
+/// Sérialise une réponse d'accusé de réception
+pub fn serialize_ack_response(code: i32, message: &str) -> String {
+    create_ack_response(code, message)
+}
+
+/// Construit une requête SQL pour récupérer des événements par IDs
+pub fn build_events_query(event_ids: &[i64]) -> String {
+    if event_ids.is_empty() {
+        return String::from("SELECT * FROM event WHERE 1=0");
+    }
+
+    let placeholders = generate_sql_placeholders(event_ids.len());
+    format!(
+        "SELECT id, name, description, date_debut, date_fin, statut, geometry FROM event WHERE id IN ({})",
+        placeholders
+    )
+}
+
+/// Vérifie si un port est dans la plage valide
+pub fn is_valid_port(port: u16) -> bool {
+    (1025..=65534).contains(&port)
+}
+
+/// Génère une adresse IP locale par défaut
+pub fn get_default_local_ip() -> IpAddr {
+    local_ip().unwrap_or(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)))
+}
+
+/// Canal global pour envoyer des événements au thread WebSocket
+static EVENT_SENDER: Lazy<Mutex<Option<Sender<TransferEvent>>>> = Lazy::new(|| Mutex::new(None));
+
+/// Canal global pour envoyer des messages de contrôle (comme "terminate")
+static CONTROL_SENDER: Lazy<Mutex<Option<Sender<String>>>> = Lazy::new(|| Mutex::new(None));
+
 /// Insère les points au format mobile dans la base de données
 async fn insert_mobile_points(
     app: &AppHandle,
-    event_id: i64,
+    event_id: String,
     points: Vec<MobilePointDetail>,
 ) -> Result<(), String> {
     let pool = get_db_pool(app).await?;
@@ -145,55 +167,34 @@ async fn insert_mobile_points(
         .map_err(|e| format!("Erreur démarrage transaction: {}", e))?;
 
     for point in &points {
-        // Insérer ou mettre à jour le point
-        sqlx::query(r#"INSERT OR REPLACE INTO point (id, x, y) VALUES (?, ?, ?)"#)
-            .bind(&point.id)
-            .bind(point.x)
-            .bind(point.y)
-            .execute(&mut *tx)
-            .await
-            .map_err(|e| format!("Erreur INSERT point {}: {}", point.id, e))?;
+        // Insérer ou mettre à jour le point avec tous les champs (sans created_at/modified_at)
+        sqlx::query(
+            r#"INSERT OR REPLACE INTO point (id, event_id, x, y, name, type, status, comment) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)"#,
+        )
+        .bind(&point.id)
+        .bind(&event_id)
+        .bind(point.x)
+        .bind(point.y)
+        .bind(point.name.as_deref().unwrap_or("Point"))
+        .bind(point.point_type.as_deref())
+        .bind(point.status.unwrap_or(0))
+        .bind(point.comment.as_deref())
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| format!("Erreur INSERT point {}: {}", point.id, e))?;
 
-        // Lier le point à l'event (utiliser l'event_id passé en paramètre)
-        sqlx::query(r#"INSERT OR IGNORE INTO point_event (event_id, point_id) VALUES (?, ?)"#)
-            .bind(event_id)
-            .bind(&point.id)
-            .execute(&mut *tx)
-            .await
-            .map_err(|e| format!("Erreur INSERT point_event: {}", e))?;
+        // Note: Les tables comment et obstacle n'existent pas dans la base web
+        // Seule la table picture existe
 
-        // Insérer les commentaires
-        for comment in &point.comments {
-            sqlx::query(r#"INSERT OR REPLACE INTO comment (id, point_id, value) VALUES (?, ?, ?)"#)
-                .bind(&comment.id)
-                .bind(&comment.point_id)
-                .bind(&comment.value)
-                .execute(&mut *tx)
-                .await
-                .map_err(|e| format!("Erreur INSERT comment {}: {}", comment.id, e))?;
-        }
-
-        // Insérer les images
+        // Insérer les images (utiliser image_data au lieu de image)
         for picture in &point.pictures {
-            sqlx::query(r#"INSERT OR REPLACE INTO picture (id, point_id, image) VALUES (?, ?, ?)"#)
-                .bind(&picture.id)
-                .bind(&picture.point_id)
+            sqlx::query(r#"INSERT OR REPLACE INTO picture (point_id, image_data) VALUES (?, ?)"#)
+                .bind(&point.id)
                 .bind(&picture.image)
                 .execute(&mut *tx)
                 .await
-                .map_err(|e| format!("Erreur INSERT picture {}: {}", picture.id, e))?;
-        }
-
-        // Insérer les obstacles
-        for obstacle in &point.obstacles {
-            sqlx::query(r#"INSERT OR REPLACE INTO obstacle (id, point_id, type_id, number) VALUES (?, ?, ?, ?)"#)
-                .bind(&obstacle.id)
-                .bind(&obstacle.point_id)
-                .bind(obstacle.type_id)
-                .bind(obstacle.number)
-                .execute(&mut *tx)
-                .await
-                .map_err(|e| format!("Erreur INSERT obstacle {}: {}", obstacle.id, e))?;
+                .map_err(|e| format!("Erreur INSERT picture pour point {}: {}", point.id, e))?;
         }
     }
 
@@ -204,54 +205,134 @@ async fn insert_mobile_points(
     Ok(())
 }
 
-/// Récupère les events sélectionnés pour le transfert
+/// Récupère les events sélectionnés pour le transfert avec leurs parcours, zones et points
+/// UNIQUEMENT pour l'export Data - N'inclut JAMAIS teams/actions/équipements
 async fn fetch_events_for_transfer(
     app: &AppHandle,
-    event_ids: &[i64],
+    event_ids: &[String],
 ) -> Result<Vec<TransferEvent>, String> {
     let pool = get_db_pool(app).await?;
 
-    // Récupérer les events sélectionnés
-    let event_ids_placeholder = event_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let mut transfer_events = Vec::new();
 
-    let events_query = format!(
-        "SELECT id, name, description, date_debut, date_fin, statut, geometry FROM event WHERE id IN ({})",
-        event_ids_placeholder
-    );
+    for event_id in event_ids {
+        // Récupérer SEULEMENT l'événement de base
+        let event_row =
+            sqlx::query("SELECT id, name, start_date, end_date FROM event WHERE id = ?")
+                .bind(event_id)
+                .fetch_optional(&pool)
+                .await
+                .map_err(|e| format!("Erreur récupération event {}: {}", event_id, e))?;
 
-    let mut query = sqlx::query(&events_query);
-    for id in event_ids {
-        query = query.bind(id);
+        if let Some(event_row) = event_row {
+            let event_id_str: String = event_row.get("id");
+
+            // Récupérer les parcours de cet événement (DATA EXPORT ONLY)
+            let parcours_rows = sqlx::query(
+                "SELECT id, event_id, name, color, start_time, speed_low, speed_high, geometry_json 
+                 FROM parcours WHERE event_id = ?"
+            )
+            .bind(&event_id_str)
+            .fetch_all(&pool)
+            .await
+            .map_err(|e| format!("Erreur récupération parcours: {}", e))?;
+
+            let parcours: Vec<TransferParcours> = parcours_rows
+                .iter()
+                .map(|row| {
+                    let start_time_i64: Option<i64> = row.get("start_time");
+                    TransferParcours {
+                        id: row.get("id"),
+                        event_id: row.get("event_id"),
+                        name: row.get("name"),
+                        color: row.get("color"),
+                        start_time: start_time_i64.map(|t| t.to_string()),
+                        speed_low: row.get("speed_low"),
+                        speed_high: row.get("speed_high"),
+                        geometry_json: row.get("geometry_json"),
+                    }
+                })
+                .collect();
+
+            // Récupérer les zones de cet événement (DATA EXPORT ONLY)
+            let zones_rows = sqlx::query(
+                "SELECT id, event_id, name, color, geometry_json 
+                 FROM zone WHERE event_id = ?",
+            )
+            .bind(&event_id_str)
+            .fetch_all(&pool)
+            .await
+            .map_err(|e| format!("Erreur récupération zones: {}", e))?;
+
+            let zones: Vec<TransferZone> = zones_rows
+                .iter()
+                .map(|row| TransferZone {
+                    id: row.get("id"),
+                    event_id: row.get("event_id"),
+                    name: row.get("name"),
+                    color: row.get("color"),
+                    geometry_json: row.get("geometry_json"),
+                })
+                .collect();
+
+            // Récupérer les points de cet événement (DATA EXPORT ONLY)
+            let points_rows = sqlx::query(
+                "SELECT id, event_id, x, y, name, comment, type, status 
+                 FROM point WHERE event_id = ?",
+            )
+            .bind(&event_id_str)
+            .fetch_all(&pool)
+            .await
+            .map_err(|e| format!("Erreur récupération points: {}", e))?;
+
+            let points: Vec<TransferPoint> = points_rows
+                .iter()
+                .map(|row| TransferPoint {
+                    id: row.get("id"),
+                    event_id: row.get("event_id"),
+                    x: row.get("x"),
+                    y: row.get("y"),
+                    name: row.get("name"),
+                    comment: row.get("comment"),
+                    point_type: row.get("type"),
+                    status: row.get("status"),
+                })
+                .collect();
+
+            transfer_events.push(TransferEvent {
+                id: event_id_str.clone(),
+                name: event_row.get("name"),
+                start_date: event_row.get("start_date"),
+                end_date: event_row.get("end_date"),
+                parcours,
+                zones,
+                points,
+            });
+
+            println!(
+                "📋 [DATA EXPORT] Event '{}' récupéré avec {} parcours, {} zones, {} points (SANS teams/actions/équipements)",
+                event_row.get::<String, _>("name"),
+                transfer_events.last().unwrap().parcours.len(),
+                transfer_events.last().unwrap().zones.len(),
+                transfer_events.last().unwrap().points.len(),
+            );
+        }
     }
 
-    let event_rows = query
-        .fetch_all(&pool)
-        .await
-        .map_err(|e| format!("Erreur récupération events: {}", e))?;
+    println!(
+        "✅ [DATA EXPORT] {} événement(s) récupéré(s) pour le transfert (SANS données de planning)",
+        transfer_events.len()
+    );
 
-    let events: Vec<TransferEvent> = event_rows
-        .iter()
-        .map(|row| TransferEvent {
-            id: row.get("id"),
-            name: row.get("name"),
-            description: row.get("description"),
-            date_debut: row.get("date_debut"),
-            date_fin: row.get("date_fin"),
-            statut: row.get("statut"),
-            geometry: row.get("geometry"),
-        })
-        .collect();
-
-    println!("📋 {} event(s) récupéré(s) pour le transfert", events.len());
-
-    Ok(events)
+    Ok(transfer_events)
 }
 
 async fn handle_websocket(
     app: &AppHandle,
     mut websocket: tungstenite::WebSocket<std::net::TcpStream>,
-    event_ids: Arc<Vec<i64>>,
+    event_ids: Arc<Vec<String>>,
     event_receiver: Receiver<TransferEvent>,
+    control_receiver: Receiver<String>,
 ) -> Result<(), String> {
     println!("📱 Client mobile connecté, en attente d'actions...");
 
@@ -281,6 +362,23 @@ async fn handle_websocket(
 
     // Boucle principale - attendre les actions du client ou les événements du frontend
     loop {
+        // Vérifier s'il y a un message de contrôle (comme "terminate")
+        if let Ok(control_msg) = control_receiver.try_recv() {
+            println!("🛑 Message de contrôle reçu: {}", control_msg);
+            if control_msg == "terminate" {
+                // Envoyer goodbye au mobile
+                let goodbye = serde_json::json!({
+                    "type": "goodbye",
+                    "message": "Serveur fermé"
+                });
+                let _ = websocket.write(Message::Text(goodbye.to_string().into()));
+                let _ = websocket.flush();
+                let _ = websocket.close(None);
+                println!("👋 Connexion fermée sur demande du serveur");
+                return Ok(());
+            }
+        }
+
         // Vérifier s'il y a un événement à envoyer depuis le frontend
         if let Ok(event) = event_receiver.try_recv() {
             println!("📤 Envoi de l'événement {} au mobile...", event.id);
@@ -399,7 +497,9 @@ async fn handle_websocket(
                                 "🚀 Insertion de {} point(s) en base de données...",
                                 points_count
                             );
-                            match insert_mobile_points(app, event_id, mobile_export.points).await {
+                            match insert_mobile_points(app, event_id.clone(), mobile_export.points)
+                                .await
+                            {
                                 Ok(_) => {
                                     println!("✅ Points insérés avec succès !");
                                     // Émettre un événement pour notifier le frontend
@@ -438,11 +538,26 @@ async fn handle_websocket(
                             eprintln!("⚠️ Erreur envoi confirmation: {}", e);
                         }
                         let _ = websocket.flush();
-                        continue;
+
+                        // Émettre événement de déconnexion pour le frontend
+                        app.emit("mobile-disconnected", ()).unwrap_or_else(|e| {
+                            eprintln!("⚠️ Erreur émission événement mobile-disconnected: {}", e);
+                        });
+
+                        // Envoyer goodbye et fermer la connexion après succès
+                        let goodbye = serde_json::json!({
+                            "type": "goodbye",
+                            "message": "Données reçues, connexion fermée"
+                        });
+                        let _ = websocket.write(Message::Text(goodbye.to_string().into()));
+                        let _ = websocket.flush();
+                        let _ = websocket.close(None);
+                        println!("👋 Connexion fermée après réception réussie");
+                        return Ok(());
                     }
 
                     // Sinon, essayer de parser comme un tableau de PointDetail
-                    match serde_json::from_str::<Vec<PointDetail>>(&text) {
+                    match serde_json::from_str::<Vec<PointWithDetails>>(&text) {
                         Ok(point_details_vec) => {
                             println!(
                                 "🔄 Désérialisation réussie. Nombre de points reçus : {}",
@@ -450,7 +565,14 @@ async fn handle_websocket(
                             );
 
                             println!("🚀 Début de l'insertion en base de données...");
-                            match insert_point_details(app, point_details_vec).await {
+                            let mut insert_result = Ok(());
+                            for point in point_details_vec {
+                                if let Err(e) = insert_point(app.clone(), point).await {
+                                    insert_result = Err(e);
+                                    break;
+                                }
+                            }
+                            match insert_result {
                                 Ok(_) => {
                                     println!("✅ Insertion terminée avec succès ! Envoi du message 'fini'...");
 
@@ -518,6 +640,21 @@ async fn handle_websocket(
             }
             Err(e) => {
                 eprintln!("Client déconnecté : {}", e);
+
+                // Émettre événement de déconnexion pour le frontend
+                app.emit("mobile-disconnected", ()).unwrap_or_else(|e| {
+                    eprintln!("⚠️ Erreur émission événement mobile-disconnected: {}", e);
+                });
+
+                // Essayer d'envoyer un message goodbye avant de fermer
+                let goodbye = serde_json::json!({
+                    "type": "goodbye",
+                    "message": "Serveur fermé"
+                });
+                let _ = websocket.write(Message::Text(goodbye.to_string().into()));
+                let _ = websocket.flush();
+                let _ = websocket.close(None);
+
                 // Nettoyer le sender global
                 if let Ok(mut sender) = EVENT_SENDER.lock() {
                     *sender = None;
@@ -529,7 +666,7 @@ async fn handle_websocket(
 }
 
 #[tauri::command]
-pub fn start_server(app: AppHandle, event_ids: Vec<i64>) -> Result<String, String> {
+pub fn start_server(app: AppHandle, event_ids: Vec<String>) -> Result<String, String> {
     println!(
         "🚀 Démarrage du serveur WebSocket pour {} événement(s)",
         event_ids.len()
@@ -570,12 +707,16 @@ pub fn start_server(app: AppHandle, event_ids: Vec<i64>) -> Result<String, Strin
                         Ok(ws) => {
                             println!("Client WebSocket connecté");
 
-                            // Créer le canal pour cet client
-                            let (sender, receiver) = channel::<TransferEvent>();
+                            // Créer les canaux pour ce client
+                            let (event_sender, event_receiver) = channel::<TransferEvent>();
+                            let (control_sender, control_receiver) = channel::<String>();
 
-                            // Stocker le sender globalement
+                            // Stocker les senders globalement
                             if let Ok(mut global_sender) = EVENT_SENDER.lock() {
-                                *global_sender = Some(sender);
+                                *global_sender = Some(event_sender);
+                            }
+                            if let Ok(mut global_control) = CONTROL_SENDER.lock() {
+                                *global_control = Some(control_sender);
                             }
 
                             let app_clone = app_for_thread.clone();
@@ -584,17 +725,25 @@ pub fn start_server(app: AppHandle, event_ids: Vec<i64>) -> Result<String, Strin
                                 // Create a Tokio runtime to run the async function
                                 let rt = tokio::runtime::Runtime::new().unwrap();
                                 rt.block_on(async {
-                                    if let Err(e) =
-                                        handle_websocket(&app_clone, ws, event_ids_clone, receiver)
-                                            .await
+                                    if let Err(e) = handle_websocket(
+                                        &app_clone,
+                                        ws,
+                                        event_ids_clone,
+                                        event_receiver,
+                                        control_receiver,
+                                    )
+                                    .await
                                     {
                                         eprintln!("Erreur WebSocket: {}", e);
                                     }
                                 });
 
-                                // Nettoyer le sender global quand la connexion se termine
+                                // Nettoyer les senders globaux quand la connexion se termine
                                 if let Ok(mut global_sender) = EVENT_SENDER.lock() {
                                     *global_sender = None;
+                                }
+                                if let Ok(mut global_control) = CONTROL_SENDER.lock() {
+                                    *global_control = None;
                                 }
                             });
                         }
@@ -609,32 +758,29 @@ pub fn start_server(app: AppHandle, event_ids: Vec<i64>) -> Result<String, Strin
     Ok(base64_data)
 }
 
-/// Envoyer un événement individuel au mobile connecté
+/// Envoyer un événement individuel au mobile connecté (DATA EXPORT UNIQUEMENT)
+/// N'envoie QUE l'événement + parcours + zones + points
+/// PAS de teams, actions ou équipements !
 #[tauri::command]
-pub async fn send_event_to_mobile(app: AppHandle, event_id: i64) -> Result<(), String> {
-    println!("📤 Demande d'envoi de l'événement {} au mobile", event_id);
+pub async fn send_event_to_mobile(app: AppHandle, event_id: String) -> Result<(), String> {
+    println!(
+        "📤 [DATA EXPORT] Demande d'envoi de l'événement {} au mobile",
+        event_id
+    );
 
-    // Récupérer l'événement depuis la base de données
-    let pool = get_db_pool(&app).await?;
+    // Utiliser fetch_events_for_transfer qui récupère SEULEMENT event + parcours + zones + points
+    let events = fetch_events_for_transfer(&app, std::slice::from_ref(&event_id)).await?;
 
-    let row = sqlx::query(
-        "SELECT id, name, description, date_debut, date_fin, statut, geometry FROM event WHERE id = ?"
-    )
-    .bind(event_id)
-    .fetch_optional(&pool)
-    .await
-    .map_err(|e| format!("Erreur récupération event: {}", e))?
-    .ok_or_else(|| format!("Event {} non trouvé", event_id))?;
+    let event = events
+        .into_iter()
+        .next()
+        .ok_or_else(|| format!("Event {} non trouvé", event_id))?;
 
-    let event = TransferEvent {
-        id: row.get("id"),
-        name: row.get("name"),
-        description: row.get("description"),
-        date_debut: row.get("date_debut"),
-        date_fin: row.get("date_fin"),
-        statut: row.get("statut"),
-        geometry: row.get("geometry"),
-    };
+    println!("📋 [DATA EXPORT] Événement récupéré: {} parcours, {} zones, {} points (PAS de teams/actions/équipements)", 
+             event.parcours.len(), event.zones.len(), event.points.len());
+
+    // Vérification de sécurité : s'assurer qu'aucune donnée de planning n'est présente
+    println!("🔒 [SÉCURITÉ] Envoi DATA uniquement - aucune donnée de planning incluse");
 
     // Envoyer via le canal global
     let sender = EVENT_SENDER
@@ -647,12 +793,35 @@ pub async fn send_event_to_mobile(app: AppHandle, event_id: i64) -> Result<(), S
         .send(event)
         .map_err(|e| format!("Erreur envoi via canal: {}", e))?;
 
+    println!(
+        "✅ [DATA EXPORT] Événement {} envoyé avec données géographiques SEULEMENT",
+        event_id
+    );
+    Ok(())
+}
+
+/// Terminer le serveur WebSocket et fermer la connexion avec le mobile
+#[tauri::command]
+pub fn terminate_server() -> Result<(), String> {
+    println!("🛑 Demande de fermeture du serveur");
+
+    let sender = CONTROL_SENDER
+        .lock()
+        .map_err(|e| format!("Erreur lock: {}", e))?
+        .clone()
+        .ok_or_else(|| "Aucune connexion active".to_string())?;
+
+    sender
+        .send("terminate".to_string())
+        .map_err(|e| format!("Erreur envoi message terminate: {}", e))?;
+
+    println!("✅ Message de fermeture envoyé au thread WebSocket");
     Ok(())
 }
 
 /// Démarrer un serveur WebSocket pour recevoir les données du mobile
 #[tauri::command]
-pub fn start_receive_server(app: AppHandle, event_id: i64) -> Result<String, String> {
+pub fn start_receive_server(app: AppHandle, event_id: String) -> Result<String, String> {
     println!(
         "📥 Démarrage du serveur de réception pour l'événement {}",
         event_id
@@ -689,12 +858,13 @@ pub fn start_receive_server(app: AppHandle, event_id: i64) -> Result<String, Str
                     Ok(ws) => {
                         println!("📱 Client mobile connecté pour réception");
                         let app_clone = app_for_thread.clone();
+                        let event_id_clone = event_id.clone();
 
                         thread::spawn(move || {
                             let rt = tokio::runtime::Runtime::new().unwrap();
                             rt.block_on(async {
                                 if let Err(e) =
-                                    handle_receive_websocket(&app_clone, ws, event_id).await
+                                    handle_receive_websocket(&app_clone, ws, event_id_clone).await
                                 {
                                     eprintln!("Erreur WebSocket réception: {}", e);
                                 }
@@ -711,11 +881,71 @@ pub fn start_receive_server(app: AppHandle, event_id: i64) -> Result<String, Str
     Ok(base64_data)
 }
 
+#[tauri::command]
+pub fn start_server_planning(app: AppHandle, team_id: String) -> Result<String, String> {
+    println!(
+        "📥 Démarrage du serveur de réception pour l'envoie des actions {}",
+        team_id
+    );
+
+    let ip = local_ip().map_err(|e| e.to_string())?;
+    let port = random_port();
+    let socket = SocketAddr::new(ip, port);
+
+    let ws_uri = format!("ws://{}:{}", ip, port);
+
+    let code = QrCode::new(ws_uri.as_bytes()).map_err(|e| e.to_string())?;
+    let image = code.render::<Luma<u8>>().min_dimensions(256, 256).build();
+
+    let mut buffer = Vec::new();
+    let mut cursor = Cursor::new(&mut buffer);
+
+    image::DynamicImage::ImageLuma8(image)
+        .write_to(&mut cursor, image::ImageFormat::Png)
+        .map_err(|e| format!("Erreur d'écriture PNG: {}", e))?;
+
+    let base64_data = general_purpose::STANDARD.encode(&buffer);
+
+    let app_for_thread = app.clone();
+
+    thread::spawn(move || {
+        let listener =
+            std::net::TcpListener::bind(socket).expect("Impossible de binder le socket WebSocket");
+        println!("📥 Serveur de réception démarré sur {}", socket);
+
+        for stream in listener.incoming() {
+            match stream {
+                Ok(stream) => match accept(stream) {
+                    Ok(ws) => {
+                        println!("📱 Client mobile connecté pour réception");
+                        let app_clone = app_for_thread.clone();
+                        let team_id_clone = team_id.clone();
+
+                        thread::spawn(move || {
+                            let rt = tokio::runtime::Runtime::new().unwrap();
+                            rt.block_on(async {
+                                if let Err(e) =
+                                    handle_receive_planning(&app_clone, ws, team_id_clone).await
+                                {
+                                    eprintln!("Erreur WebSocket réception: {}", e);
+                                }
+                            });
+                        });
+                    }
+                    Err(e) => eprintln!("Erreur accept WebSocket : {}", e),
+                },
+                Err(e) => eprintln!("Erreur connexion : {}", e),
+            }
+        }
+    });
+
+    Ok(base64_data)
+}
 /// Gère la connexion WebSocket pour recevoir les données du mobile
 async fn handle_receive_websocket(
     app: &AppHandle,
     mut websocket: tungstenite::WebSocket<std::net::TcpStream>,
-    event_id: i64,
+    event_id: String,
 ) -> Result<(), String> {
     println!("📥 Client connecté pour réception, event_id: {}", event_id);
 
@@ -760,7 +990,9 @@ async fn handle_receive_websocket(
 
                         if points_count > 0 {
                             println!("🚀 Insertion de {} point(s)...", points_count);
-                            match insert_mobile_points(app, event_id, mobile_export.points).await {
+                            match insert_mobile_points(app, event_id.clone(), mobile_export.points)
+                                .await
+                            {
                                 Ok(_) => {
                                     println!("✅ Points insérés avec succès !");
 
@@ -806,8 +1038,62 @@ async fn handle_receive_websocket(
             }
             Err(e) => {
                 eprintln!("📥 Client déconnecté: {}", e);
+
+                // Émettre événement de déconnexion pour le frontend
+                app.emit("mobile-disconnected", ()).unwrap_or_else(|e| {
+                    eprintln!("⚠️ Erreur émission événement mobile-disconnected: {}", e);
+                });
+
                 return Ok(());
             }
         }
     }
+}
+
+async fn handle_receive_planning(
+    app: &AppHandle,
+    mut websocket: tungstenite::WebSocket<std::net::TcpStream>,
+    team_id: String,
+) -> Result<(), String> {
+    println!(
+        "📥 [PLANNING EXPORT] Client connecté pour réception, team_id: {}",
+        team_id
+    );
+
+    // Émettre un événement Tauri pour notifier le frontend
+    app.emit("mobile-connected", ()).unwrap_or_else(|e| {
+        eprintln!("⚠️ Erreur émission événement mobile-connected: {}", e);
+    });
+
+    // Récupérer SEULEMENT les données de planning (teams + actions + équipements)
+    let planning = send_planning(team_id.clone(), app.clone()).await?;
+    let actions = vec![planning];
+
+    println!("🔒 [SÉCURITÉ] Envoi PLANNING uniquement - teams/actions/équipements SEULEMENT (pas d'events/parcours/zones/points)");
+
+    // Envoyer un message de planning (PAS d'événements géographiques)
+    let message = serde_json::json!({
+        "type": "planning_data",
+        "actions": actions
+    });
+    websocket
+        .write(Message::Text(message.to_string().into()))
+        .map_err(|e| format!("Erreur envoi message planning: {}", e))?;
+    websocket
+        .flush()
+        .map_err(|e| format!("Erreur flush: {}", e))?;
+
+    println!("✅ [PLANNING EXPORT] Planning envoyé (teams/actions/équipements uniquement)");
+
+    // Envoyer goodbye et fermer proprement la connexion
+    let goodbye = serde_json::json!({
+        "type": "goodbye",
+        "message": "Planning envoyé avec succès"
+    });
+    let _ = websocket.write(Message::Text(goodbye.to_string().into()));
+    let _ = websocket.flush();
+    let _ = websocket.close(None);
+    println!("👋 [PLANNING EXPORT] Connexion fermée proprement");
+
+    Ok(())
 }

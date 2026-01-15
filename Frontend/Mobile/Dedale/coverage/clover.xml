@@ -470,34 +470,6 @@
         <line num="75" count="0" type="stmt"/>
         <line num="94" count="0" type="stmt"/>
       </file>
-      <file name="CreateRoute.tsx" path="/Users/PlayerOne/Desktop/t5-crs/Frontend/Mobile/Dedale/src/screens/CreateRoute.tsx">
-        <metrics statements="25" coveredstatements="4" conditionals="8" coveredconditionals="0" methods="12" coveredmethods="1"/>
-        <line num="15" count="2" type="stmt"/>
-        <line num="16" count="2" type="stmt"/>
-        <line num="17" count="2" type="stmt"/>
-        <line num="18" count="2" type="stmt"/>
-        <line num="29" count="0" type="stmt"/>
-        <line num="30" count="0" type="stmt"/>
-        <line num="31" count="0" type="stmt"/>
-        <line num="32" count="0" type="cond" truecount="0" falsecount="2"/>
-        <line num="35" count="0" type="stmt"/>
-        <line num="37" count="0" type="stmt"/>
-        <line num="38" count="0" type="cond" truecount="0" falsecount="2"/>
-        <line num="39" count="0" type="stmt"/>
-        <line num="43" count="0" type="stmt"/>
-        <line num="45" count="0" type="stmt"/>
-        <line num="48" count="0" type="stmt"/>
-        <line num="49" count="0" type="stmt"/>
-        <line num="52" count="0" type="stmt"/>
-        <line num="56" count="0" type="stmt"/>
-        <line num="67" count="0" type="stmt"/>
-        <line num="70" count="0" type="stmt"/>
-        <line num="71" count="0" type="stmt"/>
-        <line num="72" count="0" type="stmt"/>
-        <line num="73" count="0" type="stmt"/>
-        <line num="74" count="0" type="stmt"/>
-        <line num="84" count="0" type="stmt"/>
-      </file>
       <file name="RegisterPoint.tsx" path="/Users/PlayerOne/Desktop/t5-crs/Frontend/Mobile/Dedale/src/screens/RegisterPoint.tsx">
         <metrics statements="108" coveredstatements="11" conditionals="46" coveredconditionals="4" methods="22" coveredmethods="1"/>
         <line num="44" count="2" type="stmt"/>

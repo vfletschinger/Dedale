@@ -1,97 +1,112 @@
-import logoStrasbourg from "../assets/logo_strasbourg.png";
+import logoStrasbourg from "../../public/dedale.png";
 import type { PageKey } from "../hooks/useNavigation";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCalendarAlt, faTimes } from "@fortawesome/free-solid-svg-icons";
 
 interface NavigationProps {
   currentPage: PageKey;
   onNavigate: (page: PageKey) => void;
   canGoBack?: boolean;
   onGoBack?: () => void;
+  eventSelected: boolean;
+  eventName?: string;
+  deselectEvent: () => void;
 }
 
-const navItems: { key: PageKey; label: string }[] = [
+const NAV_ITEMS: { key: PageKey; label: string }[] = [
   { key: "event", label: "Événements" },
   { key: "map", label: "Carte" },
   { key: "team", label: "Équipes" },
   { key: "person", label: "Personnes" },
+  { key: "planning", label: "Planning" },
   { key: "data", label: "Données" },
 ];
 
 export default function Navigation({
   currentPage,
   onNavigate,
-  canGoBack,
-  onGoBack,
+  eventSelected,
+  eventName,
+  deselectEvent,
 }: NavigationProps) {
   return (
-    <nav className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 backdrop-blur-lg border-b border-white/10 shadow-2xl">
-      <div className="mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex h-20 items-center justify-between">
-          {/* Left side - Logo + Back button */}
-          <div className="flex items-center space-x-3">
-            {canGoBack && onGoBack && (
-              <button
-                type="button"
-                onClick={onGoBack}
-                className="p-2 rounded-xl text-white/80 hover:text-white bg-white/10 hover:bg-white/20 transition-all duration-200"
-                title="Retour"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 19l-7-7 7-7"
-                  />
-                </svg>
-              </button>
-            )}
-            <div className="relative">
-              <div className="absolute -inset-1 bg-gradient-to-r from-blue-400 to-purple-600 rounded-full blur opacity-30"></div>
+    <nav className="sticky top-0 z-[100] w-full bg-gray-900 border-b border-gray-800 shadow-xl">
+      <div className="w-full px-6">
+        <div className="flex h-16 items-center justify-between">
+          {/* Section Gauche : Logo & Branding */}
+          <div className="flex items-center ">
+            <div
+              className="flex items-center cursor-pointer group"
+              onClick={() => onNavigate("event")}
+            >
               <img
                 src={logoStrasbourg}
                 alt="Logo"
-                className="relative h-12 w-auto rounded-full shadow-lg ring-2 ring-white/20"
+                className="h-16 w-auto "
               />
-            </div>
-            <div className="hidden sm:block">
-              <h1 className="text-xl font-bold bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">
+              <span className="text-3xl font-bold text-white tracking-tight ">
                 Dedale
-              </h1>
+              </span>
             </div>
           </div>
 
-          {/* Center - Navigation Buttons */}
-          <div className="flex items-center space-x-2">
-            {navItems.map((item) => (
+          {/* Section Centre : Navigation */}
+          <div className="flex items-center gap-1 h-full">
+            {NAV_ITEMS.map(({ key, label }) => {
+              const isActive = currentPage === key;
+              const requiresEvent = key !== "event";
+              const isDisabled = requiresEvent && !eventSelected;
+
+              return (
+                <button
+                  key={key}
+                  onClick={() => onNavigate(key)}
+                  disabled={isDisabled}
+                  className={`relative h-full px-5 text-sm font-medium transition-all duration-200 flex items-center justify-center
+                  ${isActive
+                      ? "text-secondary bg-white/5 border-b-2 border-secondary"
+                      : isDisabled
+                        ? "text-gray-600 cursor-not-allowed"
+                        : "text-gray-300 hover:text-white hover:bg-white/5 border-b-2 border-transparent"
+                    }`}
+                  title={isDisabled ? "Sélectionnez d'abord un événement" : ""}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex items-center flex-shrink-0">
+            {eventSelected ? (
+              <div className="flex items-center group relative">
+                <div className="flex items-center gap-3 px-5 py-2 bg-gray-800 border border-gray-700 rounded-full pr-12 transition-all hover:border-yellow-500/50">
+                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                  <FontAwesomeIcon icon={faCalendarAlt} className="text-yellow-500 text-sm" />
+                  <span className="text-sm font-medium text-gray-200 max-w-[180px] truncate">
+                    {eventName || "Événement"}
+                  </span>
+                </div>
+                <button
+                  onClick={deselectEvent}
+                  className="absolute right-1 w-8 h-8 flex items-center justify-center rounded-full bg-gray-700 hover:bg-red-500/20 text-gray-400 hover:text-red-500 transition-all cursor-pointer"
+                  title="Désélectionner l'événement"
+                >
+                  <FontAwesomeIcon icon={faTimes} className="text-xs" />
+                </button>
+              </div>
+            ) : (
               <button
-                key={item.key}
-                type="button"
-                className={`group relative px-4 py-2 rounded-2xl font-medium transition-all duration-300 transform hover:scale-105 ${currentPage === item.key
-                  ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg shadow-blue-500/30 ring-2 ring-white/20"
-                  : "text-white/80 hover:text-white bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/10 hover:border-white/30"
-                  }`}
-                onClick={() => onNavigate(item.key)}
+                className="flex items-center gap-2 px-5 py-2.5 bg-yellow-500  text-gray-900 font-bold rounded-lg transition-all cursor-pointer transform "
               >
-                <span className="flex items-center space-x-2">
-                  <span>{item.label}</span>
+                <FontAwesomeIcon icon={faCalendarAlt} className="text-sm" />
+                <span className="text-sm">
+                  Sélectionner un événement
                 </span>
-                {currentPage === item.key && (
-                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-white rounded-full"></div>
-                )}
               </button>
-            ))}
+            )}
           </div>
         </div>
       </div>
-
-      {/* Glow effect at the bottom */}
-      <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-400 to-transparent opacity-50"></div>
     </nav>
   );
 }
