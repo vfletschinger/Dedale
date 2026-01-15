@@ -96,7 +96,7 @@ pub async fn fetch_teams_with_actions_for_event(
         JOIN event e ON e.id = te.event_id
         LEFT JOIN action a ON a.team_id = t.id
         WHERE e.id = ?
-        ORDER BY t.name ASC, a.scheduled_time ASC
+        ORDER BY t.name ASC, a.is_done ASC, a.scheduled_time ASC
     "#;
 
     let rows = sqlx::query(query)
