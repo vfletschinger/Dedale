@@ -1,7 +1,7 @@
 use sqlx::Row;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
-use std::collections::HashMap;
 use tauri::AppHandle;
 use tauri::Manager;
 
@@ -114,12 +114,14 @@ pub async fn fetch_teams_with_actions_for_event(
         let team_event_id: String = row.get("event_id");
 
         // Insérer ou récupérer l'équipe
-        let team = teams_map.entry(team_id.clone()).or_insert_with(|| TeamWithActions {
-            id: team_id.clone(),
-            name: team_name,
-            event_id: team_event_id,
-            actions: Vec::new(),
-        });
+        let team = teams_map
+            .entry(team_id.clone())
+            .or_insert_with(|| TeamWithActions {
+                id: team_id.clone(),
+                name: team_name,
+                event_id: team_event_id,
+                actions: Vec::new(),
+            });
 
         // Ajouter l'action si elle existe
         if let Ok::<Option<String>, _>(Some(_)) = row.try_get::<Option<String>, _>("action_id") {
