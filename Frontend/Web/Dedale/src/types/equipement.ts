@@ -2,7 +2,7 @@ export type Action = {
   id: string;
   team_id: string;
   equipement_id: string;
-  type: string;
+  action_type: string;
   scheduled_time: string;
   is_done: boolean;
 };
@@ -19,21 +19,21 @@ export type TeamWithActions = Team & {
 };
 
 export type Equipement = {
-    id: string;
-    event_id: string;
-    type_id: string;
-    quantity: number;
-    length_per_unit: number;
-    date_pose: string | null;
-    date_depose: string | null;
-    coordinates: TransferEquipementCoordinate[];
+  id: string;
+  event_id: string;
+  type_id: string;
+  quantity: number;
+  length_per_unit: number;
+  date_pose: string | null;
+  date_depose: string | null;
+  coordinates: TransferEquipementCoordinate[];
 }
 export type TransferEquipementCoordinate = {
-    id: string;
-    equipement_id: string;
-    x: number;
-    y: number;
-    order_index: number | null;
+  id: string;
+  equipement_id: string;
+  x: number;
+  y: number;
+  order_index: number | null;
 }
 
 export type TransferTeamInfo = {

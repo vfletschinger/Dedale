@@ -41,7 +41,6 @@ function Data({ selectedEventId: activeEventId }: DataProps) {
   const [isExcelLoading, setIsExcelLoading] = useState<boolean>(false);
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedEventIds, setSelectedEventIds] = useState<Set<string>>(new Set());
-  const [selectedEventId, _setSelectedEventId] = useState<string>("");
   const [transferPhase, setTransferPhase] = useState<TransferPhase>("idle");
   const [sentEventIds, setSentEventIds] = useState<Set<string>>(new Set());
   const [sendingEventId, setSendingEventId] = useState<string | null>(null);
@@ -71,14 +70,14 @@ function Data({ selectedEventId: activeEventId }: DataProps) {
       unlistenConnect = await listen("mobile-connected", () => {
         console.log("Connecté !");
         setTransferPhase("connected");
-        
+
         // Cooldown: afficher le toast une seule fois par 3 secondes
         const now = Date.now();
         if (now - lastConnectionToastTime.current > 3000) {
           toast.success("Mobile connecté avec succès !");
           lastConnectionToastTime.current = now;
         }
-        
+
         // Émettre un événement custom pour notifier les autres composants
         window.dispatchEvent(new CustomEvent("app-mobile-connected"));
       });
@@ -160,12 +159,12 @@ function Data({ selectedEventId: activeEventId }: DataProps) {
       if (!appDataPath) throw new Error("Impossible de récupérer AppData");
 
       const db_url = await path.join(appDataPath, "mydatabase.db");
-      const filename = selectedEventId
-        ? `points_event_${selectedEventId}.xlsx`
+      const filename = activeEventId
+        ? `points_event_${activeEventId}.xlsx`
         : "points_all.xlsx";
 
       const excel_path_str = await path.join(appDataPath, filename);
-      const eventIdParam = selectedEventId ? selectedEventId : null;
+      const eventIdParam = activeEventId ? activeEventId : null;
 
       await invoke("export_points_excel", {
         dbUrl: db_url,
@@ -180,14 +179,13 @@ function Data({ selectedEventId: activeEventId }: DataProps) {
     } finally {
       setIsExcelLoading(false);
     }
-  }, [selectedEventId]);
+  }, [activeEventId]);
 
   // Fonction pour la création de PDF
   const createPdf = useCallback(async () => {
     try {
       setIsPdfLoading(true);
-      const eventIdParam = selectedEventId ? selectedEventId : null;
-      await invoke("create_pdf", { eventId: eventIdParam });
+      await invoke("create_pdf", { eventId: activeEventId });
       toast.success("Le rapport PDF a été généré avec succès.");
     } catch (error) {
       console.error("Erreur PDF:", error);
@@ -195,7 +193,7 @@ function Data({ selectedEventId: activeEventId }: DataProps) {
     } finally {
       setIsPdfLoading(false);
     }
-  }, [selectedEventId]);
+  }, [activeEventId]);
 
   // Fonction QR Code
   const qr_code = useCallback(async () => {
@@ -318,11 +316,10 @@ function Data({ selectedEventId: activeEventId }: DataProps) {
                 setSyncMode("export");
                 closeReceiveModal();
               }}
-              className={`flex-1 py-3 px-4 text-sm font-bold transition-all flex items-center justify-center gap-2 ${
-                syncMode === "export"
-                  ? "text-primary border-b-2 border-primary bg-primary/5"
-                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-              }`}
+              className={`flex-1 py-3 px-4 text-sm font-bold transition-all flex items-center justify-center gap-2 ${syncMode === "export"
+                ? "text-primary border-b-2 border-primary bg-primary/5"
+                : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                }`}
             >
               <FontAwesomeIcon icon={faCloudUploadAlt} />
               Envoyer au mobile
@@ -332,11 +329,10 @@ function Data({ selectedEventId: activeEventId }: DataProps) {
                 setSyncMode("import");
                 terminateTransfer();
               }}
-              className={`flex-1 py-3 px-4 text-sm font-bold transition-all flex items-center justify-center gap-2 ${
-                syncMode === "import"
-                  ? "text-blue-600 border-b-2 border-blue-600 bg-blue-50/50"
-                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-              }`}
+              className={`flex-1 py-3 px-4 text-sm font-bold transition-all flex items-center justify-center gap-2 ${syncMode === "import"
+                ? "text-blue-600 border-b-2 border-blue-600 bg-blue-50/50"
+                : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                }`}
             >
               <FontAwesomeIcon icon={faDownload} />
               Recevoir du mobile
@@ -374,7 +370,7 @@ function Data({ selectedEventId: activeEventId }: DataProps) {
                       <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></span>
                       En attente de connexion...
                     </p>
-                    
+
                     {/* Liste des événements à envoyer */}
                     <div className="w-full mt-4 max-h-[120px] overflow-y-auto custom-scrollbar border border-gray-100 rounded-lg bg-gray-50/50 p-2">
                       <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-2">Événements prêts</p>
@@ -385,7 +381,7 @@ function Data({ selectedEventId: activeEventId }: DataProps) {
                         </div>
                       ))}
                     </div>
-                    
+
                     <button
                       onClick={terminateTransfer}
                       className="mt-4 text-gray-400 hover:text-red-500 font-medium text-sm transition-colors"
@@ -440,7 +436,7 @@ function Data({ selectedEventId: activeEventId }: DataProps) {
                     <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6 text-blue-400 group-hover:scale-110 transition-transform duration-300">
                       <FontAwesomeIcon icon={faDownload} className="text-3xl" />
                     </div>
-                    
+
                     {/* Affichage de l'événement sélectionné */}
                     {activeEventId ? (
                       <div className="mb-6 p-3 bg-blue-50 border border-blue-200 rounded-xl">
@@ -454,7 +450,7 @@ function Data({ selectedEventId: activeEventId }: DataProps) {
                         <p className="text-xs font-semibold text-amber-600">⚠️ Sélectionnez un événement dans le menu de gauche</p>
                       </div>
                     )}
-                    
+
                     <p className="text-gray-500 mb-6 text-sm">
                       Recevez les points collectés sur le terrain depuis l'application mobile.
                     </p>
@@ -480,7 +476,7 @@ function Data({ selectedEventId: activeEventId }: DataProps) {
                       <div className={`w-2 h-2 rounded-full ${receiveStatus.includes("reçu") || pointsReceived > 0 ? "bg-green-500" : "bg-blue-500 animate-pulse"}`}></div>
                       {receiveStatus}
                     </span>
-                    
+
                     {/* Événement cible */}
                     <div className="w-full p-3 bg-blue-50 border border-blue-200 rounded-xl mb-4">
                       <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">Import vers</p>
@@ -488,7 +484,7 @@ function Data({ selectedEventId: activeEventId }: DataProps) {
                         {events.find(e => e.id === activeEventId)?.name || "Événement"}
                       </p>
                     </div>
-                    
+
                     <button
                       onClick={closeReceiveModal}
                       className="text-gray-400 hover:text-red-500 font-medium text-sm transition-colors"
