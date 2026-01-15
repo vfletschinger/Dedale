@@ -1,4 +1,16 @@
 
+// GeoJSON type for local use
+interface GeoJSONObject {
+  type: string
+  geometry?: {
+    type: string
+    coordinates: number[] | number[][] | number[][][]
+  }
+  properties?: Record<string, unknown>
+  features?: GeoJSONObject[]
+  coordinates?: number[] | number[][] | number[][][]
+}
+
 // Fonction pour convertir GeoJSON en WKT
 export function geoJSONtoWKT(geometry: GeoJSON.Geometry): string {
   if (geometry.type === "Polygon") {
@@ -221,7 +233,7 @@ function toDMS(decimal: number): string {
  * @param longitude Longitude to validate
  * @returns true if coordinates are valid
  */
-export function validateCoordinates(latitude: any, longitude: any): boolean {
+export function validateCoordinates(latitude: unknown, longitude: unknown): boolean {
   if (typeof latitude !== 'number' || typeof longitude !== 'number') {
     return false
   }
@@ -242,9 +254,9 @@ export function validateCoordinates(latitude: any, longitude: any): boolean {
  * @param geoJSON GeoJSON string
  * @returns Parsed GeoJSON object
  */
-export function parseGeoJSON(geoJSON: string): any {
+export function parseGeoJSON(geoJSON: string): GeoJSONObject {
   try {
-    const parsed = JSON.parse(geoJSON)
+    const parsed = JSON.parse(geoJSON) as GeoJSONObject
     
     // Validate basic GeoJSON structure
     if (!parsed.type) {
@@ -271,7 +283,7 @@ export function parseGeoJSON(geoJSON: string): any {
  * @param properties Optional properties
  * @returns GeoJSON object
  */
-export function generateGeoJSON(coordinates: number[][], properties: Record<string, any> = {}): any {
+export function generateGeoJSON(coordinates: number[][], properties: Record<string, unknown> = {}): GeoJSONObject {
   if (!coordinates || coordinates.length === 0) {
     throw new Error('Coordinates array cannot be empty')
   }
@@ -305,7 +317,7 @@ interface Event {
   start_date: string
   end_date: string
   statut: string
-  [key: string]: any
+  [key: string]: unknown
 }
 
 /**
@@ -313,13 +325,13 @@ interface Event {
  * @param event Event data
  * @returns Normalized event
  */
-export function normalizeEventData(event: any): Event {
+export function normalizeEventData(event: Record<string, unknown>): Event {
   return {
-    id: event.id || event._id || '',
-    name: event.name || event.title || '',
-    start_date: event.start_date || event.startDate || '',
-    end_date: event.end_date || event.endDate || '',
-    statut: event.statut || event.status || 'pending',
+    id: (event.id as string) || (event._id as string) || '',
+    name: (event.name as string) || (event.title as string) || '',
+    start_date: (event.start_date as string) || (event.startDate as string) || '',
+    end_date: (event.end_date as string) || (event.endDate as string) || '',
+    statut: (event.statut as string) || (event.status as string) || 'pending',
     ...event
   }
 }
@@ -329,16 +341,17 @@ export function normalizeEventData(event: any): Event {
  * @param event Event data to validate
  * @returns true if event is valid
  */
-export function validateEventData(event: any): boolean {
+export function validateEventData(event: unknown): boolean {
   if (!event) return false
   if (typeof event !== 'object') return false
-  if (!event.name || typeof event.name !== 'string') return false
-  if (!event.start_date || typeof event.start_date !== 'string') return false
-  if (!event.end_date || typeof event.end_date !== 'string') return false
+  const e = event as Record<string, unknown>
+  if (!e.name || typeof e.name !== 'string') return false
+  if (!e.start_date || typeof e.start_date !== 'string') return false
+  if (!e.end_date || typeof e.end_date !== 'string') return false
   
   // Validate dates
-  const startDate = new Date(event.start_date)
-  const endDate = new Date(event.end_date)
+  const startDate = new Date(e.start_date)
+  const endDate = new Date(e.end_date)
   
   if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
     return false

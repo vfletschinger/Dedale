@@ -71,6 +71,7 @@ export default function Planning({
       console.log("🚀 Connexion détectée, lancement de l'envoi...");
       sendPlanningToTeam(syncState.teamId, syncState.teamName!);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMobileConnected, syncState.step, syncState.teamId]);
 
   // Charger les données

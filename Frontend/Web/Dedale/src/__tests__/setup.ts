@@ -43,7 +43,7 @@ vi.mock('react-hot-toast', () => ({
 
 // Mock FontAwesome
 vi.mock('@fortawesome/react-fontawesome', () => ({
-  FontAwesomeIcon: vi.fn(({ icon, ...props }) => 
+  FontAwesomeIcon: vi.fn(() => 
     'i'
   )
 }))

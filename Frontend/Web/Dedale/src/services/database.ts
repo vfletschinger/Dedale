@@ -50,7 +50,7 @@ export async function getAllPersons(): Promise<Person[]> {
   try {
     const persons = await invoke<Person[]>('get_all_persons');
     return persons;
-  } catch (error) {
+  } catch {
     throw new Error('Failed to fetch persons');
   }
 }
@@ -66,7 +66,7 @@ export async function getPersonById(id: number | null): Promise<Person> {
   try {
     const person = await invoke<Person>('get_person_by_id', { id });
     return person;
-  } catch (error) {
+  } catch {
     throw new Error('Person not found');
   }
 }
@@ -85,7 +85,7 @@ export async function createPerson(person: Omit<Person, 'id'>): Promise<number> 
   try {
     const id = await invoke<number>('create_person', person);
     return id;
-  } catch (error) {
+  } catch {
     throw new Error('Failed to create person');
   }
 }
@@ -106,7 +106,7 @@ export async function updatePerson(id: number, updateData: Partial<Omit<Person, 
   
   try {
     await invoke('update_person', { id, ...updateData });
-  } catch (error) {
+  } catch {
     throw new Error('Failed to update person');
   }
 }
@@ -118,7 +118,7 @@ export async function deletePerson(id: number): Promise<void> {
   
   try {
     await invoke('delete_person', { id });
-  } catch (error) {
+  } catch {
     throw new Error('Person has associated records');
   }
 }
@@ -128,7 +128,7 @@ export async function getAllTeams(): Promise<Team[]> {
   try {
     const teams = await invoke<Team[]>('get_all_teams');
     return teams;
-  } catch (error) {
+  } catch {
     throw new Error('Failed to fetch teams');
   }
 }
@@ -141,7 +141,7 @@ export async function getTeamById(id: number | null): Promise<Team> {
   try {
     const team = await invoke<Team>('get_team_by_id', { id });
     return team;
-  } catch (error) {
+  } catch {
     throw new Error('Team not found');
   }
 }
@@ -157,7 +157,7 @@ export async function createTeam(team: Omit<Team, 'id'>): Promise<number> {
   try {
     const id = await invoke<number>('create_team', team);
     return id;
-  } catch (error) {
+  } catch {
     throw new Error('Failed to create team');
   }
 }
@@ -169,7 +169,7 @@ export async function updateTeam(id: number, updateData: Partial<Omit<Team, 'id'
   
   try {
     await invoke('update_team', { id, ...updateData });
-  } catch (error) {
+  } catch {
     throw new Error('Failed to update team');
   }
 }
@@ -181,7 +181,7 @@ export async function deleteTeam(id: number): Promise<void> {
   
   try {
     await invoke('delete_team', { id });
-  } catch (error) {
+  } catch {
     throw new Error('Failed to delete team');
   }
 }
@@ -191,7 +191,7 @@ export async function getAllEquipments(): Promise<Equipment[]> {
   try {
     const equipments = await invoke<Equipment[]>('get_all_equipments');
     return equipments;
-  } catch (error) {
+  } catch {
     throw new Error('Failed to fetch equipments');
   }
 }
@@ -204,7 +204,7 @@ export async function getEquipmentsByPointId(pointId: number | null): Promise<Eq
   try {
     const equipments = await invoke<Equipment[]>('get_equipments_by_point', { point_id: pointId });
     return equipments;
-  } catch (error) {
+  } catch {
     throw new Error('Failed to fetch equipments');
   }
 }
@@ -223,7 +223,7 @@ export async function createEquipment(equipment: Omit<Equipment, 'id'>): Promise
   try {
     const id = await invoke<number>('create_equipment', equipment);
     return id;
-  } catch (error) {
+  } catch {
     throw new Error('Failed to create equipment');
   }
 }
@@ -235,7 +235,7 @@ export async function updateEquipment(id: number, updateData: Partial<Omit<Equip
   
   try {
     await invoke('update_equipment', { id, ...updateData });
-  } catch (error) {
+  } catch {
     throw new Error('Failed to update equipment');
   }
 }
@@ -247,7 +247,7 @@ export async function deleteEquipment(id: number): Promise<void> {
   
   try {
     await invoke('delete_equipment', { id });
-  } catch (error) {
+  } catch {
     throw new Error('Failed to delete equipment');
   }
 }
@@ -260,7 +260,7 @@ export async function searchPersons(query: string): Promise<Person[]> {
     }
     const persons = await invoke<Person[]>('search_persons', { query });
     return persons;
-  } catch (error) {
+  } catch {
     throw new Error('Failed to search persons');
   }
 }
@@ -273,7 +273,7 @@ export async function getPersonsByRole(role: string): Promise<Person[]> {
   try {
     const persons = await invoke<Person[]>('get_persons_by_role', { role });
     return persons;
-  } catch (error) {
+  } catch {
     throw new Error('Failed to fetch persons by role');
   }
 }
@@ -286,7 +286,7 @@ export async function getTeamMembers(teamId: number): Promise<Person[]> {
   try {
     const members = await invoke<Person[]>('get_team_members', { team_id: teamId });
     return members;
-  } catch (error) {
+  } catch {
     throw new Error('Failed to fetch team members');
   }
 }
@@ -296,7 +296,7 @@ export async function initializeDatabase(): Promise<boolean> {
   try {
     const result = await invoke<boolean>('initialize_database');
     return result;
-  } catch (error) {
+  } catch {
     throw new Error('Database initialization failed');
   }
 }
@@ -305,7 +305,7 @@ export async function backupDatabase(): Promise<string> {
   try {
     const backupPath = await invoke<string>('backup_database');
     return backupPath;
-  } catch (error) {
+  } catch {
     throw new Error('Backup failed');
   }
 }
@@ -318,7 +318,7 @@ export async function restoreDatabase(backupPath: string): Promise<boolean> {
   try {
     const result = await invoke<boolean>('restore_database', { backup_path: backupPath });
     return result;
-  } catch (error) {
+  } catch {
     throw new Error('Restore failed');
   }
 }
@@ -327,7 +327,7 @@ export async function clearDatabase(): Promise<boolean> {
   try {
     const result = await invoke<boolean>('clear_database');
     return result;
-  } catch (error) {
+  } catch {
     throw new Error('Clear database failed');
   }
 }
@@ -350,7 +350,7 @@ export async function createMultiplePersons(persons: Omit<Person, 'id'>[]): Prom
   try {
     const ids = await invoke<number[]>('create_multiple_persons', { persons });
     return ids;
-  } catch (error) {
+  } catch {
     throw new Error('Failed to create multiple persons');
   }
 }
@@ -364,7 +364,7 @@ export async function deleteMultiplePersons(ids: number[]): Promise<boolean> {
   try {
     const result = await invoke<boolean>('delete_multiple_persons', { ids });
     return result;
-  } catch (error) {
+  } catch {
     throw new Error('Failed to delete multiple persons');
   }
 }
@@ -388,7 +388,7 @@ export async function initLegacyDatabase(): Promise<Database> {
     console.log("[DB] Tables existantes:", tables.map(t => t.name).join(", ") || "Aucune");
 
     return db;
-  } catch (error) {
+  } catch {
     console.error("[DB] Erreur lors du chargement:", error);
     throw error;
   }

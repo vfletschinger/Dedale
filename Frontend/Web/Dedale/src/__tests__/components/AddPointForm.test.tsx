@@ -178,8 +178,8 @@ describe('AddPointForm', () => {
     })
 
     it('should show loading state during save', async () => {
-      let resolvePromise: (value: any) => void
-      const savePromise = new Promise(resolve => {
+      let resolvePromise: (value: string[]) => void
+      const savePromise = new Promise<string[]>(resolve => {
         resolvePromise = resolve
       })
       mockInvoke.mockReturnValueOnce(savePromise)

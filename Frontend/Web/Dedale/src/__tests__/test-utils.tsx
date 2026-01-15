@@ -54,7 +54,7 @@ export const createMockInvoke = () => {
   const mockInvoke = vi.fn()
   
   // Default implementations
-  mockInvoke.mockImplementation((command, args) => {
+  mockInvoke.mockImplementation((command) => {
     switch (command) {
       case 'fetch_events':
         return Promise.resolve([mockEvent()])
@@ -75,5 +75,6 @@ export const createMockInvoke = () => {
 }
 
 // Re-export everything from @testing-library/react
+// eslint-disable-next-line react-refresh/only-export-components
 export * from '@testing-library/react'
 export { default as userEvent } from '@testing-library/user-event'

@@ -10,10 +10,7 @@ import {
   fetchEventById,
   createEvent,
   updateEvent,
-  deleteEvent,
-  createEventGeometry,
-  updateEventGeometry,
-  deleteEventGeometry
+  deleteEvent
 } from '../../services/eventService'
 import { invoke } from '@tauri-apps/api/core'
 

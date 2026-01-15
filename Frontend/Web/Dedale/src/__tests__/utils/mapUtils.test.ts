@@ -7,12 +7,9 @@ import {
   formatCoordinates,
   validateCoordinates,
   parseGeoJSON,
-  generateGeoJSON,
-  normalizeEventData,
   validateEventData,
   sortEventsByDate,
-  filterEventsByStatus,
-  searchEvents
+  filterEventsByStatus
 } from '../../utils/mapUtils'
 
 describe('mapUtils', () => {
