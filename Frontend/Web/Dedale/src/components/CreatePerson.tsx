@@ -1,13 +1,6 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-
-export interface Person {
-    id: string;
-    firstname: string;
-    lastname: string;
-    email: string;
-    phone_number: string;
-}
+import { Person } from "../types";
 
 interface CreatePersonProps {
     onClose: () => void;

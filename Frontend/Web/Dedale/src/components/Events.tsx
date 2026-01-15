@@ -19,15 +19,10 @@ import {
   faFilter,
 } from "@fortawesome/free-solid-svg-icons";
 import toast from 'react-hot-toast';
+import { Event } from "../types";
 
-// Types
-export interface Event {
-  id: string;
-  name: string;
-  start_date: string;
-  end_date: string;
-  statut: string;
-}
+// Re-export Event for backward compatibility with App.tsx
+export type { Event } from "../types";
 
 interface EventsProps {
   onEventClick?: (eventId: string) => void;
@@ -396,8 +391,8 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
                 }
 
                 // Status filter
-                const startDate = new Date(event.start_date);
-                const endDate = new Date(event.end_date);
+                const startDate = new Date(event.start_date ?? '');
+                const endDate = new Date(event.end_date ?? '');
                 if (statusFilter === "future" && startDate <= now) return false;
                 if (statusFilter === "in_progress" && (startDate > now || endDate < now)) return false;
                 if (statusFilter === "past" && endDate >= now) return false;
@@ -452,7 +447,7 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
                           <div className="flex flex-col text-sm">
                             <span className="text-gray-500 text-xs">Période</span>
                             <span className="font-medium text-gray-800">
-                              {formatDate(event.start_date)} - {formatDate(event.end_date)}
+                              {formatDate(event.start_date ?? '')} - {formatDate(event.end_date ?? '')}
                             </span>
                           </div>
                         </div>

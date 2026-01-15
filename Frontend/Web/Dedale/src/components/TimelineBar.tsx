@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from "react";
-import { MapPoint, MapEvent, Equipement } from "../types/map";
+import { MapPoint, MapEvent, Equipement, MapBounds, Team } from "../types";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -10,14 +10,6 @@ import {
   faTimes,
 } from "@fortawesome/free-solid-svg-icons";
 
-// --- Types ---
-interface MapBounds {
-  north: number;
-  south: number;
-  east: number;
-  west: number;
-}
-
 interface TimelineBarProps {
   event: MapEvent;
   points: MapPoint[];
@@ -27,12 +19,6 @@ interface TimelineBarProps {
   onClose: () => void;
   onDateChange: (date: Date | null) => void;
   mapBounds?: MapBounds | null;
-}
-
-interface Team {
-  id: string;
-  name: string;
-  event_id: string;
 }
 
 // --- Fonctions utilitaires ---
