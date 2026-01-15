@@ -23,14 +23,18 @@ export const interpolateWidth = (widthAtZ19: number) => [
   widthAtZ19,
 ];
 
-export const getMapStyle = (): StyleSpecification =>
+/**
+ * Génère le style de la carte avec l'URL du fichier PMTiles
+ * @param pmtilesUrl - URL vers le fichier PMTiles (file:// pour local, ou chemin relatif pour dev)
+ */
+export const getMapStyle = (pmtilesUrl?: string): StyleSpecification =>
   ({
     version: 8,
     sources: {
       // Source Raster (Tuiles PNG depuis PMTiles)
       "raster-tiles": {
         type: "raster",
-        url: "pmtiles:///eurometropole_strasbourg.pmtiles",
+        url: `pmtiles://${pmtilesUrl || "/eurometropole_strasbourg.pmtiles"}`,
         tileSize: 256,
       },
     },

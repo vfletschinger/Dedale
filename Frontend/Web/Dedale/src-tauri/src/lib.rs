@@ -5,8 +5,9 @@ mod db;
 mod excel;
 mod geocoding;
 mod map;
-mod map_static;
+mod map_pdf;
 mod pdf;
+mod pmtiles;
 mod seed;
 mod socket;
 mod types;
@@ -117,6 +118,7 @@ pub fn run() {
             db::fetch_team_actions,
             geocoding::search_address,
             db::fetch_teams_for_event,
+            db::fetch_teams_with_actions_for_event,
             db::fetch_actions_for_team,
             db::fetch_actions_for_equipement,
             db::update_action_status,
@@ -124,6 +126,8 @@ pub fn run() {
             db::create_planning_pdf,
             db::send_equipements_to_mobile,
             db::send_planning,
+            pmtiles::get_pmtiles_file_path,
+            geocoding::reverse_geocode,
         ])
         .run(tauri::generate_context!())
         .expect("Erreur lors de l'exécution de l'application Tauri");

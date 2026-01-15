@@ -94,7 +94,7 @@ pub async fn export_points_excel(app: AppHandle, event_id: Option<String>) -> Re
         current_row += 1;
     }
 
-    let (dir_path, file_name) = utils::create_file_name("xlsx".to_string());
+    let (dir_path, file_name) = utils::create_file_name("recap".to_string(), "xlsx".to_string());
 
     if let Some(file_path) = utils::show_save_dialog(&file_name, &dir_path, "xlsx".to_string()) {
         println!("💾 Saving workbook... {}", file_path.display());

@@ -3,15 +3,14 @@ import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 
 import { useNavigation } from "./hooks/useNavigation";
-import Navigation from "./components/Navigation";
+import Navigation from "./components/layout/Navigation";
 import Data from "./components/Data";
-import Teams from "./components/Teams";
-import Map from "./components/Map";
-import Event from "./components/Events";
+import TeamsAndPersons from "./components/features/teams/TeamsAndPersons";
+import Map from "./components/features/map/Map";
+import Event from "./components/features/events/Events";
 import AdminForm from "./components/AdminForm";
-import Persons from "./components/Persons";
-import Planning from "./components/Planning";
-import { Event as AppEvent } from "./components/Events";
+import Planning from "./components/features/planning/Planning";
+import { Event as AppEvent } from "./types";
 
 import LoadingScreen from "./components/LoadingScreen";
 import { Toaster } from 'react-hot-toast';
@@ -88,14 +87,13 @@ function App() {
   }, []);
 
   useEffect(() => {
-    // Si on demande d'aller voir une équipe
+    // Si on demande d'aller voir une équipe ou une personne
     const unlistenTeam = listen('navigate-to-team', () => {
-      navigate("team");
+      navigate("team-person");
     });
 
-    // Si on demande d'aller voir une personne
     const unlistenPerson = listen('navigate-to-person', () => {
-      navigate("person");
+      navigate("team-person");
     });
 
     // Si on demande d'aller voir un event
@@ -153,8 +151,8 @@ function App() {
         <Navigation
           currentPage={currentPage}
           onNavigate={(page) => {
-            // Empêcher la navigation vers map, team, person, data ou planning si aucun événement sélectionné
-            if (!selectedEventId && (page === "map" || page === "team" || page === "person" || page === "data" || page === "planning")) {
+            // Empêcher la navigation vers map, team-person, data ou planning si aucun événement sélectionné
+            if (!selectedEventId && (page === "map" || page === "team-person" || page === "data" || page === "planning")) {
               alert("Veuillez sélectionner un événement avant d'accéder à cette page.");
               return;
             }
@@ -191,24 +189,17 @@ function App() {
             </PageWrapper>
           )}
 
-          {/* Teams - kept mounted once visited */}
-          {selectedEventId && hasVisited("team") && (
-            <PageWrapper isVisible={currentPage === "team"}>
-              <Teams activeEventId={selectedEventId} />
-            </PageWrapper>
-          )}
-
-          {/* Persons - kept mounted once visited */}
-          {hasVisited("person") && (
-            <PageWrapper isVisible={currentPage === "person"}>
-              <Persons activeEventId={selectedEventId} />
+          {/* Teams and Persons - kept mounted once visited */}
+          {selectedEventId && hasVisited("team-person") && (
+            <PageWrapper isVisible={currentPage === "team-person"}>
+              <TeamsAndPersons activeEventId={selectedEventId} />
             </PageWrapper>
           )}
 
           {/* Data - kept mounted once visited */}
           {hasVisited("data") && (
             <PageWrapper isVisible={currentPage === "data"}>
-              <Data />
+              <Data selectedEventId={selectedEventId} />
             </PageWrapper>
           )}
 
@@ -229,9 +220,6 @@ function App() {
             </div>
             <div>
               <div className="text-sm font-semibold text-white">Événements au total</div>
-              <div className="text-xs text-gray-400">
-                {events.filter((e) => e.statut === 'active' || e.statut === 'Actif').length} actif(s)
-              </div>
             </div>
           </div>
         </div>
