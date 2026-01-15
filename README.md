@@ -1,5 +1,9 @@
 # Dédale
 
+[![Rust](https://img.shields.io/badge/Backend-Rust-orange?logo=rust)](https://www.rust-lang.org/)
+[![React](https://img.shields.io/badge/Frontend-React-blue?logo=react)](https://react.dev/)
+[![React Native](https://img.shields.io/badge/Mobile-React_Native-61DAFB?logo=react)](https://reactnative.dev/)
+
 ## Présentation du projet
 
 **Dédale** est une application développée pour le compte de **l’Eurométropole de Strasbourg**, destinée à la **gestion et à l’organisation de manifestations sportives et d’événements publics** (courses, événements urbains, etc.).
