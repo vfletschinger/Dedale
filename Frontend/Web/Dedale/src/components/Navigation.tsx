@@ -16,7 +16,7 @@ interface NavigationProps {
 const NAV_ITEMS: { key: PageKey; label: string }[] = [
   { key: "event", label: "Événements" },
   { key: "map", label: "Carte" },
-  { key: "team-person", label: "Équipes & Personnes" },
+  { key: "team-person", label: "Équipes" },
   { key: "planning", label: "Planning" },
   { key: "data", label: "Données" },
 ];
