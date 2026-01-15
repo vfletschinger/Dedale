@@ -32,7 +32,8 @@
     "targets": "all",
     "resources": [
       "resources/addresses.db",
-      "resources/eurometropole_strasbourg.pmtiles"
+      "resources/eurometropole_strasbourg.pmtiles",
+      "fonts/*"
     ],
     "icon": [
       "icons/dedale.ico"
