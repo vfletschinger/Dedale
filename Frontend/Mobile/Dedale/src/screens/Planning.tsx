@@ -2,407 +2,571 @@ import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
+  StyleSheet,
   ScrollView,
-  SafeAreaView,
-  StatusBar,
-  TouchableOpacity,
-  Alert,
   ActivityIndicator,
+  Pressable,
 } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { SQLiteDatabase } from "expo-sqlite";
+import {
+  useSafeAreaInsets,
+  SafeAreaView,
+} from "react-native-safe-area-context";
+import getDatabase from "../../assets/migrations";
 import { useEvent } from "../context/EventContext";
-import { PlanningTeam, PlanningAction } from "../types/planning";
-import { getDatabase } from "../../assets/migrations";
-import "../style/global.css";
+import { RootStackParamList } from "../types/navigation";
+import QRCodeScanner from "../components/QrCodeScanner";
+import Colors from "../constants/colors";
 
-interface TeamWithActions extends PlanningTeam {
-  actions: PlanningAction[];
+interface Action {
+  id: string;
+  team_id: string;
+  equipement_id: string;
+  type: string | null;
+  scheduled_time: string | null;
+  is_done: number;
+  equipement_name?: string;
 }
 
-interface MessageType {
-  type: "success" | "error";
-  text: string;
+interface Team {
+  id: string;
+  event_id: string;
+  name: string;
 }
 
 export default function PlanningScreen() {
-  const { getSelectedEvent } = useEvent();
-  const event = getSelectedEvent();
-  const [teams, setTeams] = useState<TeamWithActions[]>([]);
-  const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
-  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
-  const [message, setMessage] = useState<MessageType | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { selectedEventId, getSelectedEvent } = useEvent();
+  const selectedEvent = getSelectedEvent();
+  const insets = useSafeAreaInsets();
+
+  const [db, setDb] = useState<SQLiteDatabase | null>(null);
+  const [team, setTeam] = useState<Team | null>(null);
+  const [actions, setActions] = useState<Action[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [scanQR, setScanQR] = useState(false);
 
   useEffect(() => {
-    // Charger les équipes et actions depuis la base de données
-    if (!event?.id) return;
-    
     try {
-      const db = getDatabase();
-      const eventId = event.id;
-      
-      // Charger les équipes de l'event
-      const teamsList = db.getAllSync<any>(
-        "SELECT * FROM team WHERE event_id = ?",
-        [eventId]
-      );
-      
-      // Charger les actions de l'event
-      const actionsList = db.getAllSync<any>(
-        "SELECT * FROM action WHERE team_id IN (SELECT id FROM team WHERE event_id = ?)",
-        [eventId]
-      );
-      
-      // Charger les membres des équipes
-      const teamsWithMembers = teamsList.map((team: any) => {
-        const members = db.getAllSync<any>(
-          "SELECT * FROM team_member WHERE team_id = ?",
-          [team.id]
-        );
-        
-        return {
-          id: team.id,
-          name: team.name,
-          number: team.number || 0,
-          event_id: team.event_id,
-          members: members || [],
-          actions: actionsList.filter((a: any) => a.team_id === team.id),
-        };
-      });
-      
-      console.log('Planning - Équipes chargées:', teamsWithMembers);
-      setTeams(teamsWithMembers);
+      const database = getDatabase();
+      setDb(database);
+      loadData(database);
     } catch (error) {
-      console.error('Erreur chargement planning:', error);
-      setMessage({
-        type: "error",
-        text: "Erreur lors du chargement des équipes",
-      });
+      console.error("Error initializing database:", error);
+      setLoading(false);
     }
-  }, [event?.id]);
+  }, [selectedEventId]);
 
-  const toggleTeamExpanded = (teamId: string) => {
-    const newExpanded = new Set(expandedTeams);
-    if (newExpanded.has(teamId)) {
-      newExpanded.delete(teamId);
-    } else {
-      newExpanded.add(teamId);
+  // Rafraîchir les données quand on revient sur l'écran
+  useFocusEffect(
+    useCallback(() => {
+      if (db) {
+        loadData(db);
+      }
+    }, [db, selectedEventId])
+  );
+
+  const loadData = (database: SQLiteDatabase) => {
+    try {
+      if (!database) {
+        console.error("Database not initialized");
+        setLoading(false);
+        return;
+      }
+
+      if (!selectedEventId) {
+        console.log("Aucun événement sélectionné");
+        setTeam(null);
+        setActions([]);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        // Récupérer la première équipe qui a des actions
+        const teamResult = database.getFirstSync<Team>(
+          `SELECT t.* FROM team t
+           INNER JOIN action a ON a.team_id = t.id
+           WHERE t.event_id = ?
+           GROUP BY t.id
+           HAVING COUNT(a.id) > 0
+           LIMIT 1`,
+          [selectedEventId]
+        );
+        setTeam(teamResult || null);
+
+        if (teamResult) {
+          const actionsResult = database.getAllSync<Action>(
+            `SELECT a.*, t.name as equipement_name 
+             FROM action a 
+             LEFT JOIN equipement e ON a.equipement_id = e.id
+             LEFT JOIN type t ON e.type_id = t.id
+             WHERE a.team_id = ?
+             ORDER BY a.scheduled_time ASC`,
+            [teamResult.id]
+          );
+          setActions(actionsResult || []);
+        } else {
+          setActions([]);
+        }
+      } catch (error) {
+        console.error("Erreur lors du chargement des données:", error);
+        setTeam(null);
+        setActions([]);
+      }
+    } catch (error) {
+      console.error("Erreur générale lors du chargement des données:", error);
+    } finally {
+      setLoading(false);
     }
-    setExpandedTeams(newExpanded);
   };
 
-  const formatDateTime = (dateString?: string | null): string => {
+  const formatDate = (dateString: string | null) => {
     if (!dateString) return "Non planifié";
     try {
       const date = new Date(dateString);
-      return date.toLocaleTimeString("fr-FR", {
+      if (isNaN(date.getTime())) return "Non planifié";
+      return date.toLocaleString("fr-FR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
         hour: "2-digit",
         minute: "2-digit",
+        timeZone: "Europe/Paris",
       });
-    } catch {
-      return dateString;
+    } catch (e) {
+      console.error("Erreur format date:", e);
+      return "Non planifié";
     }
   };
 
-  const generateTeamPDF = useCallback(async (teamId: string) => {
-    setMessage(null);
-    setIsLoading(true);
-    try {
-      // Pour mobile, on simule la génération
-      Alert.alert(
-        "PDF Équipe",
-        `Génération du PDF pour l'équipe ${teamId}`,
-        [{ text: "OK" }]
-      );
-
-      setMessage({
-        type: "success",
-        text: "PDF de l'équipe généré avec succès",
-      });
-    } catch (error) {
-      console.error("Erreur PDF équipe:", error);
-      setMessage({
-        type: "error",
-        text: `Erreur PDF: ${String(error)}`,
-      });
-    } finally {
-      setIsLoading(false);
+  const getActionTypeLabel = (type: string | null) => {
+    switch (type) {
+      case "pose":
+        return "Pose";
+      case "retrait":
+        return "Retrait";
+      case "déploiement":
+        return "Déploiement";
+      case "inspection":
+        return "Inspection";
+      default:
+        return type || "Action";
     }
-  }, []);
+  };
 
-  const exportToExcel = useCallback(async () => {
-    if (!event?.id) return;
-    setIsLoading(true);
-    try {
-      const db = getDatabase();
-      const eventId = event?.id;
-      
-      // Récupérer les données des équipes et actions
-      const teamsData = db.getAllSync<any>(
-        "SELECT * FROM team WHERE event_id = ?",
-        [eventId]
-      );
-      
-      const actionsData = db.getAllSync<any>(
-        "SELECT * FROM action WHERE team_id IN (SELECT id FROM team WHERE event_id = ?)",
-        [eventId]
-      );
-      
-      // Formater les données pour Excel
-      const formattedData = teamsData.map((team: any) => {
-        const teamActions = actionsData.filter((a: any) => a.team_id === team.id);
-        return {
-          "Équipe ID": team.id,
-          "Nom de l'équipe": team.name,
-          "Nombre d'actions": teamActions.length,
-          "Actions": teamActions.map((a: any) => a.action_type).join(", "),
-        };
-      });
-      
-      // Afficher un message de succès
-      Alert.alert(
-        "Export Excel",
-        "Les données ont été exportées avec succès",
-        [{ text: "OK" }]
-      );
-      
-      setMessage({
-        type: "success",
-        text: "Données exportées vers Excel avec succès",
-      });
-    } catch (error) {
-      console.error("Erreur export Excel:", error);
-      setMessage({
-        type: "error",
-        text: `Erreur export Excel: ${String(error)}`,
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [event?.id]);
-
-  if (!event?.id) {
+  if (scanQR) {
     return (
-      <SafeAreaView className="flex-1 bg-white">
-        <View className="flex-1 items-center justify-center">
-          <Feather name="inbox" size={48} color="#94a3b8" />
-          <Text className="text-gray-600 mt-4">Aucun événement</Text>
+      <SafeAreaView style={styles.container} edges={["top"]}>
+        <View style={styles.scannerHeader}>
+          <Pressable onPress={() => setScanQR(false)} style={styles.backButton}>
+            <Feather name="arrow-left" size={24} color="#fff" />
+            <Text style={styles.backText}>Retour</Text>
+          </Pressable>
         </View>
+        <QRCodeScanner
+          setScanQR={setScanQR}
+          dataType="planning"
+          onImportSuccess={() => db && loadData(db)}
+        />
       </SafeAreaView>
     );
   }
 
-  return (
-    <SafeAreaView className="flex-1 bg-gradient-to-b from-slate-50 to-slate-100">
-      <View className="bg-white border-b border-slate-200 px-4 py-4 shadow-sm">
-        <Text className="text-2xl font-bold text-slate-800">📋 Planning</Text>
-        <Text className="text-sm text-slate-500 mt-1">
-          {teams.length} équipe{teams.length !== 1 ? "s" : ""} •{" "}
-          {teams.reduce((sum, t) => sum + (t.actions?.length || 0), 0)} action
-          {teams.reduce((sum, t) => sum + (t.actions?.length || 0), 0) !== 1
-            ? "s"
-            : ""}
-        </Text>
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color={Colors.secondary} />
       </View>
+    );
+  }
 
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+  if (!selectedEventId) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.mainTitle}>Planning</Text>
+        <Text style={styles.emptyText}>Veuillez sélectionner un événement</Text>
+      </View>
+    );
+  }
 
-      <ScrollView className="flex-1 px-4 py-4" showsVerticalScrollIndicator={false}>
-        {/* Message d'erreur/succès */}
-        {message && (
-          <View
-            className={`p-4 rounded-lg mb-4 border-l-4 ${
-              message.type === "success"
-                ? "bg-green-50 border-green-300"
-                : "bg-red-50 border-red-300"
-            }`}
+  if (!team) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.headerRow}>
+          <Text style={styles.mainTitle}>Planning</Text>
+          <Pressable
+            style={({ pressed }) => [
+              styles.qrIconButton,
+              pressed && styles.qrIconButtonPressed,
+            ]}
+            onPress={() => setScanQR(true)}
           >
-            <Text
-              className={`font-medium text-sm ${
-                message.type === "success"
-                  ? "text-green-700"
-                  : "text-red-700"
-              }`}
-            >
-              {message.text}
-            </Text>
-          </View>
+            <MaterialCommunityIcons
+              name="qrcode-scan"
+              size={24}
+              color={Colors.secondary}
+            />
+          </Pressable>
+        </View>
+        {selectedEvent && (
+          <Text style={styles.eventName}>{selectedEvent.name}</Text>
+        )}
+        <View style={styles.emptyState}>
+          <Feather name="users" size={48} color={Colors.textMuted} />
+          <Text style={styles.emptyText}>Aucune équipe pour cet événement</Text>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <ScrollView style={styles.scrollContent}>
+        <View style={styles.headerRow}>
+          <Text style={styles.mainTitle}>Planning</Text>
+          <Pressable
+            style={({ pressed }) => [
+              styles.qrIconButton,
+              pressed && styles.qrIconButtonPressed,
+            ]}
+            onPress={() => setScanQR(true)}
+          >
+            <MaterialCommunityIcons
+              name="qrcode-scan"
+              size={24}
+              color={Colors.secondary}
+            />
+          </Pressable>
+        </View>
+        {selectedEvent && (
+          <Text style={styles.eventName}>{selectedEvent.name}</Text>
         )}
 
-        {/* Actions d'export */}
-        <View className="mb-6 gap-3">
-          <View>
-            <Text className="text-sm font-semibold text-slate-700 mb-2">
-              Équipe pour PDF
-            </Text>
-            <TouchableOpacity
-              className="bg-white border border-slate-300 rounded-lg px-3 py-3"
-              onPress={() => {
-                Alert.alert(
-                  "Sélectionner une équipe",
-                  "Choisissez une équipe",
-                  teams.map((team) => ({
-                    text: team.name || `Équipe ${team.number}`,
-                    onPress: () => setSelectedTeamId(team.id),
-                  })).concat([
-                    { text: "Annuler", style: "cancel" },
-                  ])
-                );
-              }}
-            >
-              <Text className="text-slate-700">
-                {selectedTeamId
-                  ? teams.find((t) => t.id === selectedTeamId)?.name ||
-                    `Équipe ${teams.find((t) => t.id === selectedTeamId)?.number}`
-                  : "-- Sélectionner une équipe --"}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <TouchableOpacity
-            onPress={exportToExcel}
-            disabled={isLoading}
-            className="bg-green-600 px-6 py-3 rounded-lg"
-          >
-            {isLoading ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <Text className="text-white text-center font-semibold">
-                Exporter en Excel
-              </Text>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => selectedTeamId && generateTeamPDF(selectedTeamId)}
-            disabled={isLoading || !selectedTeamId}
-            className={`px-6 py-3 rounded-lg ${
-              selectedTeamId && !isLoading
-                ? "bg-purple-600"
-                : "bg-gray-400"
-            }`}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <Text className="text-white text-center font-semibold">
-                📥 Télécharger PDF (Équipe)
-              </Text>
-            )}
-          </TouchableOpacity>
+        <View style={styles.teamHeader}>
+          <Feather name="users" size={32} color={Colors.secondary} />
+          <Text style={styles.teamName}>{team.name}</Text>
         </View>
 
-        {/* Liste des équipes */}
-        {isLoading && teams.length === 0 ? (
-          <View className="items-center justify-center py-12">
-            <ActivityIndicator size="large" color="#3b82f6" />
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryNumber}>{actions.length}</Text>
+            <Text style={styles.summaryLabel}>Actions</Text>
           </View>
-        ) : teams.length === 0 ? (
-          <View className="items-center justify-center py-12">
-            <Feather name="calendar" size={48} color="#cbd5e1" />
-            <Text className="text-slate-600 mt-4 font-semibold text-center">
-              Aucun planning disponible
+          <View style={styles.summaryDivider} />
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryNumber}>
+              {actions.filter((a) => a.is_done).length}
             </Text>
-            <Text className="text-slate-500 mt-2 text-sm text-center px-4">
-              Le planning sera affiché une fois connecté
-            </Text>
+            <Text style={styles.summaryLabel}>Terminées</Text>
           </View>
-        ) : (
-          teams.map((team) => (
+          <View style={styles.summaryDivider} />
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryNumber}>
+              {actions.filter((a) => !a.is_done).length}
+            </Text>
+            <Text style={styles.summaryLabel}>En attente</Text>
+          </View>
+        </View>
+
+        <Text style={styles.sectionTitle}>Actions de l'équipe</Text>
+
+        {actions.length > 0 ? (
+          actions.map((action) => (
             <View
-              key={team.id}
-              className="mb-4 bg-white rounded-lg overflow-hidden shadow-sm border border-slate-200"
+              key={action.id}
+              style={[
+                styles.actionCard,
+                action.is_done ? styles.actionCardDone : undefined,
+              ]}
             >
-              <TouchableOpacity
-                onPress={() => toggleTeamExpanded(team.id)}
-                className="bg-gradient-to-r from-blue-500 to-blue-600 px-4 py-4 flex-row items-center justify-between active:opacity-80"
-              >
-                <View className="flex-row items-center flex-1">
-                  <Text className="text-white text-xl mr-3">👥</Text>
-                  <View className="flex-1">
-                    <Text className="text-white font-bold text-base">
-                      Équipe {team.number}
+              <View style={styles.actionHeader}>
+                <Text style={styles.actionType}>
+                  {getActionTypeLabel(action.type)}
+                </Text>
+                <View
+                  style={[
+                    styles.statusBadge,
+                    action.is_done ? styles.statusDone : styles.statusPending,
+                  ]}
+                >
+                  <Text style={styles.statusText}>
+                    {action.is_done ? "Terminée" : "En attente"}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.actionDetails}>
+                <View style={styles.detailRow}>
+                  <Feather name="clock" size={14} color="#666" />
+                  <Text style={styles.detailText}>
+                    {formatDate(action.scheduled_time)}
+                  </Text>
+                </View>
+
+                {action.equipement_name && (
+                  <View style={styles.detailRow}>
+                    <Feather name="box" size={14} color="#666" />
+                    <Text style={styles.detailText}>
+                      {action.equipement_name}
                     </Text>
-                    {team.name && (
-                      <Text className="text-blue-100 text-sm">{team.name}</Text>
-                    )}
                   </View>
-                </View>
-                <View className="flex-row items-center">
-                  <Text className="text-blue-100 text-xs mr-2">
-                    {team.actions?.length || 0} actions
-                  </Text>
-                  <Text className="text-white text-lg">
-                    {expandedTeams.has(team.id) ? "▼" : "▶"}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-
-              {expandedTeams.has(team.id) && (
-                <View className="px-4 py-4 border-t border-slate-200">
-                  {/* Actions */}
-                  {team.actions && team.actions.length > 0 ? (
-                    <View className="mb-4">
-                      <Text className="text-sm font-bold text-slate-700 mb-3">
-                        Actions ({team.actions.length})
-                      </Text>
-                      {team.actions.map((action) => (
-                        <View
-                          key={action.id}
-                          className={`flex-row items-center p-3 mb-2 rounded-lg border-l-4 ${
-                            action.is_done
-                              ? "bg-green-50 border-green-500"
-                              : "bg-orange-50 border-orange-500"
-                          }`}
-                        >
-                          <Text className="text-lg mr-3">
-                            {action.is_done ? "✓" : "⏳"}
-                          </Text>
-                          <View className="flex-1">
-                            <Text className="font-semibold text-slate-800">
-                              {action.equipement_name || action.action_type || "Action"}
-                            </Text>
-                            <Text className="text-xs text-slate-500 mt-1">
-                              {formatDateTime(action.scheduled_time)}
-                            </Text>
-                          </View>
-                          <Text className="text-xs font-bold px-2 py-1 rounded bg-slate-200 text-slate-700">
-                            {action.is_done ? "Complétée" : "En attente"}
-                          </Text>
-                        </View>
-                      ))}
-                    </View>
-                  ) : (
-                    <Text className="text-slate-500 italic text-sm mb-4">
-                      Aucune action pour cette équipe
-                    </Text>
-                  )}
-
-                  {/* Membres */}
-                  {team.members && team.members.length > 0 && (
-                    <View className="pt-3 border-t border-slate-100">
-                      <Text className="text-sm font-bold text-slate-700 mb-3">
-                        Membres ({team.members.length})
-                      </Text>
-                      {team.members.map((member) => (
-                        <View
-                          key={member.id}
-                          className="bg-slate-50 rounded px-3 py-2 mb-2 flex-row items-center"
-                        >
-                          <Feather name="user" size={16} color="#64748b" />
-                          <Text className="text-sm text-slate-700 ml-2 flex-1">
-                            {member.firstname} {member.lastname}
-                          </Text>
-                        </View>
-                      ))}
-                    </View>
-                  )}
-                </View>
-              )}
+                )}
+              </View>
             </View>
           ))
+        ) : (
+          <View style={styles.emptyState}>
+            <Feather name="inbox" size={48} color="#ccc" />
+            <Text style={styles.emptyText}>
+              Aucune action pour cette équipe
+            </Text>
+          </View>
         )}
+        <View style={{ height: 100 }} />
       </ScrollView>
-    </SafeAreaView>
+
+      {actions.filter((a) => !a.is_done).length > 0 && (
+        <View
+          style={[
+            styles.bottomButtonContainer,
+            { paddingBottom: Math.max(insets.bottom, 16) },
+          ]}
+        >
+          <Pressable
+            style={({ pressed }) => [
+              styles.guidanceButton,
+              pressed && styles.guidanceButtonPressed,
+            ]}
+            onPress={() =>
+              navigation.navigate("TeamGuidance", {
+                teamId: team.id,
+                teamName: team.name,
+              })
+            }
+          >
+            <View style={styles.guidanceButtonContent}>
+              <Feather name="navigation" size={22} color="#fff" />
+              <Text style={styles.guidanceButtonText}>
+                Commencer le guidage
+              </Text>
+            </View>
+          </Pressable>
+        </View>
+      )}
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#f5f5f5",
+  },
+  scrollContent: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 30,
+    marginBottom: 4,
+    paddingHorizontal: 16,
+  },
+  mainTitle: {
+    fontSize: 28,
+    fontWeight: "bold",
+    color: "#333",
+  },
+  qrIconButton: {
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: "#EFF6FF",
+  },
+  qrIconButtonPressed: {
+    backgroundColor: "#DBEAFE",
+  },
+  eventName: {
+    fontSize: 16,
+    color: Colors.secondary,
+    marginBottom: 16,
+    fontWeight: "500",
+    paddingHorizontal: 16,
+  },
+  teamHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 16,
+  },
+  teamName: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#333",
+  },
+  summaryCard: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 20,
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+    marginBottom: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  summaryItem: {
+    alignItems: "center",
+  },
+  summaryNumber: {
+    fontSize: 28,
+    fontWeight: "bold",
+    color: Colors.secondary,
+  },
+  summaryLabel: {
+    fontSize: 12,
+    color: "#666",
+    marginTop: 4,
+  },
+  summaryDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: "#e0e0e0",
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 12,
+  },
+  actionCard: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: "#FF9500",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  actionCardDone: {
+    borderLeftColor: Colors.accent,
+    opacity: 0.8,
+  },
+  actionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  actionType: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusPending: {
+    backgroundColor: "#FFF3E0",
+  },
+  statusDone: {
+    backgroundColor: "#E8F5E9",
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#333",
+  },
+  actionDetails: {
+    gap: 8,
+  },
+  detailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  detailText: {
+    fontSize: 14,
+    color: "#666",
+  },
+  emptyState: {
+    alignItems: "center",
+    paddingVertical: 48,
+  },
+  emptyText: {
+    textAlign: "center",
+    fontSize: 16,
+    color: "#999",
+    marginTop: 12,
+  },
+  bottomButtonContainer: {
+    backgroundColor: Colors.secondary,
+    position: "absolute",
+    bottom: -1,
+    left: -1,
+    right: -1,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 16,
+    borderTopWidth: 1,
+    borderTopStartRadius: 24,
+    borderTopEndRadius: 24,
+    borderTopColor: Colors.border,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 8,
+  },
+  guidanceButton: {
+    backgroundColor: Colors.secondary,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    borderRadius: 14,
+    elevation: 6,
+  },
+  guidanceButtonContent: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  guidanceButtonPressed: {
+    backgroundColor: Colors.secondaryDark,
+  },
+  guidanceButtonText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+    flexShrink: 0,
+  },
+  scannerHeader: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  backButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  backText: {
+    color: Colors.accent,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+});

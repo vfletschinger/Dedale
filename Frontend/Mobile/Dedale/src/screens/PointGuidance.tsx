@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
-  SafeAreaView,
   StatusBar,
   TouchableOpacity,
   ActivityIndicator,
@@ -10,11 +9,15 @@ import {
 } from "react-native";
 import MapView, { Marker, Polyline, PROVIDER_DEFAULT } from "react-native-maps";
 import * as Location from "expo-location";
-import { useRoute, useNavigation, useIsFocused } from "@react-navigation/native";
+import {
+  useRoute,
+  useNavigation,
+  useIsFocused,
+} from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import { usePoints } from "../context/PointsContext";
 import { InterestPointsType } from "../types/database";
-import "../style/global.css";
+import Colors from "../constants/colors";
 
 type RouteParams = {
   startPointId?: string;
@@ -176,44 +179,41 @@ export default function PointGuidanceScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 bg-white">
+      <View className="flex-1 bg-white">
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="#0066cc" />
+          <ActivityIndicator size="large" color={Colors.secondary} />
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   if (error || !startPoint || !endPoint) {
     return (
-      <SafeAreaView className="flex-1 bg-white">
+      <View className="flex-1 bg-white">
         <View className="flex-1 items-center justify-center px-4">
-          <Feather name="alert-circle" size={48} color="#ef4444" />
+          <Feather name="alert-circle" size={48} color={Colors.error} />
           <Text className="text-red-600 font-semibold text-center mt-4">
             {error || "Points non trouvés"}
           </Text>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
-            className="mt-6 bg-blue-500 px-6 py-3 rounded-lg"
+            className="mt-6 bg-secondary px-6 py-3 rounded-lg"
           >
             <Text className="text-white font-semibold">Retour</Text>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <View className="flex-1 bg-white">
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
 
       {/* Header */}
       <View className="bg-gradient-to-r from-blue-500 to-blue-600 px-4 py-4 shadow-md">
         <View className="flex-row items-center justify-between mb-2">
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            className="p-2"
-          >
+          <TouchableOpacity onPress={() => navigation.goBack()} className="p-2">
             <Feather name="arrow-left" size={24} color="white" />
           </TouchableOpacity>
           <Text className="text-white text-lg font-bold flex-1 ml-3">
@@ -312,11 +312,9 @@ export default function PointGuidanceScreen() {
         </View>
 
         <TouchableOpacity
-          onPress={() =>
-            setLocationTracking(!locationTracking)
-          }
+          onPress={() => setLocationTracking(!locationTracking)}
           className={`mt-3 py-3 px-4 rounded-lg flex-row items-center justify-center ${
-            locationTracking ? "bg-blue-500" : "bg-slate-400"
+            locationTracking ? "bg-secondary" : "bg-slate-400"
           }`}
         >
           <Feather name="navigation-2" size={18} color="white" />
@@ -325,6 +323,6 @@ export default function PointGuidanceScreen() {
           </Text>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }

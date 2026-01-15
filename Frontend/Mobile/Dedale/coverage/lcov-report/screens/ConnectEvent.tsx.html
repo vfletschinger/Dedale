@@ -273,7 +273,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { View, Text, Pressable, FlatList } from "react-native";
 import {
-  SafeAreaView,
+  View,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import QRCodeScanner from "../components/QrCodeScanner";
@@ -321,7 +321,7 @@ export default function <span class="fstat-no" title="function not covered" >Con
 &nbsp;
 <span class="cstat-no" title="statement not covered" >  if (scanQR) {</span>
 <span class="cstat-no" title="statement not covered" >    return (</span>
-      &lt;SafeAreaView className="container" edges={["top"]}&gt;
+      &lt;View className="container" edges={["top"]}&gt;
         &lt;View className="header header-row"&gt;
           &lt;Pressable onPress={<span class="fstat-no" title="function not covered" >()</span> =&gt; <span class="cstat-no" title="statement not covered" >setScanQR(false)}</span> className="row gap-2"&gt;
             &lt;Feather name="arrow-left" size={24} color="#fff" /&gt;
@@ -329,17 +329,17 @@ export default function <span class="fstat-no" title="function not covered" >Con
           &lt;/Pressable&gt;
         &lt;/View&gt;
         &lt;QRCodeScanner setScanQR={setScanQR} /&gt;
-      &lt;/SafeAreaView&gt;
+      &lt;/View&gt;
     );
   }
 &nbsp;
 <span class="cstat-no" title="statement not covered" >  return (</span>
     &lt;View className="container"&gt;
-      &lt;SafeAreaView edges={["top"]} className="bg-blue-500"&gt;
+      &lt;View edges={["top"]} className="bg-blue-500"&gt;
         &lt;View className="bg-blue-500 pb-4 px-4"&gt;
           &lt;Text className="header-title"&gt;Sélectionner un événement&lt;/Text&gt;
         &lt;/View&gt;
-      &lt;/SafeAreaView&gt;
+      &lt;/View&gt;
 &nbsp;
       &lt;FlatList
         data={events}
