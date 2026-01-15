@@ -28,8 +28,8 @@ export default function EventItem({
         case "planifié":
           return {
             label: "planifié",
-            color: "bg-blue-100",
-            textColor: "text-blue-700",
+            color: "bg-secondary/20",
+            textColor: "text-secondary",
           };
         case "passé":
           return {
@@ -47,16 +47,15 @@ export default function EventItem({
       }
     }
 
-    // Fallback: calculer le statut si pas présent
     const now = new Date();
-    const dateDebut = new Date(event.dateDebut);
-    const dateFin = new Date(event.dateFin);
+    const dateDebut = new Date(event.dateDebut!);
+    const dateFin = new Date(event.dateFin!);
 
     if (now < dateDebut) {
       return {
         label: "planifié",
-        color: "bg-blue-100",
-        textColor: "text-blue-700",
+        color: "bg-secondary/20",
+        textColor: "text-secondary",
       };
     } else if (now > dateFin) {
       return {
@@ -83,7 +82,7 @@ export default function EventItem({
       <View className="flex-row items-center justify-between mb-3">
         {/* Badge événement */}
         <View className="flex-row items-center flex-1">
-          <View className="bg-blue-500 rounded-full w-12 h-12 items-center justify-center mr-3">
+          <View className="bg-secondary rounded-full w-12 h-12 items-center justify-center mr-3">
             <Text className="text-white text-2xl">📅</Text>
           </View>
           <View className="flex-1">
@@ -102,8 +101,8 @@ export default function EventItem({
 
         {/* Flèche navigation */}
         {navArrow && (
-          <View className="bg-blue-50 rounded-full px-3 py-1">
-            <Text className="text-blue-600 text-xs font-semibold">→</Text>
+          <View className="bg-secondary/10 rounded-full px-3 py-1">
+            <Text className="text-secondary text-xs font-semibold">→</Text>
           </View>
         )}
       </View>
@@ -118,8 +117,8 @@ export default function EventItem({
       {/* Dates */}
       <View className="flex-row items-center">
         <Text className="text-gray-400 text-xs">
-          📍 Du {new Date(event.dateDebut).toLocaleDateString("fr-FR")} au{" "}
-          {new Date(event.dateFin).toLocaleDateString("fr-FR")}
+          📍 Du {new Date(event.dateDebut!).toLocaleDateString("fr-FR")} au{" "}
+          {new Date(event.dateFin!).toLocaleDateString("fr-FR")}
         </Text>
       </View>
     </Pressable>
