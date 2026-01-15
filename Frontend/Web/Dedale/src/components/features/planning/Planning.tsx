@@ -44,35 +44,31 @@ export default function Planning({
   const [generatingPdfForTeam, setGeneratingPdfForTeam] = useState<string | null>(null);
   const [isMobileConnected, setIsMobileConnected] = useState(false);
 
-  // 1. Écouter la connexion mobile
+  // Note: Les listeners pour 'mobile-connected' et 'mobile-disconnected' sont gérés de manière centralisée
+  // dans Data.tsx pour éviter les doublons et les toasts multiples
+  // Planning écoute les événements custom émis par Data.tsx
   useEffect(() => {
-    const unlistenConnect = listen("mobile-connected", () => {
-      console.log("📱 Mobile connecté !");
+    const handleMobileConnected = () => {
       setIsMobileConnected(true);
-      if (syncState.step === "waiting_for_scan") {
-        toast.success("Mobile connecté !");
+      // Déclencher l'envoi si on est en attente
+      if (syncState.step === "waiting_for_scan" && syncState.teamId) {
+        console.log("🚀 Connexion détectée, lancement de l'envoi...");
+        sendPlanningToTeam(syncState.teamId, syncState.teamName!);
       }
-    });
+    };
 
-    const unlistenDisconnect = listen("mobile-disconnected", () => {
-      console.log("👋 Mobile déconnecté !");
+    const handleMobileDisconnected = () => {
       setIsMobileConnected(false);
-    });
+    };
+
+    window.addEventListener("app-mobile-connected", handleMobileConnected);
+    window.addEventListener("app-mobile-disconnected", handleMobileDisconnected);
 
     return () => {
-      unlistenConnect.then((fn) => fn());
-      unlistenDisconnect.then((fn) => fn());
+      window.removeEventListener("app-mobile-connected", handleMobileConnected);
+      window.removeEventListener("app-mobile-disconnected", handleMobileDisconnected);
     };
-  }, [syncState.step]);
-
-  // 2. Réagir automatiquement à la connexion pour envoyer le planning
-  useEffect(() => {
-    if (syncState.step === "waiting_for_scan" && isMobileConnected && syncState.teamId) {
-      console.log("🚀 Connexion détectée, lancement de l'envoi...");
-      sendPlanningToTeam(syncState.teamId, syncState.teamName!);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMobileConnected, syncState.step, syncState.teamId]);
+  }, [syncState.step, syncState.teamId, syncState.teamName]);
 
   // Charger les données
   const loadTeamsWithActions = useCallback(async () => {

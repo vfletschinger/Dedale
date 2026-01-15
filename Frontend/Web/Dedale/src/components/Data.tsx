@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import * as path from "@tauri-apps/api/path";
@@ -12,7 +12,9 @@ import {
   faCloudUploadAlt,
   faCheck,
   faSpinner,
-  faServer
+  faServer,
+  faFileImport,
+  faDownload
 } from "@fortawesome/free-solid-svg-icons";
 import toast from 'react-hot-toast';
 
@@ -27,37 +29,92 @@ type Event = {
 
 type TransferPhase = "idle" | "qr_displayed" | "connected";
 
-function Data() {
+interface DataProps {
+  selectedEventId?: string | null;
+}
+
+function Data({ selectedEventId: activeEventId }: DataProps) {
   const [qrCodeBase64, setQrCodeBase64] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isPdfLoading, setIsPdfLoading] = useState<boolean>(false);
   const [isExcelLoading, setIsExcelLoading] = useState<boolean>(false);
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedEventIds, setSelectedEventIds] = useState<Set<string>>(new Set());
-  const [selectedEventId, setSelectedEventId] = useState<string>("");
+  const [selectedEventId, _setSelectedEventId] = useState<string>("");
   const [transferPhase, setTransferPhase] = useState<TransferPhase>("idle");
   const [sentEventIds, setSentEventIds] = useState<Set<string>>(new Set());
   const [sendingEventId, setSendingEventId] = useState<string | null>(null);
 
-  // Écouter l'événement de connexion mobile
-  useEffect(() => {
-    const unlistenConnect = listen("mobile-connected", () => {
-      console.log("Connecté !");
-      setTransferPhase("connected");
-      toast.success("Mobile connecté avec succès !");
-    });
+  // États pour l'import depuis mobile
+  const [receiveQrCode, setReceiveQrCode] = useState<string | null>(null);
+  const [receiveStatus, setReceiveStatus] = useState<string>("En attente...");
 
-    const unlistenDisconnect = listen("mobile-disconnected", () => {
-      console.log("Déconnecté !");
-      setTransferPhase("idle");
-      toast("Connexion mobile interrompue", { icon: '⚠️' });
-    });
+  // Ref pour cooldown sur les toasts et listeners
+  const lastConnectionToastTime = useRef(0);
+  const listenersSetup = useRef(false);
+
+  // Écouter l'événement de connexion mobile - une seule fois au montage
+  useEffect(() => {
+    // Éviter le double setup en React Strict Mode
+    if (listenersSetup.current) return;
+    listenersSetup.current = true;
+
+    let unlistenConnect: (() => void) | null = null;
+    let unlistenDisconnect: (() => void) | null = null;
+
+    const setupListeners = async () => {
+      unlistenConnect = await listen("mobile-connected", () => {
+        console.log("Connecté !");
+        setTransferPhase("connected");
+        
+        // Cooldown: afficher le toast une seule fois par 3 secondes
+        const now = Date.now();
+        if (now - lastConnectionToastTime.current > 3000) {
+          toast.success("Mobile connecté avec succès !");
+          lastConnectionToastTime.current = now;
+        }
+        
+        // Émettre un événement custom pour notifier les autres composants
+        window.dispatchEvent(new CustomEvent("app-mobile-connected"));
+      });
+
+      unlistenDisconnect = await listen("mobile-disconnected", () => {
+        console.log("Déconnecté !");
+        setTransferPhase("idle");
+        toast("Connexion mobile interrompue", { icon: '⚠️' });
+        // Émettre un événement custom pour notifier les autres composants
+        window.dispatchEvent(new CustomEvent("app-mobile-disconnected"));
+      });
+    };
+
+    setupListeners();
 
     return () => {
-      unlistenConnect.then((fn) => fn());
-      unlistenDisconnect.then((fn) => fn());
+      if (unlistenConnect) unlistenConnect();
+      if (unlistenDisconnect) unlistenDisconnect();
     };
   }, []);
+
+  // Listener séparé pour réception de points
+  useEffect(() => {
+    let unlistenReceiveConnect: (() => void) | null = null;
+
+    const setupReceiveListener = async () => {
+      unlistenReceiveConnect = await listen("mobile-connected", () => {
+        if (receiveQrCode) {
+          setReceiveStatus("Mobile connecté ! En attente des données...");
+        }
+      });
+    };
+
+    if (receiveQrCode) {
+      setupReceiveListener();
+    }
+
+    return () => {
+      if (unlistenReceiveConnect) unlistenReceiveConnect();
+    };
+  }, [receiveQrCode]);
 
   // --- CHARGEMENT DES ÉVÉNEMENTS ---
   useEffect(() => {
@@ -175,6 +232,32 @@ function Data() {
     return `data:image/png;base64,${base64}`;
   };
 
+  // Fonction pour démarrer la réception depuis le mobile
+  const handleReceiveFromMobile = useCallback(async () => {
+    if (!activeEventId) {
+      toast.error("Aucun événement sélectionné");
+      return;
+    }
+    try {
+      setReceiveStatus("Génération du QR code...");
+      console.log("Démarrage serveur de réception pour event:", activeEventId);
+      const qrCodeBase64 = await invoke<string>("start_receive_server", {
+        eventId: activeEventId,
+      });
+      setReceiveQrCode(qrCodeBase64);
+      setReceiveStatus("Scannez le QR code avec le mobile");
+    } catch (err) {
+      console.error("Erreur démarrage serveur réception:", err);
+      setReceiveStatus(`Erreur: ${err}`);
+      toast.error("Impossible de démarrer le serveur de réception.");
+    }
+  }, [activeEventId]);
+
+  const closeReceiveModal = useCallback(() => {
+    setReceiveQrCode(null);
+    setReceiveStatus("En attente...");
+  }, []);
+
   return (
     <div className="h-full flex flex-col space-y-8 pb-10 overflow-y-auto custom-scrollbar pr-2">
       {/* Header */}
@@ -288,22 +371,8 @@ function Data() {
             </h3>
           </div>
 
-          <div className="p-8 flex-1 flex flex-col gap-6">
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">Choisir un événement cible</label>
-              <select
-                value={selectedEventId}
-                onChange={(e) => setSelectedEventId(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-medium text-gray-700"
-              >
-                <option value="">Tous les événements</option>
-                {events.map((event) => (
-                  <option key={event.id} value={event.id}>{event.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 pt-4">
+          <div className="p-6 flex-1 flex flex-col">
+            <div className="grid grid-cols-1 gap-4">
               <button
                 onClick={generate_excel}
                 disabled={isExcelLoading}
@@ -341,7 +410,94 @@ function Data() {
           </div>
         </div>
 
+        {/* Card 3: Import depuis Mobile */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-300 flex flex-col overflow-hidden group">
+          <div className="px-6 py-5 bg-linear-to-r from-gray-50 to-white border-b border-gray-100">
+            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <FontAwesomeIcon icon={faFileImport} className="text-blue-500" />
+              Import depuis Mobile
+            </h3>
+          </div>
+
+          <div className="p-6 flex-1 flex flex-col">
+            <p className="text-gray-500 mb-6 text-sm">
+              Importez les points collectés sur le terrain depuis l'application mobile.
+            </p>
+
+            {/* Affichage de l'événement sélectionné */}
+            {activeEventId && (
+              <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">Événement de destination</p>
+                <p className="text-sm font-bold text-gray-800">
+                  {events.find(e => e.id === activeEventId)?.name || "Chargement..."}
+                </p>
+              </div>
+            )}
+
+            <button
+              onClick={handleReceiveFromMobile}
+              disabled={!activeEventId}
+              className="w-full py-4 px-6 bg-white border border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all group/btn flex items-center justify-between shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center text-xl group-hover/btn:scale-110 transition-transform">
+                  <FontAwesomeIcon icon={faDownload} />
+                </div>
+                <div className="text-left">
+                  <p className="font-bold text-gray-900">Importer les données</p>
+                  <p className="text-xs text-gray-500">Scanner le QR code avec le mobile</p>
+                </div>
+              </div>
+              <FontAwesomeIcon icon={faFileImport} className="text-gray-300 group-hover/btn:text-blue-500" />
+            </button>
+          </div>
+        </div>
+
       </div>
+
+      {/* Modal QR Code pour réception */}
+      {receiveQrCode && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full mx-4 shadow-2xl animate-in zoom-in-95 duration-200">
+            <h3 className="text-xl font-extrabold text-center mb-6 flex items-center justify-center gap-3 text-gray-800">
+              <span className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+                <FontAwesomeIcon icon={faMobileAlt} />
+              </span>
+              Réception Mobile
+            </h3>
+
+            <div className="bg-gray-50 p-6 rounded-2xl border border-dashed border-gray-300 mb-6 flex justify-center relative group">
+              <img
+                src={`data:image/png;base64,${receiveQrCode}`}
+                alt="QR Code"
+                className="w-48 h-48 mix-blend-multiply"
+              />
+            </div>
+
+            <p className="text-gray-600 text-center text-sm mb-6 leading-relaxed">
+              Scannez ce QR code avec l'application mobile pour transférer les points vers cet événement.
+            </p>
+
+            <div className="text-center mb-6">
+              <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${
+                receiveStatus.includes("connecté") ? "bg-green-100 text-green-700" : "bg-blue-50 text-blue-600"
+              }`}>
+                <div className={`w-2 h-2 rounded-full ${receiveStatus.includes("connecté") ? "bg-green-500" : "bg-blue-500 animate-pulse"}`}></div>
+                {receiveStatus}
+              </span>
+            </div>
+
+            <div className="flex justify-center">
+              <button
+                onClick={closeReceiveModal}
+                className="w-full px-6 py-3 bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition-transform active:scale-95 font-bold shadow-lg shadow-gray-900/20"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
