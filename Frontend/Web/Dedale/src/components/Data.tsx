@@ -49,6 +49,7 @@ function Data({ selectedEventId: activeEventId }: DataProps) {
   // États pour l'import depuis mobile
   const [receiveQrCode, setReceiveQrCode] = useState<string | null>(null);
   const [receiveStatus, setReceiveStatus] = useState<string>("En attente...");
+  const [pointsReceived, setPointsReceived] = useState<number>(0);
 
   // Mode actif (export ou import)
   const [syncMode, setSyncMode] = useState<SyncMode>("export");
@@ -102,12 +103,28 @@ function Data({ selectedEventId: activeEventId }: DataProps) {
   // Listener séparé pour réception de points
   useEffect(() => {
     let unlistenReceiveConnect: (() => void) | null = null;
+    let unlistenPointsUpdated: (() => void) | null = null;
 
     const setupReceiveListener = async () => {
       unlistenReceiveConnect = await listen("mobile-connected", () => {
         if (receiveQrCode) {
           setReceiveStatus("Mobile connecté ! En attente des données...");
         }
+      });
+
+      // Listener pour les points reçus
+      unlistenPointsUpdated = await listen<number>("points-updated", (event) => {
+        const pointsCount = event.payload;
+        setPointsReceived(pointsCount);
+        setReceiveStatus(`${pointsCount} point(s) reçu(s) avec succès !`);
+        
+        // Toast de confirmation
+        toast.success(`${pointsCount} point(s) importé(s) !`);
+        
+        // Fermer la connexion automatiquement après 2 secondes
+        setTimeout(() => {
+          closeReceiveModal();
+        }, 2000);
       });
     };
 
@@ -117,6 +134,7 @@ function Data({ selectedEventId: activeEventId }: DataProps) {
 
     return () => {
       if (unlistenReceiveConnect) unlistenReceiveConnect();
+      if (unlistenPointsUpdated) unlistenPointsUpdated();
     };
   }, [receiveQrCode]);
 
@@ -260,6 +278,7 @@ function Data({ selectedEventId: activeEventId }: DataProps) {
   const closeReceiveModal = useCallback(() => {
     setReceiveQrCode(null);
     setReceiveStatus("En attente...");
+    setPointsReceived(0);
   }, []);
 
   return (
@@ -456,9 +475,9 @@ function Data({ selectedEventId: activeEventId }: DataProps) {
                     <p className="text-sm font-bold text-gray-800 mb-2">Scannez avec l'app mobile</p>
                     
                     <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide mb-4 ${
-                      receiveStatus.includes("connecté") ? "bg-green-100 text-green-700" : "bg-blue-50 text-blue-600"
+                      receiveStatus.includes("reçu") || pointsReceived > 0 ? "bg-green-100 text-green-700" : "bg-blue-50 text-blue-600"
                     }`}>
-                      <div className={`w-2 h-2 rounded-full ${receiveStatus.includes("connecté") ? "bg-green-500" : "bg-blue-500 animate-pulse"}`}></div>
+                      <div className={`w-2 h-2 rounded-full ${receiveStatus.includes("reçu") || pointsReceived > 0 ? "bg-green-500" : "bg-blue-500 animate-pulse"}`}></div>
                       {receiveStatus}
                     </span>
                     
