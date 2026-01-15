@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import SelectableList, { SelectableItem } from '../../components/SelectableList'
+import SelectableList, { SelectableItem } from '../../components/common/SelectableList'
 
 interface TestItem extends SelectableItem {
   id: string

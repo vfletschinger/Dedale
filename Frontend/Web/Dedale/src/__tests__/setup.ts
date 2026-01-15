@@ -7,29 +7,30 @@ const mockInvoke = vi.fn()
 
 // Expose mock globally for tests
 declare global {
-  var mockInvoke: typeof mockInvoke
+  // eslint-disable-next-line no-var
+  var mockInvoke: ReturnType<typeof vi.fn>
 }
 
-global.mockInvoke = mockInvoke
+globalThis.mockInvoke = mockInvoke
 
 // Mock URL.createObjectURL at top level (before any imports)
-global.URL.createObjectURL = vi.fn(() => 'blob:mock-url')
-global.URL.revokeObjectURL = vi.fn()
+globalThis.URL.createObjectURL = vi.fn(() => 'blob:mock-url')
+globalThis.URL.revokeObjectURL = vi.fn()
 
 // Mock Tauri API with the global reference
 vi.mock('@tauri-apps/api/core', () => ({
-  invoke: global.mockInvoke
+  invoke: globalThis.mockInvoke
 }))
 
 // Mock window.URL.createObjectURL for map tests
 beforeEach(() => {
   // Clear all mocks before each test
   vi.clearAllMocks()
-  global.mockInvoke.mockReset()
+  globalThis.mockInvoke.mockReset()
 })
 
 vi.mock('@tauri-apps/api/event', () => ({
-  listen: vi.fn().mockResolvedValue(() => {})
+  listen: vi.fn().mockResolvedValue(() => { })
 }))
 
 vi.mock('react-hot-toast', () => ({
@@ -43,7 +44,7 @@ vi.mock('react-hot-toast', () => ({
 
 // Mock FontAwesome
 vi.mock('@fortawesome/react-fontawesome', () => ({
-  FontAwesomeIcon: vi.fn(() => 
+  FontAwesomeIcon: vi.fn(() =>
     'i'
   )
 }))
