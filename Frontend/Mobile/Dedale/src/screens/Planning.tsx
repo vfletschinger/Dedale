@@ -11,11 +11,14 @@ import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { SQLiteDatabase } from "expo-sqlite";
-import { useSafeAreaInsets, SafeAreaView } from "react-native-safe-area-context";
+import {
+  useSafeAreaInsets,
+  SafeAreaView,
+} from "react-native-safe-area-context";
 import getDatabase from "../../assets/migrations";
 import { useEvent } from "../context/EventContext";
 import { RootStackParamList } from "../types/navigation";
-import QRCodeScannerPlanning from "../components/QrCodeScannerPlanning";
+import QRCodeScanner from "../components/QrCodeScanner";
 import Colors from "../constants/colors";
 
 interface Action {
@@ -35,11 +38,12 @@ interface Team {
 }
 
 export default function PlanningScreen() {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { selectedEventId, getSelectedEvent } = useEvent();
   const selectedEvent = getSelectedEvent();
   const insets = useSafeAreaInsets();
-  
+
   const [db, setDb] = useState<SQLiteDatabase | null>(null);
   const [team, setTeam] = useState<Team | null>(null);
   const [actions, setActions] = useState<Action[]>([]);
@@ -164,7 +168,11 @@ export default function PlanningScreen() {
             <Text style={styles.backText}>Retour</Text>
           </Pressable>
         </View>
-        <QRCodeScannerPlanning setScanQR={setScanQR} />
+        <QRCodeScanner
+          setScanQR={setScanQR}
+          dataType="planning"
+          onImportSuccess={() => db && loadData(db)}
+        />
       </SafeAreaView>
     );
   }
@@ -198,7 +206,11 @@ export default function PlanningScreen() {
             ]}
             onPress={() => setScanQR(true)}
           >
-            <MaterialCommunityIcons name="qrcode-scan" size={24} color={Colors.secondary} />
+            <MaterialCommunityIcons
+              name="qrcode-scan"
+              size={24}
+              color={Colors.secondary}
+            />
           </Pressable>
         </View>
         {selectedEvent && (
@@ -224,7 +236,11 @@ export default function PlanningScreen() {
             ]}
             onPress={() => setScanQR(true)}
           >
-            <MaterialCommunityIcons name="qrcode-scan" size={24} color={Colors.secondary} />
+            <MaterialCommunityIcons
+              name="qrcode-scan"
+              size={24}
+              color={Colors.secondary}
+            />
           </Pressable>
         </View>
         {selectedEvent && (
@@ -327,11 +343,18 @@ export default function PlanningScreen() {
               pressed && styles.guidanceButtonPressed,
             ]}
             onPress={() =>
-              navigation.navigate("TeamGuidance", { teamId: team.id, teamName: team.name })
+              navigation.navigate("TeamGuidance", {
+                teamId: team.id,
+                teamName: team.name,
+              })
             }
           >
-            <Feather name="navigation" size={22} color="#fff" />
-            <Text style={styles.guidanceButtonText}>Commencer le guidage</Text>
+            <View style={styles.guidanceButtonContent}>
+              <Feather name="navigation" size={22} color="#fff" />
+              <Text style={styles.guidanceButtonText}>
+                Commencer le guidage
+              </Text>
+            </View>
           </Pressable>
         </View>
       )}
@@ -492,15 +515,17 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   bottomButtonContainer: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
     backgroundColor: Colors.secondary,
+    position: "absolute",
+    bottom: -1,
+    left: -1,
+    right: -1,
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 16,
     borderTopWidth: 1,
+    borderTopStartRadius: 24,
+    borderTopEndRadius: 24,
     borderTopColor: Colors.border,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: -2 },
@@ -510,17 +535,14 @@ const styles = StyleSheet.create({
   },
   guidanceButton: {
     backgroundColor: Colors.secondary,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
     paddingVertical: 18,
+    paddingHorizontal: 20,
     borderRadius: 14,
-    shadowColor: Colors.secondary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
     elevation: 6,
+  },
+  guidanceButtonContent: {
+    flexDirection: "row",
+    gap: 10,
   },
   guidanceButtonPressed: {
     backgroundColor: Colors.secondaryDark,
@@ -530,6 +552,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
     letterSpacing: 0.5,
+    flexShrink: 0,
   },
   scannerHeader: {
     backgroundColor: Colors.primary,

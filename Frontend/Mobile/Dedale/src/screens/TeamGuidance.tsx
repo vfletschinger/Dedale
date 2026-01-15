@@ -52,7 +52,9 @@ export default function TeamGuidanceScreen() {
     longitude: number;
   } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [routeCoordinates, setRouteCoordinates] = useState<{ latitude: number; longitude: number }[]>([]);
+  const [routeCoordinates, setRouteCoordinates] = useState<
+    { latitude: number; longitude: number }[]
+  >([]);
   const [routeDistance, setRouteDistance] = useState<number | null>(null);
   const [routeDuration, setRouteDuration] = useState<number | null>(null);
   const lastRouteUpdate = useRef<number>(0);
@@ -74,7 +76,10 @@ export default function TeamGuidanceScreen() {
 
     const a =
       Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
-      Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2);
+      Math.cos(phi1) *
+        Math.cos(phi2) *
+        Math.sin(deltaLon / 2) *
+        Math.sin(deltaLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
     return earthRadius * c;
@@ -103,7 +108,10 @@ export default function TeamGuidanceScreen() {
     const currentAction = actions[currentActionIndex];
     if (userLocation && currentAction?.point_x && currentAction?.point_y) {
       const now = Date.now();
-      if (now - lastRouteUpdate.current > 10000 || routeCoordinates.length === 0) {
+      if (
+        now - lastRouteUpdate.current > 10000 ||
+        routeCoordinates.length === 0
+      ) {
         lastRouteUpdate.current = now;
         fetchRoute(
           userLocation.longitude,
@@ -117,7 +125,8 @@ export default function TeamGuidanceScreen() {
 
   useEffect(() => {
     const currentAction = actions[currentActionIndex];
-    if (!userLocation || !currentAction?.point_x || !currentAction?.point_y) return;
+    if (!userLocation || !currentAction?.point_x || !currentAction?.point_y)
+      return;
     if (currentAction.is_done) return;
     if (proximityValidatedRef.current.has(currentAction.id)) return;
 
@@ -130,19 +139,19 @@ export default function TeamGuidanceScreen() {
 
     if (distance <= PROXIMITY_THRESHOLD) {
       proximityValidatedRef.current.add(currentAction.id);
-      
+
       Alert.alert(
         "📍 Vous êtes arrivé !",
         `Vous êtes à proximité de "${currentAction.point_name || getActionTypeLabel(currentAction.type)}". Valider l'action ?`,
         [
-          { 
-            text: "Pas encore", 
+          {
+            text: "Pas encore",
             style: "cancel",
             onPress: () => {
               setTimeout(() => {
                 proximityValidatedRef.current.delete(currentAction.id);
               }, 30000);
-            }
+            },
           },
           {
             text: "Valider ✓",
@@ -174,10 +183,10 @@ export default function TeamGuidanceScreen() {
   ) => {
     try {
       const url = `https://router.project-osrm.org/route/v1/foot/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson`;
-      
+
       const response = await fetch(url);
       const data = await response.json();
-      
+
       if (data.code === "Ok" && data.routes && data.routes.length > 0) {
         const route = data.routes[0];
         const coordinates = route.geometry.coordinates.map(
@@ -189,7 +198,13 @@ export default function TeamGuidanceScreen() {
         setRouteCoordinates(coordinates);
         setRouteDistance(route.distance);
         setRouteDuration(route.duration);
-        console.log("🗺️ Route chargée:", coordinates.length, "points,", route.distance, "m");
+        console.log(
+          "🗺️ Route chargée:",
+          coordinates.length,
+          "points,",
+          route.distance,
+          "m"
+        );
       } else {
         console.log("⚠️ Pas de route trouvée, utilisation ligne directe");
         setRouteCoordinates([
@@ -211,20 +226,20 @@ export default function TeamGuidanceScreen() {
   const loadActionsAndLocation = async () => {
     try {
       const db = getDatabase();
-      
+
       const team = db.getFirstSync<{ event_id: string }>(
         "SELECT event_id FROM team WHERE id = ?",
         [teamId]
       );
-      
+
       if (!team) {
         console.error("❌ Équipe non trouvée");
         setLoading(false);
         return;
       }
-      
+
       console.log("📍 Event ID:", team.event_id);
-      
+
       const actionsResult = db.getAllSync<ActionWithPoint>(
         `SELECT a.*, 
                 t.name as equipement_name,
@@ -238,19 +253,23 @@ export default function TeamGuidanceScreen() {
          ORDER BY a.scheduled_time ASC`,
         [teamId]
       );
-      
+
       console.log("📍 Actions chargées:", actionsResult?.length || 0);
       if (actionsResult && actionsResult.length > 0) {
         console.log("📍 Première action:", JSON.stringify(actionsResult[0]));
       }
-      
+
       if (actionsResult && actionsResult.length > 0) {
         const actionsWithPoints = actionsResult.map((action, index) => {
           let x = (action as any).coord_x;
           let y = (action as any).coord_y;
-          
+
           if (!x || !y) {
-            const eventPoints = db.getAllSync<{ x: number; y: number; name: string }>(
+            const eventPoints = db.getAllSync<{
+              x: number;
+              y: number;
+              name: string;
+            }>(
               "SELECT x, y, name FROM point WHERE event_id = ? LIMIT 1 OFFSET ?",
               [team.event_id, index]
             );
@@ -259,25 +278,38 @@ export default function TeamGuidanceScreen() {
               y = eventPoints[0].y;
             }
           }
-          
+
           if (!x || !y) {
-            x = 7.7521 + (index * 0.001);
-            y = 48.5734 + (index * 0.001);
+            x = 7.7521 + index * 0.001;
+            y = 48.5734 + index * 0.001;
           }
-          
+
           return {
             ...action,
             point_x: x,
             point_y: y,
-            point_name: action.point_name || action.equipement_name || `Action ${index + 1}`,
+            point_name:
+              action.point_name ||
+              action.equipement_name ||
+              `Action ${index + 1}`,
           };
         });
-        
-        console.log("📍 Actions avec points:", JSON.stringify(actionsWithPoints[0]));
-        console.log("📍 Coordonnées action 0: x=", actionsWithPoints[0].point_x, "y=", actionsWithPoints[0].point_y);
+
+        console.log(
+          "📍 Actions avec points:",
+          JSON.stringify(actionsWithPoints[0])
+        );
+        console.log(
+          "📍 Coordonnées action 0: x=",
+          actionsWithPoints[0].point_x,
+          "y=",
+          actionsWithPoints[0].point_y
+        );
         setActions(actionsWithPoints);
-        
-        const firstPendingIndex = actionsWithPoints.findIndex(a => !a.is_done);
+
+        const firstPendingIndex = actionsWithPoints.findIndex(
+          (a) => !a.is_done
+        );
         setCurrentActionIndex(firstPendingIndex >= 0 ? firstPendingIndex : 0);
       } else {
         setActions([]);
@@ -321,17 +353,19 @@ export default function TeamGuidanceScreen() {
     db.runSync("UPDATE action SET is_done = 1 WHERE id = ?", [action.id]);
 
     const updatedActions = [...actions];
-    const actionIndex = updatedActions.findIndex(a => a.id === action.id);
+    const actionIndex = updatedActions.findIndex((a) => a.id === action.id);
     if (actionIndex !== -1) {
       updatedActions[actionIndex].is_done = 1;
       setActions(updatedActions);
     }
 
-    const nextPendingIndex = updatedActions.findIndex((a, idx) => idx > currentActionIndex && !a.is_done);
-    
+    const nextPendingIndex = updatedActions.findIndex(
+      (a, idx) => idx > currentActionIndex && !a.is_done
+    );
+
     if (nextPendingIndex !== -1) {
       setCurrentActionIndex(nextPendingIndex);
-      
+
       const nextAction = updatedActions[nextPendingIndex];
       if (nextAction?.point_x && nextAction?.point_y && mapRef.current) {
         mapRef.current.animateToRegion({
@@ -342,13 +376,11 @@ export default function TeamGuidanceScreen() {
         });
       }
     } else {
-      const anyPending = updatedActions.some(a => !a.is_done);
+      const anyPending = updatedActions.some((a) => !a.is_done);
       if (!anyPending) {
-        Alert.alert(
-          "🎉 Bravo !",
-          "Toutes les actions ont été complétées.",
-          [{ text: "OK", onPress: () => navigation.goBack() }]
-        );
+        Alert.alert("🎉 Bravo !", "Toutes les actions ont été complétées.", [
+          { text: "OK", onPress: () => navigation.goBack() },
+        ]);
       }
     }
   };
@@ -357,7 +389,7 @@ export default function TeamGuidanceScreen() {
   const SLIDER_WIDTH = Dimensions.get("window").width - 72; // Largeur du slider
   const THUMB_SIZE = 56;
   const SLIDE_THRESHOLD = SLIDER_WIDTH - THUMB_SIZE - 10;
-  
+
   const slideAnim = useRef(new Animated.Value(0)).current;
 
   const handleSlideComplete = () => {
@@ -376,7 +408,10 @@ export default function TeamGuidanceScreen() {
         onStartShouldSetPanResponder: () => true,
         onMoveShouldSetPanResponder: () => true,
         onPanResponderMove: (_, gestureState) => {
-          const newValue = Math.max(0, Math.min(gestureState.dx, SLIDE_THRESHOLD));
+          const newValue = Math.max(
+            0,
+            Math.min(gestureState.dx, SLIDE_THRESHOLD)
+          );
           slideAnim.setValue(newValue);
         },
         onPanResponderRelease: (_, gestureState) => {
@@ -441,7 +476,7 @@ export default function TeamGuidanceScreen() {
       }
       return `${(routeDistance / 1000).toFixed(1)} km`;
     }
-    
+
     const currentAction = getCurrentAction();
     if (!currentAction?.point_x || !currentAction?.point_y || !userLocation) {
       return null;
@@ -504,19 +539,20 @@ export default function TeamGuidanceScreen() {
   }
 
   const currentAction = getCurrentAction();
-  const initialRegion: Region = currentAction?.point_x && currentAction?.point_y
-    ? {
-        latitude: currentAction.point_y,
-        longitude: currentAction.point_x,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      }
-    : {
-        latitude: 48.5734,
-        longitude: 7.7521,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      };
+  const initialRegion: Region =
+    currentAction?.point_x && currentAction?.point_y
+      ? {
+          latitude: currentAction.point_y,
+          longitude: currentAction.point_x,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        }
+      : {
+          latitude: 48.5734,
+          longitude: 7.7521,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        };
 
   return (
     <View style={styles.container}>
@@ -613,7 +649,11 @@ export default function TeamGuidanceScreen() {
                 {getDistanceToCurrentAction() && (
                   <>
                     <Text style={styles.metaSeparator}>•</Text>
-                    <Feather name="navigation" size={12} color={Colors.textSecondary} />
+                    <Feather
+                      name="navigation"
+                      size={12}
+                      color={Colors.textSecondary}
+                    />
                     <Text style={styles.actionDistance}>
                       {getDistanceToCurrentAction()}
                     </Text>
@@ -623,7 +663,12 @@ export default function TeamGuidanceScreen() {
                   <>
                     <Text style={styles.metaSeparator}>•</Text>
                     <Feather name="clock" size={12} color={Colors.secondary} />
-                    <Text style={[styles.actionDistance, { color: Colors.secondary }]}>
+                    <Text
+                      style={[
+                        styles.actionDistance,
+                        { color: Colors.secondary },
+                      ]}
+                    >
                       ~{getEstimatedTime()}
                     </Text>
                   </>
@@ -635,7 +680,7 @@ export default function TeamGuidanceScreen() {
 
         {/* Bouton Google Maps */}
         {currentAction?.point_x && currentAction?.point_y && (
-            <Pressable
+          <Pressable
             style={({ pressed }) => [
               styles.googleMapsButton,
               pressed && styles.googleMapsButtonPressed,
@@ -644,18 +689,20 @@ export default function TeamGuidanceScreen() {
               const url = `https://www.google.com/maps/dir/?api=1&destination=${currentAction.point_y},${currentAction.point_x}&travelmode=walking`;
               Linking.openURL(url);
             }}
-            >
-            <Feather name="map-pin" size={18} color="#4285F4" />
-            <Text style={styles.googleMapsButtonText}>Ouvrir dans Google Maps</Text>
-            </Pressable>
+          >
+            <View style={styles.openMapsButtonContent}>
+              <Feather name="map-pin" size={18} color="#4285F4" />
+              <Text style={styles.googleMapsButtonText}>
+                Ouvrir dans Google Maps
+              </Text>
+            </View>
+          </Pressable>
         )}
 
         {/* Slider pour valider */}
         <View style={styles.sliderContainer}>
           <View style={styles.sliderTrack}>
-            <Text style={styles.sliderText}>
-              Glisser pour valider →
-            </Text>
+            <Text style={styles.sliderText}>Glisser pour valider →</Text>
             <Animated.View
               style={[
                 styles.sliderThumb,
@@ -711,6 +758,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  openMapsButtonContent: {
+    flexDirection: "row",
+    gap: 10,
   },
   backButtonOverlay: {
     padding: 4,
