@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from "react";
 
-export type PageKey = "event" | "map" | "team" | "person" | "data" | "planning";
+export type PageKey = "event" | "map" | "team-person" | "data" | "planning";
 
 interface NavigationState {
   currentPage: PageKey;

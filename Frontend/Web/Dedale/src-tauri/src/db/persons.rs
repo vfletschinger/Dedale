@@ -34,7 +34,7 @@ pub async fn create_person(
     firstname: String,
     lastname: String,
     email: String,
-    phone_number: String,
+    phone_number: Option<String>,
 ) -> Result<Person, String> {
     let pool = get_db_pool(&app).await?;
     let id = Uuid::new_v4().to_string();
@@ -55,7 +55,7 @@ pub async fn create_person(
         firstname: Some(firstname),
         lastname: Some(lastname),
         email: Some(email),
-        phone_number: Some(phone_number),
+        phone_number,
     })
 }
 

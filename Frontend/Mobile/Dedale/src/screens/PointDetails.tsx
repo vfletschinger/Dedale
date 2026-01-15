@@ -1,18 +1,5 @@
-import {
-  View,
-  Text,
-  ActivityIndicator,
-  ScrollView,
-  Image,
-  Alert,
-  Modal,
-  Pressable,
-} from "react-native";
-import {
-  useNavigation,
-  useRoute,
-  useFocusEffect,
-} from "@react-navigation/native";
+import { View, Text, ActivityIndicator, ScrollView, Image, Alert, Modal, Pressable } from "react-native";
+import { useNavigation, useRoute, useFocusEffect, } from "@react-navigation/native";
 import React, { useCallback, useState } from "react";
 import { getDatabase } from "../../assets/migrations";
 import {

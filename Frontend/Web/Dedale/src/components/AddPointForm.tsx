@@ -15,8 +15,8 @@ export default function AddPointForm({
   onSaved?: () => void;
   eventId?: string | null;
 }) {
-  const [x, setX] = useState<number>(initialCoords.lng);
-  const [y, setY] = useState<number>(initialCoords.lat);
+  const [x, _setX] = useState<number>(initialCoords.lng);
+  const [y, _setY] = useState<number>(initialCoords.lat);
   const [name, setName] = useState<string>("Point 1");
   const [comment, setComment] = useState<string>("");
   const [type, setType] = useState<string>("info");
@@ -27,7 +27,7 @@ export default function AddPointForm({
   useEffect(() => {
     async function loadPointCount() {
       if (!eventId) return;
-      
+
       try {
         const points = await invoke<{ id: string; event_id: string; x: number; y: number; name: string | null; comment: string | null; type: string | null; status: boolean }[]>("fetch_points", { eventId });
         const nextPointNumber = points.length + 1;
@@ -36,7 +36,7 @@ export default function AddPointForm({
         console.error("Erreur lors du chargement des points:", error);
       }
     }
-    
+
     loadPointCount();
   }, [eventId]);
 
@@ -102,10 +102,11 @@ export default function AddPointForm({
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
         {/* Nom du point */}
         <div>
-          <label className="block text-sm font-semibold text-gray-900 mb-2">
+          <label htmlFor="point-name" className="block text-sm font-semibold text-gray-900 mb-2">
             Nom du point
           </label>
           <input
+            id="point-name"
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -123,10 +124,11 @@ export default function AddPointForm({
           <div className="p-4 space-y-3">
             {/* Type */}
             <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">
+              <label htmlFor="point-type" className="block text-sm font-semibold text-gray-900 mb-2">
                 Type
               </label>
               <select
+                id="point-type"
                 value={type}
                 onChange={(e) => setType(e.target.value)}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
@@ -153,10 +155,11 @@ export default function AddPointForm({
 
         {/* Commentaire */}
         <div>
-          <label className="block text-sm font-semibold text-gray-900 mb-2">
+          <label htmlFor="point-comment" className="block text-sm font-semibold text-gray-900 mb-2">
             Commentaire (optionnel)
           </label>
           <textarea
+            id="point-comment"
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             placeholder="Ajouter un commentaire..."

@@ -36,11 +36,11 @@ describe('Logic: WebSocketClient', () => {
   });
 
   test('Se connecte et reçoit des messages JSON valides', async () => {
-    // ARRANGE
+    // Arrange
     const onMessageMock = jest.fn();
     const mockEvents = [{ id: 1, name: "Event Test" }];
     
-    // ACT
+    // Act
     const connectPromise = client.connect(onMessageMock);
     await new Promise(r => setTimeout(r, 20));
     await connectPromise;
@@ -49,41 +49,41 @@ describe('Logic: WebSocketClient', () => {
         mockWsInstance.onmessage({ data: JSON.stringify(mockEvents) });
     }
 
-    // ASSERT
+    // Assert
     expect(client.isConnected).toBe(true);
     expect(onMessageMock).toHaveBeenCalledWith(mockEvents);
   });
 
   test('Gère le message spécial "fini"', async () => {
-    // ARRANGE
+    // Arrange
     const onFinishedMock = jest.fn();
     client.setCallbacks(onFinishedMock);
     await client.connect();
     await new Promise(r => setTimeout(r, 20));
     const mockWsInstance = client['ws'] as unknown as MockWebSocket;
 
-    // ACT
+    // Act
     mockWsInstance.onmessage({ data: "fini" });
 
-    // ASSERT
+    // Assert
     expect(onFinishedMock).toHaveBeenCalled();
   });
 
   test('Envoie des données correctement', async () => {
-    // ARRANGE
+    // Arrange
     await client.connect();
     await new Promise(r => setTimeout(r, 20));
     const mockWsInstance = client['ws'] as unknown as MockWebSocket;
 
-    // ACT
+    // Act
     client.send("Hello Server");
 
-    // ASSERT
+    // Assert
     expect(mockWsInstance.send).toHaveBeenCalledWith("Hello Server");
   });
 
   test('Détecte une erreur de connexion', async () => {
-    // ARRANGE
+    // Arrange
     class FailWebSocket {
         onopen: any;
         onerror: any;
@@ -100,7 +100,7 @@ describe('Logic: WebSocketClient', () => {
     
     client = new WebSocketClient('ws://fail.local');
 
-    // ACT & ASSERT
+    // Act & Assert
     await expect(client.connect()).rejects.toEqual("Erreur de connexion WebSocket");
   });
 });
