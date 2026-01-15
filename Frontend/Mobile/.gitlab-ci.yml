@@ -29,7 +29,7 @@ test:
     - cd Frontend/Mobile/Dedale
     - npm install -ci
   script:
-    - npm test -- --ci --reporters=default --reporters=jest-junit
+    - npm test
   artifacts:
     paths:
       - Frontend/Mobile/Dedale/junit.xml

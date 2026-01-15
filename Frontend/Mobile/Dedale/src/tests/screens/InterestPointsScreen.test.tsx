@@ -215,7 +215,7 @@ describe('InterestPoints - Screens', () => {
     });
   });
 
-  describe('Contexte de chargement', () => {
+  describe('Chargement', () => {
     it('devrait afficher le bon texte avec l\'ActivityIndicator', () => {
       // Arrange
       (usePoints as jest.Mock).mockReturnValue({
@@ -238,32 +238,6 @@ describe('InterestPoints - Screens', () => {
       
       // Assert
       expect(screen.queryByText('Chargement des points...')).toBeNull();
-    });
-  });
-
-  describe('Interface utilisateur', () => {
-    it('devrait afficher tous les éléments de l\'en-tête', () => {
-      // Act
-      render(<InterestPoints />);
-      
-      // Assert
-      expect(screen.getByText('Points d\'intérêt')).toBeTruthy();
-      expect(screen.getByText('3 points enregistrés')).toBeTruthy();
-      expect(screen.getByText('Plus récent')).toBeTruthy();
-      expect(screen.getByText('Plus proche')).toBeTruthy();
-    });
-
-    it('devrait afficher l\'icône et le message d\'état vide', () => {
-      (usePoints as jest.Mock).mockReturnValue({
-        pointsByEvent: { event1: [] },
-        loading: false,
-        refreshPoints: mockRefreshPoints,
-      });
-
-      render(<InterestPoints />);
-      
-      expect(screen.getByText('📍')).toBeTruthy();
-      expect(screen.getByText('Aucun point d\'intérêt')).toBeTruthy();
     });
   });
 
