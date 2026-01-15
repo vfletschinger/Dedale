@@ -54,7 +54,7 @@ jest.mock('../../context/EventContext', () => ({
   }),
 }));
 
-describe('Screen: PlanningScreen', () => {
+describe('PlanningScreen - Screens', () => {
   
   beforeEach(() => {
     // Arrange
@@ -84,7 +84,7 @@ describe('Screen: PlanningScreen', () => {
     ]);
   });
 
-  test('should render team info and actions list correctly', async () => {
+  test('devrait afficher les infos d\'équipe et la liste d\'actions correctement', async () => {
     // Act
     const { getByText, getAllByText } = render(<PlanningScreen />);
 
@@ -97,12 +97,11 @@ describe('Screen: PlanningScreen', () => {
     expect(getByText('Pose')).toBeTruthy();
     expect(getByText('Retrait')).toBeTruthy();
     
-    // CORRECTION ICI : Utilisation de getAllByText car ces textes apparaissent plusieurs fois
     expect(getAllByText('Terminée')).toBeTruthy();
     expect(getAllByText('En attente')).toBeTruthy();
   });
 
-  test('should navigate to TeamGuidance when clicking start button', async () => {
+  test('devrait naviguer vers TeamGuidance quand on clique sur le bouton démarrer', async () => {
     // Act
     const { getByText } = render(<PlanningScreen />);
     
@@ -116,7 +115,7 @@ describe('Screen: PlanningScreen', () => {
     });
   });
 
-  test('should toggle QR Scanner', async () => {
+  test('devrait basculer le scanner QR', async () => {
     // Act
     const { getByTestId, queryByTestId, getAllByText } = render(<PlanningScreen />);
     
@@ -133,7 +132,7 @@ describe('Screen: PlanningScreen', () => {
     expect(queryByTestId('mock-qr-scanner')).toBeNull();
   });
 
-  test('should handle empty state (no team found)', async () => {
+  test('devrait gérer l\'état vide (aucune équipe trouvée)', async () => {
     // Arrange
     mockGetFirstSync.mockReturnValue(null);
 
