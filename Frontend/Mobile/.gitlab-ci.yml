@@ -28,6 +28,7 @@ test:
   before_script:
     - cd Frontend/Mobile/Dedale
     - npm install -ci
+    - npm install expo-asset
   script:
     - npm test
   artifacts:
