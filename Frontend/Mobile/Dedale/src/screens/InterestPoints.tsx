@@ -174,7 +174,7 @@ export default function InterestPointsScreen() {
     <View className="flex-1 bg-gray-50">
       {/* Header */}
       <View className="bg-primary pt-4 pb-4 px-4 shadow-sm">
-        <Text className="text-accent text-3xl font-bold mb-2">
+        <Text className="text-accent text-3xl font-bold mb-2 mt-6">
           Points d&apos;intérêt
         </Text>
         <Text className="text-accent-light text-base">

@@ -183,6 +183,12 @@ class WebSocketClient {
                 // Ne pas appeler ws.close() ici, le serveur ferme déjà la connexion
                 // L'événement onclose sera déclenché automatiquement
                 break;
+              case "planning_data":
+                // Ajoute ce bloc pour traiter le planning_data
+                if (this.onMessageCallback) {
+                  this.onMessageCallback([data]);
+                }
+                break;
               default:
                 console.log("🤔 Type de message inconnu:", data.type);
             }

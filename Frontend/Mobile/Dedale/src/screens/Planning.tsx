@@ -15,7 +15,7 @@ import { useSafeAreaInsets, SafeAreaView } from "react-native-safe-area-context"
 import getDatabase from "../../assets/migrations";
 import { useEvent } from "../context/EventContext";
 import { RootStackParamList } from "../types/navigation";
-import QRCodeScanner from "../components/QrCodeScanner";
+import QRCodeScannerPlanning from "../components/QrCodeScannerPlanning";
 import Colors from "../constants/colors";
 
 interface Action {
@@ -143,19 +143,18 @@ export default function PlanningScreen() {
   const getActionTypeLabel = (type: string | null) => {
     switch (type) {
       case "pose":
-        return "🔧 Pose";
+        return "Pose";
       case "retrait":
-        return "📤 Retrait";
+        return "Retrait";
       case "déploiement":
-        return "🚀 Déploiement";
+        return "Déploiement";
       case "inspection":
-        return "🔍 Inspection";
+        return "Inspection";
       default:
         return type || "Action";
     }
   };
 
-  // Afficher le scanner QR
   if (scanQR) {
     return (
       <SafeAreaView style={styles.container} edges={["top"]}>
@@ -165,7 +164,7 @@ export default function PlanningScreen() {
             <Text style={styles.backText}>Retour</Text>
           </Pressable>
         </View>
-        <QRCodeScanner setScanQR={setScanQR} />
+        <QRCodeScannerPlanning setScanQR={setScanQR} />
       </SafeAreaView>
     );
   }
@@ -353,7 +352,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginTop: 60,
+    marginTop: 30,
     marginBottom: 4,
     paddingHorizontal: 16,
   },

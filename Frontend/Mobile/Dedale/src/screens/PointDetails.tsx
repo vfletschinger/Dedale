@@ -412,7 +412,8 @@ export default function PointDetails() {
                 {pointData.point.comment ? (
                   <Pressable
                     onPress={handleEditComment}
-                    className="bg-blue-500 px-3 py-1 rounded-lg"
+                    className="px-3 py-1 rounded-lg"
+                    style={{ backgroundColor: Colors.secondary }}
                   >
                     <Text className="text-white text-xs font-semibold">
                       ✏️ Modifier
@@ -421,7 +422,8 @@ export default function PointDetails() {
                 ) : (
                   <Pressable
                     onPress={handleAddComment}
-                    className="bg-blue-500 px-3 py-1 rounded-lg"
+                    className="px-3 py-1 rounded-lg"
+                    style={{ backgroundColor: Colors.secondary }}
                   >
                     <Text className="text-white text-xs font-semibold">
                       + Ajouter
@@ -435,9 +437,10 @@ export default function PointDetails() {
                   <View className="flex-row gap-2">
                     <Pressable
                       onPress={handleEditComment}
-                      className="bg-blue-100 px-3 py-1 rounded"
+                      className="px-3 py-1 rounded"
+                      style={{ backgroundColor: Colors.secondary }}
                     >
-                      <Text className="text-blue-600 text-xs">Modifier</Text>
+                      <Text className="text-white text-xs font-semibold">Modifier</Text>
                     </Pressable>
                     <Pressable
                       onPress={handleDeleteComment}
@@ -461,7 +464,8 @@ export default function PointDetails() {
                 <View className="flex-row gap-2">
                   <Pressable
                     onPress={handleEditObstacles}
-                    className="bg-blue-500 px-3 py-1 rounded-lg"
+                    className="px-3 py-1 rounded-lg"
+                    style={{ backgroundColor: Colors.secondary }}
                   >
                     <Text className="text-white text-xs font-semibold">
                       {pointData.equipements.length > 0
@@ -507,7 +511,8 @@ export default function PointDetails() {
                 </Text>
                 <Pressable
                   onPress={handleAddPicture}
-                  className="bg-blue-500 px-3 py-1 rounded-lg"
+                  className="px-3 py-1 rounded-lg"
+                  style={{ backgroundColor: Colors.secondary }}
                 >
                   <Text className="text-white text-xs font-semibold">
                     + Ajouter

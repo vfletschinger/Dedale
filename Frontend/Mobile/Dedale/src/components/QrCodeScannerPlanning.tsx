@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   Text,
   View,
@@ -8,126 +8,41 @@ import {
   ActivityIndicator,
   StyleSheet,
   TouchableOpacity,
-  Alert,
 } from "react-native";
 import {
   CameraView,
   useCameraPermissions,
   BarcodeScanningResult,
 } from "expo-camera";
-import WebSocketClient, { WebSocketResponse } from "./WebSocketClient";
-const { width } = Dimensions.get("window");
-const SCANNER_SIZE = width * 0.7;
+import WebSocketClient from "./WebSocketClient";
 import { getDatabase } from "../../assets/migrations";
 import { useWebSocket } from "../context/WebSocketContext";
 import { useEvent } from "../context/EventContext";
 import { usePoints } from "../context/PointsContext";
 import { useGeometries } from "../context/GeometriesContext";
-import {
-  EventType,
-  TransferEventType,
-  InterestPointsType,
-  PictureType,
-  EquipementType,
-  ParcoursType,
-  ZoneType,
-} from "../types/database";
 
-// Types pour l'export
-type PointWithDetails = InterestPointsType & {
-  pictures: PictureType[];
-  equipements: EquipementType[];
-};
+const { width } = Dimensions.get("window");
+const SCANNER_SIZE = width * 0.7;
 
-type EventExportData = {
-  event: any;
-  points: PointWithDetails[];
-  equipements?: any[];
-};
-
-// Nouveau type pour les données reçues du desktop
-interface IncomingEventData {
-  type: "event";
-  data: {
-    id: string;
-    name: string;
-    startDate: string;
-    endDate: string;
-    points: Array<{
-      id: string;
-      eventId: string;
-      x: number;
-      y: number;
-      name: string;
-      comment: string | null;
-      type: string | null;
-      status: boolean;
-    }>;
-    parcours: Array<{
-      id: string;
-      eventId: string;
-      geometryJson?: string;
-      wkt?: string;
-    }>;
-    zones: Array<{
-      id: string;
-      eventId: string;
-      geometryJson?: string;
-      wkt?: string;
-    }>;
-    teams: Array<{
-      id: string;
-      eventId: string;
-      name: string;
-      members: any[];
-    }>;
-    actions: Array<{
-      id: string;
-      teamId: string;
-      equipementId: string;
-      actionType?: string;
-      type?: string;
-      scheduledTime?: string;
-      scheduled_time?: string;
-      isDone?: boolean;
-      is_done?: number;
-    }>;
-    equipements: Array<{
-      id: string;
-      eventId: string;
-      typeId: string;
-      quantity: number;
-      lengthPerUnit: number;
-      datePose: string;
-      dateDepose: string;
-      coordinates: Array<{
-        id: string;
-        equipementId: string;
-        x: number;
-        y: number;
-        orderIndex: number;
-      }>;
-    }>;
-  };
-}
-
-interface QRCodeScannerProps {
+interface QRCodeScannerPlanningProps {
   setScanQR: (value: boolean) => void;
-  mode?: "receive" | "send"; // Mode: recevoir des events ou envoyer
-  eventToSend?: any; // L'événement à envoyer (si mode 'send')
-  onExportSuccess?: () => void; // Callback quand l'export réussit
+  mode?: "receive" | "send";
+  eventToSend?: any;
+  onExportSuccess?: () => void;
 }
 
-const QRCodeScanner = ({
+const QRCodeScannerPlanning = ({
   setScanQR,
   mode = "receive",
   eventToSend,
   onExportSuccess,
-}: QRCodeScannerProps) => {
+}: QRCodeScannerPlanningProps) => {
   const { setWsClient, setIsConnected } = useWebSocket();
-  const { refreshEvents } = useEvent();
+  const { refreshEvents, currentEvent } = useEvent();
   const { refreshPoints } = usePoints();
   const { refreshGeometries } = useGeometries();
+  const selectedEventId = currentEvent?.id;
+
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [isTransferring, setIsTransferring] = useState(false);
@@ -136,6 +51,7 @@ const QRCodeScanner = ({
   const [currentClient, setCurrentClient] = useState<WebSocketClient | null>(
     null
   );
+
   const db = getDatabase();
 
   if (!permission || !permission.granted) {
@@ -155,588 +71,212 @@ const QRCodeScanner = ({
     );
   }
 
-  const insertEvents = (eventsData: (EventType | TransferEventType | IncomingEventData)[]) => {
-    try {
-      let insertedCount = 0;
-      let updatedCount = 0;
-      let parcoursCount = 0;
-      let zonesCount = 0;
-      let pointsCount = 0;
-      let teamsCount = 0;
-      let actionsCount = 0;
-      let equipementsCount = 0;
-
-      for (const incomingData of eventsData) {
-        // Vérifier si c'est le nouveau format {type: "event", data: {...}}
-        let eventData: any;
-        if ((incomingData as IncomingEventData).type === "event" && (incomingData as IncomingEventData).data) {
-          eventData = (incomingData as IncomingEventData).data;
-        } else {
-          eventData = incomingData;
-        }
-
-        // Normaliser les noms de champs (camelCase vers snake_case)
-        const event: EventType = {
-          id: eventData.id,
-          name: eventData.name,
-          description: eventData.description || "",
-          dateDebut: eventData.dateDebut || eventData.startDate || "",
-          dateFin: eventData.dateFin || eventData.endDate || "",
-          statut: eventData.statut || "actif",
-        };
-
-        console.log("📦 Traitement événement:", event.name);
-
-        const existing = db.getFirstSync<EventType>(
-          "SELECT id FROM event WHERE id = ?",
-          [event.id]
-        );
-
-        if (existing) {
-          db.runSync(
-            "UPDATE event SET name = ?, description = ?, dateDebut = ?, dateFin = ?, statut = ? WHERE id = ?",
-            [
-              event.name || "",
-              event.description || "",
-              event.dateDebut || "",
-              event.dateFin || "",
-              event.statut || "actif",
-              event.id,
-            ]
-          );
-          updatedCount++;
-        } else {
-          db.runSync(
-            "INSERT INTO event (id, name, description, dateDebut, dateFin, statut) VALUES (?, ?, ?, ?, ?, ?)",
-            [
-              event.id,
-              event.name || "",
-              event.description || "",
-              event.dateDebut || "",
-              event.dateFin || "",
-              event.statut || "actif",
-            ]
-          );
-          insertedCount++;
-        }
-
-        // Insérer les parcours si présents
-        if (eventData.parcours && Array.isArray(eventData.parcours)) {
-          for (const parcours of eventData.parcours) {
-            const existingParcours = db.getFirstSync(
-              "SELECT id FROM parcours WHERE id = ?",
-              [parcours.id]
-            );
-
-            const wkt = parcours.geometryJson || parcours.wkt || "";
-
-            if (!existingParcours) {
-              db.runSync(
-                "INSERT INTO parcours (id, event_id, wkt) VALUES (?, ?, ?)",
-                [parcours.id, event.id, wkt]
-              );
-              parcoursCount++;
-            } else {
-              db.runSync("UPDATE parcours SET wkt = ? WHERE id = ?", [
-                wkt,
-                parcours.id,
-              ]);
-            }
-          }
-        }
-
-        // Insérer les zones si présentes
-        if (eventData.zones && Array.isArray(eventData.zones)) {
-          for (const zone of eventData.zones) {
-            const existingZone = db.getFirstSync(
-              "SELECT id FROM zone WHERE id = ?",
-              [zone.id]
-            );
-
-            const wkt = zone.geometryJson || zone.wkt || "";
-
-            if (!existingZone) {
-              db.runSync(
-                "INSERT INTO zone (id, event_id, wkt) VALUES (?, ?, ?)",
-                [zone.id, event.id, wkt]
-              );
-              zonesCount++;
-            } else {
-              db.runSync("UPDATE zone SET wkt = ? WHERE id = ?", [
-                wkt,
-                zone.id,
-              ]);
-            }
-          }
-        }
-
-        // Insérer les points si présents
-        if (eventData.points && Array.isArray(eventData.points)) {
-          for (const point of eventData.points) {
-            const existingPoint = db.getFirstSync(
-              "SELECT id FROM point WHERE id = ?",
-              [point.id]
-            );
-
-            if (!existingPoint) {
-              db.runSync(
-                "INSERT INTO point (id, event_id, x, y, name, comment, type, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                [
-                  point.id,
-                  event.id,
-                  point.x,
-                  point.y,
-                  point.name || "Point",
-                  point.comment || null,
-                  point.type || null,
-                  point.status !== undefined ? (point.status ? 1 : 0) : 0,
-                ]
-              );
-              pointsCount++;
-            } else {
-              db.runSync(
-                "UPDATE point SET x = ?, y = ?, name = ?, comment = ?, type = ?, status = ? WHERE id = ?",
-                [
-                  point.x,
-                  point.y,
-                  point.name || "Point",
-                  point.comment || null,
-                  point.type || null,
-                  point.status !== undefined ? (point.status ? 1 : 0) : 0,
-                  point.id,
-                ]
-              );
-            }
-          }
-        }
-
-        // Insérer les équipes si présentes
-        if (eventData.teams && Array.isArray(eventData.teams)) {
-          for (const team of eventData.teams) {
-            const teamEventId = team.eventId || team.event_id || event.id;
-            
-            const existingTeam = db.getFirstSync(
-              "SELECT id FROM team WHERE id = ?",
-              [team.id]
-            );
-
-            if (!existingTeam) {
-              db.runSync(
-                "INSERT INTO team (id, event_id, name) VALUES (?, ?, ?)",
-                [team.id, teamEventId, team.name]
-              );
-              teamsCount++;
-            } else {
-              db.runSync("UPDATE team SET name = ? WHERE id = ?", [
-                team.name,
-                team.id,
-              ]);
-            }
-          }
-        }
-
-        // Insérer les équipements si présents (nouveau format)
-        if (eventData.equipements && Array.isArray(eventData.equipements)) {
-          for (const equipement of eventData.equipements) {
-            const existingEquipement = db.getFirstSync(
-              "SELECT id FROM equipement WHERE id = ?",
-              [equipement.id]
-            );
-
-            // Calculer le point_id à partir de la première coordonnée ou null
-            let pointId = null;
-            if (equipement.coordinates && equipement.coordinates.length > 0) {
-              const firstCoord = equipement.coordinates[0];
-              pointId = firstCoord.id;
-              
-              // Insérer ce point s'il n'existe pas
-              const existingCoordPoint = db.getFirstSync(
-                "SELECT id FROM point WHERE id = ?",
-                [firstCoord.id]
-              );
-              
-              if (!existingCoordPoint) {
-                db.runSync(
-                  "INSERT INTO point (id, event_id, x, y, name, comment, type, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                  [
-                    firstCoord.id,
-                    event.id,
-                    firstCoord.x,
-                    firstCoord.y,
-                    `Équipement - Coord ${firstCoord.orderIndex + 1}`,
-                    null,
-                    "equipement",
-                    0,
-                  ]
-                );
-                pointsCount++;
-              }
-            }
-
-            // Insérer ou mettre à jour l'équipement (schéma Tauri: event_id obligatoire, pas de point_id)
-            if (!existingEquipement) {
-              db.runSync(
-                "INSERT INTO equipement (id, event_id, type_id, quantity, length_per_unit, date_pose, date_depose) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                [
-                  equipement.id,
-                  event.id,
-                  equipement.typeId || null,
-                  equipement.quantity || 1,
-                  equipement.lengthPerUnit || 0,
-                  equipement.datePose || null,
-                  equipement.dateDepose || null,
-                ]
-              );
-              equipementsCount++;
-            } else {
-              db.runSync(
-                "UPDATE equipement SET event_id = ?, type_id = ?, quantity = ?, length_per_unit = ?, date_pose = ?, date_depose = ? WHERE id = ?",
-                [
-                  event.id,
-                  equipement.typeId || null,
-                  equipement.quantity || 1,
-                  equipement.lengthPerUnit || 0,
-                  equipement.datePose || null,
-                  equipement.dateDepose || null,
-                  equipement.id,
-                ]
-              );
-            }
-
-            // Insérer toutes les coordonnées dans equipement_coordinate
-            if (equipement.coordinates && Array.isArray(equipement.coordinates)) {
-              // Supprimer les anciennes coordonnées
-              db.runSync("DELETE FROM equipement_coordinate WHERE equipement_id = ?", [equipement.id]);
-              
-              for (const coord of equipement.coordinates) {
-                db.runSync(
-                  "INSERT INTO equipement_coordinate (id, equipement_id, x, y, order_index) VALUES (?, ?, ?, ?, ?)",
-                  [
-                    coord.id,
-                    equipement.id,
-                    coord.x,
-                    coord.y,
-                    coord.orderIndex || 0,
-                  ]
-                );
-                
-                // Créer aussi un point pour chaque coordonnée (pour le guidage)
-                const existingCoord = db.getFirstSync(
-                  "SELECT id FROM point WHERE id = ?",
-                  [coord.id]
-                );
-                
-                if (!existingCoord) {
-                  db.runSync(
-                    "INSERT INTO point (id, event_id, x, y, name, comment, type, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                    [
-                      coord.id,
-                      event.id,
-                      coord.x,
-                      coord.y,
-                      `Équipement - Coord ${coord.orderIndex + 1}`,
-                      null,
-                      "equipement",
-                      0,
-                    ]
-                  );
-                  pointsCount++;
-                }
-              }
-            }
-          }
-        }
-
-        // Insérer les actions si présentes
-        if (eventData.actions && Array.isArray(eventData.actions)) {
-          for (const actionData of eventData.actions) {
-            const action = {
-              id: actionData.id,
-              team_id: actionData.teamId || actionData.team_id,
-              equipement_id: actionData.equipementId || actionData.equipement_id,
-              type: actionData.actionType || actionData.type || null,
-              scheduled_time: actionData.scheduledTime || actionData.scheduled_time || null,
-              is_done: actionData.isDone !== undefined 
-                ? (actionData.isDone ? 1 : 0) 
-                : (actionData.is_done !== undefined ? actionData.is_done : 0),
-            };
-            
-            console.log("📝 Insertion action:", action);
-            
-            // Vérifier si l'équipement référencé existe, sinon le créer
-            if (action.equipement_id) {
-              const existingEquip = db.getFirstSync(
-                "SELECT id FROM equipement WHERE id = ?",
-                [action.equipement_id]
-              );
-              
-              if (!existingEquip) {
-                console.log("⚠️ Création équipement manquant:", action.equipement_id);
-                db.runSync(
-                  "INSERT INTO equipement (id, event_id, type_id, quantity, length_per_unit) VALUES (?, ?, ?, ?, ?)",
-                  [action.equipement_id, event.id, null, 1, 0]
-                );
-                equipementsCount++;
-              }
-            }
-            
-            const existingAction = db.getFirstSync(
-              "SELECT id FROM action WHERE id = ?",
-              [action.id]
-            );
-
-            if (!existingAction) {
-              db.runSync(
-                "INSERT INTO action (id, team_id, equipement_id, type, scheduled_time, is_done) VALUES (?, ?, ?, ?, ?, ?)",
-                [
-                  action.id,
-                  action.team_id,
-                  action.equipement_id,
-                  action.type,
-                  action.scheduled_time,
-                  action.is_done,
-                ]
-              );
-              actionsCount++;
-            } else {
-              db.runSync(
-                "UPDATE action SET team_id = ?, equipement_id = ?, type = ?, scheduled_time = ?, is_done = ? WHERE id = ?",
-                [
-                  action.team_id,
-                  action.equipement_id,
-                  action.type,
-                  action.scheduled_time,
-                  action.is_done,
-                  action.id,
-                ]
-              );
-            }
-          }
-        }
-
-        console.log(`✅ Équipes: ${teamsCount}, Actions: ${actionsCount}, Équipements: ${equipementsCount}`);
-      }
-
-      console.log(
-        `✅ ${insertedCount} événement(s) inséré(s), ${updatedCount} mis à jour`
-      );
-      console.log(
-        `✅ ${parcoursCount} parcours, ${zonesCount} zones, ${pointsCount} points`
-      );
-      console.log(
-        `✅ ${equipementsCount} équipements, ${teamsCount} équipes, ${actionsCount} actions`
-      );
-      setTransferStatus(
-        `${insertedCount + updatedCount} événement(s)\n${pointsCount} points, ${equipementsCount} équipements\n${teamsCount} équipes, ${actionsCount} actions`
-      );
-    } catch (error) {
-      console.error("❌ Erreur lors de l'insertion des événements:", error);
-      throw error;
+  const insertPlanningData = (planningData: any) => {
+    let teams = 0, equipements = 0, actions = 0, coordinates = 0;
+    // Le format attendu : planningData.actions est un tableau de blocs
+    // Chaque bloc : { team, equipements, actions, coordonees }
+    const blocks = planningData.actions ?? [];
+    // On prend l'eventId du premier bloc si non fourni
+    const eventId = selectedEventId ?? blocks[0]?.team?.eventId ?? blocks[0]?.team?.event_id;
+    if (!eventId) {
+      console.error("❌ Aucun eventId trouvé");
+      return { teams: 0, equipements: 0, actions: 0, coordinates: 0 };
     }
-  };
-
-  // Récupérer les données complètes d'un événement pour l'export
-  const getEventExportData = (eventId: number): EventExportData | null => {
     try {
-      const event = db.getFirstSync<EventType>(
-        "SELECT * FROM event WHERE id = ?",
-        [eventId]
-      );
-      if (!event) return null;
-
-      const points = db.getAllSync<InterestPointsType>(
-        `SELECT p.* FROM point p WHERE p.event_id = ?`,
-        [eventId]
-      );
-
-      const pointsWithDetails: PointWithDetails[] = points.map((point) => {
-        const pictures = db.getAllSync<PictureType>(
-          "SELECT * FROM picture WHERE point_id = ?",
-          [point.id]
-        );
-
-        return { ...point, pictures, equipements: [] };
-      });
-
-      // Récupérer les équipements de l'événement avec leurs coordonnées
-      const equipements = db.getAllSync<any>(
-        `SELECT e.*, t.name, t.description 
-         FROM equipement e 
-         LEFT JOIN type t ON e.type_id = t.id 
-         WHERE e.event_id = ?`,
-        [eventId]
-      );
-
-      // Ajouter les coordonnées à chaque équipement
-      const equipementsWithCoords = (equipements || []).map((eq: any) => {
-        const coords = db.getAllSync<any>(
-          "SELECT * FROM equipement_coordinate WHERE equipement_id = ? ORDER BY order_index",
-          [eq.id]
-        );
-        return { ...eq, coordinates: coords || [] };
-      });
-
-      return { 
-        event: eventToSend || event, 
-        points: pointsWithDetails,
-        equipements: equipementsWithCoords,
-      };
-    } catch (error) {
-      console.error("Erreur récupération données export:", error);
-      return null;
-    }
-  };
-
-  const handleBarCodeScanned = ({ type, data }: BarcodeScanningResult) => {
-    if (!scanned) {
-      setScanned(true);
-      setIsTransferring(true);
-      setTransferStatus("Connexion en cours...");
-      setReceivedCount(0);
-
-      const websocketUri: string = data.startsWith("ws")
-        ? data
-        : `ws://${data}`;
-      const client = new WebSocketClient(websocketUri);
-      setCurrentClient(client);
-
-      if (mode === "send" && eventToSend) {
-        // Mode ENVOI: connecter et envoyer l'événement
-        client.setCallbacks(
-          () => {
-            // onFinished
-            setTransferStatus("Export terminé avec succès !");
-            setTimeout(() => {
-              handleCloseConnection();
-              onExportSuccess?.();
-            }, 2000);
-          },
-          (error) => {
-            // onError
-            setTransferStatus(`Erreur: ${error}`);
-          }
-        );
-
-        // Configurer le callback de fermeture
-        client.setOnClose(() => {
-          console.log("🚪 Connexion fermée par le serveur");
-          handleCloseConnection();
-        });
-
-        client.setOnResponse((response: WebSocketResponse) => {
-          console.log("📨 Réponse serveur:", response);
-          if (response.code === 3) {
-            setTransferStatus("✅ " + response.message);
-            setTimeout(() => {
-              handleCloseConnection();
-              onExportSuccess?.();
-            }, 2000);
+      db.runSync("BEGIN TRANSACTION");
+      for (const block of blocks) {
+        // TEAM
+        const team = block.team;
+        if (team) {
+          const teamId = team.id;
+          const existingTeam = db.getFirstSync(
+            "SELECT id FROM team WHERE id = ?",
+            [teamId]
+          );
+          if (!existingTeam) {
+            db.runSync(
+              "INSERT INTO team (id, event_id, name) VALUES (?, ?, ?)",
+              [teamId, team.eventId ?? team.event_id ?? eventId, team.name]
+            );
+            teams++;
           } else {
-            setTransferStatus(`Erreur: ${response.message}`);
+            db.runSync(
+              "UPDATE team SET name = ? WHERE id = ?",
+              [team.name, teamId]
+            );
           }
-        });
-
-        client
-          .connect()
-          .then(() => {
-            console.log("✅ Connecté, envoi de l'événement...");
-            setTransferStatus("Connecté ! Envoi des données...");
-
-            // Récupérer et envoyer les données
-            const exportData = getEventExportData(eventToSend.id);
-            if (exportData) {
-              console.log(
-                "📤 Envoi:",
-                exportData.event.name,
-                "avec",
-                exportData.points.length,
-                "points"
-              );
-              client.send(JSON.stringify(exportData));
-              setTransferStatus(
-                `Envoi de ${exportData.points.length} point(s)...`
-              );
-            } else {
-              setTransferStatus("Erreur: données non trouvées");
-            }
-          })
-          .catch((error: string) => {
-            console.error("❌ Erreur connexion:", error);
-            setTransferStatus(`Erreur: ${error}`);
-            setTimeout(() => {
-              client.close();
-              setCurrentClient(null);
-              setIsTransferring(false);
-              setScanned(false);
-              setScanQR(false);
-            }, 3000);
-          });
-      } else {
-        // Mode RÉCEPTION: attendre les événements du desktop
-        const onEventsReceived = (data: any) => {
-          console.log("📦 Données reçues:", JSON.stringify(data).substring(0, 200));
-          try {
-            // Normaliser les données reçues en tableau
-            let eventsArray: any[];
-            if (Array.isArray(data)) {
-              eventsArray = data;
-            } else if (data.type === "event" && data.data) {
-              // Nouveau format: {type: "event", data: {...}}
-              eventsArray = [data];
-            } else {
-              // Ancien format: objet événement unique
-              eventsArray = [data];
-            }
-            
-            insertEvents(eventsArray);
-            // Rafraîchir tous les contextes pour afficher immédiatement les données
-            refreshEvents();
-            refreshPoints();
-            refreshGeometries();
-            setReceivedCount((prev) => prev + eventsArray.length);
-            setTransferStatus(`Événement reçu avec succès !`);
-          } catch (error) {
-            console.error("Erreur insertion:", error);
-            setTransferStatus(`Erreur: ${error}`);
+        }
+        // EQUIPEMENTS
+        for (const equip of block.equipements ?? []) {
+          const equipId = equip.id;
+          const existingEquip = db.getFirstSync(
+            "SELECT id FROM equipement WHERE id = ?",
+            [equipId]
+          );
+          if (!existingEquip) {
+            db.runSync(
+              `INSERT INTO equipement
+                (id, event_id, type_id, quantity, length_per_unit, date_pose, date_depose)
+                VALUES (?, ?, ?, ?, ?, ?, ?)`,
+              [
+                equipId,
+                equip.eventId ?? equip.event_id ?? eventId,
+                equip.typeId ?? equip.type_id ?? null,
+                equip.quantity ?? 1,
+                equip.lengthPerUnit ?? equip.length_per_unit ?? 0,
+                equip.datePose ?? equip.date_pose ?? null,
+                equip.dateDepose ?? equip.date_depose ?? null,
+              ]
+            );
+            equipements++;
           }
-        };
-
-        // Configurer le callback de fermeture
-        client.setOnClose(() => {
-          console.log("🚪 Connexion fermée par le serveur");
-          handleCloseConnection();
-        });
-
-        client
-          .connect(onEventsReceived)
-          .then(() => {
-            console.log("✅ Connexion WebSocket établie");
-            setTransferStatus("Connecté ! En attente des événements...");
-
-            setWsClient(client);
-            setIsConnected(true);
-          })
-          .catch((error: string) => {
-            console.error("❌ Erreur connexion:", error);
-            setTransferStatus(`Erreur: ${error}`);
-            setTimeout(() => {
-              client.close();
-              setCurrentClient(null);
-              setIsTransferring(false);
-              setScanned(false);
-              setScanQR(false);
-            }, 3000);
-          });
+          // Supprimer les coordonnées existantes
+          db.runSync(
+            "DELETE FROM equipement_coordinate WHERE equipement_id = ?",
+            [equipId]
+          );
+          // Ajouter les coordonnées (champ coordinates)
+          for (const coord of equip.coordinates ?? []) {
+            db.runSync(
+              `INSERT INTO equipement_coordinate
+                (id, equipement_id, x, y, order_index)
+                VALUES (?, ?, ?, ?, ?)`,
+              [
+                coord.id,
+                equipId,
+                coord.x,
+                coord.y,
+                coord.orderIndex ?? coord.order_index ?? 0,
+              ]
+            );
+            coordinates++;
+          }
+        }
+        // COORDONEES (champ à la racine du bloc, pour compatibilité)
+        for (const coord of block.coordonees ?? []) {
+          // On suppose que equipementId est présent
+          db.runSync(
+            `INSERT INTO equipement_coordinate
+              (id, equipement_id, x, y, order_index)
+              VALUES (?, ?, ?, ?, ?)`,
+            [
+              coord.id,
+              coord.equipementId ?? coord.equipement_id,
+              coord.x,
+              coord.y,
+              coord.orderIndex ?? coord.order_index ?? 0,
+            ]
+          );
+          coordinates++;
+        }
+        // ACTIONS
+        for (const action of block.actions ?? []) {
+          const exists = db.getFirstSync(
+            'SELECT id FROM "action" WHERE id = ?',
+            [action.id]
+          );
+          const isDone =
+            action.is_done !== undefined
+              ? action.is_done
+              : action.isDone !== undefined
+              ? action.isDone
+              : 0;
+          if (!exists) {
+            db.runSync(
+              `INSERT INTO "action"
+                (id, team_id, equipement_id, type, scheduled_time, is_done)
+                VALUES (?, ?, ?, ?, ?, ?)`,
+              [
+                action.id,
+                action.team_id ?? team?.id,
+                action.equipement_id,
+                action.type ?? null,
+                action.scheduled_time ?? null,
+                isDone ? 1 : 0,
+              ]
+            );
+            actions++;
+          } else {
+            db.runSync(
+              `UPDATE "action"
+                SET type = ?, scheduled_time = ?, is_done = ?
+                WHERE id = ?`,
+              [
+                action.type ?? null,
+                action.scheduled_time ?? null,
+                isDone ? 1 : 0,
+                action.id,
+              ]
+            );
+          }
+        }
       }
+      db.runSync("COMMIT");
+      return { teams, equipements, actions, coordinates };
+    } catch (e) {
+      db.runSync("ROLLBACK");
+      throw e;
     }
   };
 
-  // Fonction pour fermer la connexion et le modal
+  const handleBarCodeScanned = ({ data }: BarcodeScanningResult) => {
+    if (scanned) return;
+
+    setScanned(true);
+    setIsTransferring(true);
+    setTransferStatus("Connexion en cours...");
+    setReceivedCount(0);
+
+    const websocketUri = data.startsWith("ws") ? data : `ws://${data}`;
+    const client = new WebSocketClient(websocketUri);
+    setCurrentClient(client);
+
+    const onEventsReceived = (payload: any) => {
+      try {
+        const message =
+          typeof payload === "string" ? JSON.parse(payload) : payload;
+
+        if (message.type === "planning_data") {
+          try {
+            const result = insertPlanningData(message);
+
+            setTransferStatus(
+              `✅ Planning importé\n` +
+              `${result.teams} équipes\n` +
+              `${result.equipements} équipements\n` +
+              `${result.actions} actions`
+            );
+          } catch (e) {
+            console.error("❌ Import échoué", e);
+            setTransferStatus("❌ Erreur import planning");
+          }
+
+          setReceivedCount((c) => c + 1);
+        }
+      } catch (error) {
+        console.error("💥 Erreur WS:", error);
+        setTransferStatus("❌ Erreur import planning");
+      }
+    };
+
+    client.setOnClose(() => handleCloseConnection());
+
+    client
+      .connect(onEventsReceived)
+      .then(() => {
+        setWsClient(client);
+        setIsConnected(true);
+        setTransferStatus("Connecté ! En attente des données...");
+      })
+      .catch((error: string) => {
+        setTransferStatus(`Erreur: ${error}`);
+        setTimeout(handleCloseConnection, 3000);
+      });
+  };
+
   const handleCloseConnection = () => {
-    if (currentClient) {
-      currentClient.close();
-      setCurrentClient(null);
-    }
+    currentClient?.close();
+    setCurrentClient(null);
     setWsClient(null);
     setIsConnected(false);
     setIsTransferring(false);
@@ -749,9 +289,7 @@ const QRCodeScanner = ({
       {!isTransferring && (
         <CameraView
           style={StyleSheet.absoluteFillObject}
-          barcodeScannerSettings={{
-            barcodeTypes: ["qr"],
-          }}
+          barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
           onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
           facing="back"
         />
@@ -759,49 +297,43 @@ const QRCodeScanner = ({
 
       {!isTransferring && (
         <View className="full-absolute justify-center items-center">
-          <View className="flex-1 bg-black/60 w-full justify-center items-center" />
+          <View className="flex-1 bg-black/60 w-full" />
           <View className="flex-row" style={{ height: SCANNER_SIZE }}>
             <View className="flex-1 bg-black/60" />
             <View
-              className="bg-transparent border-2 border-white"
-              style={{ width: SCANNER_SIZE, height: SCANNER_SIZE }}
+              style={{
+                width: SCANNER_SIZE,
+                height: SCANNER_SIZE,
+                borderWidth: 2,
+                borderColor: "white",
+              }}
             />
             <View className="flex-1 bg-black/60" />
           </View>
           <View className="flex-1 bg-black/60 w-full justify-center items-center">
-            <Text className="scanner-text">
-              {scanned ? "Code scanné!" : "Scannez le Code QR dans le carré."}
+            <Text className="text-white">
+              {scanned ? "Code scanné" : "Scanne le QR code"}
             </Text>
           </View>
         </View>
       )}
 
-      <Modal visible={isTransferring} transparent={true} animationType="fade">
+      <Modal visible={isTransferring} transparent animationType="fade">
         <View className="modal-overlay bg-black/80">
-          <View className="bg-white rounded-2xl p-10 items-center min-w-[280px] shadow-lg">
-            <ActivityIndicator size="large" color="#4A90E2" />
-            <Text className="text-xl font-bold mt-5 mb-2 text-gray-800">
-              {mode === "send" ? "Export en cours" : "Synchronisation"}
+          <View className="bg-white rounded-2xl p-10 items-center min-w-[280px]">
+            <ActivityIndicator size="large" />
+            <Text className="text-xl font-bold mt-5 mb-2">
+              Synchronisation
             </Text>
-            <Text className="text-base text-gray-600 text-center mb-2">
+            <Text className="text-base text-center mb-2">
               {transferStatus}
             </Text>
-            {mode === "send" && eventToSend && (
-              <Text className="text-sm text-blue-600 mb-2">
-                Événement: {eventToSend.name}
-              </Text>
-            )}
-            {mode === "receive" && receivedCount > 0 && (
-              <Text className="text-sm text-green-600 mb-4">
-                Total reçu: {receivedCount} événement(s)
-              </Text>
-            )}
             <TouchableOpacity
               onPress={handleCloseConnection}
               className="mt-4 bg-red-500 px-6 py-3 rounded-xl"
             >
               <Text className="text-white font-semibold">
-                {mode === "send" ? "Annuler" : "Fermer la connexion"}
+                Fermer la connexion
               </Text>
             </TouchableOpacity>
           </View>
@@ -811,4 +343,4 @@ const QRCodeScanner = ({
   );
 };
 
-export default QRCodeScanner;
+export default QRCodeScannerPlanning;

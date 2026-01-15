@@ -159,7 +159,6 @@ export default function RegisterPointScreen() {
         }
       }
 
-      // Sauvegarder les équipements (anciennement obstacles)
       if (selectedObstacles.length > 0 && selectedEventId && location) {
         for (const obstacle of selectedObstacles) {
           try {
@@ -174,7 +173,6 @@ export default function RegisterPointScreen() {
                 0,
               ]
             );
-            // Ajouter la coordonnée du point comme coordonnée de l'équipement
             const coordId = generateUUID();
             db.runSync(
               "INSERT INTO equipement_coordinate (id, equipement_id, x, y, order_index) VALUES (?, ?, ?, ?, ?)",
@@ -283,14 +281,16 @@ export default function RegisterPointScreen() {
       <View className="absolute bottom-5 left-5 right-5 flex-row justify-between gap-2">
         <Pressable
           onPress={requestLocation}
-          className="flex-1 bg-violet-500 p-4 rounded-xl items-center active:bg-violet-600"
+          className="flex-1 p-4 rounded-xl items-center active:bg-violet-600"
+          style={{ backgroundColor: Colors.secondary }}
         >
           <Text className="text-white font-bold">Centrer</Text>
         </Pressable>
 
         <Pressable
           onPress={() => setIsModalVisible(true)}
-          className="flex-1 bg-violet-500 p-4 rounded-xl items-center active:bg-violet-600"
+          className="flex-1 p-4 rounded-xl items-center active:bg-violet-600"
+          style={{ backgroundColor: Colors.secondary }}
         >
           <Text className="text-white font-bold">Ajouter un point</Text>
         </Pressable>

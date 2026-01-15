@@ -36,8 +36,8 @@ function TabNavigator() {
       initialRouteName="Accueil"
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: Colors.accent,
-        tabBarInactiveTintColor: Colors.accentLight,
+        tabBarActiveTintColor: "#FFD600",
+        tabBarInactiveTintColor: "#FFFFFF",
         tabBarStyle: {
           backgroundColor: Colors.primary,
           borderTopColor: Colors.primaryDark,
