@@ -238,6 +238,8 @@ function OfflineMapLibre({
     pendingZoneGeometry,
     saveZoneWithDetails,
     cancelZoneForm,
+    updateZoneColor,
+    updateParcoursColor,
   } = useMapGeometries(map, selectedEventId, timelineFilterDate, selectedEquipementTypes, visibilityFilters);
 
   // 3. Logique des ÉVÉNEMENTS
@@ -635,7 +637,17 @@ function OfflineMapLibre({
                                 }
                               >
                                 <div className="flex items-center gap-2">
-                                  <span className="text-lg" style={{ color: zone.color || '#6366f1' }}><FontAwesomeIcon icon={faSquare} /></span>
+                                  <input
+                                    type="color"
+                                    value={zone.color || '#6366f1'}
+                                    onChange={(e) => {
+                                      e.stopPropagation();
+                                      updateZoneColor(zone.id, e.target.value);
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="w-6 h-6 rounded border-2 border-gray-200 cursor-pointer"
+                                    title="Changer la couleur"
+                                  />
                                   <span className="text-sm font-medium truncate flex-1">
                                     {zone.name ||
                                       `Zone #${zone.id.slice(0, 8)}`}
@@ -710,7 +722,17 @@ function OfflineMapLibre({
                                 }
                               >
                                 <div className="flex items-center gap-2">
-                                  <span className="text-lg" style={{ color: p.color || '#16a34a' }}><FontAwesomeIcon icon={faWaveSquare} /></span>
+                                  <input
+                                    type="color"
+                                    value={p.color || '#16a34a'}
+                                    onChange={(e) => {
+                                      e.stopPropagation();
+                                      updateParcoursColor(p.id, e.target.value);
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="w-6 h-6 rounded border-2 border-gray-200 cursor-pointer"
+                                    title="Changer la couleur"
+                                  />
                                   <span className="text-sm font-medium truncate flex-1">
                                     {p.name || `Parcours #${p.id.slice(0, 8)}`}
                                   </span>

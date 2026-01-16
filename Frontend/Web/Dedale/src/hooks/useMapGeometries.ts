@@ -1058,6 +1058,45 @@ export function useMapGeometries(
     }
   };
 
+  // Modifier la couleur d'une zone
+  const updateZoneColor = async (zoneId: string, newColor: string) => {
+    try {
+      const zone = zones.find(z => z.id === zoneId);
+      if (!zone) return;
+      
+      await invoke("update_zone", {
+        geometryId: zoneId,
+        geom: zone.geometry_json,
+        name: zone.name || "Zone",
+        color: newColor,
+      });
+      loadGeometries();
+    } catch (err) {
+      console.error("Erreur mise à jour couleur zone:", err);
+    }
+  };
+
+  // Modifier la couleur d'un parcours
+  const updateParcoursColor = async (parcoursId: string, newColor: string) => {
+    try {
+      const p = parcours.find(p => p.id === parcoursId);
+      if (!p) return;
+      
+      await invoke("update_parcours", {
+        geometryId: parcoursId,
+        geom: p.geometry_json,
+        name: p.name || "Parcours",
+        color: newColor,
+        startTime: p.start_time ? new Date(p.start_time).getTime() : null,
+        speedLow: p.speed_low,
+        speedHigh: p.speed_high,
+      });
+      loadGeometries();
+    } catch (err) {
+      console.error("Erreur mise à jour couleur parcours:", err);
+    }
+  };
+
   return {
     zones,
     parcours,
@@ -1091,6 +1130,9 @@ export function useMapGeometries(
     saveEquipmentWithDetails,
     cancelEquipmentForm,
     handleDeleteEquipement,
+    // Modification couleurs
+    updateZoneColor,
+    updateParcoursColor,
   };
 
 }
