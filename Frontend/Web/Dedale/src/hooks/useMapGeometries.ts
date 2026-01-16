@@ -923,21 +923,25 @@ export function useMapGeometries(
 
       // On redirige vers la bonne commande Rust selon le type
       if (editingGeometry.type === "zone") {
+        // Récupérer la zone existante pour conserver ses propriétés
+        const existingZone = zones.find(z => z.id === editingGeometry.id);
         await invoke("update_zone", {
           geometryId: editingGeometry.id,
           geom: wkt,
-          name: "Zone",
-          color: "#6366f1",
+          name: existingZone?.name || "Zone",
+          color: existingZone?.color || "#6366f1",
         });
       } else {
+        // Récupérer le parcours existant pour conserver ses propriétés
+        const existingParcours = parcours.find(p => p.id === editingGeometry.id);
         await invoke("update_parcours", {
           geometryId: editingGeometry.id,
           geom: wkt,
-          name: "Parcours",
-          color: "#ef4444",
-          startTime: null,
-          speedLow: null,
-          speedHigh: null,
+          name: existingParcours?.name || "Parcours",
+          color: existingParcours?.color || "#16a34a",
+          startTime: existingParcours?.start_time ? new Date(existingParcours.start_time).getTime() : null,
+          speedLow: existingParcours?.speed_low ?? null,
+          speedHigh: existingParcours?.speed_high ?? null,
         });
       }
 
