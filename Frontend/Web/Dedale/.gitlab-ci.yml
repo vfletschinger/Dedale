@@ -6,7 +6,6 @@ variables:
 
 image: $CI_REGISTRY_IMAGE:latest
 
-
 stages:
   - build-image
   - quality
@@ -193,18 +192,18 @@ build_and_upload_windows:
   script:
     # 1. Installation de Curl (si pas présent dans ton image Docker)
     - apt-get update && apt-get install -y curl || true
-    
+
     # 2. Build de l'application
     - cd $WEB_PATH
     - npm ci --prefer-offline
     - npm run tauri build -- --runner cargo-xwin --target x86_64-pc-windows-msvc --verbose
-    
-    # 3. Upload DIRECT vers le Registre de Paquets (On évite la section artifacts)
+
+    # 3. Upload DIRECT vers le Registre de Paquets
     - cd $CI_PROJECT_DIR
     - INSTALLER_PATH=$(find $PROJECT_PATH/target/x86_64-pc-windows-msvc/release/bundle/nsis/ -name "*.exe" | head -n 1)
     - INSTALLER_NAME="dedale-installer-v1.0.$CI_PIPELINE_IID.exe"
     - echo "Uploading $INSTALLER_PATH as $INSTALLER_NAME..."
-    
+
     - |
       curl --header "JOB-TOKEN: $CI_JOB_TOKEN" \
            --upload-file "$INSTALLER_PATH" \
@@ -213,24 +212,6 @@ build_and_upload_windows:
 # ===========================================
 # DEPLOY JOBS
 # ===========================================
-upload_package:
-  stage: deploy
-  image: curlimages/curl:latest
-  rules:
-    - if: $CI_COMMIT_BRANCH == "main"
-  needs:
-    - job: build_app_windows
-      artifacts: true
-  script:
-    - |
-      INSTALLER_PATH=$(find $PROJECT_PATH/target/x86_64-pc-windows-msvc/release/bundle/nsis/ -name "*.exe" | head -n 1)
-      INSTALLER_NAME="dedale-installer-v1.0.$CI_PIPELINE_IID.exe"
-      echo "Uploading $INSTALLER_PATH as $INSTALLER_NAME"
-
-      curl --header "JOB-TOKEN: $CI_JOB_TOKEN" \
-           --upload-file "$INSTALLER_PATH" \
-           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/dedale/1.0.$CI_PIPELINE_IID/$INSTALLER_NAME"
-
 # --- GITLAB RELEASE ---
 release_windows:
   stage: deploy
@@ -246,10 +227,10 @@ release_windows:
     name: "Dedale v1.0.$CI_PIPELINE_IID"
     description: |
       ## 📦 Version 1.0.$CI_PIPELINE_IID
-      
+
       **Build:** $CI_PIPELINE_IID
       **Commit:** $CI_COMMIT_SHORT_SHA
-      
+
       ### Téléchargement
       [Télécharger l'installateur Windows](https://gitlab.com/${CI_PROJECT_PATH}/-/package_files/...)
       *(Le lien direct est dans les Assets ci-dessous)*
