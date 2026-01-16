@@ -86,6 +86,7 @@ export function useMapGeometries(
   const [editingGeometry, setEditingGeometry] = useState<{
     id: string;
     type: "zone" | "parcours";
+    color?: string;
   } | null>(null);
 
   const [isGeometryListOpen, setIsGeometryListOpen] = useState(false);
@@ -857,12 +858,60 @@ export function useMapGeometries(
   const startEditGeometry = (item: GeometryItem) => {
     if (!drawRef.current || !map) return;
 
-    // On sauvegarde l'ID ET le type pour savoir quelle fonction appeler au Save
-    setEditingGeometry({ id: item.id, type: item.type });
+    // On sauvegarde l'ID, le type ET la couleur pour savoir quelle fonction appeler au Save
+    const itemColor = item.color || (item.type === "zone" ? "#6366f1" : "#16a34a");
+    setEditingGeometry({ id: item.id, type: item.type, color: itemColor });
     highlightGeometry(null);
 
     const geometry = parseWKTtoGeoJSON(item.geometry_json); // Utilisation du bon champ
     if (!geometry) return;
+
+    // Mettre à jour les styles de MapboxDraw avec la couleur de l'élément
+    const drawStyles = [
+      {
+        id: "gl-draw-polygon-fill",
+        type: "fill",
+        filter: ["all", ["==", "$type", "Polygon"], ["!=", "mode", "static"]],
+        paint: { "fill-color": itemColor, "fill-opacity": 0.3 },
+      },
+      {
+        id: "gl-draw-line",
+        type: "line",
+        filter: [
+          "all",
+          ["==", "$type", "LineString"],
+          ["!=", "mode", "static"],
+        ],
+        paint: { "line-color": itemColor, "line-width": 4 },
+      },
+      {
+        id: "gl-draw-polygon-stroke",
+        type: "line",
+        filter: ["all", ["==", "$type", "Polygon"], ["!=", "mode", "static"]],
+        paint: { "line-color": itemColor, "line-width": 3 },
+      },
+      {
+        id: "gl-draw-point-active",
+        type: "circle",
+        filter: ["all", ["==", "$type", "Point"], ["!=", "mode", "static"]],
+        paint: {
+          "circle-radius": 6,
+          "circle-color": "#fff",
+          "circle-stroke-color": itemColor,
+          "circle-stroke-width": 2,
+        },
+      },
+    ];
+    
+    // Recréer MapboxDraw avec les nouveaux styles
+    map.removeControl(drawRef.current as unknown as maplibregl.IControl);
+    const newDraw = new MapboxDraw({
+      displayControlsDefault: false,
+      defaultMode: "simple_select",
+      styles: drawStyles,
+    });
+    map.addControl(newDraw as unknown as maplibregl.IControl, "top-right");
+    drawRef.current = newDraw;
 
     drawRef.current.deleteAll();
     // On utilise l'ID tel quel (string UUID)
@@ -895,6 +944,44 @@ export function useMapGeometries(
     drawRef.current.deleteAll();
     drawRef.current.changeMode("simple_select");
     setEditingGeometry(null);
+
+    // Restaurer les styles par défaut de MapboxDraw
+    map.removeControl(drawRef.current as unknown as maplibregl.IControl);
+    const defaultDraw = new MapboxDraw({
+      displayControlsDefault: false,
+      defaultMode: "simple_select",
+      styles: [
+        {
+          id: "gl-draw-polygon-fill",
+          type: "fill",
+          filter: ["all", ["==", "$type", "Polygon"], ["!=", "mode", "static"]],
+          paint: { "fill-color": "#6366f1", "fill-opacity": 0.3 },
+        },
+        {
+          id: "gl-draw-line",
+          type: "line",
+          filter: [
+            "all",
+            ["==", "$type", "LineString"],
+            ["!=", "mode", "static"],
+          ],
+          paint: { "line-color": "#16a34a", "line-width": 4 },
+        },
+        {
+          id: "gl-draw-point-active",
+          type: "circle",
+          filter: ["all", ["==", "$type", "Point"], ["!=", "mode", "static"]],
+          paint: {
+            "circle-radius": 6,
+            "circle-color": "#fff",
+            "circle-stroke-color": "#4f46e5",
+            "circle-stroke-width": 2,
+          },
+        },
+      ],
+    });
+    map.addControl(defaultDraw as unknown as maplibregl.IControl, "top-right");
+    drawRef.current = defaultDraw;
 
     // Restaurer filtres
     if (map.getLayer("event-geometries-fill"))
