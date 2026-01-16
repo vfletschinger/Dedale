@@ -160,13 +160,12 @@ export default function PointDetails({
 
   async function handleDelete() {
     if (!point) return;
-    if (!confirm(`Supprimer le point #${shortId(point.id)} ?`)) return;
 
     try {
       await invoke("delete_point", { pointId: point.id });
+      toast.success(`Point ${point.name} supprimé`);
       if (onClose) onClose();
       if (onRefresh) await onRefresh();
-      toast.success("Point supprimé");
     } catch (error) {
       console.error("Erreur lors de la suppression:", error);
       toast.error("Erreur lors de la suppression du point.");
@@ -196,7 +195,7 @@ export default function PointDetails({
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">
-              {point.name || `Point #${shortId(point.id)}`}
+              {point.name || `Point ${point.name}`}
             </h2>
             <p className="text-gray-500 text-sm mt-1 flex items-center gap-1">
               <FontAwesomeIcon icon={faMapMarkerAlt} className="text-gray-400" />

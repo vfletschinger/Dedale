@@ -80,15 +80,12 @@ export default function GeometryDetails({
     if (!geometry) return;
 
     const geometryType = getGeometryType(geometry.geom);
-    const typeLabel = geometryType === "polygon" ? "cette zone" : "ce parcours";
-
-    if (!confirm(`Supprimer ${typeLabel} ?`)) return;
 
     try {
       await invoke("delete_geometry", { geometryId: String(geometry.id) });
+      toast.success(geometryType === "polygon" ? "Zone supprimée" : "Parcours supprimé");
       if (onClose) onClose();
       if (onRefresh) await onRefresh();
-      toast.success(geometryType === "polygon" ? "Zone supprimée" : "Parcours supprimé");
     } catch (error) {
       console.error("Failed to delete geometry:", error);
       toast.error("Erreur lors de la suppression.");
