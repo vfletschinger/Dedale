@@ -694,12 +694,13 @@ export function useMapGeometries(
     const description = item.description || "Aucune description";
     const itemId = item.id;
     const itemType = item.type;
+    const itemColor = item.color || (item.type === "zone" ? "#6366f1" : "#16a34a");
 
     const popupContent = `
       <div style="min-width: 240px; font-family: system-ui, -apple-system, sans-serif; padding: 4px;">
         <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
           <div style="width: 40px; height: 40px; background: ${item.type === "zone" ? "#dbeafe" : "#dcfce7"}; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
-            <span style="font-size: 18px; color: ${item.type === "zone" ? "#2563eb" : "#16a34a"};">${item.type === "zone" ? "◼" : "━"}</span>
+            <span style="font-size: 18px; color: ${itemColor};">${item.type === "zone" ? "◼" : "━"}</span>
           </div>
           <div style="flex: 1;">
             <div style="font-weight: 700; font-size: 15px; color: #1e293b; line-height: 1.2;">${name}</div>
@@ -711,6 +712,18 @@ export function useMapGeometries(
             ${description}
           </div>
         </div>
+        <div style="background: #f8fafc; border-radius: 8px; padding: 10px; margin-bottom: 14px; display: flex; align-items: center; gap: 10px;">
+          <label style="font-size: 12px; color: #475569; font-weight: 600;">Couleur :</label>
+          <input 
+            type="color" 
+            id="geo-color-picker"
+            data-id="${itemId}"
+            data-type="${itemType}"
+            value="${itemColor}"
+            style="width: 32px; height: 32px; border: 2px solid #e2e8f0; border-radius: 6px; cursor: pointer; padding: 0;"
+          />
+          <span id="geo-color-value" style="font-size: 12px; color: #64748b; font-family: monospace;">${itemColor}</span>
+        </div>
         <div style="display: flex; gap: 8px;">
           <button 
             id="geo-edit-btn" 
@@ -721,7 +734,7 @@ export function useMapGeometries(
             onmouseout="this.style.background='#2563eb'"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            Modifier
+            Modifier tracé
           </button>
           <button 
             id="geo-delete-btn" 
@@ -752,6 +765,58 @@ export function useMapGeometries(
     setTimeout(() => {
       const editBtn = document.getElementById("geo-edit-btn");
       const deleteBtn = document.getElementById("geo-delete-btn");
+      const colorPicker = document.getElementById("geo-color-picker") as HTMLInputElement;
+      const colorValue = document.getElementById("geo-color-value");
+
+      if (colorPicker) {
+        colorPicker.addEventListener("input", (e) => {
+          const newColor = (e.target as HTMLInputElement).value;
+          if (colorValue) colorValue.textContent = newColor;
+        });
+        
+        colorPicker.addEventListener("change", async (e) => {
+          const newColor = (e.target as HTMLInputElement).value;
+          const id = colorPicker.dataset.id;
+          const type = colorPicker.dataset.type as "zone" | "parcours";
+          
+          if (id && type) {
+            if (type === "zone") {
+              const zone = zones.find(z => z.id === id);
+              if (zone) {
+                try {
+                  await invoke("update_zone", {
+                    geometryId: id,
+                    geom: zone.geometry_json,
+                    name: zone.name || "Zone",
+                    color: newColor,
+                  });
+                  loadGeometries();
+                } catch (err) {
+                  console.error("Erreur mise à jour couleur zone:", err);
+                }
+              }
+            } else {
+              const p = parcours.find(p => p.id === id);
+              if (p) {
+                try {
+                  await invoke("update_parcours", {
+                    geometryId: id,
+                    geom: p.geometry_json,
+                    name: p.name || "Parcours",
+                    color: newColor,
+                    startTime: p.start_time ? new Date(p.start_time).getTime() : null,
+                    speedLow: p.speed_low,
+                    speedHigh: p.speed_high,
+                  });
+                  loadGeometries();
+                } catch (err) {
+                  console.error("Erreur mise à jour couleur parcours:", err);
+                }
+              }
+            }
+          }
+        });
+      }
 
       if (editBtn) {
         editBtn.addEventListener("click", () => {
