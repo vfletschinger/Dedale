@@ -17,6 +17,8 @@ import {
   faClock,
   faSearch,
   faFilter,
+  faCopy,
+  faEdit,
 } from "@fortawesome/free-solid-svg-icons";
 import toast from 'react-hot-toast';
 import { Event } from "../../../types";
@@ -63,6 +65,28 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
   const [statusFilter, setStatusFilter] = useState<"all" | "future" | "in_progress" | "past">("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+
+  // État pour copier/coller
+  const [copiedEvent, setCopiedEvent] = useState<Event | null>(null);
+
+  // État pour l'édition d'événement
+  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+  const [editFormData, setEditFormData] = useState({
+    name: "",
+    dateDebut: "",
+    dateFin: "",
+  });
+
+  // État pour la duplication avec modal
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [duplicateFormData, setDuplicateFormData] = useState({
+    name: "",
+    dateDebut: "",
+    dateFin: "",
+  });
+
+  // État pour la confirmation de suppression
+  const [deleteConfirmEvent, setDeleteConfirmEvent] = useState<Event | null>(null);
 
   const loadEvents = async () => {
     setLoading(true);
@@ -191,18 +215,122 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
   };
 
   const handleDeleteEvent = async (eventId: string) => {
-    if (!confirm("Êtes-vous sûr de vouloir supprimer cet événement ?")) {
-      return;
-    }
     try {
       console.log("Suppression de l'événement:", eventId);
       await invoke("delete_event", { eventId });
       console.log("Événement supprimé");
-      toast.success("Événement supprimé.");
+      toast.success("Événement supprimé avec succès.");
+      setDeleteConfirmEvent(null);
       loadEvents();
     } catch (err) {
       console.error("Erreur lors de la suppression:", err);
       toast.error("Erreur lors de la suppression de l'événement");
+    }
+  };
+
+  const handleDeleteClick = (event: Event) => {
+    setDeleteConfirmEvent(event);
+  };
+
+  const handleCopyEvent = (event: Event) => {
+    setCopiedEvent(event);
+    setDuplicateFormData({
+      name: `${event.name} (copie)`,
+      dateDebut: event.start_date ?? "",
+      dateFin: event.end_date ?? "",
+    });
+    setShowDuplicateModal(true);
+    toast.success(`Événement "${event.name}" sélectionné pour duplication`);
+  };
+
+  const handlePasteEvent = async () => {
+    if (!copiedEvent) return;
+    
+    // Validation
+    if (duplicateFormData.name.trim() === "") {
+      toast.error("Le nom de l'événement est requis !");
+      return;
+    }
+    if (duplicateFormData.dateDebut === "" || duplicateFormData.dateFin === "") {
+      toast.error("Les dates de début et de fin sont requises !");
+      return;
+    }
+    if (new Date(duplicateFormData.dateDebut) > new Date(duplicateFormData.dateFin)) {
+      toast.error("La date de fin ne peut pas être antérieure à la date de début !");
+      return;
+    }
+    
+    // Sauvegarder les données avant de fermer le modal
+    const eventToDuplicate = copiedEvent;
+    const formDataCopy = { ...duplicateFormData };
+    
+    // Fermer le modal
+    setShowDuplicateModal(false);
+    setCopiedEvent(null);
+    
+    // Afficher un toast de chargement
+    const toastId = toast.loading("Duplication en cours...");
+    
+    try {
+      console.log("Duplication complète de l'événement...", eventToDuplicate.id);
+      await invoke<string>("duplicate_event", {
+        sourceEventId: eventToDuplicate.id,
+        newName: formDataCopy.name.trim(),
+        startDate: formDataCopy.dateDebut,
+        endDate: formDataCopy.dateFin,
+      });
+      console.log("Événement dupliqué avec succès");
+      toast.success("Événement dupliqué avec succès !", { id: toastId });
+      
+      // Recharger les événements avec await
+      await loadEvents();
+    } catch (err) {
+      console.error("Erreur lors de la duplication:", err);
+      toast.error(`Erreur lors de la duplication : ${err}`, { id: toastId });
+    }
+  };
+
+  const handleEditEvent = (event: Event) => {
+    setEditingEvent(event);
+    setEditFormData({
+      name: event.name,
+      dateDebut: event.start_date ?? "",
+      dateFin: event.end_date ?? "",
+    });
+  };
+
+  const handleUpdateEvent = async () => {
+    if (!editingEvent) return;
+    try {
+      if (editFormData.name.trim() === "") {
+        toast.error("Le nom de l'événement est requis !");
+        return;
+      }
+
+      if (editFormData.dateDebut === "" || editFormData.dateFin === "") {
+        toast.error("Les dates de début et de fin sont requises !");
+        return;
+      }
+
+      if (new Date(editFormData.dateDebut) > new Date(editFormData.dateFin)) {
+        toast.error("La date de fin ne peut pas être antérieure à la date de début !");
+        return;
+      }
+
+      console.log("Mise à jour de l'événement...", editingEvent.id);
+      await invoke("update_event", {
+        eventId: editingEvent.id,
+        name: editFormData.name.trim(),
+        startDate: editFormData.dateDebut,
+        endDate: editFormData.dateFin,
+      });
+      console.log("Événement mis à jour avec succès");
+      toast.success("Événement modifié avec succès !");
+      setEditingEvent(null);
+      loadEvents();
+    } catch (err) {
+      console.error("Erreur lors de la mise à jour:", err);
+      toast.error(`Erreur lors de la mise à jour : ${err}`);
     }
   };
 
@@ -247,15 +375,17 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
           <p className="text-gray-500 mt-1 ml-1">Gérez vos événements et planifications.</p>
         </div>
 
-        <button
-          onClick={() => setShowCreateForm(!showCreateForm)}
-          className={`px-5 py-2.5 rounded-xl font-medium shadow-md transition-all duration-200 flex items-center gap-2 transform active:scale-95 ${showCreateForm
-            ? "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50"
-            : "bg-primary text-white hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/20"
-            }`}
-        >
-          {showCreateForm ? <><FontAwesomeIcon icon={faTimes} /> Annuler</> : <><FontAwesomeIcon icon={faPlus} /> Nouvel événement</>}
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowCreateForm(!showCreateForm)}
+            className={`px-5 py-2.5 rounded-xl font-medium shadow-md transition-all duration-200 flex items-center gap-2 transform active:scale-95 ${showCreateForm
+              ? "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50"
+              : "bg-primary text-white hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/20"
+              }`}
+          >
+            {showCreateForm ? <><FontAwesomeIcon icon={faTimes} /> Annuler</> : <><FontAwesomeIcon icon={faPlus} /> Nouvel événement</>}
+          </button>
+        </div>
       </div>
 
 
@@ -452,6 +582,26 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
+                            handleEditEvent(event);
+                          }}
+                          className="p-2 text-gray-600 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                          title="Modifier l'événement"
+                        >
+                          <FontAwesomeIcon icon={faEdit} />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCopyEvent(event);
+                          }}
+                          className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Dupliquer l'événement (avec toutes les données)"
+                        >
+                          <FontAwesomeIcon icon={faCopy} />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
                             handleReceiveFromMobile(event.id);
                           }}
                           className="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
@@ -463,7 +613,7 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDeleteEvent(event.id);
+                            handleDeleteClick(event);
                           }}
                           className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                           title="Supprimer"
@@ -614,6 +764,223 @@ function Events({ onEventClick, onEventsLoaded }: EventsProps) {
               >
                 <FontAwesomeIcon icon={faCheck} />
                 Créer l'événement
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Édition d'événement */}
+      {editingEvent && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-8 max-w-2xl w-full mx-4 shadow-2xl animate-in zoom-in-95 duration-200">
+            <h3 className="text-2xl font-extrabold text-gray-900 mb-8 flex items-center gap-3 border-b border-gray-100 pb-4">
+              <span className="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center text-lg shadow-sm">
+                <FontAwesomeIcon icon={faEdit} />
+              </span>
+              Modifier l'événement
+            </h3>
+
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2 ml-1">
+                  Nom de l'événement
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={editFormData.name}
+                    onChange={(e) => setEditFormData(prev => ({ ...prev, name: e.target.value }))}
+                    className="w-full pl-4 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white transition-all font-medium"
+                    placeholder="Ex: Festival de musique 2024..."
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2 ml-1">
+                    Date de début
+                  </label>
+                  <div className="relative">
+                    <FontAwesomeIcon icon={faCalendarAlt} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                    <input
+                      type="date"
+                      value={editFormData.dateDebut}
+                      onChange={(e) => setEditFormData(prev => ({ ...prev, dateDebut: e.target.value }))}
+                      className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white transition-all font-medium appearance-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2 ml-1">
+                    Date de fin
+                  </label>
+                  <div className="relative">
+                    <FontAwesomeIcon icon={faCalendarAlt} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                    <input
+                      type="date"
+                      value={editFormData.dateFin}
+                      onChange={(e) => setEditFormData(prev => ({ ...prev, dateFin: e.target.value }))}
+                      className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white transition-all font-medium appearance-none"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-10 flex justify-end gap-3 pt-6 border-t border-gray-100">
+              <button
+                onClick={() => setEditingEvent(null)}
+                className="px-6 py-3 text-gray-600 font-bold hover:bg-gray-100 rounded-xl transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleUpdateEvent}
+                className="px-8 py-3 bg-amber-500 text-white rounded-xl hover:bg-amber-600 hover:scale-[1.02] active:scale-95 transition-all font-bold shadow-lg shadow-amber-500/25 flex items-center gap-2"
+              >
+                <FontAwesomeIcon icon={faCheck} />
+                Enregistrer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Duplication d'événement */}
+      {showDuplicateModal && copiedEvent && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-8 max-w-2xl w-full mx-4 shadow-2xl animate-in zoom-in-95 duration-200">
+            <h3 className="text-2xl font-extrabold text-gray-900 mb-8 flex items-center gap-3 border-b border-gray-100 pb-4">
+              <span className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center text-lg shadow-sm">
+                <FontAwesomeIcon icon={faCopy} />
+              </span>
+              Dupliquer l'événement
+            </h3>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+              <p className="text-blue-800 text-sm">
+                <strong>Source :</strong> {copiedEvent.name}
+              </p>
+              <p className="text-blue-600 text-xs mt-1">
+                Tous les points, zones, parcours, équipes et équipements seront copiés.
+              </p>
+            </div>
+
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2 ml-1">
+                  Nom du nouvel événement
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={duplicateFormData.name}
+                    onChange={(e) => setDuplicateFormData(prev => ({ ...prev, name: e.target.value }))}
+                    className="w-full pl-4 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white transition-all font-medium"
+                    placeholder="Ex: Festival de musique 2024..."
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2 ml-1">
+                    Date de début
+                  </label>
+                  <div className="relative">
+                    <FontAwesomeIcon icon={faCalendarAlt} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                    <input
+                      type="date"
+                      value={duplicateFormData.dateDebut}
+                      onChange={(e) => setDuplicateFormData(prev => ({ ...prev, dateDebut: e.target.value }))}
+                      className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white transition-all font-medium appearance-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2 ml-1">
+                    Date de fin
+                  </label>
+                  <div className="relative">
+                    <FontAwesomeIcon icon={faCalendarAlt} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                    <input
+                      type="date"
+                      value={duplicateFormData.dateFin}
+                      onChange={(e) => setDuplicateFormData(prev => ({ ...prev, dateFin: e.target.value }))}
+                      className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white transition-all font-medium appearance-none"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-10 flex justify-end gap-3 pt-6 border-t border-gray-100">
+              <button
+                onClick={() => { setShowDuplicateModal(false); setCopiedEvent(null); }}
+                className="px-6 py-3 text-gray-600 font-bold hover:bg-gray-100 rounded-xl transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handlePasteEvent}
+                className="px-8 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 hover:scale-[1.02] active:scale-95 transition-all font-bold shadow-lg shadow-blue-500/25 flex items-center gap-2"
+              >
+                <FontAwesomeIcon icon={faCopy} />
+                Dupliquer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Confirmation de suppression */}
+      {deleteConfirmEvent && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full mx-4 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex flex-col items-center text-center">
+              <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mb-6">
+                <FontAwesomeIcon icon={faTrash} className="text-red-500 text-2xl" />
+              </div>
+              
+              <h3 className="text-xl font-extrabold text-gray-900 mb-2">
+                Supprimer l'événement ?
+              </h3>
+              
+              <p className="text-gray-500 mb-2">
+                Vous êtes sur le point de supprimer :
+              </p>
+              
+              <p className="text-lg font-bold text-gray-800 mb-4">
+                "{deleteConfirmEvent.name}"
+              </p>
+              
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 w-full">
+                <p className="text-red-700 text-sm flex items-center gap-2">
+                  <FontAwesomeIcon icon={faExclamationTriangle} />
+                  <span>Cette action est <strong>irréversible</strong>. Toutes les données associées (points, zones, parcours, équipes) seront également supprimées.</span>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteConfirmEvent(null)}
+                className="flex-1 px-6 py-3 text-gray-600 font-bold hover:bg-gray-100 rounded-xl transition-colors border border-gray-200"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => handleDeleteEvent(deleteConfirmEvent.id)}
+                className="flex-1 px-6 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 hover:scale-[1.02] active:scale-95 transition-all font-bold shadow-lg shadow-red-500/25 flex items-center justify-center gap-2"
+              >
+                <FontAwesomeIcon icon={faTrash} />
+                Supprimer
               </button>
             </div>
           </div>

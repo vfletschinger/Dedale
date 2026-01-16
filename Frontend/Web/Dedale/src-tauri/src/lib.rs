@@ -69,6 +69,8 @@ pub fn run() {
             db::fetch_teams,
             db::insert_event,
             db::delete_event,
+            db::update_event,
+            db::duplicate_event,
             db::link_point_to_event,
             db::unlink_point_from_event,
             db::get_points_for_event,
