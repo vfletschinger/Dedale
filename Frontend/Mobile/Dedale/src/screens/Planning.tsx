@@ -50,26 +50,6 @@ export default function PlanningScreen() {
   const [loading, setLoading] = useState(true);
   const [scanQR, setScanQR] = useState(false);
 
-  useEffect(() => {
-    try {
-      const database = getDatabase();
-      setDb(database);
-      loadData(database);
-    } catch (error) {
-      console.error("Error initializing database:", error);
-      setLoading(false);
-    }
-  }, [selectedEventId]);
-
-  // Rafraîchir les données quand on revient sur l'écran
-  useFocusEffect(
-    useCallback(() => {
-      if (db) {
-        loadData(db);
-      }
-    }, [db, selectedEventId])
-  );
-
   const loadData = (database: SQLiteDatabase) => {
     try {
       if (!database) {
@@ -87,7 +67,6 @@ export default function PlanningScreen() {
       }
 
       try {
-        // Récupérer la première équipe qui a des actions
         const teamResult = database.getFirstSync<Team>(
           `SELECT t.* FROM team t
            INNER JOIN action a ON a.team_id = t.id
@@ -124,6 +103,25 @@ export default function PlanningScreen() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    try {
+      const database = getDatabase();
+      setDb(database);
+      loadData(database);
+    } catch (error) {
+      console.error("Error initializing database:", error);
+      setLoading(false);
+    }
+  }, [selectedEventId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (db) {
+        loadData(db);
+      }
+    }, [db, selectedEventId])
+  );
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "Non planifié";

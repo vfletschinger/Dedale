@@ -622,11 +622,12 @@ function OfflineMapLibre({
                               <div
                                 key={`zone-${zone.id}`}
                                 className={`p-3 border-b border-gray-200 last:border-0 hover:bg-primary/10 cursor-pointer transition-colors ${isSelected
-                                  ? "bg-primary/20 border-l-4 border-l-primary"
+                                  ? "bg-primary/20 border-l-4"
                                   : isEditing
                                     ? "bg-amber-50"
                                     : ""
                                   }`}
+                                style={isSelected ? { borderLeftColor: zone.color || '#6366f1' } : {}}
                                 onClick={() =>
                                   highlightGeometry(
                                     isSelected ? null : itemData
@@ -634,13 +635,13 @@ function OfflineMapLibre({
                                 }
                               >
                                 <div className="flex items-center gap-2">
-                                  <span className="text-lg text-primary"><FontAwesomeIcon icon={faSquare} /></span>
+                                  <span className="text-lg" style={{ color: zone.color || '#6366f1' }}><FontAwesomeIcon icon={faSquare} /></span>
                                   <span className="text-sm font-medium truncate flex-1">
                                     {zone.name ||
                                       `Zone #${zone.id.slice(0, 8)}`}
                                   </span>
                                   {isSelected && (
-                                    <span className="text-primary text-sm">
+                                    <span className="text-sm" style={{ color: zone.color || '#6366f1' }}>
                                       <FontAwesomeIcon icon={faEye} />
                                     </span>
                                   )}
@@ -696,11 +697,12 @@ function OfflineMapLibre({
                               <div
                                 key={`parcours-${p.id}`}
                                 className={`p-3 border-b border-gray-200 last:border-0 hover:bg-primary/10 cursor-pointer transition-colors ${isSelected
-                                  ? "bg-primary/20 border-l-4 border-l-green-500"
+                                  ? "bg-primary/20 border-l-4"
                                   : isEditing
                                     ? "bg-amber-50"
                                     : ""
                                   }`}
+                                style={isSelected ? { borderLeftColor: p.color || '#16a34a' } : {}}
                                 onClick={() =>
                                   highlightGeometry(
                                     isSelected ? null : itemData
@@ -708,12 +710,12 @@ function OfflineMapLibre({
                                 }
                               >
                                 <div className="flex items-center gap-2">
-                                  <span className="text-lg text-green-600"><FontAwesomeIcon icon={faWaveSquare} /></span>
+                                  <span className="text-lg" style={{ color: p.color || '#16a34a' }}><FontAwesomeIcon icon={faWaveSquare} /></span>
                                   <span className="text-sm font-medium truncate flex-1">
                                     {p.name || `Parcours #${p.id.slice(0, 8)}`}
                                   </span>
                                   {isSelected && (
-                                    <span className="text-green-500 text-sm">
+                                    <span className="text-sm" style={{ color: p.color || '#16a34a' }}>
                                       <FontAwesomeIcon icon={faEye} />
                                     </span>
                                   )}

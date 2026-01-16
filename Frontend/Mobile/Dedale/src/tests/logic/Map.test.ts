@@ -33,11 +33,11 @@ import { parseWKT } from '../../components/Map';
 describe('Logic: Map WKT Parsing', () => {
   
   test('Parse correctement un POINT', () => {
-    // ARRANGE
+    // Arrange
     const wkt = "POINT(7.75 48.58)";
     const result = parseWKT(wkt);
 
-    // ASSERT
+    // Assert
     expect(result).toEqual({
       type: 'point',
       coordinates: [{ latitude: 48.58, longitude: 7.75 }]
@@ -45,11 +45,11 @@ describe('Logic: Map WKT Parsing', () => {
   });
 
   test('Parse correctement une LINESTRING', () => {
-    // ARRANGE
+    // Arrange
     const wkt = "LINESTRING(10 10, 20 20, 30 40)";
     const result = parseWKT(wkt);
 
-    // ASSERT
+    // Assert
     expect(result).toEqual({
       type: 'linestring',
       coordinates: [
@@ -61,11 +61,11 @@ describe('Logic: Map WKT Parsing', () => {
   });
 
   test('Parse correctement un POLYGON', () => {
-    // ARRANGE
+    // Arrange
     const wkt = "POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))";
     const result = parseWKT(wkt);
 
-    // ASSERT
+    // Assert
     expect(result?.type).toBe('polygon');
     expect(result?.coordinates).toHaveLength(5);
     expect(result?.coordinates[0]).toEqual({ latitude: 0, longitude: 0 });
@@ -73,18 +73,18 @@ describe('Logic: Map WKT Parsing', () => {
   });
 
   test('Retourne null pour un WKT invalide', () => {
-    // ARRANGE
+    // Arrange
     const result = parseWKT("INVALID TEXT");
     
-    // ASSERT
+    // Assert
     expect(result).toBeNull();
   });
 
   test('Retourne null pour une chaîne vide', () => {
-    // ARRANGE
+    // Arrange
     const result = parseWKT("");
     
-    // ASSERT
+    // Assert
     expect(result).toBeNull();
   });
 });

@@ -14,11 +14,12 @@ import CustomButton from "./CustomButton";
 import { useEvent } from "../context/EventContext";
 import { usePoints } from "../context/PointsContext";
 import { useGeometries } from "../context/GeometriesContext";
+import { getShortAddressFromCoords } from "../services/Helper";
 
 // Fonction utilitaire exportée pour les tests
 export const parseWKT = (wkt: string) => {
   if (!wkt || wkt.trim() === '') return null;
-  
+
   const trimmed = wkt.trim();
 
   if (trimmed.startsWith("POLYGON")) {
@@ -100,6 +101,7 @@ export default function OfflineMap({
     React.useState(true);
   const [listPoint, setListPoint] = React.useState<InterestPointsType[]>([]);
   const [listGeometry, setListGeometry] = React.useState<GeometryType[]>([]);
+  const [pointAddresses, setPointAddresses] = React.useState<Record<string, string>>({});
 
   const internalMapRef = React.useRef<MapView | null>(null);
   const mapRef = externalMapRef || internalMapRef;
@@ -136,6 +138,21 @@ export default function OfflineMap({
       setListGeometry([]);
     }
   }, [selectedEventId, geometriesByEvent]);
+
+  // Fetch addresses for all points
+  React.useEffect(() => {
+    const fetchAddresses = async () => {
+      const newAddresses: Record<string, string> = {};
+      for (const point of listPoint) {
+        const address = await getShortAddressFromCoords(point.y, point.x);
+        newAddresses[point.id] = address || "Adresse inconnue";
+      }
+      setPointAddresses(newAddresses);
+    };
+    if (listPoint.length > 0) {
+      fetchAddresses();
+    }
+  }, [listPoint]);
 
   React.useEffect(() => {
     const initialize = async () => {
@@ -249,7 +266,8 @@ export default function OfflineMap({
             <Marker
               key={p.id}
               coordinate={{ longitude: p.x, latitude: p.y }}
-              title={`${p.id}`}
+              title={p.name || "Point sans nom"}
+              description={pointAddresses[p.id] || "Chargement..."}
             />
           ))}
         {listGeometry.map((geom, index) => {

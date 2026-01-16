@@ -14,7 +14,6 @@ import {
 } from "react-native";
 import React, { useState, useRef } from "react";
 import CustomButton from "../components/CustomButton";
-import ObstacleSelector from "../components/ObstacleSelector";
 import Map from "../components/Map";
 import MapView, { Marker } from "react-native-maps";
 import * as Location from "expo-location";
@@ -25,6 +24,7 @@ import { useEvent } from "../context/EventContext";
 import { usePoints } from "../context/PointsContext";
 import { generateUUID } from "../services/Helper";
 import Colors from "../constants/colors";
+import { Feather } from "@expo/vector-icons";
 
 type SelectedObstacle = {
   type_id: string;
@@ -46,13 +46,12 @@ export default function RegisterPointScreen() {
   const mapRef = useRef<MapView | null>(null);
   const db: any = getDatabase();
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [isObstacleSelectorVisible, setIsObstacleSelectorVisible] =
-    useState(false);
   const [pointComment, setPointComment] = useState("");
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [selectedObstacles, setSelectedObstacles] = useState<
     SelectedObstacle[]
   >([]);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   React.useEffect(() => {
     requestLocation();
@@ -130,10 +129,8 @@ export default function RegisterPointScreen() {
     commentValue: string = ""
   ) => {
     try {
-      // Générer un UUID pour le point
       const pointId = generateUUID();
 
-      // Insérer le point avec event_id direct et le commentaire
       db.runSync(
         "INSERT INTO point (id, event_id, x, y, comment) VALUES (?, ?, ?, ?, ?)",
         [pointId, selectedEventId, x, y, commentValue.trim() || null]
@@ -216,11 +213,11 @@ export default function RegisterPointScreen() {
         initialRegion={
           coords
             ? {
-                latitude: coords.latitude,
-                longitude: coords.longitude,
-                latitudeDelta: 0.003,
-                longitudeDelta: 0.003,
-              }
+              latitude: coords.latitude,
+              longitude: coords.longitude,
+              latitudeDelta: 0.003,
+              longitudeDelta: 0.003,
+            }
             : undefined
         }
         onMapPress={(e) => {
@@ -306,126 +303,224 @@ export default function RegisterPointScreen() {
           behavior={Platform.OS === "ios" ? "padding" : undefined}
           className="flex-1 justify-end"
         >
-          <View className="bg-white p-5 rounded-t-2xl">
+          <View className="bg-white rounded-t-3xl" style={{ maxHeight: '85%' }}>
+            {/* Header avec barre accent */}
+            <View style={{ backgroundColor: Colors.secondary }} className="rounded-t-3xl px-5 py-4">
+              <View className="flex-row items-center justify-between">
+                <View className="flex-row items-center">
+                  <View style={{ backgroundColor: Colors.accent }} className="w-10 h-10 rounded-full items-center justify-center mr-3">
+                    <Feather name="map-pin" size={20} color="white" />
+                  </View>
+                  <View>
+                    <Text className="text-white font-bold text-lg">Nouveau point</Text>
+                    <Text className="text-white/70 text-xs">Ajoutez les détails du point</Text>
+                  </View>
+                </View>
+                <Pressable
+                  onPress={() => {
+                    setIsModalVisible(false);
+                    setPointComment("");
+                    setSelectedImages([]);
+                    setSelectedObstacles([]);
+                  }}
+                  className="w-8 h-8 rounded-full bg-white/20 items-center justify-center"
+                >
+                  <Feather name="x" size={18} color="white" />
+                </Pressable>
+              </View>
+            </View>
+
             <ScrollView
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
-              style={{ maxHeight: "100%" }}
+              className="px-5 py-4"
             >
-              <Text className="text-lg font-semibold mb-3">
-                Ajouter un point d&apos;intérêt
-              </Text>
+              {/* Section Commentaire */}
+              <View className="mb-4">
+                <View className="flex-row items-center mb-2">
+                  <Feather name="message-circle" size={20} color={Colors.secondary} style={{ marginRight: 8 }} />
+                  <Text className="font-semibold text-gray-800">Commentaire</Text>
+                </View>
+                <TextInput
+                  className="bg-gray-50 border border-gray-200 rounded-xl p-4 min-h-[80px]"
+                  placeholder="Décrivez ce point d'intérêt..."
+                  placeholderTextColor="#9ca3af"
+                  value={pointComment}
+                  onChangeText={setPointComment}
+                  multiline
+                  textAlignVertical="top"
+                />
+              </View>
 
-              {/* Commentaire */}
-              <TextInput
-                className="border border-gray-300 rounded-lg p-3 min-h-[60px] mb-3"
-                placeholder="Entrez le commentaire du point"
-                value={pointComment}
-                onChangeText={setPointComment}
-                multiline
-              />
-
-              {/* Bouton pour ajouter des obstacles */}
-              <CustomButton
-                title={`Ajouter des obstacles ${selectedObstacles.length > 0 ? `(${selectedObstacles.length})` : ""}`}
-                onPress={() => setIsObstacleSelectorVisible(true)}
-              />
-
-              {/* Affichage des obstacles sélectionnés */}
+              {/* Badges obstacles */}
               {selectedObstacles.length > 0 && (
-                <View className="my-2">
-                  <Text className="font-semibold mb-1">
-                    Obstacles sélectionnés :
-                  </Text>
-                  <View className="flex-row flex-wrap gap-2">
-                    {selectedObstacles.map((obs, idx) => (
-                      <View
-                        key={idx}
-                        className="bg-blue-100 px-3 py-1.5 rounded-full"
-                      >
-                        <Text className="text-blue-800 font-medium">
-                          {obs.name} ({obs.number})
-                        </Text>
+                <View className="flex-row flex-wrap gap-2">
+                  {selectedObstacles.map((obs, idx) => (
+                    <View
+                      key={idx}
+                      style={{ backgroundColor: Colors.accent + '20' }}
+                      className="px-3 py-1.5 rounded-full flex-row items-center"
+                    >
+                      <Text style={{ color: Colors.secondary }} className="font-medium text-sm">
+                        {obs.name}
+                      </Text>
+                      <View style={{ backgroundColor: Colors.secondary }} className="ml-2 w-5 h-5 rounded-full items-center justify-center">
+                        <Text className="text-white text-xs font-bold">{obs.number}</Text>
                       </View>
-                    ))}
-                  </View>
+                    </View>
+                  ))}
                 </View>
               )}
 
-              {/* Bouton pour prendre une photo */}
-              <CustomButton title="Prendre une photo" onPress={pickImage} />
+              {/* Section Photos */}
+              <View className="mb-6">
+                <View className="flex-row items-center mb-2">
+                  <Feather name="camera" size={20} color={Colors.secondary} style={{ marginRight: 8 }} />
+                  <Text className="font-semibold text-gray-800">Photos</Text>
+                </View>
 
-              {/* Liste des images */}
-              {selectedImages.length > 0 ? (
-                <FlatList
-                  horizontal
-                  data={selectedImages}
-                  keyExtractor={(item) => item}
-                  renderItem={({ item }) => (
-                    <View className="relative mr-2 my-2">
-                      <Image
-                        source={{ uri: item }}
-                        className="image-thumbnail"
-                      />
+                {/* Galerie photos */}
+                <View className="flex-row flex-wrap">
+                  {/* Photos existantes */}
+                  {selectedImages.map((item, index) => (
+                    <View key={item} style={{ position: 'relative', marginRight: 12, marginBottom: 12 }}>
+                      <Pressable onPress={() => setPreviewImage(item)}>
+                        <Image
+                          source={{ uri: item }}
+                          style={{
+                            width: 72,
+                            height: 72,
+                            borderRadius: 12,
+                          }}
+                        />
+                      </Pressable>
                       <TouchableOpacity
                         onPress={() => removeImage(item)}
-                        className="image-remove-btn"
+                        style={{
+                          position: 'absolute',
+                          top: -6,
+                          right: -6,
+                          backgroundColor: Colors.error,
+                          width: 22,
+                          height: 22,
+                          borderRadius: 11,
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          borderWidth: 2,
+                          borderColor: 'white',
+                        }}
                       >
-                        <Text className="image-remove-text">X</Text>
+                        <Feather name="x" size={10} color="white" />
                       </TouchableOpacity>
                     </View>
-                  )}
-                  className="my-2"
-                />
-              ) : null}
+                  ))}
 
-              {/* Bouton enregistrer */}
-              <CustomButton
-                title="Enregistrer le point"
-                onPress={async () => {
-                  if (location) {
-                    const insertedId = await savePointToDB(
-                      location.longitude,
-                      location.latitude,
-                      pointComment
-                    );
-                    if (insertedId) {
-                      await refreshPoints();
-                      Alert.alert("Succès", "Point enregistré avec succès");
-                      setIsModalVisible(false);
-                      setPointComment("");
-                      setSelectedImages([]);
-                      setSelectedObstacles([]);
-                      setLocation(null);
+                  {/* Bouton ajouter photo */}
+                  <Pressable
+                    onPress={pickImage}
+                    style={{
+                      width: 72,
+                      height: 72,
+                      borderRadius: 12,
+                      borderWidth: 2,
+                      borderColor: Colors.secondary,
+                      borderStyle: 'dashed',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      backgroundColor: Colors.secondary + '10',
+                    }}
+                  >
+                    <Feather name="plus" size={24} color={Colors.secondary} />
+                    <Text style={{ color: Colors.secondary, fontSize: 10, marginTop: 2 }}>Photo</Text>
+                  </Pressable>
+                </View>
+              </View>
+
+              {/* Boutons d'action */}
+              <View className="mb-6">
+                {/* Bouton Enregistrer */}
+                <Pressable
+                  onPress={async () => {
+                    if (location) {
+                      const insertedId = await savePointToDB(
+                        location.longitude,
+                        location.latitude,
+                        pointComment
+                      );
+                      if (insertedId) {
+                        await refreshPoints();
+                        Alert.alert("Succès", "Point enregistré avec succès");
+                        setIsModalVisible(false);
+                        setPointComment("");
+                        setSelectedImages([]);
+                        setSelectedObstacles([]);
+                        setLocation(null);
+                      }
+                    } else {
+                      Alert.alert("Erreur", "Aucune position à enregistrer.");
                     }
-                  } else {
-                    Alert.alert("Erreur", "Aucune position à enregistrer.");
-                  }
-                }}
-              />
+                  }}
+                  style={{ backgroundColor: Colors.success }}
+                  className="py-4 rounded-xl flex-row items-center justify-center mb-3"
+                >
+                  <Feather name="check" size={18} color="white" style={{ marginRight: 8 }} />
+                  <Text className="text-white font-bold text-base">Enregistrer le point</Text>
+                </Pressable>
 
-              {/* Bouton annuler */}
-              <CustomButton
-                title="Annuler"
-                onPress={() => {
-                  setIsModalVisible(false);
-                  setPointComment("");
-                  setSelectedImages([]);
-                  setSelectedObstacles([]);
-                }}
-              />
+                {/* Bouton Annuler */}
+                <Pressable
+                  onPress={() => {
+                    setIsModalVisible(false);
+                    setPointComment("");
+                    setSelectedImages([]);
+                    setSelectedObstacles([]);
+                  }}
+                  className="py-3 rounded-xl flex-row items-center justify-center border border-gray-300"
+                >
+                  <Text className="text-gray-600 font-medium">Annuler</Text>
+                </Pressable>
+              </View>
             </ScrollView>
           </View>
-        </KeyboardAvoidingView>
-      </Modal>
+        </KeyboardAvoidingView >
+      </Modal >
 
-      {/* Composant ObstacleSelector */}
-      <ObstacleSelector
-        visible={isObstacleSelectorVisible}
-        onClose={() => setIsObstacleSelectorVisible(false)}
-        onSave={handleSaveObstacles}
-        initialObstacles={selectedObstacles}
-      />
+      {/* Modal de prévisualisation d'image */}
+      <Modal
+        visible={previewImage !== null}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setPreviewImage(null)}
+      >
+        <View className="flex-1 bg-black/90 justify-center items-center">
+          {previewImage && (
+            <Image
+              source={{ uri: previewImage }}
+              className="w-full h-4/5"
+              resizeMode="contain"
+            />
+          )}
+          <View className="absolute bottom-10 flex-row gap-4">
+            <Pressable
+              onPress={() => setPreviewImage(null)}
+              className="bg-white px-6 py-3 rounded-xl"
+            >
+              <Text className="text-gray-800 font-bold">Fermer</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                if (previewImage) {
+                  removeImage(previewImage);
+                  setPreviewImage(null);
+                }
+              }}
+              className="bg-red-500 px-6 py-3 rounded-xl"
+            >
+              <Text className="text-white font-bold">Supprimer</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

@@ -308,11 +308,12 @@ pub async fn create_team_mission_pdf(
         FROM action a
         JOIN equipement e ON a.equipement_id = e.id
         LEFT JOIN type t ON e.type_id = t.id
-        WHERE a.team_id = ?
+        WHERE a.team_id = ? AND e.event_id = ?
     "#;
 
     let rows = sqlx::query(query)
         .bind(&team_id)
+        .bind(&event_id)
         .fetch_all(&pool)
         .await
         .map_err(|e| e.to_string())?;
