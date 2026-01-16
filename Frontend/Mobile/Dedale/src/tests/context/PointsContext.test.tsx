@@ -35,7 +35,7 @@ describe('Context: PointsContext Integration', () => {
     jest.clearAllMocks();
   });
 
-  test('Charge et trie les points correctement au démarrage', async () => {
+  test('devrait charger et trier les points correctement au démarrage', async () => {
     // Arrange
     const fakeDBData = [
       { id: '10', x: 1, y: 1, event_id: 1 },
@@ -57,7 +57,7 @@ describe('Context: PointsContext Integration', () => {
     expect(getByText('Event 2: 1')).toBeTruthy();
   });
 
-  test('Rafraichit les données quand refreshPoints est appelé', async () => {
+  test('devrait rafraîchir les données quand refreshPoints est appelé', async () => {
     // Arrange
     mockGetAllAsync.mockResolvedValueOnce([]); 
     

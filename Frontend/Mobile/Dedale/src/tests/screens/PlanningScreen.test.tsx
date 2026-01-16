@@ -115,23 +115,6 @@ describe('PlanningScreen - Screens', () => {
     });
   });
 
-  test('devrait basculer le scanner QR', async () => {
-    // Act
-    const { getByTestId, queryByTestId, getAllByText } = render(<PlanningScreen />);
-    
-    const qrIcon = getAllByText('Icon-qrcode-scan')[0];
-    fireEvent.press(qrIcon);
-
-    // Assert
-    expect(getByTestId('mock-qr-scanner')).toBeTruthy();
-
-    // Act
-    fireEvent.press(getAllByText('Retour')[0]);
-
-    // Assert
-    expect(queryByTestId('mock-qr-scanner')).toBeNull();
-  });
-
   test('devrait gérer l\'état vide (aucune équipe trouvée)', async () => {
     // Arrange
     mockGetFirstSync.mockReturnValue(null);

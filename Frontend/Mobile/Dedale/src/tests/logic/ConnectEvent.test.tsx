@@ -51,7 +51,7 @@ jest.mock('@expo/vector-icons', () => ({
   Feather: 'Icon',
 }));
 
-describe('Screen: ConnectEvent', () => {
+describe('ConnectEvent : Screen', () => {
   
   beforeEach(() => {
     jest.clearAllMocks();
@@ -59,7 +59,7 @@ describe('Screen: ConnectEvent', () => {
     mockGetFirstSync.mockReturnValue({ count: 0 });
   });
 
-  test('should render empty state correctly', () => {
+  test('devrait afficher correctement l\'état vide', () => {
     // Arrange
     mockEventsReturn = [];
 
@@ -72,7 +72,7 @@ describe('Screen: ConnectEvent', () => {
     expect(mockRefreshEvents).toHaveBeenCalledTimes(1);
   });
 
-  test('should render a list of events', () => {
+  test('devrait afficher une liste d\'événements', () => {
     // Arrange
     mockEventsReturn = [
       { id: '1', name: 'Festival 2024', status: 'actif' },
@@ -87,7 +87,7 @@ describe('Screen: ConnectEvent', () => {
     expect(getByText('Marathon')).toBeTruthy();
   });
 
-  test('should toggle QR Scanner view', () => {
+  test('devrait basculer la vue du scanner QR', () => {
     // Arrange
     const { getByText, getByTestId, queryByTestId } = render(<ConnectEvent />);
 
@@ -99,7 +99,7 @@ describe('Screen: ConnectEvent', () => {
     expect(queryByTestId('mock-qr-scanner')).toBeNull();
   });
 
-  test('should handle event selection: fetch stats, set context, and navigate', () => {
+  test('devrait gérer la sélection d\'événement : récupérer les stats, définir le contexte et naviguer', () => {
     // Arrange
     const fakeEvent = { id: 'evt-1', name: 'Super Event', status: 'actif' };
     mockEventsReturn = [fakeEvent];
@@ -119,8 +119,8 @@ describe('Screen: ConnectEvent', () => {
   });
 });
 
-describe('Helper: sortEventsByStatus', () => {
-  test('should sort events by priority: actif > planifié > passé', () => {
+describe('Helper: trier les événements', () => {
+  test('devrait trier les événements par priorité : actif > planifié > passé', () => {
     // Arrange
     const mixedEvents: any[] = [
       { id: '1', name: 'Passé', status: 'passé' },
@@ -139,7 +139,7 @@ describe('Helper: sortEventsByStatus', () => {
     expect(sorted[3].status).toBe('autre');
   });
 
-  test('should handle missing status gracefully', () => {
+  test('devrait gérer l\'absence de statut avec grâce', () => {
     const events: any[] = [
       { id: '1', name: 'No Status' },
       { id: '2', name: 'Actif', status: 'actif' },

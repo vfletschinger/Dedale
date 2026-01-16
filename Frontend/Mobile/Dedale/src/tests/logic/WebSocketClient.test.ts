@@ -35,7 +35,7 @@ describe('Logic: WebSocketClient', () => {
     client = new WebSocketClient('ws://test.local');
   });
 
-  test('Se connecte et reçoit des messages JSON valides', async () => {
+  test('devrait se connecter et recevoir des messages JSON valides', async () => {
     // Arrange
     const onMessageMock = jest.fn();
     const mockEvents = [{ id: 1, name: "Event Test" }];
@@ -54,7 +54,7 @@ describe('Logic: WebSocketClient', () => {
     expect(onMessageMock).toHaveBeenCalledWith(mockEvents);
   });
 
-  test('Gère le message spécial "fini"', async () => {
+  test('devrait gérer le message spécial "fini"', async () => {
     // Arrange
     const onFinishedMock = jest.fn();
     client.setCallbacks(onFinishedMock);
@@ -69,7 +69,7 @@ describe('Logic: WebSocketClient', () => {
     expect(onFinishedMock).toHaveBeenCalled();
   });
 
-  test('Envoie des données correctement', async () => {
+  test('devrait envoyer des données correctement', async () => {
     // Arrange
     await client.connect();
     await new Promise(r => setTimeout(r, 20));
@@ -82,7 +82,7 @@ describe('Logic: WebSocketClient', () => {
     expect(mockWsInstance.send).toHaveBeenCalledWith("Hello Server");
   });
 
-  test('Détecte une erreur de connexion', async () => {
+  test('devrait détecter une erreur de connexion', async () => {
     // Arrange
     class FailWebSocket {
         onopen: any;

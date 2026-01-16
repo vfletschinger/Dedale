@@ -105,7 +105,7 @@ describe('Screen: TeamGuidance', () => {
     ]);
   });
 
-  test('should render loading state initially then display map and actions', async () => {
+  test('devrait rendre l\'état de chargement initial puis afficher la carte et les actions', async () => {
     // Act
     const { getByText, getByTestId, queryByText } = render(<TeamGuidanceScreen />);
 
@@ -122,7 +122,7 @@ describe('Screen: TeamGuidance', () => {
     expect(getByText('Balise A')).toBeTruthy();
   });
 
-  test('should fetch route from OSRM API', async () => {
+  test('devrait récupérer l\'itinéraire depuis l\'API OSRM', async () => {
     // Arrange
     render(<TeamGuidanceScreen />);
 
@@ -135,7 +135,7 @@ describe('Screen: TeamGuidance', () => {
     );
   });
 
-  test('should handle empty actions (all done or no actions)', async () => {
+  test('devrait gérer les actions vides (toutes terminées ou aucune action)', async () => {
     // Arrange
     mockGetAllSync.mockReturnValue([]);
 
@@ -148,7 +148,7 @@ describe('Screen: TeamGuidance', () => {
     });
   });
 
-  test('should fallback to direct coordinates if point coordinates missing', async () => {
+  test('devrait revenir aux coordonnées directes si les coordonnées du point manquent', async () => {
      // Arrange
      mockGetAllSync.mockReturnValue([{
         id: 'act-1',
@@ -175,8 +175,8 @@ describe('Screen: TeamGuidance', () => {
      });
   });
 
-  test('should detect proximity and allow validation via Alert', async () => {
-    // Arange
+  test('devrait détecter la proximité et permettre la validation via Alert', async () => {
+    // Arrange
     const mockLocation = { 
       coords: { latitude: 48.58, longitude: 7.75 } 
     };

@@ -30,7 +30,7 @@ describe('EventContext', () => {
     });
   });
 
-  it('should throw error if used outside provider', () => {
+  it('devrait lancer une erreur si utilisé en dehors du fournisseur', () => {
     // Arrange
     const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
@@ -41,7 +41,7 @@ describe('EventContext', () => {
     consoleSpy.mockRestore();
   });
 
-  it('should fetch events, calculate status correctly and sort them', async () => {
+  it('devrait récupérer les événements, calculer correctement leur statut et les trier', async () => {
     // Arrange
     const mockEvents = [
       { id: '1', name: 'Event Passé', dateDebut: '2024-01-01', dateFin: '2024-01-02' },
@@ -69,7 +69,7 @@ describe('EventContext', () => {
     expect(events[2].calculatedStatus).toBe('passé');
   });
 
-  it('should sort events with same status by date', async () => {
+  it('devrait trier les événements avec le même statut par date', async () => {
     // Arrange
     const mockEvents = [
       { id: '1', name: 'Planifié Loin', dateDebut: '2024-12-01', dateFin: '2024-12-02' },
@@ -87,7 +87,7 @@ describe('EventContext', () => {
     expect(result.current.events[1].id).toBe('1');
   });
 
-  it('should handle event selection', async () => {
+  it('devrait gérer la sélection d\'événement', async () => {
     // Arrange
     const mockEvents = [
       { id: '100', name: 'Test Event', dateDebut: '2024-06-15', dateFin: '2024-06-15' },
@@ -106,7 +106,7 @@ describe('EventContext', () => {
     expect(result.current.getSelectedEvent()?.id).toBe('100');
   });
 
-  it('should return null when getting non-existent selected event', async () => {
+  it('devrait retourner null lorsqu\'on récupère un événement sélectionné inexistant', async () => {
     // Arrange
     mockGetAllSync.mockReturnValue([]);
     const { result } = renderHook(() => useEvent(), { wrapper: EventProvider });
@@ -121,7 +121,7 @@ describe('EventContext', () => {
     expect(result.current.getSelectedEvent()).toBeNull();
   });
 
-  it('should handle database errors gracefully', async () => {
+  it('devrait gérer les erreurs de la base de données de manière appropriée', async () => {
     // Arrange
     const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     mockGetAllSync.mockImplementation(() => {

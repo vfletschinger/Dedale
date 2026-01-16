@@ -30,9 +30,8 @@ jest.mock('expo-location', () => ({
 
 import { parseWKT } from '../../components/Map';
 
-describe('Logic: Map WKT Parsing', () => {
-  
-  test('Parse correctement un POINT', () => {
+describe('Logic: Analyse WKT de la carte', () => {
+  test('devrait parser correctement un POINT', () => {
     // Arrange
     const wkt = "POINT(7.75 48.58)";
     const result = parseWKT(wkt);
@@ -44,7 +43,7 @@ describe('Logic: Map WKT Parsing', () => {
     });
   });
 
-  test('Parse correctement une LINESTRING', () => {
+  test('devrait parser correctement une LINESTRING', () => {
     // Arrange
     const wkt = "LINESTRING(10 10, 20 20, 30 40)";
     const result = parseWKT(wkt);
@@ -60,7 +59,7 @@ describe('Logic: Map WKT Parsing', () => {
     });
   });
 
-  test('Parse correctement un POLYGON', () => {
+  test('devrait parser correctement un POLYGON', () => {
     // Arrange
     const wkt = "POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))";
     const result = parseWKT(wkt);
@@ -72,7 +71,7 @@ describe('Logic: Map WKT Parsing', () => {
     expect(result?.coordinates[4]).toEqual({ latitude: 0, longitude: 0 });
   });
 
-  test('Retourne null pour un WKT invalide', () => {
+  test('devrait retourner null pour un WKT invalide', () => {
     // Arrange
     const result = parseWKT("INVALID TEXT");
     
@@ -80,7 +79,7 @@ describe('Logic: Map WKT Parsing', () => {
     expect(result).toBeNull();
   });
 
-  test('Retourne null pour une chaîne vide', () => {
+  test('devrait retourner null pour une chaîne vide', () => {
     // Arrange
     const result = parseWKT("");
     

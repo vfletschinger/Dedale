@@ -35,7 +35,7 @@ jest.mock('react-native', () => ({
   },
 }));
 
-describe('Service: ImageHelper', () => {
+describe('Service : ImageHelper', () => {
   const db = getDatabase();
   
   beforeEach(() => {
@@ -43,8 +43,8 @@ describe('Service: ImageHelper', () => {
     jest.clearAllMocks();
   });
 
-  describe('imageToBase64', () => {
-    test('should convert file uri to base64 string', async () => {
+  describe('image à base64', () => {
+    test('devrait convertir un URI de fichier en chaîne base64', async () => {
       // Arrange
       const fakeUri = 'file://photo.jpg';
       const fakeBase64 = 'SGVsbG8gV29ybGQ=';
@@ -59,8 +59,8 @@ describe('Service: ImageHelper', () => {
     });
   });
 
-  describe('saveImageToBDD', () => {
-    test('should convert image, generate ID and insert into DB', async () => {
+  describe('sauvegarde Image Dans BDD', () => {
+    test('devrait convertir l\'image, générer un ID et insérer dans la BDD', async () => {
       // Arrange
       const fakeUri = 'file://photo.jpg';
       const pointId = 'point-123';
@@ -84,7 +84,7 @@ describe('Service: ImageHelper', () => {
       );
     });
 
-    test('should throw error if database fails', async () => {
+    test('devrait lancer une erreur si la base de données échoue', async () => {
       // Arrange
       (FileSystem.readAsStringAsync as jest.Mock).mockResolvedValue('data');
       
@@ -102,8 +102,8 @@ describe('Service: ImageHelper', () => {
     });
   });
 
-  describe('pickImage', () => {
-    test('should return URI if permission granted and photo taken', async () => {
+  describe('choisis Image', () => {
+    test('devrait retourner l\'URI si la permission est accordée et la photo prise', async () => {
       // Arrange
       (ImagePicker.requestCameraPermissionsAsync as jest.Mock).mockResolvedValue({ status: 'granted' });
       (ImagePicker.launchCameraAsync as jest.Mock).mockResolvedValue({
@@ -119,7 +119,7 @@ describe('Service: ImageHelper', () => {
       expect(Alert.alert).not.toHaveBeenCalled();
     });
 
-    test('should alert and return undefined if permission denied', async () => {
+    test('devrait afficher une alerte et retourner undefined si la permission est refusée', async () => {
       // Arrange
       (ImagePicker.requestCameraPermissionsAsync as jest.Mock).mockResolvedValue({ status: 'denied' });
 
@@ -132,7 +132,7 @@ describe('Service: ImageHelper', () => {
       expect(ImagePicker.launchCameraAsync).not.toHaveBeenCalled();
     });
 
-    test('should return undefined if user cancels camera', async () => {
+    test('devrait retourner undefined si l\'utilisateur annule la caméra', async () => {
       // Arrange
       (ImagePicker.requestCameraPermissionsAsync as jest.Mock).mockResolvedValue({ status: 'granted' });
       (ImagePicker.launchCameraAsync as jest.Mock).mockResolvedValue({
@@ -147,7 +147,7 @@ describe('Service: ImageHelper', () => {
       expect(result).toBeUndefined();
     });
 
-    test('should handle errors and show alert', async () => {
+    test('devrait gérer les erreurs et afficher une alerte', async () => {
       // Arrange
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
       (ImagePicker.requestCameraPermissionsAsync as jest.Mock).mockRejectedValue(new Error('Camera broken'));

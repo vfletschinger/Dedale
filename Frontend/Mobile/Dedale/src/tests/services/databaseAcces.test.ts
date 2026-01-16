@@ -6,7 +6,7 @@ jest.mock('../../services/Helper', () => ({
   generateUUID: jest.fn(),
 }));
 
-describe('Service: databaseAcces', () => {
+describe('Service : databaseAcces', () => {
   let mockDb: any;
 
   beforeEach(() => {
@@ -18,7 +18,7 @@ describe('Service: databaseAcces', () => {
   });
 
   describe('Comment Functions', () => {
-    test('updateComment should execute correct SQL', () => {
+    test('devrait mettre à jour le commentaire avec la bonne requête SQL', () => {
       // Arrange
       const pointId = 'point-123';
       const newValue = 'Nouveau commentaire';
@@ -33,7 +33,7 @@ describe('Service: databaseAcces', () => {
       );
     });
 
-    test('deleteComment should set comment to NULL', () => {
+    test('devrait supprimer le commentaire en le mettant à NULL', () => {
       // Arrange
       const pointId = 'point-123';
 
@@ -47,7 +47,7 @@ describe('Service: databaseAcces', () => {
       );
     });
 
-    test('addComment should execute update SQL and return result', () => {
+    test('devrait ajouter un commentaire en exécutant la requête SQL de mise à jour et retourner le résultat', () => {
       // Arrange
       const pointId = 'point-123';
       const value = 'Super point';
@@ -67,7 +67,7 @@ describe('Service: databaseAcces', () => {
   });
 
   describe('Picture Functions', () => {
-    test('addPicture should generate UUID and INSERT', () => {
+    test('devrait générer un UUID et insérer une image avec addPicture', () => {
       // Arrange
       const pointId = 'point-A';
       const imageBase64 = 'base64data';
@@ -84,7 +84,7 @@ describe('Service: databaseAcces', () => {
       );
     });
 
-    test('updatePicture should execute UPDATE', () => {
+    test('devrait mettre à jour une image avec updatePicture', () => {
       // Arrange
       const picId = 'pic-1';
       const newImg = 'newdata';
@@ -99,7 +99,7 @@ describe('Service: databaseAcces', () => {
       );
     });
 
-    test('deletePicture should execute DELETE', () => {
+    test('devrait supprimer une image avec deletePicture', () => {
       // Arrange
       const picId = 'pic-1';
 
@@ -114,8 +114,8 @@ describe('Service: databaseAcces', () => {
     });
   });
 
-  describe('Equipement/Obstacle Functions', () => {
-    test('addEquipement without coordinates should insert only equipement', () => {
+  describe('Equipements et Obstacles', () => {
+    test('devrait ajouter un équipement sans coordonnées en insérant uniquement l\'équipement', () => {
       // Arrange
       (generateUUID as jest.Mock).mockReturnValue('uuid-eq-1');
       const eventId = 'evt-1';
@@ -134,7 +134,7 @@ describe('Service: databaseAcces', () => {
       );
     });
 
-    test('addEquipement with coordinates should insert equipement AND coordinates', () => {
+    test('devrait ajouter un équipement avec coordonnées en insérant l\'équipement ET les coordonnées', () => {
       // Arrange
       (generateUUID as jest.Mock)
         .mockReturnValueOnce('uuid-eq-1')   // ID equipement
@@ -164,7 +164,7 @@ describe('Service: databaseAcces', () => {
       );
     });
 
-    test('updateEquipement should execute UPDATE', () => {
+    test('devrait mettre à jour un équipement avec updateEquipement', () => {
       // Act
       databaseAccess.updateEquipement('eq-1', 10, 2, mockDb);
 
@@ -175,7 +175,7 @@ describe('Service: databaseAcces', () => {
       );
     });
 
-    test('deleteEquipement should execute DELETE', () => {
+    test('devrait supprimer un équipement avec deleteEquipement', () => {
       // Act
       databaseAccess.deleteEquipement('eq-1', mockDb);
 
@@ -187,8 +187,8 @@ describe('Service: databaseAcces', () => {
     });
   });
 
-  describe('Point Functions', () => {
-    test('updatePointCoordinates should execute UPDATE', () => {
+  describe('Points', () => {
+    test('devrait mettre à jour les coordonnées d\'un point avec updatePointCoordinates', () => {
       // Act
       databaseAccess.updatePointCoordinates('pt-1', 50.5, 7.5, mockDb);
 
@@ -199,7 +199,7 @@ describe('Service: databaseAcces', () => {
       );
     });
 
-    test('deletePoint should execute DELETE', () => {
+    test('devrait supprimer un point avec deletePoint', () => {
       // Act
       databaseAccess.deletePoint('pt-1', mockDb);
 
@@ -210,7 +210,7 @@ describe('Service: databaseAcces', () => {
       );
     });
 
-    test('updateTimeStamp should update modified_at with current date', () => {
+    test('devrait mettre à jour modified_at avec la date actuelle dans updateTimeStamp', () => {
       // Arrange
       jest.useFakeTimers();
       const fakeDate = new Date('2025-01-01T12:00:00.000Z');
@@ -228,7 +228,7 @@ describe('Service: databaseAcces', () => {
       jest.useRealTimers();
     });
 
-    test('updateTimeStamp should catch errors silently and log them', () => {
+    test('devrait gérer silencieusement les erreurs dans updateTimeStamp et les consigner', () => {
       // Arrange
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
       mockDb.runSync.mockImplementation(() => {

@@ -17,7 +17,7 @@ jest.mock('../../../assets/migrations', () => ({
 }));
 
 
-describe('RegisterPoint – savePointToDB (critical persistence)', () => {
+describe('Enregistrement du point', () => {
   const mockRunSync = jest.fn();
   const mockDb = { runSync: mockRunSync };
 
@@ -26,7 +26,7 @@ describe('RegisterPoint – savePointToDB (critical persistence)', () => {
     (getDatabase as jest.Mock).mockReturnValue(mockDb);
   });
 
-  test('sauvegarde complète avec commentaire, images et obstacles', async () => {
+  test('devrait sauvegarder complètement avec commentaire, images et obstacles', async () => {
     // Arrange
     (Helper.generateUUID as jest.Mock)
       .mockReturnValueOnce('point-id')
@@ -84,7 +84,7 @@ describe('RegisterPoint – savePointToDB (critical persistence)', () => {
     expect(result).toBe('point-id');
   });
 
-  test('sauvegarde minimale sans images ni obstacles', async () => {
+  test('devrait sauvegarder minimale sans images ni obstacles', async () => {
     // Arrange
     (Helper.generateUUID as jest.Mock).mockReturnValue('point-id');
 
@@ -106,7 +106,7 @@ describe('RegisterPoint – savePointToDB (critical persistence)', () => {
     expect(result).toBe('point-id');
   });
 
-  test('échec image n’empêche pas la sauvegarde du point', async () => {
+  test('devrait ne pas laisser un échec d\'image empêcher la sauvegarde du point', async () => {
     // Arrange
     (Helper.generateUUID as jest.Mock).mockReturnValue('point-id');
     (ImageHelper.saveImageToBDD as jest.Mock).mockRejectedValue(

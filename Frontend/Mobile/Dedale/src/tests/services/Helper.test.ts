@@ -2,7 +2,6 @@ import * as Helper from '../../services/Helper';
 import * as Location from 'expo-location';
 import { Alert } from 'react-native';
 
-// Mock des modules externes
 jest.mock('expo-location', () => ({
   requestForegroundPermissionsAsync: jest.fn(),
   getCurrentPositionAsync: jest.fn(),
@@ -21,8 +20,8 @@ describe('Service: Helper', () => {
     jest.clearAllMocks();
   });
 
-  describe('generateUUID', () => {
-    test('should generate a valid UUID v4 format', () => {
+  describe('generation ID', () => {
+    test('devrait générer un UUID v4 valide', () => {
       // Act
       const uuid = Helper.generateUUID();
 
@@ -31,7 +30,7 @@ describe('Service: Helper', () => {
       expect(uuid).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
     });
 
-    test('should generate unique values', () => {
+    test('devrait générer des valeurs uniques', () => {
       // Act
       const uuid1 = Helper.generateUUID();
       const uuid2 = Helper.generateUUID();
@@ -41,8 +40,8 @@ describe('Service: Helper', () => {
     });
   });
 
-  describe('shortId', () => {
-    test('should return first 8 chars of a long string', () => {
+  describe('Formatage String', () => {
+    test('devrait retourner les 8 premiers caractères d\'une longue chaîne', () => {
       // Arrange
       const longId = '1234567890abcdef';
 
@@ -53,7 +52,7 @@ describe('Service: Helper', () => {
       expect(result).toBe('12345678');
     });
 
-    test('should return empty string if input is falsy', () => {
+    test('devrait retourner une chaîne vide si l\'entrée est falsy', () => {
       // Act
       const result = Helper.shortId('');
 
@@ -62,8 +61,8 @@ describe('Service: Helper', () => {
     });
   });
 
-  describe('calculateDistance', () => {
-    test('should calculate correct euclidean distance', () => {
+  describe('calcul de distance', () => {
+    test('devrait calculer correctement la distance euclidienne', () => {
       // Arrange
       // Triangle 3-4-5 (Pythagore)
       const x1 = 0, y1 = 0;
@@ -76,7 +75,7 @@ describe('Service: Helper', () => {
       expect(distance).toBe(5);
     });
 
-    test('should return 0 for same points', () => {
+    test('devrait retourner 0 pour des points identiques', () => {
       // Act
       const distance = Helper.calculateDistance(10, 10, 10, 10);
 
@@ -86,7 +85,7 @@ describe('Service: Helper', () => {
   });
 
   describe('getUserLocation', () => {
-    test('should return coordinates if permission granted', async () => {
+    test('devrait retourner les coordonnées si la permission est accordée', async () => {
       // Arrange
       (Location.requestForegroundPermissionsAsync as jest.Mock).mockResolvedValue({ status: 'granted' });
       (Location.getCurrentPositionAsync as jest.Mock).mockResolvedValue({
@@ -101,7 +100,7 @@ describe('Service: Helper', () => {
       expect(Alert.alert).not.toHaveBeenCalled();
     });
 
-    test('should alert and return null if permission denied', async () => {
+    test('devrait afficher une alerte et retourner null si la permission est refusée', async () => {
       // Arrange
       (Location.requestForegroundPermissionsAsync as jest.Mock).mockResolvedValue({ status: 'denied' });
 
@@ -116,7 +115,7 @@ describe('Service: Helper', () => {
   });
 
   describe('getAddressFromCoords', () => {
-    test('should format address correctly when all fields exist', async () => {
+    test('devrait formater correctement l\'adresse lorsque tous les champs existent', async () => {
       // Arrange
       (Location.reverseGeocodeAsync as jest.Mock).mockResolvedValue([{
         name: 'Cathédrale',
@@ -134,7 +133,7 @@ describe('Service: Helper', () => {
       expect(result).toBe('Cathédrale, Place du Château, Strasbourg, Grand Est, 67000, France');
     });
 
-    test('should handle missing fields gracefully', async () => {
+    test('devrait gérer gracieusement les champs manquants', async () => {
       // Arrange
       (Location.reverseGeocodeAsync as jest.Mock).mockResolvedValue([{
         name: null,
@@ -149,11 +148,10 @@ describe('Service: Helper', () => {
       const result = await Helper.getAddressFromCoords(48.5, 7.7);
 
       // Assert
-      // Vérifie qu'il n'y a pas de "null, " ou de virgules en trop
       expect(result).toBe('Strasbourg, France');
     });
 
-    test('should return null and log error on failure', async () => {
+    test('devrait retourner null et consigner une erreur en cas d\'échec', async () => {
       // Arrange
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
       (Location.reverseGeocodeAsync as jest.Mock).mockRejectedValue(new Error('Geo Error'));

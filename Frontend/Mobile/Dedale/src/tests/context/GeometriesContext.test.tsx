@@ -29,14 +29,13 @@ const TestConsumer = () => {
   );
 };
 
-describe('Context: GeometriesContext Integration', () => {
+describe('Contexte : Intégration GeometriesContext', () => {
   
   beforeEach(() => {
-    // Important : Reset complet pour éviter que les mocks des tests précédents ne bavent
     jest.resetAllMocks(); 
   });
 
-  test('Charge et groupe les géométries par event_id', async () => {
+  test('devrait charger et grouper les géométries par event_id', async () => {
     // Arrange
     const fakeGeometries = [
       { id: 1, event_id: 1, wkt: 'POINT(0 0)', created_at: '2023-01-01' },
@@ -44,9 +43,6 @@ describe('Context: GeometriesContext Integration', () => {
       { id: 3, event_id: 2, wkt: 'LINESTRING(...)', created_at: '2023-01-01' },
     ];
 
-    // On configure le mock pour DEUX appels consécutifs (Parcours puis Zones)
-    // 1er appel (Parcours) : renvoie les données
-    // 2ème appel (Zones) : renvoie vide (pour ne pas doubler les résultats)
     mockGetAllAsync
       .mockResolvedValueOnce(fakeGeometries) 
       .mockResolvedValueOnce([]); 
@@ -64,13 +60,11 @@ describe('Context: GeometriesContext Integration', () => {
     expect(getByText('Event 2: 1')).toBeTruthy();
   });
 
-  test('Gère le rafraîchissement des données', async () => {
+  test('devrait gérer le rafraîchissement des données', async () => {
     // Arrange
-    // Phase 1 : Chargement initial (Vide)
-    // Il faut Mocker les DEUX appels du chargement initial
     mockGetAllAsync
-        .mockResolvedValueOnce([]) // Parcours initiaux
-        .mockResolvedValueOnce([]); // Zones initiales
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
     
     const { getByTestId, queryByText, getByText } = render(
       <GeometriesProvider>
@@ -81,11 +75,9 @@ describe('Context: GeometriesContext Integration', () => {
     await waitFor(() => expect(queryByText('Loading...')).toBeNull());
     expect(getByText('Event 1: 0')).toBeTruthy();
     
-    // Phase 2 : Préparation du Refresh
-    // On prépare les données pour les DEUX appels suivants (ceux du refresh)
     mockGetAllAsync
-        .mockResolvedValueOnce([{ id: 99, event_id: 1, wkt: 'POINT(1 1)', created_at: '2023' }]) // Parcours après refresh
-        .mockResolvedValueOnce([]); // Zones après refresh
+        .mockResolvedValueOnce([{ id: 99, event_id: 1, wkt: 'POINT(1 1)', created_at: '2023' }])
+        .mockResolvedValueOnce([]);
 
     // Act
     await act(async () => {
