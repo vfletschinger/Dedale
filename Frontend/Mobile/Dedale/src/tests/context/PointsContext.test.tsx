@@ -22,8 +22,8 @@ const TestConsumer = () => {
 
   return (
     <>
-      <Text testID="event-1-count">Event 1: {pointsByEvent[1]?.length || 0}</Text>
-      <Text testID="event-2-count">Event 2: {pointsByEvent[2]?.length || 0}</Text>
+      <Text testID="event-1-count">Event 1: {pointsByEvent['1']?.length || 0}</Text>
+      <Text testID="event-2-count">Event 2: {pointsByEvent['2']?.length || 0}</Text>
       <Button title="Refresh" onPress={refreshPoints} testID="refresh-btn" />
     </>
   );
@@ -36,29 +36,29 @@ describe('Context: PointsContext Integration', () => {
   });
 
   test('Charge et trie les points correctement au démarrage', async () => {
-    // ARRANGE
+    // Arrange
     const fakeDBData = [
-      { id: 10, x: 1, y: 1, event_id: 1 },
-      { id: 11, x: 1, y: 1, event_id: 1 },
-      { id: 20, x: 2, y: 2, event_id: 2 },
+      { id: '10', x: 1, y: 1, event_id: 1 },
+      { id: '11', x: 1, y: 1, event_id: 1 },
+      { id: '20', x: 2, y: 2, event_id: 2 },
     ];
     mockGetAllAsync.mockResolvedValue(fakeDBData);
 
-    // ACT
+    // Act
     const { getByText, queryByText } = render(
       <PointsProvider>
         <TestConsumer />
       </PointsProvider>
     );
 
-    // ASSERT
+    // Assert
     await waitFor(() => expect(queryByText('Loading...')).toBeNull());
     expect(getByText('Event 1: 2')).toBeTruthy();
     expect(getByText('Event 2: 1')).toBeTruthy();
   });
 
   test('Rafraichit les données quand refreshPoints est appelé', async () => {
-    // ARRANGE
+    // Arrange
     mockGetAllAsync.mockResolvedValueOnce([]); 
     
     const { getByTestId, queryByText, getByText } = render(
@@ -71,16 +71,16 @@ describe('Context: PointsContext Integration', () => {
     expect(getByText('Event 1: 0')).toBeTruthy();
     
     mockGetAllAsync.mockResolvedValueOnce([
-        { id: 99, x: 1, y: 1, event_id: 1 }
+        { id: '99', x: 1, y: 1, event_id: 1 }
     ]);
 
-    // ACT
+    // Act
     await act(async () => {
         const btn = getByTestId('refresh-btn');
         fireEvent.press(btn);
     });
 
-    // ASSERT
+    // Assert
     await waitFor(() => {
         expect(getByText('Event 1: 1')).toBeTruthy();
     });

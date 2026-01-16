@@ -2,7 +2,7 @@ use crate::types::*;
 use sqlx::QueryBuilder;
 use sqlx::Row;
 use sqlx::Sqlite;
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter};
 
 use crate::db::fetch_equipement_coordinates;
 use crate::db::get_db_pool;
@@ -93,12 +93,17 @@ pub async fn create_team(app: AppHandle, name: String, event_id: String) -> Resu
         .await
         .map_err(|e| e.to_string())?;
 
-    Ok(Team {
+    let team = Team {
         id: new_id,
         name: Some(name),
         number: 0,
-        event_id: event_id,
-    })
+        event_id: event_id.clone(),
+    };
+
+    // Émettre un événement pour notifier la création de l'équipe
+    app.emit("team-created", &team).ok();
+
+    Ok(team)
 }
 
 #[tauri::command]

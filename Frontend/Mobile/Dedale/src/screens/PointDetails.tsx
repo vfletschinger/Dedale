@@ -1,24 +1,10 @@
-import {
-  View,
-  Text,
-  ActivityIndicator,
-  ScrollView,
-  Image,
-  Alert,
-  Modal,
-  Pressable,
-} from "react-native";
-import {
-  useNavigation,
-  useRoute,
-  useFocusEffect,
-} from "@react-navigation/native";
+import { View, Text, ActivityIndicator, ScrollView, Image, Alert, Modal, Pressable } from "react-native";
+import { useNavigation, useRoute, useFocusEffect, } from "@react-navigation/native";
 import React, { useCallback, useState } from "react";
 import { getDatabase } from "../../assets/migrations";
 import {
   PointDetailType,
   PictureType,
-  EquipementType,
   InterestPointsType,
 } from "../types/database";
 import {
@@ -29,8 +15,6 @@ import {
   deletePicture,
   addPicture,
   updatePointCoordinates,
-  addEquipement,
-  deleteEquipement,
   updateTimeStamp,
 } from "../services/databaseAcces";
 import { imageToBase64, pickImage } from "../services/ImageHelper";
@@ -38,21 +22,20 @@ import { shortId } from "../services/Helper";
 import MapView, { Marker, MapPressEvent } from "react-native-maps";
 import CoordinatesDisplay from "../components/CoordinatesDisplay";
 import EditModal from "../components/EditModal";
-import ObstacleSelector from "../components/ObstacleSelector";
+import { useEvent } from "../context/EventContext";
+import { usePoints } from "../context/PointsContext";
+import Colors from "../constants/colors";
 
 type RouteParams = { pointId: string };
-
-type SelectedEquipement = {
-  type_id: number;
-  name: string;
-  quantity: number;
-};
 
 export default function PointDetails() {
   const db = getDatabase();
   const route = useRoute();
   const { pointId } = route.params as RouteParams;
   const navigation = useNavigation();
+  const { getSelectedEvent } = useEvent();
+  const { refreshPoints } = usePoints();
+  const selectedEvent = getSelectedEvent();
   const [pointData, setPointData] = useState<PointDetailType | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -67,11 +50,6 @@ export default function PointDetails() {
     latitude: number;
     longitude: number;
   }>({ latitude: 0, longitude: 0 });
-
-  // États pour modal d'obstacles
-  const [isObstacleSelectorVisible, setIsObstacleSelectorVisible] =
-    useState(false);
-  const [editingObstacles, setEditingObstacles] = useState(false);
 
   const fetchPoint = async () => {
     setLoading(true);
@@ -92,18 +70,10 @@ export default function PointDetails() {
         [pointId]
       );
 
-      const equipements = db.getAllSync<EquipementType>(
-        `SELECT e.*, et.name, et.description, et.width, et.length
-         FROM equipement e
-         LEFT JOIN equipement_type et ON e.type_id = et.id
-         WHERE e.point_id = ?`,
-        [pointId]
-      );
-
       setPointData({
         point,
         pictures: pictures || [],
-        equipements: equipements || [],
+        equipements: [],
       });
 
       setTempCoordinates({
@@ -134,10 +104,10 @@ export default function PointDetails() {
         {
           text: "Supprimer",
           style: "destructive",
-          onPress: () => {
+          onPress: async () => {
             const success = deletePoint(pointId, db);
             if (success) {
-              Alert.alert("Succès", "Point supprimé avec succès");
+              await refreshPoints();
               navigation.goBack();
             } else {
               Alert.alert("Erreur", "Impossible de supprimer le point");
@@ -190,7 +160,7 @@ export default function PointDetails() {
     }
   };
 
-  const handleDeletePicture = (pictureId: number) => {
+  const handleDeletePicture = (pictureId: string) => {
     Alert.alert("Confirmer", "Supprimer cette image ?", [
       { text: "Annuler", style: "cancel" },
       {
@@ -247,72 +217,10 @@ export default function PointDetails() {
     }
   };
 
-  const handleSaveEquipements = (equipements: SelectedEquipement[]) => {
-    if (equipements.length === 0) {
-      if (editingObstacles) {
-        // Mode édition : supprimer tous les équipements existants
-        Alert.alert("Confirmer", "Supprimer tous les équipements ?", [
-          { text: "Annuler", style: "cancel" },
-          {
-            text: "Supprimer",
-            style: "destructive",
-            onPress: () => {
-              try {
-                pointData?.equipements.forEach((equipement) => {
-                  deleteEquipement(equipement.id, db);
-                });
-                updateTimeStamp(pointId, db);
-                fetchPoint();
-                Alert.alert("Succès", "Équipements supprimés");
-              } catch (error) {
-                console.error("Erreur:", error);
-                Alert.alert(
-                  "Erreur",
-                  "Impossible de supprimer les équipements"
-                );
-              }
-            },
-          },
-        ]);
-      }
-      return;
-    }
-
-    try {
-      if (editingObstacles) {
-        // Mode édition : supprimer les anciens équipements
-        pointData?.equipements.forEach((equipement) => {
-          deleteEquipement(equipement.id, db);
-        });
-      }
-
-      // Ajouter les nouveaux équipements
-      for (const equipement of equipements) {
-        addEquipement(pointId, equipement.type_id, equipement.quantity, db);
-      }
-
-      updateTimeStamp(pointId, db);
-      Alert.alert(
-        "Succès",
-        editingObstacles ? "Équipements mis à jour" : "Équipements ajoutés"
-      );
-      fetchPoint();
-      setEditingObstacles(false);
-    } catch (error) {
-      console.error("Erreur:", error);
-      Alert.alert("Erreur", "Impossible de sauvegarder les équipements");
-    }
-  };
-
-  const handleEditObstacles = () => {
-    setEditingObstacles(true);
-    setIsObstacleSelectorVisible(true);
-  };
-
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center">
-        <ActivityIndicator size="large" color="#3b82f6" />
+        <ActivityIndicator size="large" color={Colors.secondary} />
       </View>
     );
   }
@@ -327,199 +235,181 @@ export default function PointDetails() {
 
   return (
     <>
-      <ScrollView className="container-white">
-        <View className="header-lg header-row">
-          <View className="row flex-1">
+      <View className="flex-1 bg-white">
+        <View className="flex-row items-center justify-between pt-12 pb-3 bg-primary">
+          <View className="flex-row items-center flex-1">
             <Pressable onPress={() => navigation.goBack()} className="mr-3">
-              <View className="back-btn-circle">
-                <Text className="back-btn-text">←</Text>
+              <View className="bg-accent/20 w-10 h-10 rounded-full items-center justify-center">
+                <Text className="text-accent text-2xl font-bold">←</Text>
               </View>
             </Pressable>
-            <Text className="header-title-lg">Détail du point</Text>
-          </View>
-
-          <View className="row-gap">
-            <Pressable onPress={handleDelete} className="btn-icon-danger">
-              <Text className="text-white text-xl">🗑️</Text>
-            </Pressable>
+            <Text className="text-accent text-3xl font-bold" numberOfLines={1}>
+              {pointData.point.name || `Point #${shortId(pointData.point.id)}`}
+            </Text>
           </View>
         </View>
 
-        <View className="p-4">
-          <Text className="text-3xl font-bold mb-4">
-            {pointData.point.name || `Point #${shortId(pointData.point.id)}`}
-          </Text>
-
-          {/* Coordonnées */}
-          <View>
-            <View className="mb-3">
-              <CoordinatesDisplay
-                latitude={pointData.point.y}
-                longitude={pointData.point.x}
-                showAddress={true}
-              />
-            </View>
-            <View className="overflow-hidden rounded-lg mb-2">
-              <MapView
-                style={{ width: "100%", height: 200 }}
-                initialRegion={{
-                  latitude: pointData.point.y,
-                  longitude: pointData.point.x,
-                  latitudeDelta: 0.01,
-                  longitudeDelta: 0.01,
-                }}
-                zoomEnabled={true}
-                scrollEnabled={false}
-                minZoomLevel={17}
-                maxZoomLevel={18}
-              >
-                <Marker
-                  coordinate={{
+        <ScrollView className="flex-1">
+          <View className="p-4">
+            {/* Coordonnées */}
+            <View>
+              <View className="mb-3">
+                <CoordinatesDisplay
+                  latitude={pointData.point.y}
+                  longitude={pointData.point.x}
+                  showAddress={true}
+                  showCoordinates={false}
+                />
+              </View>
+              <View className="overflow-hidden rounded-lg mb-2">
+                <MapView
+                  style={{ width: "100%", height: 200 }}
+                  initialRegion={{
                     latitude: pointData.point.y,
                     longitude: pointData.point.x,
+                    latitudeDelta: 0.01,
+                    longitudeDelta: 0.01,
                   }}
-                  title={
-                    pointData.point.name ||
-                    `Point #${shortId(pointData.point.id)}`
-                  }
-                />
-              </MapView>
-            </View>
-            <Pressable
-              onPress={() => {
-                setTempCoordinates({
-                  latitude: pointData.point.y,
-                  longitude: pointData.point.x,
-                });
-                setIsCoordinatesModalVisible(true);
-              }}
-              className="bg-blue-500 py-3 rounded-lg"
-            >
-              <Text className="text-white text-center font-semibold">
-                📍 Modifier la position
-              </Text>
-            </Pressable>
-          </View>
-
-          {/* Commentaires */}
-          <View className="section-box mt-4">
-            <View className="section-header">
-              <Text className="text-section-title">Commentaire</Text>
-              {pointData.point.comment ? (
-                <Pressable
-                  onPress={handleEditComment}
-                  className="btn-add-small"
+                  zoomEnabled={true}
+                  scrollEnabled={false}
+                  minZoomLevel={17}
+                  maxZoomLevel={18}
                 >
-                  <Text className="btn-add-small-text">✏️ Modifier</Text>
-                </Pressable>
-              ) : (
-                <Pressable onPress={handleAddComment} className="btn-add-small">
-                  <Text className="btn-add-small-text">+ Ajouter</Text>
-                </Pressable>
-              )}
-            </View>
-            {pointData.point.comment ? (
-              <View className="section-item">
-                <Text className="mb-2">{pointData.point.comment}</Text>
-                <View className="row-gap">
-                  <Pressable
-                    onPress={handleEditComment}
-                    className="action-btn-edit"
-                  >
-                    <Text className="action-btn-edit-text">Modifier</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={handleDeleteComment}
-                    className="action-btn-delete"
-                  >
-                    <Text className="action-btn-delete-text">Supprimer</Text>
-                  </Pressable>
-                </View>
+                  <Marker
+                    coordinate={{
+                      latitude: pointData.point.y,
+                      longitude: pointData.point.x,
+                    }}
+                    title={
+                      pointData.point.name ||
+                      `Point #${shortId(pointData.point.id)}`
+                    }
+                  />
+                </MapView>
               </View>
-            ) : (
-              <Text className="text-caption">Aucun commentaire</Text>
-            )}
-          </View>
-
-          {/* Équipements */}
-          <View className="section-box">
-            <View className="section-header">
-              <Text className="text-section-title">
-                Équipements ({pointData.equipements.length})
-              </Text>
-              <View className="row-gap">
-                <Pressable
-                  onPress={handleEditObstacles}
-                  className="btn-add-small"
-                >
-                  <Text className="btn-add-small-text">
-                    {pointData.equipements.length > 0
-                      ? "✏️ Modifier"
-                      : "+ Ajouter"}
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
-            {pointData.equipements.length > 0 ? (
-              pointData.equipements.map((equipement) => (
-                <View key={equipement.id} className="section-item">
-                  <Text className="font-semibold">{equipement.name}</Text>
-                  {equipement.description && (
-                    <Text className="text-caption">
-                      {equipement.description}
-                    </Text>
-                  )}
-                  <Text className="text-sm mt-1">
-                    Quantité: {equipement.quantity}
-                  </Text>
-                  {(equipement.length || equipement.width) && (
-                    <Text className="text-sm">
-                      Dimensions: {equipement.length}m x {equipement.width}m
-                    </Text>
-                  )}
-                </View>
-              ))
-            ) : (
-              <Text className="text-caption">Aucun équipement</Text>
-            )}
-          </View>
-
-          {/* Images */}
-          <View className="section-box">
-            <View className="section-header">
-              <Text className="text-section-title">
-                Images ({pointData.pictures.length})
-              </Text>
-              <Pressable onPress={handleAddPicture} className="btn-add-small">
-                <Text className="btn-add-small-text">+ Ajouter</Text>
+              <Pressable
+                onPress={() => {
+                  setTempCoordinates({
+                    latitude: pointData.point.y,
+                    longitude: pointData.point.x,
+                  });
+                  setIsCoordinatesModalVisible(true);
+                }}
+                className="bg-secondary py-3 rounded-lg"
+              >
+                <Text className="text-white text-center font-semibold">
+                  📍 Modifier la position
+                </Text>
               </Pressable>
             </View>
-            {pointData.pictures.length > 0 ? (
-              pointData.pictures.map((picture) => (
-                <View key={picture.id} className="section-item">
-                  <Image
-                    source={{ uri: `data:image/jpeg;base64,${picture.image}` }}
-                    style={{
-                      width: "100%",
-                      height: 200,
-                      resizeMode: "contain",
-                    }}
-                    className="mb-2"
-                  />
+
+            {/* Commentaires */}
+            <View className="bg-gray-100 p-4 rounded-lg mb-4 mt-4">
+              <View className="flex-row justify-between items-center mb-2">
+                <Text className="text-lg font-semibold">Commentaire</Text>
+                {pointData.point.comment ? (
                   <Pressable
-                    onPress={() => handleDeletePicture(picture.id)}
-                    className="action-btn-delete self-start"
+                    onPress={handleEditComment}
+                    className="px-3 py-1 rounded-lg"
+                    style={{ backgroundColor: Colors.secondary }}
                   >
-                    <Text className="action-btn-delete-text">Supprimer</Text>
+                    <Text className="text-white text-xs font-semibold">
+                      ✏️ Modifier
+                    </Text>
                   </Pressable>
+                ) : (
+                  <Pressable
+                    onPress={handleAddComment}
+                    className="px-3 py-1 rounded-lg"
+                    style={{ backgroundColor: Colors.secondary }}
+                  >
+                    <Text className="text-white text-xs font-semibold">
+                      + Ajouter
+                    </Text>
+                  </Pressable>
+                )}
+              </View>
+              {pointData.point.comment ? (
+                <View className="bg-white p-3 rounded-lg mb-2">
+                  <Text className="mb-2">{pointData.point.comment}</Text>
+                  <View className="flex-row gap-2">
+                    <Pressable
+                      onPress={handleEditComment}
+                      className="px-3 py-1 rounded"
+                      style={{ backgroundColor: Colors.secondary }}
+                    >
+                      <Text className="text-white text-xs font-semibold">Modifier</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={handleDeleteComment}
+                      className="bg-red-100 px-3 py-1 rounded"
+                    >
+                      <Text className="text-red-600 text-xs">Supprimer</Text>
+                    </Pressable>
+                  </View>
                 </View>
-              ))
-            ) : (
-              <Text className="text-caption">Aucune image</Text>
-            )}
+              ) : (
+                <Text className="text-sm text-gray-500">Aucun commentaire</Text>
+              )}
+            </View>
+
+            {/* Images */}
+            <View className="bg-gray-100 p-4 rounded-lg mb-4">
+              <View className="flex-row justify-between items-center mb-2">
+                <Text className="text-lg font-semibold">
+                  Images ({pointData.pictures.length})
+                </Text>
+                <Pressable
+                  onPress={handleAddPicture}
+                  className="px-3 py-1 rounded-lg"
+                  style={{ backgroundColor: Colors.secondary }}
+                >
+                  <Text className="text-white text-xs font-semibold">
+                    + Ajouter
+                  </Text>
+                </Pressable>
+              </View>
+              {pointData.pictures.length > 0 ? (
+                pointData.pictures.map((picture) => (
+                  <View
+                    key={picture.id}
+                    className="bg-white p-3 rounded-lg mb-2"
+                  >
+                    <Image
+                      source={{
+                        uri: `data:image/jpeg;base64,${picture.image}`,
+                      }}
+                      style={{
+                        width: "100%",
+                        height: 200,
+                        resizeMode: "contain",
+                      }}
+                      className="mb-2"
+                    />
+                    <Pressable
+                      onPress={() => handleDeletePicture(picture.id)}
+                      className="bg-red-100 px-3 py-1 rounded self-start"
+                    >
+                      <Text className="text-red-600 text-xs">Supprimer</Text>
+                    </Pressable>
+                  </View>
+                ))
+              ) : (
+                <Text className="text-sm text-gray-500">Aucune image</Text>
+              )}
+            </View>
           </View>
-        </View>
-      </ScrollView>
+
+          <Pressable
+            onPress={handleDelete}
+            className="mx-4 mb-6 py-4 bg-white border border-red-500 rounded-lg"
+          >
+            <Text className="text-red-500 text-center font-semibold text-base">
+              Supprimer le point
+            </Text>
+          </Pressable>
+        </ScrollView>
+      </View>
 
       {/* Modal de modification de position */}
       <Modal
@@ -528,10 +418,12 @@ export default function PointDetails() {
         animationType="slide"
         onRequestClose={() => setIsCoordinatesModalVisible(false)}
       >
-        <View className="container-white">
-          <View className="header-lg">
-            <Text className="header-title mb-2">Modifier la position</Text>
-            <Text className="header-subtitle text-sm">
+        <View className="flex-1 bg-white">
+          <View className="bg-primary pt-4 pb-4 px-4 shadow-sm">
+            <Text className="text-accent text-2xl font-bold mb-2">
+              Modifier la position
+            </Text>
+            <Text className="text-accent-light text-base text-sm">
               Appuyez sur la carte pour déplacer le point
             </Text>
           </View>
@@ -559,32 +451,36 @@ export default function PointDetails() {
               />
             </MapView>
 
-            <View className="map-coord-overlay">
+            <View className="absolute top-4 left-4 right-4 bg-white/95 p-3 rounded-lg shadow-lg">
               <Text className="text-xs text-gray-600 mb-1">
                 Nouvelles coordonnées :
               </Text>
-              <Text className="coord-text">
+              <Text className="font-mono text-sm">
                 Lat: {tempCoordinates.latitude.toFixed(6)}
               </Text>
-              <Text className="coord-text">
+              <Text className="font-mono text-sm">
                 Lon: {tempCoordinates.longitude.toFixed(6)}
               </Text>
             </View>
           </View>
 
           <View className="p-4 bg-white border-t border-gray-200">
-            <View className="modal-actions">
+            <View className="flex-row gap-3">
               <Pressable
                 onPress={() => setIsCoordinatesModalVisible(false)}
-                className="flex-1 btn-secondary"
+                className="flex-1 bg-gray-300 py-3 px-6 rounded-lg active:bg-gray-400"
               >
-                <Text className="btn-text-dark">Annuler</Text>
+                <Text className="text-gray-800 text-center font-semibold text-base">
+                  Annuler
+                </Text>
               </Pressable>
               <Pressable
                 onPress={handleSaveCoordinates}
-                className="flex-1 btn-primary"
+                className="flex-1 bg-blue-500 py-3 px-6 rounded-lg active:bg-blue-600"
               >
-                <Text className="btn-text">✓ Enregistrer</Text>
+                <Text className="text-white text-center font-semibold text-base">
+                  ✓ Enregistrer
+                </Text>
               </Pressable>
             </View>
           </View>
@@ -608,25 +504,6 @@ export default function PointDetails() {
         numberOfLines={4}
       />
 
-      {/* Modal de sélection d'équipements */}
-      <ObstacleSelector
-        visible={isObstacleSelectorVisible}
-        onClose={() => {
-          setIsObstacleSelectorVisible(false);
-          setEditingObstacles(false);
-        }}
-        onSave={handleSaveEquipements}
-        initialObstacles={
-          editingObstacles
-            ? pointData?.equipements.map((equipement) => ({
-                type_id: equipement.type_id,
-                name: equipement.name ?? "Nom inconnu",
-                number: equipement.quantity,
-              })) || []
-            : []
-        }
-        editMode={editingObstacles}
-      />
     </>
   );
 }

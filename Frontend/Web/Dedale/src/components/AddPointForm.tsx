@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import toast from "react-hot-toast";
 import { invoke } from "@tauri-apps/api/core";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTag } from "@fortawesome/free-solid-svg-icons";
@@ -14,17 +15,34 @@ export default function AddPointForm({
   onSaved?: () => void;
   eventId?: string | null;
 }) {
-  const [x, setX] = useState<number>(initialCoords.lng);
-  const [y, setY] = useState<number>(initialCoords.lat);
-  const [name, setName] = useState<string>("");
+  const [x, _setX] = useState<number>(initialCoords.lng);
+  const [y, _setY] = useState<number>(initialCoords.lat);
+  const [name, setName] = useState<string>("Point 1");
   const [comment, setComment] = useState<string>("");
   const [type, setType] = useState<string>("info");
   const [status, setStatus] = useState<boolean>(false);
   const [saving, setSaving] = useState(false);
 
+
+  useEffect(() => {
+    async function loadPointCount() {
+      if (!eventId) return;
+
+      try {
+        const points = await invoke<{ id: string; event_id: string; x: number; y: number; name: string | null; comment: string | null; type: string | null; status: boolean }[]>("fetch_points", { eventId });
+        const nextPointNumber = points.length + 1;
+        setName(`Point ${nextPointNumber}`);
+      } catch (error) {
+        console.error("Erreur lors du chargement des points:", error);
+      }
+    }
+
+    loadPointCount();
+  }, [eventId]);
+
   async function handleSave() {
     if (!eventId) {
-      alert("Erreur : Impossible d'enregistrer. Aucun événement n'est sélectionné.");
+      toast.error("Impossible d'enregistrer : aucun événement sélectionné");
       console.error("Tentative d'enregistrement sans eventId");
       return;
     }
@@ -51,9 +69,10 @@ export default function AddPointForm({
 
       if (onSaved) onSaved();
       if (onClose) onClose();
+      toast.success("Point ajouté avec succès");
     } catch (err) {
       console.error("Failed to insert point:", err);
-      alert("Erreur lors de l'enregistrement du point.");
+      toast.error("Erreur lors de l'enregistrement du point");
     } finally {
       setSaving(false);
     }
@@ -83,45 +102,17 @@ export default function AddPointForm({
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
         {/* Nom du point */}
         <div>
-          <label className="block text-sm font-semibold text-gray-900 mb-2">
+          <label htmlFor="point-name" className="block text-sm font-semibold text-gray-900 mb-2">
             Nom du point
           </label>
           <input
+            id="point-name"
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Entrer le nom du point"
             className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
           />
-        </div>
-
-        {/* Coordonnées */}
-        <div>
-          <label className="block text-sm font-semibold text-gray-900 mb-3">
-            Coordonnées
-          </label>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">Longitude</label>
-              <input
-                type="number"
-                step="0.000001"
-                value={x}
-                onChange={(e) => setX(Number(e.target.value))}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">Latitude</label>
-              <input
-                type="number"
-                step="0.000001"
-                value={y}
-                onChange={(e) => setY(Number(e.target.value))}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
-              />
-            </div>
-          </div>
         </div>
 
         {/* Type et Statut Section */}
@@ -133,10 +124,11 @@ export default function AddPointForm({
           <div className="p-4 space-y-3">
             {/* Type */}
             <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">
+              <label htmlFor="point-type" className="block text-sm font-semibold text-gray-900 mb-2">
                 Type
               </label>
               <select
+                id="point-type"
                 value={type}
                 onChange={(e) => setType(e.target.value)}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
@@ -163,10 +155,11 @@ export default function AddPointForm({
 
         {/* Commentaire */}
         <div>
-          <label className="block text-sm font-semibold text-gray-900 mb-2">
+          <label htmlFor="point-comment" className="block text-sm font-semibold text-gray-900 mb-2">
             Commentaire (optionnel)
           </label>
           <textarea
+            id="point-comment"
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             placeholder="Ajouter un commentaire..."

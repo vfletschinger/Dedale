@@ -50,7 +50,7 @@ describe("Dedale Application", () => {
 
     // Le test passe si l'app se lance sans erreur
     expect(title).toBeDefined();
-    expect(title).toContain("Tauri");
+    expect(title).toContain("Dedale");
   });
 
   it("should display the main page", async () => {

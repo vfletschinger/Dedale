@@ -1,12 +1,12 @@
 import React, { useState } from "react";
 import {
-  SafeAreaView,
   View,
   Text,
   TouchableOpacity,
   Pressable,
   FlatList,
   Alert,
+  Modal,
 } from "react-native";
 import CustomButton from "../components/CustomButton";
 import QRCodeScanner from "../components/QrCodeScanner";
@@ -21,6 +21,8 @@ import {
   PictureType,
   EquipementType,
 } from "../types/database";
+import Colors from "../constants/colors";
+import { WebSocketResponse } from "../components/WebSocketClient";
 
 type PointWithDetails = InterestPointsType & {
   pictures: PictureType[];
@@ -30,12 +32,13 @@ type PointWithDetails = InterestPointsType & {
 type EventExportData = {
   event: any;
   points: PointWithDetails[];
+  equipements: EquipementType[];
 };
 
 export default function SettingsScreen() {
   const [scanQR, setScanQR] = useState(false);
   const [scanMode, setScanMode] = useState<"receive" | "send">("receive");
-  const [isEventListExpanded, setIsEventListExpanded] = useState(false);
+  const [isEventModalVisible, setIsEventModalVisible] = useState(false);
   const {
     selectedEventId,
     setSelectedEventId,
@@ -51,6 +54,7 @@ export default function SettingsScreen() {
 
   const handleEventChange = (event: EventWithStatus) => {
     setSelectedEventId(event.id);
+    setIsEventModalVisible(false);
   };
 
   const deleteEventLocally = (eventId: string) => {
@@ -94,27 +98,33 @@ export default function SettingsScreen() {
         [eventId]
       );
 
-      // Pour chaque point, récupérer ses photos et équipements
+      // Pour chaque point, récupérer ses photos
       const pointsWithDetails: PointWithDetails[] = points.map((point) => {
         const pictures = db.getAllSync<PictureType>(
           "SELECT * FROM picture WHERE point_id = ?",
-          [point.id]
-        );
-        const equipements = db.getAllSync<EquipementType>(
-          "SELECT * FROM equipement WHERE point_id = ?",
           [point.id]
         );
 
         return {
           ...point,
           pictures,
-          equipements,
+          equipements: [], // Les équipements sont maintenant au niveau event
         };
       });
+
+      // Récupérer les équipements de l'événement avec leurs coordonnées
+      const equipements = db.getAllSync<EquipementType>(
+        `SELECT e.*, t.name, t.description 
+         FROM equipement e 
+         LEFT JOIN type t ON e.type_id = t.id 
+         WHERE e.event_id = ?`,
+        [eventId]
+      );
 
       return {
         event,
         points: pointsWithDetails,
+        equipements: equipements || [],
       };
     } catch (error) {
       console.error(
@@ -173,7 +183,7 @@ export default function SettingsScreen() {
             Alert.alert(
               "Import refusé",
               response.message ||
-                "Le serveur a refusé l'import de l'événement.",
+              "Le serveur a refusé l'import de l'événement.",
               [{ text: "OK" }]
             );
             break;
@@ -183,7 +193,7 @@ export default function SettingsScreen() {
             Alert.alert(
               "Échec de l'import",
               response.message ||
-                "Le serveur a accepté mais n'a pas pu importer l'événement.",
+              "Le serveur a accepté mais n'a pas pu importer l'événement.",
               [{ text: "OK" }]
             );
             break;
@@ -193,7 +203,7 @@ export default function SettingsScreen() {
             Alert.alert(
               "Export réussi",
               response.message ||
-                "L'événement a été exporté avec succès. Il sera supprimé de votre appareil.",
+              "L'événement a été exporté avec succès. Il sera supprimé de votre appareil.",
               [
                 {
                   text: "OK",
@@ -230,15 +240,15 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView className="container">
-      <View className="header header-row">
+    <View className="flex-1 bg-gray-50">
+      <View className="bg-primary pt-12 pb-6 px-4 shadow-sm flex-row items-center justify-between">
         {scanQR && (
           <TouchableOpacity onPress={() => setScanQR(false)} className="mr-4">
             <Feather name="arrow-left" size={24} color="white" />
           </TouchableOpacity>
         )}
         <View className="flex-row items-center flex-1">
-          <Text className="header-title">Settings</Text>
+          <Text className="text-accent text-2xl font-bold">Settings</Text>
         </View>
       </View>
 
@@ -258,80 +268,101 @@ export default function SettingsScreen() {
       ) : (
         <View className="flex-1 p-5">
           {/* Section Événement actuel */}
-          <View style={isEventListExpanded ? { flex: 0.25 } : { flex: 0.33 }}>
-            <Text className="text-section-title mb-3">Événement actuel</Text>
+          <View className="mb-4">
+            <Text className="text-lg font-semibold mb-3">Événement actuel</Text>
             {selectedEvent ? (
               <EventItem
                 event={selectedEvent}
-                onPress={() => {}}
+                onPress={() => { }}
                 navArrow={false}
               />
             ) : (
-              <Text className="text-caption">Aucun événement sélectionné</Text>
+              <Text className="text-sm text-gray-500">
+                Aucun événement sélectionné
+              </Text>
             )}
+
+            {/* Bouton pour changer d'événement */}
+            <Pressable
+              onPress={() => setIsEventModalVisible(true)}
+              className="mt-3 bg-gray-100 p-4 rounded-lg flex-row justify-between items-center"
+            >
+              <Text className="text-base font-medium text-gray-700">
+                Changer d&apos;événement
+              </Text>
+              <Feather name="chevron-right" size={20} color="#374151" />
+            </Pressable>
           </View>
 
-          {/* Section Changer d'événement - dynamique */}
-          <View
-            className="section-box"
-            style={
-              isEventListExpanded
-                ? { flex: 1, maxHeight: "50%" }
-                : { flex: 0.05, justifyContent: "center" }
-            }
+          {/* Modal pour changer d'événement */}
+          <Modal
+            visible={isEventModalVisible}
+            animationType="fade"
+            transparent={true}
+            statusBarTranslucent={true}
+            onRequestClose={() => setIsEventModalVisible(false)}
           >
             <Pressable
-              onPress={() => setIsEventListExpanded(!isEventListExpanded)}
-              className="section-header"
+              className="flex-1 justify-center items-center"
+              style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+              onPress={() => setIsEventModalVisible(false)}
             >
-              <Text className="text-section-title">Événements disponibles</Text>
-              <Feather
-                name={isEventListExpanded ? "chevron-up" : "chevron-down"}
-                size={20}
-                color="#374151"
-              />
-            </Pressable>
-            {isEventListExpanded && events.length > 0 ? (
-              <FlatList
-                data={events}
-                keyExtractor={(item) => item.id.toString()}
-                renderItem={({ item }) => (
-                  <Pressable
-                    onPress={() => {
-                      handleEventChange(item);
-                      setIsEventListExpanded(false);
-                    }}
-                    className={
-                      item.id === selectedEventId
-                        ? "modal-select-item-active"
-                        : "modal-select-item"
-                    }
-                  >
-                    <View className="flex-1">
-                      <Text className="font-semibold">{item.name}</Text>
-                      <Text className="text-xs text-gray-500" numberOfLines={1}>
-                        {item.description}
-                      </Text>
-                    </View>
-                    {item.id === selectedEventId && (
-                      <View className="modal-checkbox">
-                        <Text>✓</Text>
-                      </View>
+              <Pressable
+                className="bg-white rounded-2xl w-[90%] max-h-[70%]"
+                onPress={(e) => e.stopPropagation()}
+              >
+                <View className="flex-row justify-between items-center p-4 border-b border-gray-200">
+                  <Text className="text-xl font-bold">Choisir un événement</Text>
+                  <TouchableOpacity onPress={() => setIsEventModalVisible(false)}>
+                    <Feather name="x" size={24} color="#374151" />
+                  </TouchableOpacity>
+                </View>
+
+                {events.length > 0 ? (
+                  <FlatList
+                    data={events}
+                    keyExtractor={(item) => item.id.toString()}
+                    contentContainerStyle={{ padding: 16 }}
+                    renderItem={({ item }) => (
+                      <Pressable
+                        onPress={() => handleEventChange(item)}
+                        className={
+                          item.id === selectedEventId
+                            ? "flex-row items-center justify-between p-4 rounded-lg mb-3 bg-secondary/10 border border-secondary/30"
+                            : "flex-row items-center justify-between p-4 rounded-lg mb-3 bg-gray-50"
+                        }
+                      >
+                        <View className="flex-1">
+                          <Text className="font-semibold text-base">{item.name}</Text>
+                          <Text className="text-sm text-gray-500 mt-1" numberOfLines={2}>
+                            {item.description}
+                          </Text>
+                        </View>
+                        {item.id === selectedEventId && (
+                          <View className="w-8 h-8 rounded-full bg-secondary items-center justify-center ml-3">
+                            <Feather name="check" size={18} color="white" />
+                          </View>
+                        )}
+                      </Pressable>
                     )}
-                  </Pressable>
+                  />
+                ) : (
+                  <View className="p-8 items-center">
+                    <Feather name="inbox" size={48} color="#9CA3AF" />
+                    <Text className="text-gray-500 mt-4 text-center">
+                      Aucun événement disponible
+                    </Text>
+                  </View>
                 )}
-              />
-            ) : isEventListExpanded && events.length === 0 ? (
-              <Text className="text-caption">Aucun événement disponible</Text>
-            ) : null}
-          </View>
+              </Pressable>
+            </Pressable>
+          </Modal>
 
           {/* Section Synchronisation */}
           <View
-            className="items-center justify-center"
-            style={isEventListExpanded ? { flex: 0.25 } : { flex: 0.33 }}
+            className="items-center justify-center flex-1"
           >
-            <Feather name="settings" size={48} color="#3b82f6" />
+            <Feather name="settings" size={48} color={Colors.secondary} />
             <Text className="text-lg font-bold text-gray-800 mt-3 mb-2 text-center">
               Data Synchronization
             </Text>
@@ -343,6 +374,7 @@ export default function SettingsScreen() {
             <View className="w-full gap-3">
               {/* Bouton pour recevoir (scan QR du desktop) */}
               <CustomButton
+                variant="secondary"
                 onPress={() => {
                   setScanMode("receive");
                   setScanQR(true);
@@ -352,6 +384,7 @@ export default function SettingsScreen() {
 
               {/* Bouton pour envoyer (scan QR du desktop) */}
               <CustomButton
+                variant="secondary"
                 onPress={() => {
                   if (!selectedEvent) {
                     Alert.alert(
@@ -370,12 +403,12 @@ export default function SettingsScreen() {
 
             {isConnected && (
               <Text className="text-sm text-green-600 text-center mt-4">
-                ✓ Connecté à l'application de bureau
+                ✓ Connecté à l&apos;application de bureau
               </Text>
             )}
           </View>
         </View>
       )}
-    </SafeAreaView>
+    </View>
   );
 }

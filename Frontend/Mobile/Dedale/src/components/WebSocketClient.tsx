@@ -77,6 +77,41 @@ class WebSocketClient {
         console.log("🔔 Message reçu du serveur:", e.data);
         console.log("🔍 Type de message:", typeof e.data);
 
+        // Log détaillé des données brutes
+        try {
+          const rawData = JSON.parse(e.data);
+          console.log("📋 DONNÉES BRUTES REÇUES:");
+          console.log(JSON.stringify(rawData, null, 2));
+          console.log("📊 Clés présentes:", Object.keys(rawData));
+          if (rawData.type) console.log("   - type:", rawData.type);
+          if (rawData.data) {
+            console.log("   - data keys:", Object.keys(rawData.data || {}));
+            if (Array.isArray(rawData.data)) {
+              console.log(
+                "   - data est un array de",
+                rawData.data.length,
+                "éléments"
+              );
+              if (rawData.data[0]) {
+                console.log(
+                  "   - Premier élément keys:",
+                  Object.keys(rawData.data[0])
+                );
+                console.log(
+                  "   - teams?:",
+                  rawData.data[0].teams?.length || "absent"
+                );
+                console.log(
+                  "   - actions?:",
+                  rawData.data[0].actions?.length || "absent"
+                );
+              }
+            }
+          }
+        } catch (parseErr) {
+          console.log("📋 Message non-JSON:", e.data);
+        }
+
         // Traiter les messages spéciaux (format texte)
         if (e.data === "fini") {
           console.log(
@@ -139,6 +174,23 @@ class WebSocketClient {
                     event.id,
                     event.name
                   );
+                  // Log des données associées
+                  const transferData = data.data as TransferEventType;
+                  console.log("   📋 teams:", transferData.teams?.length || 0);
+                  console.log(
+                    "   📋 actions:",
+                    transferData.actions?.length || 0
+                  );
+                  console.log(
+                    "   📋 points:",
+                    transferData.points?.length || 0
+                  );
+                  if (transferData.actions && transferData.actions.length > 0) {
+                    console.log(
+                      "   📋 Première action:",
+                      JSON.stringify(transferData.actions[0])
+                    );
+                  }
                   if (this.onMessageCallback) {
                     this.onMessageCallback([event]);
                   }
@@ -152,6 +204,13 @@ class WebSocketClient {
                 }
                 // Ne pas appeler ws.close() ici, le serveur ferme déjà la connexion
                 // L'événement onclose sera déclenché automatiquement
+                break;
+              case "planning_data":
+                // Traiter le planning_data - passer directement data (pas un tableau)
+                console.log("📋 Planning reçu, traitement...");
+                if (this.onMessageCallback) {
+                  this.onMessageCallback(data);
+                }
                 break;
               default:
                 console.log("🤔 Type de message inconnu:", data.type);

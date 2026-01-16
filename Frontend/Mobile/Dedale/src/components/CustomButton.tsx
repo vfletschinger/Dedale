@@ -6,6 +6,7 @@ interface CustomButtonProps {
   variant?: "primary" | "secondary" | "danger";
   disabled?: boolean;
   fullWidth?: boolean;
+  className?: string;
 }
 
 export default function CustomButton({
@@ -14,17 +15,18 @@ export default function CustomButton({
   variant = "primary",
   disabled = false,
   fullWidth = false,
+  className = "",
 }: CustomButtonProps) {
   const getVariantClasses = () => {
     switch (variant) {
       case "primary":
-        return "bg-blue-600 active:bg-blue-700 mb-2";
+        return "bg-primary active:bg-primary mb-2";
       case "secondary":
-        return "bg-gray-600 active:bg-gray-700 mb-2";
+        return "bg-secondary active:bg-secondary mb-2";
       case "danger":
         return "bg-red-600 active:bg-red-700";
       default:
-        return "bg-blue-600 active:bg-blue-700";
+        return "bg-primary active:bg-primary";
     }
   };
 
@@ -37,6 +39,7 @@ export default function CustomButton({
         ${getVariantClasses()}
         ${disabled ? "opacity-50" : ""}
         ${fullWidth ? "w-full" : ""}
+        ${className}
       `}
     >
       <Text className="text-white text-center font-semibold text-base">

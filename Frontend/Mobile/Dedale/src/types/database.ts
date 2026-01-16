@@ -58,6 +58,8 @@ export type TransferEventType = EventType & {
   parcours?: ParcoursType[];
   zones?: ZoneType[];
   points?: InterestPointsType[];
+  teams?: TeamType[];
+  actions?: ActionType[];
 };
 
 export type EventWithGeometries = EventType & {
@@ -75,13 +77,28 @@ export type EquipementTypeType = {
 
 export type EquipementType = {
   id: string; // UUID
-  point_id: string; // UUID reference
-  type_id: number;
+  event_id: string; // UUID reference to event
+  type_id: string; // UUID reference to type
   quantity: number;
-  name?: string; // From joined equipement_type
+  length_per_unit?: number;
+  date_pose?: string;
+  date_depose?: string;
+  name?: string; // From joined type table
   description?: string;
-  width?: number;
-  length?: number;
+};
+
+export type EquipementCoordinateType = {
+  id: string; // UUID
+  equipement_id: string; // UUID reference
+  x: number;
+  y: number;
+  order_index: number;
+};
+
+export type TypeType = {
+  id: string; // UUID
+  name?: string;
+  description?: string;
 };
 
 export type TeamType = {
@@ -103,6 +120,15 @@ export type MemberType = {
   team_id: string; // UUID reference
   person_id: string; // UUID reference
   role?: string;
+};
+
+export type ActionType = {
+  id: string; // UUID
+  team_id: string; // UUID reference
+  equipement_id: string; // UUID reference
+  type?: string | null;
+  scheduled_time?: string | null;
+  is_done?: number; // SQLite BOOLEAN as INTEGER 0/1
 };
 
 export type PointDetailType = {
