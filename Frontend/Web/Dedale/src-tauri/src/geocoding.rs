@@ -22,7 +22,7 @@ fn get_addresses_db_path() -> Result<PathBuf, String> {
         .ok_or_else(|| "Impossible d'obtenir le dossier parent".to_string())?;
 
     // Liste des chemins possibles à tester
-    let possible_paths = vec![
+    let mut possible_paths = vec![
         // Mode dev - chemin relatif depuis target/debug
         exe_dir
             .join("..")
@@ -32,11 +32,45 @@ fn get_addresses_db_path() -> Result<PathBuf, String> {
             .join("addresses.db"),
         // Mode dev - autre structure
         exe_dir.join("resources").join("addresses.db"),
-        // Mode prod - ressources à côté de l'exécutable
+        // Mode prod Windows - ressources à côté de l'exécutable
         exe_dir.join("addresses.db"),
         // Chemin absolu de fallback pour le dev
         PathBuf::from("src-tauri/resources/addresses.db"),
     ];
+
+    // macOS bundle: Contents/MacOS/exe -> Contents/Resources/
+    #[cfg(target_os = "macos")]
+    {
+        possible_paths.insert(
+            0,
+            exe_dir
+                .join("..")
+                .join("Resources")
+                .join("resources")
+                .join("addresses.db"),
+        );
+    }
+
+    // Linux AppImage/deb: ressources dans ../lib/<app>/resources/ ou à côté de l'exécutable
+    #[cfg(target_os = "linux")]
+    {
+        // AppImage extrait les ressources dans un dossier temporaire
+        // Format: /tmp/.mount_xxx/usr/bin/app -> /tmp/.mount_xxx/usr/lib/app/resources/
+        possible_paths.insert(
+            0,
+            exe_dir
+                .join("..")
+                .join("lib")
+                .join("dedale")
+                .join("resources")
+                .join("addresses.db"),
+        );
+        // Deb package: /usr/bin/app -> /usr/lib/app/resources/
+        possible_paths.insert(
+            1,
+            PathBuf::from("/usr/lib/dedale/resources/addresses.db"),
+        );
+    }
 
     for path in &possible_paths {
         if path.exists() {

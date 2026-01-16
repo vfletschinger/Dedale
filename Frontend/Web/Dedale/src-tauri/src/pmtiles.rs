@@ -20,7 +20,7 @@ fn get_pmtiles_path() -> Result<PathBuf, String> {
         .ok_or_else(|| "Impossible d'obtenir le dossier parent".to_string())?;
 
     // Liste des chemins possibles à tester
-    let possible_paths = vec![
+    let mut possible_paths = vec![
         // Mode dev - chemin relatif depuis target/debug vers resources/
         exe_dir
             .join("..")
@@ -28,7 +28,7 @@ fn get_pmtiles_path() -> Result<PathBuf, String> {
             .join("..")
             .join("resources")
             .join("eurometropole_strasbourg.pmtiles"),
-        // Mode prod - ressources à côté de l'exécutable
+        // Mode prod Windows - ressources à côté de l'exécutable
         exe_dir
             .join("resources")
             .join("eurometropole_strasbourg.pmtiles"),
@@ -37,6 +37,40 @@ fn get_pmtiles_path() -> Result<PathBuf, String> {
         // Chemin absolu de fallback pour le dev
         PathBuf::from("src-tauri/resources/eurometropole_strasbourg.pmtiles"),
     ];
+
+    // macOS bundle: Contents/MacOS/exe -> Contents/Resources/resources/
+    #[cfg(target_os = "macos")]
+    {
+        possible_paths.insert(
+            0,
+            exe_dir
+                .join("..")
+                .join("Resources")
+                .join("resources")
+                .join("eurometropole_strasbourg.pmtiles"),
+        );
+    }
+
+    // Linux AppImage/deb: ressources dans ../lib/<app>/resources/ ou à côté de l'exécutable
+    #[cfg(target_os = "linux")]
+    {
+        // AppImage extrait les ressources dans un dossier temporaire
+        // Format: /tmp/.mount_xxx/usr/bin/app -> /tmp/.mount_xxx/usr/lib/app/resources/
+        possible_paths.insert(
+            0,
+            exe_dir
+                .join("..")
+                .join("lib")
+                .join("dedale")
+                .join("resources")
+                .join("eurometropole_strasbourg.pmtiles"),
+        );
+        // Deb package: /usr/bin/app -> /usr/lib/app/resources/
+        possible_paths.insert(
+            1,
+            PathBuf::from("/usr/lib/dedale/resources/eurometropole_strasbourg.pmtiles"),
+        );
+    }
 
     for path in &possible_paths {
         if path.exists() {
