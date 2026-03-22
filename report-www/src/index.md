@@ -1,4 +1,5 @@
 # Étape 1 : Prise en main et déploiement
+
 ## Procédure d'installation
 ### **Observations préliminaires**
 Aucune étape clairement définie n'est actuellement documentée pour installer et exécuter le projet en environnement de développement ou de production. La pipeline CI/CD n'est pas conçue pour générer un installateur auto-extractible (type _setup.exe_), et une analyse approfondie ainsi que des tests seront menés pour en valider le fonctionnement. Deux scripts (un pour Linux et un pour Windows) permettent de lancer tout ou partie du projet selon les options choisies au démarrage.
