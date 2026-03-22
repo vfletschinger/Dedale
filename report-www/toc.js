@@ -31,7 +31,7 @@ function buildToc() {
 
   tocList.innerHTML = '';
 
-  const headings = content.querySelectorAll('h2, h3, h4, h5');
+  const headings = content.querySelectorAll('h1, h2, h3, h4, h5');
   if (!headings.length) {
     tocList.innerHTML = '<li class="toc-empty">Aucun titre detecte.</li>';
     return;
