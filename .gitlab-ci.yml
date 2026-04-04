@@ -21,3 +21,12 @@ trigger_web:
       - changes:
         - Frontend/Web/**/*
       - when: manual
+    
+trigger_mkdocs:
+  stage: trigger
+  trigger:
+    include: T6_rapport/.gitlab-ci.yml
+  rules:
+      - changes:
+        - T6_rapport/**/*
+      - when: manual
