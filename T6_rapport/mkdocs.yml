@@ -5,5 +5,9 @@ site_name: Rapport T6
 
 site_dir: public
 
+extra_css:
+  - css/custom.css
+
 nav:
-  - Accueil: index.md
+  - Rapport 1: index.md
+  - FAQ: FAQ.md
