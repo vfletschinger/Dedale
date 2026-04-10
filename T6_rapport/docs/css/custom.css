@@ -1,0 +1,11 @@
+body {
+    font-size: 15px;
+}
+
+.md-content, .wy-nav-content, .container {
+    max-width: 900px !important; 
+}
+
+.bs-sidebar .nav > .nav-item > .nav-link {
+    font-size: 14px;
+}

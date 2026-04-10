@@ -4,17 +4,14 @@ Application mobile de navigation hors-ligne avec cartes personnalisées.
 
 ## Configuration
 
-### 1. Variables d'environnement
+### 1. Utilisation de la carte (MapView) et clé API Google Maps
 
-Copiez le fichier `.env.example` en `.env` :
+L'application utilise le composant `MapView` de `react-native-maps` pour afficher la carte. Selon la plateforme, la gestion de la clé API Google Maps diffère :
 
-```bash
-cp .env.example .env
-```
+- **Android** : En développement, la carte fonctionne grâce aux services Google Play installés sur l'appareil. Pour la publication sur le Play Store ou l'utilisation de fonctionnalités avancées (styles personnalisés, géocodage, etc.), il est recommandé d'ajouter une clé API Google Maps dans la configuration Android.
+- **iOS** : Par défaut, c'est Apple Maps qui est utilisé.
 
-Puis modifiez `.env` et remplacez `your_api_key_here` par votre clé API Google Maps.
-
-### 2. Obtenir une clé API Google Maps
+### 2. Obtenir une clé API Google Maps (Optionnel)
 
 1. Allez sur [Google Cloud Console](https://console.cloud.google.com/)
 2. Créez un projet ou sélectionnez-en un existant
@@ -24,21 +21,25 @@ Puis modifiez `.env` et remplacez `your_api_key_here` par votre clé API Google 
 
 **Note** : La clé API est gratuite et nécessaire uniquement pour initialiser le SDK. L'application fonctionne 100% hors-ligne avec vos tuiles personnalisées.
 
-### 3. Développement
+### 3. Variables d'environnement
 
-**Terminal 1** - Serveur de tuiles (pour Expo Go) :
+Copiez le fichier `.env.example` en `.env` :
 
 ```bash
-node tile-server.js
+cp .env.example .env
 ```
 
-**Terminal 2** - Expo :
+Puis modifiez `.env` et remplacez `your_api_key_here` par votre clé API Google Maps.
+
+### 4. Développement
 
 ```bash
 npx expo start
 ```
 
-### 4. Build de production
+### 5. Build de production
+
+_ici la clé API Google Maps est nécessaire_
 
 ```bash
 npx expo run:android
