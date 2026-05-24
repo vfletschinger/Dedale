@@ -168,4 +168,38 @@ describe('Service: Helper', () => {
       consoleSpy.mockRestore();
     });
   });
+
+  describe('getShortAddressFromCoords', () => {
+    test('should prefer street then city', async () => {
+      (Location.reverseGeocodeAsync as jest.Mock).mockResolvedValue([{
+        street: 'Rue des Orfevres',
+        name: 'Cathédrale',
+        city: 'Strasbourg'
+      }]);
+
+      const result = await Helper.getShortAddressFromCoords(48.5, 7.7);
+
+      expect(result).toBe('Rue des Orfevres, Strasbourg');
+    });
+
+    test('should fallback to name when street is missing', async () => {
+      (Location.reverseGeocodeAsync as jest.Mock).mockResolvedValue([{
+        street: null,
+        name: 'Place Kléber',
+        city: 'Strasbourg'
+      }]);
+
+      const result = await Helper.getShortAddressFromCoords(48.5, 7.7);
+
+      expect(result).toBe('Place Kléber, Strasbourg');
+    });
+
+    test('should return null on reverse geocode failure', async () => {
+      (Location.reverseGeocodeAsync as jest.Mock).mockRejectedValue(new Error('Geo Error'));
+
+      const result = await Helper.getShortAddressFromCoords(48.5, 7.7);
+
+      expect(result).toBeNull();
+    });
+  });
 });
