@@ -1,5 +1,7 @@
-> Le rapport de Jörmungand est disponible en version dynamique et formaté [ICI](https://t5-crs-fschmuck-85793e115bf3d3c778920202f37cd25a00ae834152481cb.pages.unistra.fr/).
+> Le rapport de Jörmungand Partie 1 est disponible en version dynamique et formaté [ICI](https://t5-crs-fschmuck-85793e115bf3d3c778920202f37cd25a00ae834152481cb.pages.unistra.fr/).
 > Ou [ICI](report-www/src/index.md) pour la version Markdown 
+
+> Le rapport de Jörmungand Partie 2 est disponible en version dynamique et formaté [ICI](report/).
 
 # Dédale
 
