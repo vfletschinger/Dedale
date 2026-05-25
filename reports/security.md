@@ -405,7 +405,4 @@ Sur un appareil Android rooté ou via une sauvegarde ADB non chiffrée, l'intég
 **Classification OWASP :** A06:2021 – Vulnerable and Outdated Components
 
 **Description :**  
-Le fichier `package.json` de l'application mobile déclare `express: "^5.1.0"` et `mime: "^4.1.0"` comme dépendances directes, bien qu'aucun usage ne soit détecté dans le code source. Ces dépendances augmentent inutilement la surface d'attaque et le poids du bundle.
-
-**Recommandation :**  
-Retirer ces dépendances non utilisées. Effectuer régulièrement `npm audit` et `npx expo install --check` pour identifier les dépendances vulnérables ou obsolètes.
+Le fichier `package.json` de l'application mobile déclare `express: "^5.1.0"` et `mime: "^4.1.0"` comme dépendances directes, mais aucun usage dans le code source. Ces dépendances augmentent inutilement la surface d'attaque et le poids du bundle.
