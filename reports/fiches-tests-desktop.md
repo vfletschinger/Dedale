@@ -191,8 +191,9 @@
   - XLSX exporté sur le disque de la machine
   - XSLX lisible et incluant les informations du projet
 - Obtenu:
-  - Le XSLC est lisible avec un logiciel standard
-- Résultat: OK
+  - Le XLSX est lisible avec un logiciel standard
+  - Certaines informations ne sont pas présentes: les colonnes de l'obstacles ne sont pas remplis
+- Résultat: KO
 
 
 ### D-015 PDF global
