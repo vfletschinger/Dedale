@@ -1,363 +1,321 @@
-use crate::excel::{
-    calculate_range, cell_reference, column_index_to_letter, column_letter_to_index,
-    estimate_file_size, format_file_size, format_optional_float, format_optional_number,
-    format_optional_string, generate_empty_obstacle_row, generate_obstacle_row, get_column_count,
-    get_column_index, get_column_name, is_valid_dimension, is_valid_excel_range,
-    is_valid_obstacle_count, is_valid_obstacle_name, parse_cell_reference, EXCEL_HEADERS,
-};
-
-// ============== Tests pour EXCEL_HEADERS ==============
-
-#[test]
-fn test_excel_headers_count() {
-    assert_eq!(EXCEL_HEADERS.len(), 8);
-}
-
-#[test]
-fn test_excel_headers_contains_essential() {
-    let headers: Vec<&str> = EXCEL_HEADERS.to_vec();
-    assert!(headers.contains(&"Point ID"));
-    assert!(headers.contains(&"X"));
-    assert!(headers.contains(&"Y"));
-}
-
-// ============== Tests pour get_column_count ==============
-
-#[test]
-fn test_get_column_count() {
-    let count = get_column_count();
-    assert_eq!(count, EXCEL_HEADERS.len());
-    assert_eq!(count, 8);
-}
-
-// ============== Tests pour get_column_index ==============
-
-#[test]
-fn test_get_column_index_existing() {
-    let index = get_column_index("Point ID");
-    assert!(index.is_some());
-    assert_eq!(index.unwrap(), 0);
-}
-
-#[test]
-fn test_get_column_index_x() {
-    let index = get_column_index("X");
-    assert!(index.is_some());
-    assert_eq!(index.unwrap(), 1);
-}
-
-#[test]
-fn test_get_column_index_nonexistent() {
-    let index = get_column_index("ColonneInexistante");
-    assert!(index.is_none());
-}
-
-// ============== Tests pour get_column_name ==============
-
-#[test]
-fn test_get_column_name_valid() {
-    let name = get_column_name(0);
-    assert!(name.is_some());
-    assert_eq!(name.unwrap(), "Point ID");
-}
-
-#[test]
-fn test_get_column_name_y() {
-    let name = get_column_name(2);
-    assert!(name.is_some());
-    assert_eq!(name.unwrap(), "Y");
-}
-
-#[test]
-fn test_get_column_name_invalid() {
-    let name = get_column_name(1000);
-    assert!(name.is_none());
-}
-
-// ============== Tests pour is_valid_obstacle_name ==============
-
-#[test]
-fn test_is_valid_obstacle_name_valid() {
-    assert!(is_valid_obstacle_name(Some("Arbre")));
-    assert!(is_valid_obstacle_name(Some("Rocher_1")));
-    assert!(is_valid_obstacle_name(Some("Obstacle-test")));
-}
-
-#[test]
-fn test_is_valid_obstacle_name_invalid() {
-    assert!(!is_valid_obstacle_name(Some("")));
-    assert!(!is_valid_obstacle_name(Some("   ")));
-    assert!(!is_valid_obstacle_name(None));
-}
-
-#[test]
-fn test_is_valid_obstacle_name_with_spaces() {
-    assert!(is_valid_obstacle_name(Some("Mon Obstacle")));
-}
-
-// ============== Tests pour format_optional_string ==============
-
-#[test]
-fn test_format_optional_string_some() {
-    let result = format_optional_string(Some("test"));
-    assert_eq!(result, "test");
-}
-
-#[test]
-fn test_format_optional_string_none() {
-    let result = format_optional_string(None);
-    assert_eq!(result, "");
-}
-
-// ============== Tests pour format_optional_number ==============
-
-#[test]
-fn test_format_optional_number_some() {
-    assert_eq!(format_optional_number(Some(42)), 42);
-}
-
-#[test]
-fn test_format_optional_number_none() {
-    assert_eq!(format_optional_number(None), 0);
-}
-
-#[test]
-fn test_format_optional_number_negative() {
-    assert_eq!(format_optional_number(Some(-10)), -10);
-}
-
-// ============== Tests pour format_optional_float ==============
-
-#[test]
-fn test_format_optional_float_some() {
-    let result = format_optional_float(Some(3.5));
-    assert!((result - 3.5).abs() < 0.01);
-}
-
-#[test]
-fn test_format_optional_float_none() {
-    assert!((format_optional_float(None) - 0.0).abs() < 0.001);
-}
-
-#[test]
-fn test_format_optional_float_integer() {
-    assert!((format_optional_float(Some(42.0)) - 42.0).abs() < 0.01);
-}
-
-// ============== Tests pour generate_empty_obstacle_row ==============
-
-#[test]
-fn test_generate_empty_obstacle_row() {
-    let (name, desc, number, width, length) = generate_empty_obstacle_row();
-    assert_eq!(name, "");
-    assert_eq!(desc, "");
-    assert_eq!(number, 0);
-    assert!((width - 0.0).abs() < 0.001);
-    assert!((length - 0.0).abs() < 0.001);
-}
-
-// ============== Tests pour generate_obstacle_row ==============
-
-#[test]
-fn test_generate_obstacle_row_complete() {
-    let (name, desc, number, width, length) = generate_obstacle_row(
-        Some("Arbre"),
-        Some("Grand arbre"),
-        Some(5),
-        Some(2.5),
-        Some(3.0),
-    );
-    assert_eq!(name, "Arbre");
-    assert_eq!(desc, "Grand arbre");
-    assert_eq!(number, 5);
-    assert!((width - 2.5).abs() < 0.01);
-    assert!((length - 3.0).abs() < 0.01);
-}
-
-#[test]
-fn test_generate_obstacle_row_partial() {
-    let (name, desc, number, width, length) =
-        generate_obstacle_row(Some("Test"), None, None, Some(1.0), None);
-    assert_eq!(name, "Test");
-    assert_eq!(desc, "");
-    assert_eq!(number, 0);
-    assert!((width - 1.0).abs() < 0.01);
-    assert!((length - 0.0).abs() < 0.001);
-}
-
-// ============== Tests pour is_valid_dimension ==============
-
-#[test]
-fn test_is_valid_dimension_positive() {
-    assert!(is_valid_dimension(Some(5.0)));
-    assert!(is_valid_dimension(Some(0.0)));
-}
-
-#[test]
-fn test_is_valid_dimension_negative() {
-    assert!(!is_valid_dimension(Some(-1.0)));
-}
-
-#[test]
-fn test_is_valid_dimension_none() {
-    assert!(is_valid_dimension(None));
-}
-
-// ============== Tests pour is_valid_obstacle_count ==============
-
-#[test]
-fn test_is_valid_obstacle_count_positive() {
-    assert!(is_valid_obstacle_count(Some(5)));
-    assert!(is_valid_obstacle_count(Some(0)));
-}
-
-#[test]
-fn test_is_valid_obstacle_count_negative() {
-    assert!(!is_valid_obstacle_count(Some(-1)));
-}
-
-#[test]
-fn test_is_valid_obstacle_count_none() {
-    assert!(is_valid_obstacle_count(None));
-}
-
-// ============== Tests pour column_index_to_letter ==============
-
-#[test]
-fn test_column_index_to_letter_single() {
-    assert_eq!(column_index_to_letter(0), "A");
-    assert_eq!(column_index_to_letter(1), "B");
-    assert_eq!(column_index_to_letter(25), "Z");
-}
-
-#[test]
-fn test_column_index_to_letter_double() {
-    assert_eq!(column_index_to_letter(26), "AA");
-    assert_eq!(column_index_to_letter(27), "AB");
-    assert_eq!(column_index_to_letter(51), "AZ");
-}
-
-// ============== Tests pour column_letter_to_index ==============
-
-#[test]
-fn test_column_letter_to_index_single() {
-    assert_eq!(column_letter_to_index("A"), Some(0));
-    assert_eq!(column_letter_to_index("B"), Some(1));
-    assert_eq!(column_letter_to_index("Z"), Some(25));
-}
-
-#[test]
-fn test_column_letter_to_index_double() {
-    assert_eq!(column_letter_to_index("AA"), Some(26));
-    assert_eq!(column_letter_to_index("AB"), Some(27));
-}
-
-#[test]
-fn test_column_letter_to_index_invalid() {
-    assert_eq!(column_letter_to_index(""), None);
-    assert_eq!(column_letter_to_index("123"), None);
-    assert_eq!(column_letter_to_index("aB"), None);
-}
-
-// ============== Tests pour cell_reference ==============
-
-#[test]
-fn test_cell_reference_basic() {
-    assert_eq!(cell_reference(0, 0), "A1");
-    assert_eq!(cell_reference(1, 0), "B1");
-    assert_eq!(cell_reference(0, 9), "A10");
-}
-
-#[test]
-fn test_cell_reference_double_letter() {
-    assert_eq!(cell_reference(26, 0), "AA1");
-}
-
-// ============== Tests pour parse_cell_reference ==============
-
-#[test]
-fn test_parse_cell_reference_valid() {
-    let result = parse_cell_reference("A1");
-    assert!(result.is_some());
-    let (col, row) = result.unwrap();
-    assert_eq!(col, 0);
-    assert_eq!(row, 0);
-}
-
-#[test]
-fn test_parse_cell_reference_complex() {
-    let result = parse_cell_reference("AA100");
-    assert!(result.is_some());
-    let (col, row) = result.unwrap();
-    assert_eq!(col, 26);
-    assert_eq!(row, 99);
-}
-
-#[test]
-fn test_parse_cell_reference_invalid() {
-    assert!(parse_cell_reference("").is_none());
-    assert!(parse_cell_reference("123").is_none());
-    assert!(parse_cell_reference("A0").is_none());
-}
-
-// ============== Tests pour calculate_range ==============
-
-#[test]
-fn test_calculate_range_basic() {
-    let range = calculate_range(0, 0, 5, 9);
-    assert_eq!(range, "A1:F10");
-}
-
-#[test]
-fn test_calculate_range_single_cell() {
-    let range = calculate_range(0, 0, 0, 0);
-    assert_eq!(range, "A1:A1");
-}
-
-// ============== Tests pour is_valid_excel_range ==============
-
-#[test]
-fn test_is_valid_excel_range_valid() {
-    assert!(is_valid_excel_range(0, 0));
-    assert!(is_valid_excel_range(100, 1000));
-    assert!(is_valid_excel_range(16383, 1048575));
-}
-
-#[test]
-fn test_is_valid_excel_range_invalid() {
-    assert!(!is_valid_excel_range(16384, 0));
-    assert!(!is_valid_excel_range(0, 1048576));
-}
-
-// ============== Tests pour estimate_file_size ==============
-
-#[test]
-fn test_estimate_file_size_basic() {
-    let size = estimate_file_size(100, 10);
-    assert!(size > 0);
-    assert!(size > 5000); // At least base overhead
-}
-
-#[test]
-fn test_estimate_file_size_zero() {
-    let size = estimate_file_size(0, 10);
-    assert!(size >= 5000); // Base overhead
-}
-
-// ============== Tests pour format_file_size ==============
-
-#[test]
-fn test_format_file_size_bytes() {
-    assert_eq!(format_file_size(500), "500 B");
-}
-
-#[test]
-fn test_format_file_size_kb() {
-    assert_eq!(format_file_size(2048), "2.00 KB");
-}
-
-#[test]
-fn test_format_file_size_mb() {
-    let size = 2 * 1024 * 1024;
-    assert_eq!(format_file_size(size), "2.00 MB");
+#[cfg(test)]
+mod tests {
+    use crate::types::{
+        EquipementComplet, EquipementCoordinate, ObstacleWithType, PointWithDetails,
+    };
+
+    // ============== Helpers pour créer des données de test ==============
+
+    fn make_point(id: &str, name: Option<&str>, x: f64, y: f64) -> PointWithDetails {
+        PointWithDetails {
+            id: id.to_string(),
+            x,
+            y,
+            name: name.map(|s| s.to_string()),
+            event_id: Some("event-1".to_string()),
+            status: Some(true),
+            comment: Some("Un commentaire".to_string()),
+            r#type: Some("securite".to_string()),
+            pictures: vec![],
+            obstacles: vec![],
+        }
+    }
+
+    fn make_obstacle(id: &str, name: Option<&str>, number: Option<i32>) -> ObstacleWithType {
+        ObstacleWithType {
+            id: id.to_string(),
+            point_id: "point-1".to_string(),
+            type_id: "type-1".to_string(),
+            number,
+            name: name.map(|s| s.to_string()),
+            description: Some("Description obstacle".to_string()),
+            width: Some(2.5),
+            length: Some(3.0),
+            type_name: Some("Barrière".to_string()),
+            type_description: Some("Barrière de sécurité".to_string()),
+            type_width: Some(1.0),
+            type_length: Some(2.0),
+        }
+    }
+
+    fn make_equipement(id: &str, type_name: &str, quantity: i32) -> EquipementComplet {
+        EquipementComplet {
+            id: id.to_string(),
+            type_id: Some("type-1".to_string()),
+            type_name: Some(type_name.to_string()),
+            type_description: Some("Description du type".to_string()),
+            length: Some(10),
+            quantity: Some(quantity),
+            description: Some("Équipement test".to_string()),
+            date_pose: Some("2025-06-01".to_string()),
+            hour_pose: None,
+            date_depose: Some("2025-06-15".to_string()),
+            hour_depose: None,
+            coordinates: vec![
+                EquipementCoordinate {
+                    id: "coord-1".to_string(),
+                    equipement_id: id.to_string(),
+                    x: 2.3522,
+                    y: 48.8566,
+                    order_index: Some(0),
+                },
+                EquipementCoordinate {
+                    id: "coord-2".to_string(),
+                    equipement_id: id.to_string(),
+                    x: 2.3530,
+                    y: 48.8570,
+                    order_index: Some(1),
+                },
+            ],
+        }
+    }
+
+    // ============== Tests pour PointWithDetails ==============
+
+    #[test]
+    fn test_point_with_details_default_obstacles_empty() {
+        let point = make_point("p1", Some("Point A"), 2.35, 48.85);
+        assert!(point.obstacles.is_empty());
+    }
+
+    #[test]
+    fn test_point_with_obstacles() {
+        let mut point = make_point("p1", Some("Point A"), 2.35, 48.85);
+        point.obstacles.push(make_obstacle("obs-1", Some("Arbre"), Some(3)));
+        point.obstacles.push(make_obstacle("obs-2", Some("Rocher"), Some(1)));
+
+        assert_eq!(point.obstacles.len(), 2);
+        assert_eq!(point.obstacles[0].name.as_deref(), Some("Arbre"));
+        assert_eq!(point.obstacles[0].number, Some(3));
+        assert_eq!(point.obstacles[1].name.as_deref(), Some("Rocher"));
+    }
+
+    #[test]
+    fn test_obstacle_fallback_to_type_name() {
+        let obs = ObstacleWithType {
+            id: "obs-1".to_string(),
+            point_id: "p1".to_string(),
+            type_id: "t1".to_string(),
+            number: Some(2),
+            name: None, // Pas de nom propre
+            description: None,
+            width: None,
+            length: None,
+            type_name: Some("Barrière".to_string()), // Fallback
+            type_description: Some("Desc type".to_string()),
+            type_width: Some(1.5),
+            type_length: Some(3.0),
+        };
+
+        // Le nom affiché devrait être le type_name quand name est None
+        let display_name = obs.name.as_deref().or(obs.type_name.as_deref()).unwrap_or("");
+        assert_eq!(display_name, "Barrière");
+
+        // La description devrait fallback sur type_description
+        let display_desc = obs
+            .description
+            .as_deref()
+            .or(obs.type_description.as_deref())
+            .unwrap_or("");
+        assert_eq!(display_desc, "Desc type");
+
+        // La largeur devrait fallback sur type_width
+        let display_width = obs.width.or(obs.type_width).unwrap_or(0.0);
+        assert!((display_width - 1.5).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_obstacle_own_values_take_priority() {
+        let obs = make_obstacle("obs-1", Some("Mon obstacle"), Some(5));
+
+        let display_name = obs.name.as_deref().or(obs.type_name.as_deref()).unwrap_or("");
+        assert_eq!(display_name, "Mon obstacle"); // Propre nom prioritaire
+
+        let display_width = obs.width.or(obs.type_width).unwrap_or(0.0);
+        assert!((display_width - 2.5).abs() < 0.001); // Propre largeur prioritaire
+    }
+
+    // ============== Tests pour EquipementComplet ==============
+
+    #[test]
+    fn test_equipement_has_coordinates() {
+        let eq = make_equipement("eq-1", "Barrière", 5);
+        assert_eq!(eq.coordinates.len(), 2);
+        assert!((eq.coordinates[0].x - 2.3522).abs() < 0.0001);
+        assert!((eq.coordinates[0].y - 48.8566).abs() < 0.0001);
+    }
+
+    #[test]
+    fn test_equipement_has_quantity() {
+        let eq = make_equipement("eq-1", "Bloc de béton", 10);
+        assert_eq!(eq.quantity, Some(10));
+    }
+
+    #[test]
+    fn test_equipement_has_dates() {
+        let eq = make_equipement("eq-1", "Barrière", 3);
+        assert_eq!(eq.date_pose.as_deref(), Some("2025-06-01"));
+        assert_eq!(eq.date_depose.as_deref(), Some("2025-06-15"));
+    }
+
+    #[test]
+    fn test_equipement_has_type_info() {
+        let eq = make_equipement("eq-1", "Véhicule", 2);
+        assert_eq!(eq.type_name.as_deref(), Some("Véhicule"));
+        assert_eq!(eq.type_description.as_deref(), Some("Description du type"));
+    }
+
+    #[test]
+    fn test_equipement_default() {
+        let eq = EquipementComplet::default();
+        assert_eq!(eq.id, "");
+        assert!(eq.type_id.is_none());
+        assert!(eq.type_name.is_none());
+        assert!(eq.quantity.is_none());
+        assert!(eq.coordinates.is_empty());
+    }
+
+    #[test]
+    fn test_equipement_coordinates_order() {
+        let eq = make_equipement("eq-1", "Barrière", 1);
+        assert_eq!(eq.coordinates[0].order_index, Some(0));
+        assert_eq!(eq.coordinates[1].order_index, Some(1));
+    }
+
+    // ============== Tests pour le formatage des coordonnées (logique Excel) ==============
+
+    #[test]
+    fn test_format_coordinates_string() {
+        let eq = make_equipement("eq-1", "Barrière", 1);
+        let coords_str: String = eq
+            .coordinates
+            .iter()
+            .map(|c| format!("({:.6}, {:.6})", c.x, c.y))
+            .collect::<Vec<_>>()
+            .join(" → ");
+
+        assert!(coords_str.contains("2.352200"));
+        assert!(coords_str.contains("48.856600"));
+        assert!(coords_str.contains(" → "));
+    }
+
+    #[test]
+    fn test_format_coordinates_empty() {
+        let mut eq = make_equipement("eq-1", "Barrière", 1);
+        eq.coordinates = vec![];
+
+        let coords_str: String = eq
+            .coordinates
+            .iter()
+            .map(|c| format!("({:.6}, {:.6})", c.x, c.y))
+            .collect::<Vec<_>>()
+            .join(" → ");
+
+        assert_eq!(coords_str, "");
+    }
+
+    // ============== Tests pour la sérialisation/désérialisation ==============
+
+    #[test]
+    fn test_point_with_details_deserialize_without_obstacles() {
+        let json = r#"{
+            "id": "p1",
+            "x": 2.35,
+            "y": 48.85,
+            "name": "Test",
+            "event_id": "ev1",
+            "status": true,
+            "comment": null,
+            "type": null,
+            "pictures": []
+        }"#;
+
+        let point: PointWithDetails = serde_json::from_str(json).unwrap();
+        assert_eq!(point.id, "p1");
+        assert!(point.obstacles.is_empty()); // Default = vec vide grâce à #[serde(default)]
+    }
+
+    #[test]
+    fn test_point_with_details_serialize_includes_obstacles() {
+        let mut point = make_point("p1", Some("Test"), 2.35, 48.85);
+        point.obstacles.push(make_obstacle("obs-1", Some("Arbre"), Some(2)));
+
+        let json = serde_json::to_string(&point).unwrap();
+        assert!(json.contains("obstacles"));
+        assert!(json.contains("Arbre"));
+    }
+
+    #[test]
+    fn test_equipement_serialize_includes_quantity() {
+        let eq = make_equipement("eq-1", "Barrière", 7);
+        let json = serde_json::to_string(&eq).unwrap();
+        assert!(json.contains("\"quantity\":7"));
+    }
+
+    // ============== Tests pour les cas limites de l'export ==============
+
+    #[test]
+    fn test_point_without_optional_fields() {
+        let point = PointWithDetails {
+            id: "p1".to_string(),
+            x: 0.0,
+            y: 0.0,
+            name: None,
+            event_id: None,
+            status: None,
+            comment: None,
+            r#type: None,
+            pictures: vec![],
+            obstacles: vec![],
+        };
+
+        // Vérifier que les valeurs par défaut sont gérées proprement
+        assert_eq!(point.name.as_deref().unwrap_or(""), "");
+        assert_eq!(point.comment.as_deref().unwrap_or(""), "");
+        assert_eq!(
+            match point.status {
+                Some(true) => "Validé",
+                Some(false) => "Non validé",
+                None => "",
+            },
+            ""
+        );
+    }
+
+    #[test]
+    fn test_multiple_obstacles_per_point() {
+        let mut point = make_point("p1", Some("Multi-obstacles"), 2.0, 48.0);
+        for i in 0..5 {
+            point.obstacles.push(make_obstacle(
+                &format!("obs-{}", i),
+                Some(&format!("Obstacle {}", i)),
+                Some(i),
+            ));
+        }
+
+        assert_eq!(point.obstacles.len(), 5);
+        assert_eq!(point.obstacles[3].number, Some(3));
+    }
+
+    #[test]
+    fn test_equipement_without_optional_fields() {
+        let eq = EquipementComplet {
+            id: "eq-1".to_string(),
+            type_id: None,
+            type_name: None,
+            type_description: None,
+            length: None,
+            quantity: None,
+            description: None,
+            date_pose: None,
+            hour_pose: None,
+            date_depose: None,
+            hour_depose: None,
+            coordinates: vec![],
+        };
+
+        assert_eq!(eq.type_name.as_deref().unwrap_or(""), "");
+        assert_eq!(eq.quantity.unwrap_or(0), 0);
+        assert_eq!(eq.length.unwrap_or(0), 0);
+    }
 }

@@ -6,7 +6,7 @@ use sqlx::Row;
 use tauri::AppHandle;
 
 #[tauri::command]
-pub async fn export_points_excel(app: AppHandle, event_id: Option<String>) -> Result<(), String> {
+pub async fn export_points_excel(app: AppHandle, event_id: Option<String>) -> Result<String, String> {
     let points: Vec<PointWithDetails> = db::retrieve_data_by_event(&app, &event_id).await?;
     println!("📊 Export Excel : {} points récupérés", points.len());
 
@@ -217,11 +217,11 @@ pub async fn export_points_excel(app: AppHandle, event_id: Option<String>) -> Re
 
     if let Some(file_path) = utils::show_save_dialog(&file_name, &dir_path, "xlsx".to_string()) {
         println!("💾 Saving workbook... {}", file_path.display());
-        workbook.save(file_path).map_err(|e| e.to_string())?;
+        workbook.save(&file_path).map_err(|e| e.to_string())?;
         println!("✅ Excel saved successfully!");
+        Ok(file_path.display().to_string())
     } else {
         println!("Save cancelled by user");
+        Err("Export annulé par l'utilisateur".to_string())
     }
-
-    Ok(())
 }
