@@ -139,6 +139,24 @@ pub struct PointWithDetails {
     pub r#type: Option<String>,
     #[serde(default)]
     pub pictures: Vec<Picture>,
+    #[serde(default)]
+    pub obstacles: Vec<ObstacleWithType>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ObstacleWithType {
+    pub id: String,
+    pub point_id: String,
+    pub type_id: String,
+    pub number: Option<i32>,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub width: Option<f64>,
+    pub length: Option<f64>,
+    pub type_name: Option<String>,
+    pub type_description: Option<String>,
+    pub type_width: Option<f64>,
+    pub type_length: Option<f64>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -223,6 +241,7 @@ pub struct EquipementComplet {
     pub type_name: Option<String>,
     pub type_description: Option<String>,
     pub length: Option<i32>,
+    pub quantity: Option<i32>,
     pub description: Option<String>,
     pub date_pose: Option<String>,
     pub hour_pose: Option<String>,

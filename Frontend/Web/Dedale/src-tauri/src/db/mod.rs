@@ -262,6 +262,38 @@ pub async fn get_db_pool(app: &AppHandle) -> Result<SqlitePool, String> {
     .await
     .map_err(|e| format!("Error creating action: {}", e))?;
 
+    // --- OBSTACLES ---
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS obstacle_type (
+            id CHAR(36) PRIMARY KEY,
+            name TEXT,
+            description TEXT,
+            width REAL,
+            length REAL
+        )",
+    )
+    .execute(&pool)
+    .await
+    .map_err(|e| format!("Error creating obstacle_type: {}", e))?;
+
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS obstacle (
+            id CHAR(36) PRIMARY KEY,
+            point_id CHAR(36) NOT NULL,
+            type_id CHAR(36) NOT NULL,
+            number INTEGER,
+            name TEXT,
+            description TEXT,
+            width REAL,
+            length REAL,
+            FOREIGN KEY (point_id) REFERENCES point (id) ON DELETE CASCADE,
+            FOREIGN KEY (type_id) REFERENCES obstacle_type (id)
+        )",
+    )
+    .execute(&pool)
+    .await
+    .map_err(|e| format!("Error creating obstacle: {}", e))?;
+
     // --- MIGRATIONS: Ajouter les colonnes description si elles n'existent pas ---
     // Pour les bases de données existantes créées avant l'ajout de ces colonnes
     let _ = sqlx::query("ALTER TABLE zone ADD COLUMN description TEXT")

@@ -394,6 +394,7 @@ pub async fn create_team_mission_pdf(
                 comment: None,
                 r#type: None, // Utilisation de r#type pour échapper le mot clé
                 pictures: vec![],
+                obstacles: vec![],
             });
         }
     }
