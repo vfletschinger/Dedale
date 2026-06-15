@@ -1,5 +1,6 @@
 import React from 'react';
-import { render, waitFor } from '@testing-library/react-native';
+import { render, waitFor, fireEvent } from '@testing-library/react-native';
+import { Linking } from 'react-native';
 import TeamGuidanceScreen from '../../screens/TeamGuidance';
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -61,18 +62,8 @@ jest.mock('../../../assets/migrations', () => ({
   }),
 }));
 
-global.fetch = jest.fn(() =>
-  Promise.resolve({
-    json: () => Promise.resolve({
-      code: 'Ok',
-      routes: [{
-        geometry: { coordinates: [[7.7, 48.5], [7.8, 48.6]] },
-        distance: 1500,
-        duration: 900
-      }]
-    }),
-  })
-) as jest.Mock;
+const mockFetch = jest.fn();
+global.fetch = mockFetch as jest.Mock;
 
 
 describe('Screen: TeamGuidance', () => {
@@ -103,6 +94,17 @@ describe('Screen: TeamGuidance', () => {
         scheduled_time: '2025-01-01T11:00:00.000Z'
       }
     ]);
+
+    mockFetch.mockResolvedValue({
+      json: () => Promise.resolve({
+        code: 'Ok',
+        routes: [{
+          geometry: { coordinates: [[7.7, 48.5], [7.8, 48.6]] },
+          distance: 1500,
+          duration: 900
+        }]
+      })
+    });
   });
 
   test('should render loading state initially then display map and actions', async () => {
@@ -148,6 +150,22 @@ describe('Screen: TeamGuidance', () => {
     });
   });
 
+  test('should open Google Maps with an https link', async () => {
+    const openUrlSpy = jest.spyOn(Linking, 'openURL').mockResolvedValue(true as any);
+
+    const { getByText } = render(<TeamGuidanceScreen />);
+
+    await waitFor(() => {
+      expect(getByText('Ouvrir dans Google Maps')).toBeTruthy();
+    });
+
+    fireEvent.press(getByText('Ouvrir dans Google Maps'));
+
+    expect(openUrlSpy).toHaveBeenCalledWith(
+      expect.stringContaining('https://www.google.com/maps/dir/?api=1&destination=48.58,7.75')
+    );
+  });
+
   test('should fallback to direct coordinates if point coordinates missing', async () => {
      // Arrange
      mockGetAllSync.mockReturnValue([{
@@ -173,6 +191,16 @@ describe('Screen: TeamGuidance', () => {
      await waitFor(() => {
         expect(getByText('Inspection')).toBeTruthy();
      });
+  });
+
+  test('should keep a route polyline when OSRM request fails', async () => {
+    mockFetch.mockRejectedValue(new Error('Network error'));
+
+    const { getByTestId } = render(<TeamGuidanceScreen />);
+
+    await waitFor(() => {
+      expect(getByTestId('map-polyline')).toBeTruthy();
+    });
   });
 
   test('should detect proximity and allow validation via Alert', async () => {

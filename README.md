@@ -1,3 +1,8 @@
+> Le rapport de Jörmungand Partie 1 est disponible en version dynamique et formaté [ICI](https://t5-crs-fschmuck-85793e115bf3d3c778920202f37cd25a00ae834152481cb.pages.unistra.fr/).
+> Ou [ICI](report-www/src/index.md) pour la version Markdown 
+
+> Les rapports de Jörmungand Partie 2 sont disponible [ICI](reports/).
+
 # Dédale
 
 [![Rust](https://img.shields.io/badge/Backend-Rust-orange?logo=rust)](https://www.rust-lang.org/)

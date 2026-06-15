@@ -51,6 +51,35 @@ pub async fn fetch_points(
                 })
                 .collect();
 
+        // Récupérer les obstacles pour ce point (avec les infos du type)
+        let obstacles = sqlx::query(
+            r#"SELECT o.id, o.point_id, o.type_id, o.number, o.name, o.description, o.width, o.length,
+                      ot.name AS type_name, ot.description AS type_description, ot.width AS type_width, ot.length AS type_length
+               FROM obstacle o
+               LEFT JOIN obstacle_type ot ON o.type_id = ot.id
+               WHERE o.point_id = ?"#,
+        )
+        .bind(&point_id)
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| e.to_string())?
+        .into_iter()
+        .map(|obs_row| ObstacleWithType {
+            id: obs_row.get("id"),
+            point_id: obs_row.get("point_id"),
+            type_id: obs_row.get("type_id"),
+            number: obs_row.get("number"),
+            name: obs_row.get("name"),
+            description: obs_row.get("description"),
+            width: obs_row.get("width"),
+            length: obs_row.get("length"),
+            type_name: obs_row.get("type_name"),
+            type_description: obs_row.get("type_description"),
+            type_width: obs_row.get("type_width"),
+            type_length: obs_row.get("type_length"),
+        })
+        .collect();
+
         points_with_details.push(PointWithDetails {
             id: point_id,
             x: row.get("x"),
@@ -61,6 +90,7 @@ pub async fn fetch_points(
             comment: row.get("comment"),
             r#type: row.get("type"),
             pictures,
+            obstacles,
         });
     }
 
@@ -163,6 +193,7 @@ pub async fn fetch_equipement_details(
                 type_name: row.get("type_name"),
                 type_description: row.get("type_description"),
                 length: row.get("length"),
+                quantity: None,
                 description: row.get("description"),
                 // Attention aux types de dates:
                 // Si stocké en TEXT (ISO 8601), .get::<String, _> fonctionne.
@@ -307,6 +338,35 @@ pub async fn retrieve_data_by_event(
                 })
                 .collect();
 
+        // Récupérer les obstacles pour ce point (avec les infos du type)
+        let obstacles = sqlx::query(
+            r#"SELECT o.id, o.point_id, o.type_id, o.number, o.name, o.description, o.width, o.length,
+                      ot.name AS type_name, ot.description AS type_description, ot.width AS type_width, ot.length AS type_length
+               FROM obstacle o
+               LEFT JOIN obstacle_type ot ON o.type_id = ot.id
+               WHERE o.point_id = ?"#,
+        )
+        .bind(&id)
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| e.to_string())?
+        .into_iter()
+        .map(|obs_row| ObstacleWithType {
+            id: obs_row.get("id"),
+            point_id: obs_row.get("point_id"),
+            type_id: obs_row.get("type_id"),
+            number: obs_row.get("number"),
+            name: obs_row.get("name"),
+            description: obs_row.get("description"),
+            width: obs_row.get("width"),
+            length: obs_row.get("length"),
+            type_name: obs_row.get("type_name"),
+            type_description: obs_row.get("type_description"),
+            type_width: obs_row.get("type_width"),
+            type_length: obs_row.get("type_length"),
+        })
+        .collect();
+
         points.push(PointWithDetails {
             id,
             x: row.get("x"),
@@ -317,6 +377,7 @@ pub async fn retrieve_data_by_event(
             event_id: row.get("event_id"),
             r#type: row.get("type"),
             pictures,
+            obstacles,
         });
     }
 

@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import * as path from "@tauri-apps/api/path";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faWifi,
@@ -155,27 +154,21 @@ function Data({ selectedEventId: activeEventId }: DataProps) {
   const generate_excel = useCallback(async () => {
     try {
       setIsExcelLoading(true);
-      const appDataPath = await path.appDataDir();
-      if (!appDataPath) throw new Error("Impossible de récupérer AppData");
-
-      const db_url = await path.join(appDataPath, "mydatabase.db");
-      const filename = activeEventId
-        ? `points_event_${activeEventId}.xlsx`
-        : "points_all.xlsx";
-
-      const excel_path_str = await path.join(appDataPath, filename);
       const eventIdParam = activeEventId ? activeEventId : null;
 
-      await invoke("export_points_excel", {
-        dbUrl: db_url,
-        excelPathStr: excel_path_str,
+      const savedPath = await invoke<string>("export_points_excel", {
         eventId: eventIdParam,
       });
 
-      toast.success(`Export Excel réussi : ${filename}`);
+      toast.success(`Export Excel réussi : ${savedPath}`);
     } catch (error) {
-      console.error("Erreur export Excel:", error);
-      toast.error(`Erreur Export: ${String(error)}`);
+      const errMsg = String(error);
+      if (errMsg.includes("annulé")) {
+        // L'utilisateur a simplement annulé la boîte de dialogue
+      } else {
+        console.error("Erreur export Excel:", error);
+        toast.error(`Erreur Export: ${errMsg}`);
+      }
     } finally {
       setIsExcelLoading(false);
     }

@@ -1,7 +1,9 @@
 image: alpine:latest
 stages:
+  - report
   - info
   - trigger
+  - deploy
 
 trigger_mobile:
   stage: trigger
@@ -21,3 +23,18 @@ trigger_web:
       - changes:
         - Frontend/Web/**/*
       - when: manual
+
+pages:
+  stage: report
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes:
+        - report-www/*
+        - report-www/**/*
+  script:
+    - rm -rf $CI_PROJECT_DIR/public
+    - mkdir -p $CI_PROJECT_DIR/public
+    - cp -r $CI_PROJECT_DIR/report-www/. $CI_PROJECT_DIR/public/
+  artifacts:
+    paths:
+      - public
