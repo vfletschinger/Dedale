@@ -1,0 +1,24 @@
+# Tester le site sur un serveur local : mkdocs serve
+# Build du site : mkdocs build
+
+site_name: Rapport T6
+
+site_dir: public
+
+extra_css:
+  - css/custom.css
+
+nav:
+  - Rendu 1:
+      - Rapport: index.md
+      - FAQ: FAQ.md
+  - Rendu 2:
+      - Rapport: Rapport2.md
+      - Liste des fonctionnalités: features_list.md
+  - E2N:
+      - Exécution du plan Desktop: E2E/execution_desktop_plan.md
+      - Exécution du plan Mobile: E2E/execution_mobile_plan.md
+  - Rapports de bugs:
+      - Bug Desktop 001: bug_reports/BUG-desktop-001.md
+      - Bug Desktop 002: bug_reports/BUG-desktop-002.md
+      - Bug Desktop 003: bug_reports/BUG-desktop-003.md
