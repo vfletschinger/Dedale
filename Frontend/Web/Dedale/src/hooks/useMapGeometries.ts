@@ -606,8 +606,9 @@ export function useMapGeometries(
   const cancelDrawing = () => {
     if (!drawRef.current) return;
     setDrawingMode("none");
-    drawRef.current.changeMode("simple_select");
+
     drawRef.current.deleteAll();
+    drawRef.current.changeMode("simple_select");
   };
 
   const startDrawEquipment = () => {
