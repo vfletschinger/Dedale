@@ -4,51 +4,51 @@
 [![React](https://img.shields.io/badge/Frontend-React-blue?logo=react)](https://react.dev/)
 [![React Native](https://img.shields.io/badge/Mobile-React_Native-61DAFB?logo=react)](https://reactnative.dev/)
 
-## Présentation du projet
+## Project overview
 
-**Dédale** est une application développée pour le compte de **l’Eurométropole de Strasbourg**, destinée à la **gestion et à l’organisation de manifestations sportives et d’événements publics** (courses, événements urbains, etc.).
+**Dédale** is an application developed for the **Eurométropole de Strasbourg**, intended for the **management and organization of sporting events and public events** (races, urban events, etc.).
 
-L’application permet de planifier les événements, d’organiser les équipements à installer, de gérer les zones de vigilance et de coordonner le personnel ainsi que les équipes impliquées dans la pose et la dépose du matériel.
+The application makes it possible to plan events, organize the equipment to be installed, manage watch zones and coordinate the staff and teams involved in setting up and removing the equipment.
 
-Le projet se compose d’une **application desktop** destinée à la planification et à la supervision ainsi que d’une **application mobile** destinée au terrain et aux agents.
+The project consists of a **desktop application** intended for planning and supervision, as well as a **mobile application** intended for the field and agents.
 
-## Objectifs
+## Goals
 
-- Centraliser la gestion des événements publics  
-- Organiser les équipements, zones et parcours  
-- Gérer le personnel, les équipes et leurs plannings  
-- Faciliter la coordination entre terrain et supervision  
-- Offrir une visualisation cartographique et temporelle des événements  
+- Centralize the management of public events  
+- Organize equipment, zones and routes  
+- Manage staff, teams and their schedules  
+- Facilitate coordination between the field and supervision  
+- Provide a cartographic and temporal visualization of events  
 
-## Technologies utilisées
+## Technologies used
 
-### Application Desktop
+### Desktop application
 
 - Tauri (Rust) 
 - React (TypeScript)
 
-### Application Mobile  
+### Mobile application  
 
 - Expo Go (React Native)
 
-### Base de données
+### Database
 
 - SQLite (.db)
 
-## Structure du dépôt
+## Repository structure
 
 ```
 Frontend/
 ├── Web/
-│   └── Dedale/        # Application desktop (Tauri + React)
+│   └── Dedale/        # Desktop application (Tauri + React)
 ├── Mobile/
-│   └── Dedale/        # Application mobile (React Native)
-└── start-dedale.sh          # Script de lancement global
+│   └── Dedale/        # Mobile application (React Native)
+└── start-dedale.sh          # Global launch script
 ```
 
-## Installation et lancement
+## Installation and launch
 
-### Prérequis
+### Prerequisites
 
 - Node.js
 
@@ -56,37 +56,37 @@ Frontend/
 
 - SQLite
 
-- Expo Go (mobile ou émulateur)
+- Expo Go (mobile or emulator)
 
-### Lancement global du projet
+### Global launch of the project
 
-Un script shell permet de lancer l’ensemble des dépendances nécessaires au projet (application desktop et application mobile).
+A shell script makes it possible to launch all the dependencies required by the project (desktop application and mobile application).
 
 
-### Application Desktop
+### Desktop application
 
-Le code de l’application desktop se trouve dans : Frontend/Web/Dedale
+The desktop application code is located in: Frontend/Web/Dedale
 
-L’application desktop est développée avec Tauri, combinant un backend Rust et une interface React. Elle est utilisée pour la planification, la supervision et la gestion globale des événements.
+The desktop application is developed with Tauri, combining a Rust backend and a React interface. It is used for planning, supervision and the overall management of events.
 
-### Application Mobile
+### Mobile application
 
-Le code de l’application mobile se trouve dans : Frontend/Mobile/Dedale
+The mobile application code is located in: Frontend/Mobile/Dedale
 
-### Fonctionnalités principales
+### Main features
 
-- Gestion des événements
+- Event management
 
-- Gestion du personnel
+- Staff management
 
-- Gestion des équipes
+- Team management
 
-- Gestion des plannings
+- Schedule management
 
-- Carte interactive avec gestion d'équipements, de zones de vigilance, de parcours et points d’intérêt et visualisation d'une timeline en direct
+- Interactive map with management of equipment, watch zones, routes and points of interest, and live timeline visualization
 
-- Transfert de données par QR Code entre l’application mobile et l’application desktop
+- Data transfer via QR Code between the mobile application and the desktop application
 
-### Équipe
+### Team
 
-Projet réalisé dans le cadre d’un travail de groupe (équipe dedale/CRS/Krisprolls/ex-CRS/extreme-inateur) pour un client institutionnel : Eurométropole de Strasbourg
+Project carried out as part of a group work (team dedale/CRS/Krisprolls/ex-CRS/extreme-inateur) for an institutional client: Eurométropole de Strasbourg
